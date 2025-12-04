@@ -58,9 +58,13 @@ Build and run with Docker:
 
 ```bash
 # Build the image
+make docker-build
+# or directly with docker
 docker build -t airflow-mcp .
 
 # Run with stdio transport (default)
+make docker-run
+# or directly with docker
 docker run -e AIRFLOW_API_URL=http://host.docker.internal:8080 \
            -e AIRFLOW_AUTH_TOKEN=your_token \
            airflow-mcp
