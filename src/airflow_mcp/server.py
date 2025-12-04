@@ -5,6 +5,11 @@ from typing import Any
 import requests
 from fastmcp import FastMCP
 
+# Default configuration values
+DEFAULT_AIRFLOW_URL = "http://localhost:8080"
+DEFAULT_LIMIT = 100
+DEFAULT_OFFSET = 0
+
 # Create MCP server
 mcp = FastMCP("Airflow MCP Server")
 
@@ -14,7 +19,7 @@ class AirflowConfig:
     """Global configuration for Airflow API access."""
 
     def __init__(self):
-        self.url: str = "http://localhost:8080"
+        self.url: str = DEFAULT_AIRFLOW_URL
         self.auth_token: str | None = None
 
 
@@ -40,7 +45,7 @@ def configure(
 # Helper functions for API calls and response formatting
 def _call_airflow_api(
     endpoint: str,
-    airflow_url: str = "http://localhost:8080",
+    airflow_url: str = DEFAULT_AIRFLOW_URL,
     params: dict[str, Any] | None = None,
     auth_token: str | None = None,
 ) -> dict[str, Any]:
@@ -103,7 +108,7 @@ def _wrap_list_response(items: list[dict[str, Any]], key_name: str, data: dict[s
 
 def _get_dag_details_impl(
     dag_id: str,
-    airflow_url: str = "http://localhost:8080",
+    airflow_url: str = DEFAULT_AIRFLOW_URL,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for getting details about a specific DAG.
@@ -131,9 +136,9 @@ def _get_dag_details_impl(
 
 
 def _list_dags_impl(
-    airflow_url: str = "http://localhost:8080",
-    limit: int = 100,
-    offset: int = 0,
+    airflow_url: str = DEFAULT_AIRFLOW_URL,
+    limit: int = DEFAULT_LIMIT,
+    offset: int = DEFAULT_OFFSET,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for listing DAGs from Airflow.
@@ -238,7 +243,7 @@ def list_dags() -> str:
 
 def _get_dag_source_impl(
     dag_id: str,
-    airflow_url: str = "http://localhost:8080",
+    airflow_url: str = DEFAULT_AIRFLOW_URL,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for getting DAG source code from Airflow.
@@ -294,7 +299,7 @@ def get_dag_source(dag_id: str) -> str:
 
 
 def _get_dag_stats_impl(
-    airflow_url: str = "http://localhost:8080",
+    airflow_url: str = DEFAULT_AIRFLOW_URL,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for getting DAG statistics from Airflow.
@@ -348,9 +353,9 @@ def get_dag_stats() -> str:
 
 
 def _list_dag_warnings_impl(
-    airflow_url: str = "http://localhost:8080",
-    limit: int = 100,
-    offset: int = 0,
+    airflow_url: str = DEFAULT_AIRFLOW_URL,
+    limit: int = DEFAULT_LIMIT,
+    offset: int = DEFAULT_OFFSET,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for listing DAG warnings from Airflow.
@@ -409,7 +414,7 @@ def list_dag_warnings() -> str:
 def _get_task_impl(
     dag_id: str,
     task_id: str,
-    airflow_url: str = "http://localhost:8080",
+    airflow_url: str = DEFAULT_AIRFLOW_URL,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for getting task details from Airflow.
@@ -440,7 +445,7 @@ def _get_task_impl(
 
 def _list_tasks_impl(
     dag_id: str,
-    airflow_url: str = "http://localhost:8080",
+    airflow_url: str = DEFAULT_AIRFLOW_URL,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for listing tasks in a DAG from Airflow.
@@ -473,7 +478,7 @@ def _get_task_instance_impl(
     dag_id: str,
     dag_run_id: str,
     task_id: str,
-    airflow_url: str = "http://localhost:8080",
+    airflow_url: str = DEFAULT_AIRFLOW_URL,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for getting task instance details from Airflow.
@@ -623,9 +628,9 @@ def get_task_instance(dag_id: str, dag_run_id: str, task_id: str) -> str:
 
 
 def _list_dag_runs_impl(
-    airflow_url: str = "http://localhost:8080",
-    limit: int = 100,
-    offset: int = 0,
+    airflow_url: str = DEFAULT_AIRFLOW_URL,
+    limit: int = DEFAULT_LIMIT,
+    offset: int = DEFAULT_OFFSET,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for listing DAG runs from Airflow.
@@ -689,9 +694,9 @@ def list_dag_runs() -> str:
 
 
 def _list_assets_impl(
-    airflow_url: str = "http://localhost:8080",
-    limit: int = 100,
-    offset: int = 0,
+    airflow_url: str = DEFAULT_AIRFLOW_URL,
+    limit: int = DEFAULT_LIMIT,
+    offset: int = DEFAULT_OFFSET,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for listing assets from Airflow.
@@ -754,9 +759,9 @@ def list_assets() -> str:
 
 
 def _list_connections_impl(
-    airflow_url: str = "http://localhost:8080",
-    limit: int = 100,
-    offset: int = 0,
+    airflow_url: str = DEFAULT_AIRFLOW_URL,
+    limit: int = DEFAULT_LIMIT,
+    offset: int = DEFAULT_OFFSET,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for listing connections from Airflow.
@@ -855,7 +860,7 @@ def list_connections() -> str:
 
 def _get_variable_impl(
     variable_key: str,
-    airflow_url: str = "http://localhost:8080",
+    airflow_url: str = DEFAULT_AIRFLOW_URL,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for getting a specific variable from Airflow.
@@ -883,9 +888,9 @@ def _get_variable_impl(
 
 
 def _list_variables_impl(
-    airflow_url: str = "http://localhost:8080",
-    limit: int = 100,
-    offset: int = 0,
+    airflow_url: str = DEFAULT_AIRFLOW_URL,
+    limit: int = DEFAULT_LIMIT,
+    offset: int = DEFAULT_OFFSET,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for listing variables from Airflow.
@@ -917,7 +922,7 @@ def _list_variables_impl(
 
 
 def _get_version_impl(
-    airflow_url: str = "http://localhost:8080",
+    airflow_url: str = DEFAULT_AIRFLOW_URL,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for getting Airflow version information.
@@ -944,7 +949,7 @@ def _get_version_impl(
 
 
 def _get_config_impl(
-    airflow_url: str = "http://localhost:8080",
+    airflow_url: str = DEFAULT_AIRFLOW_URL,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for getting Airflow configuration.
@@ -977,7 +982,7 @@ def _get_config_impl(
 
 def _get_pool_impl(
     pool_name: str,
-    airflow_url: str = "http://localhost:8080",
+    airflow_url: str = DEFAULT_AIRFLOW_URL,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for getting details about a specific pool.
@@ -1005,9 +1010,9 @@ def _get_pool_impl(
 
 
 def _list_pools_impl(
-    airflow_url: str = "http://localhost:8080",
-    limit: int = 100,
-    offset: int = 0,
+    airflow_url: str = DEFAULT_AIRFLOW_URL,
+    limit: int = DEFAULT_LIMIT,
+    offset: int = DEFAULT_OFFSET,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for listing pools from Airflow.
@@ -1039,9 +1044,9 @@ def _list_pools_impl(
 
 
 def _list_plugins_impl(
-    airflow_url: str = "http://localhost:8080",
-    limit: int = 100,
-    offset: int = 0,
+    airflow_url: str = DEFAULT_AIRFLOW_URL,
+    limit: int = DEFAULT_LIMIT,
+    offset: int = DEFAULT_OFFSET,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for listing installed plugins from Airflow.
@@ -1073,7 +1078,7 @@ def _list_plugins_impl(
 
 
 def _list_providers_impl(
-    airflow_url: str = "http://localhost:8080",
+    airflow_url: str = DEFAULT_AIRFLOW_URL,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for listing installed providers from Airflow.
