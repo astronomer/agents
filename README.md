@@ -213,7 +213,7 @@ The MCP server provides the following tools:
 
 ## Development
 
-Quick start:
+### Quick Start
 
 ```bash
 # Setup development environment
@@ -228,6 +228,21 @@ make check
 # Run pre-commit hooks
 make pre-commit
 ```
+
+### Local Testing with Astro CLI
+
+The easiest way to test the MCP server locally is with [Astro CLI](https://www.astronomer.io/docs/astro/cli/overview):
+
+```bash
+# Start a local Airflow instance locally with an astro project (optional but recommended)
+astro dev start
+
+# In another terminal, run the MCP server
+# It will automatically connect to http://localhost:8080
+make run
+```
+
+The default configuration (`http://localhost:8080`) matches Astro CLI's default Airflow webserver URL, so `make run` works out of the box with no additional configuration needed.
 
 ## Configuration
 
