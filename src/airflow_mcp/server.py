@@ -16,8 +16,6 @@ class AirflowConfig:
     def __init__(self):
         self.url: str = "http://localhost:8080"
         self.auth_token: str | None = None
-        self.auth_username: str | None = None
-        self.auth_password: str | None = None
 
 
 _config = AirflowConfig()
@@ -26,25 +24,17 @@ _config = AirflowConfig()
 def configure(
     url: str | None = None,
     auth_token: str | None = None,
-    auth_username: str | None = None,
-    auth_password: str | None = None,
 ) -> None:
     """Configure global Airflow connection settings.
 
     Args:
         url: Base URL of Airflow webserver
         auth_token: Bearer token for authentication
-        auth_username: Username for Basic authentication
-        auth_password: Password for Basic authentication
     """
     if url:
         _config.url = url
     if auth_token:
         _config.auth_token = auth_token
-    if auth_username:
-        _config.auth_username = auth_username
-    if auth_password:
-        _config.auth_password = auth_password
 
 
 # Helper functions for API calls and response formatting
@@ -52,8 +42,6 @@ def _call_airflow_api(
     endpoint: str,
     airflow_url: str = "http://localhost:8080",
     params: dict[str, Any] | None = None,
-    auth_username: str | None = None,
-    auth_password: str | None = None,
     auth_token: str | None = None,
 ) -> dict[str, Any]:
     """Call Airflow REST API with error handling and optional authentication.
@@ -62,8 +50,6 @@ def _call_airflow_api(
         endpoint: API endpoint path (e.g., 'dags', 'dagRuns')
         airflow_url: Base URL of the Airflow webserver
         params: Optional query parameters
-        auth_username: Optional username for Basic Authentication
-        auth_password: Optional password for Basic Authentication
         auth_token: Optional Bearer token for token-based authentication
 
     Returns:
@@ -73,9 +59,8 @@ def _call_airflow_api(
         Exception: If the API call fails with error details
 
     Note:
-        - If auth_token is provided, it takes precedence (Bearer token auth)
-        - If auth_username and auth_password are provided, use Basic Auth
-        - If neither is provided, no authentication is used (current default)
+        If auth_token is provided, Bearer token authentication is used.
+        If not provided, no authentication is used.
     """
     try:
         api_url = f"{airflow_url}/api/v2/{endpoint}"
@@ -83,14 +68,7 @@ def _call_airflow_api(
 
         # Handle authentication
         if auth_token:
-            # Bearer token authentication
             headers["Authorization"] = f"Bearer {auth_token}"
-        elif auth_username and auth_password:
-            # Basic authentication
-            import base64
-
-            credentials = base64.b64encode(f"{auth_username}:{auth_password}".encode()).decode()
-            headers["Authorization"] = f"Basic {credentials}"
 
         response = requests.get(api_url, params=params, headers=headers, timeout=30)
         response.raise_for_status()
@@ -126,8 +104,6 @@ def _wrap_list_response(items: list[dict[str, Any]], key_name: str, data: dict[s
 def _get_dag_details_impl(
     dag_id: str,
     airflow_url: str = "http://localhost:8080",
-    auth_username: str | None = None,
-    auth_password: str | None = None,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for getting details about a specific DAG.
@@ -135,8 +111,6 @@ def _get_dag_details_impl(
     Args:
         dag_id: The ID of the DAG to get details for
         airflow_url: The base URL of the Airflow webserver (default: http://localhost:8080)
-        auth_username: Optional username for Basic Authentication
-        auth_password: Optional password for Basic Authentication
         auth_token: Optional Bearer token for token-based authentication
 
     Returns:
@@ -146,8 +120,6 @@ def _get_dag_details_impl(
         data = _call_airflow_api(
             f"dags/{dag_id}",
             airflow_url,
-            auth_username=auth_username,
-            auth_password=auth_password,
             auth_token=auth_token,
         )
 
@@ -162,8 +134,6 @@ def _list_dags_impl(
     airflow_url: str = "http://localhost:8080",
     limit: int = 100,
     offset: int = 0,
-    auth_username: str | None = None,
-    auth_password: str | None = None,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for listing DAGs from Airflow.
@@ -172,8 +142,6 @@ def _list_dags_impl(
         airflow_url: The base URL of the Airflow webserver (default: http://localhost:8080)
         limit: Maximum number of DAGs to return (default: 100)
         offset: Offset for pagination (default: 0)
-        auth_username: Optional username for Basic Authentication
-        auth_password: Optional password for Basic Authentication
         auth_token: Optional Bearer token for token-based authentication
 
     Returns:
@@ -185,8 +153,6 @@ def _list_dags_impl(
             "dags",
             airflow_url,
             params,
-            auth_username=auth_username,
-            auth_password=auth_password,
             auth_token=auth_token,
         )
 
@@ -237,8 +203,6 @@ def get_dag_details(dag_id: str) -> str:
         dag_id=dag_id,
         airflow_url=_config.url,
         auth_token=_config.auth_token,
-        auth_username=_config.auth_username,
-        auth_password=_config.auth_password,
     )
 
 
@@ -269,16 +233,12 @@ def list_dags() -> str:
     return _list_dags_impl(
         airflow_url=_config.url,
         auth_token=_config.auth_token,
-        auth_username=_config.auth_username,
-        auth_password=_config.auth_password,
     )
 
 
 def _get_dag_source_impl(
     dag_id: str,
     airflow_url: str = "http://localhost:8080",
-    auth_username: str | None = None,
-    auth_password: str | None = None,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for getting DAG source code from Airflow.
@@ -286,8 +246,6 @@ def _get_dag_source_impl(
     Args:
         dag_id: The ID of the DAG to get source code for
         airflow_url: The base URL of the Airflow webserver (default: http://localhost:8080)
-        auth_username: Optional username for Basic Authentication
-        auth_password: Optional password for Basic Authentication
         auth_token: Optional Bearer token for token-based authentication
 
     Returns:
@@ -298,8 +256,6 @@ def _get_dag_source_impl(
         source_data = _call_airflow_api(
             f"dagSources/{dag_id}",
             airflow_url,
-            auth_username=auth_username,
-            auth_password=auth_password,
             auth_token=auth_token,
         )
 
@@ -334,23 +290,17 @@ def get_dag_source(dag_id: str) -> str:
         dag_id=dag_id,
         airflow_url=_config.url,
         auth_token=_config.auth_token,
-        auth_username=_config.auth_username,
-        auth_password=_config.auth_password,
     )
 
 
 def _get_dag_stats_impl(
     airflow_url: str = "http://localhost:8080",
-    auth_username: str | None = None,
-    auth_password: str | None = None,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for getting DAG statistics from Airflow.
 
     Args:
         airflow_url: The base URL of the Airflow webserver (default: http://localhost:8080)
-        auth_username: Optional username for Basic Authentication
-        auth_password: Optional password for Basic Authentication
         auth_token: Optional Bearer token for token-based authentication
 
     Returns:
@@ -361,8 +311,6 @@ def _get_dag_stats_impl(
         stats_data = _call_airflow_api(
             "dagStats",
             airflow_url,
-            auth_username=auth_username,
-            auth_password=auth_password,
             auth_token=auth_token,
         )
 
@@ -396,8 +344,6 @@ def get_dag_stats() -> str:
     return _get_dag_stats_impl(
         airflow_url=_config.url,
         auth_token=_config.auth_token,
-        auth_username=_config.auth_username,
-        auth_password=_config.auth_password,
     )
 
 
@@ -405,8 +351,6 @@ def _list_dag_warnings_impl(
     airflow_url: str = "http://localhost:8080",
     limit: int = 100,
     offset: int = 0,
-    auth_username: str | None = None,
-    auth_password: str | None = None,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for listing DAG warnings from Airflow.
@@ -415,8 +359,6 @@ def _list_dag_warnings_impl(
         airflow_url: The base URL of the Airflow webserver (default: http://localhost:8080)
         limit: Maximum number of warnings to return (default: 100)
         offset: Offset for pagination (default: 0)
-        auth_username: Optional username for Basic Authentication
-        auth_password: Optional password for Basic Authentication
         auth_token: Optional Bearer token for token-based authentication
 
     Returns:
@@ -428,8 +370,6 @@ def _list_dag_warnings_impl(
             "dagWarnings",
             airflow_url,
             params,
-            auth_username=auth_username,
-            auth_password=auth_password,
             auth_token=auth_token,
         )
 
@@ -463,8 +403,6 @@ def list_dag_warnings() -> str:
     return _list_dag_warnings_impl(
         airflow_url=_config.url,
         auth_token=_config.auth_token,
-        auth_username=_config.auth_username,
-        auth_password=_config.auth_password,
     )
 
 
@@ -472,8 +410,6 @@ def _get_task_impl(
     dag_id: str,
     task_id: str,
     airflow_url: str = "http://localhost:8080",
-    auth_username: str | None = None,
-    auth_password: str | None = None,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for getting task details from Airflow.
@@ -482,8 +418,6 @@ def _get_task_impl(
         dag_id: The ID of the DAG
         task_id: The ID of the task
         airflow_url: The base URL of the Airflow webserver (default: http://localhost:8080)
-        auth_username: Optional username for Basic Authentication
-        auth_password: Optional password for Basic Authentication
         auth_token: Optional Bearer token for token-based authentication
 
     Returns:
@@ -494,8 +428,6 @@ def _get_task_impl(
         data = _call_airflow_api(
             endpoint,
             airflow_url,
-            auth_username=auth_username,
-            auth_password=auth_password,
             auth_token=auth_token,
         )
 
@@ -509,8 +441,6 @@ def _get_task_impl(
 def _list_tasks_impl(
     dag_id: str,
     airflow_url: str = "http://localhost:8080",
-    auth_username: str | None = None,
-    auth_password: str | None = None,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for listing tasks in a DAG from Airflow.
@@ -518,8 +448,6 @@ def _list_tasks_impl(
     Args:
         dag_id: The ID of the DAG to list tasks for
         airflow_url: The base URL of the Airflow webserver (default: http://localhost:8080)
-        auth_username: Optional username for Basic Authentication
-        auth_password: Optional password for Basic Authentication
         auth_token: Optional Bearer token for token-based authentication
 
     Returns:
@@ -530,8 +458,6 @@ def _list_tasks_impl(
         data = _call_airflow_api(
             endpoint,
             airflow_url,
-            auth_username=auth_username,
-            auth_password=auth_password,
             auth_token=auth_token,
         )
 
@@ -548,8 +474,6 @@ def _get_task_instance_impl(
     dag_run_id: str,
     task_id: str,
     airflow_url: str = "http://localhost:8080",
-    auth_username: str | None = None,
-    auth_password: str | None = None,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for getting task instance details from Airflow.
@@ -559,8 +483,6 @@ def _get_task_instance_impl(
         dag_run_id: The ID of the DAG run
         task_id: The ID of the task
         airflow_url: The base URL of the Airflow webserver (default: http://localhost:8080)
-        auth_username: Optional username for Basic Authentication
-        auth_password: Optional password for Basic Authentication
         auth_token: Optional Bearer token for token-based authentication
 
     Returns:
@@ -572,8 +494,6 @@ def _get_task_instance_impl(
         data = _call_airflow_api(
             endpoint,
             airflow_url,
-            auth_username=auth_username,
-            auth_password=auth_password,
             auth_token=auth_token,
         )
 
@@ -624,8 +544,6 @@ def get_task(dag_id: str, task_id: str) -> str:
         task_id=task_id,
         airflow_url=_config.url,
         auth_token=_config.auth_token,
-        auth_username=_config.auth_username,
-        auth_password=_config.auth_password,
     )
 
 
@@ -662,8 +580,6 @@ def list_tasks(dag_id: str) -> str:
         dag_id=dag_id,
         airflow_url=_config.url,
         auth_token=_config.auth_token,
-        auth_username=_config.auth_username,
-        auth_password=_config.auth_password,
     )
 
 
@@ -703,8 +619,6 @@ def get_task_instance(dag_id: str, dag_run_id: str, task_id: str) -> str:
         task_id=task_id,
         airflow_url=_config.url,
         auth_token=_config.auth_token,
-        auth_username=_config.auth_username,
-        auth_password=_config.auth_password,
     )
 
 
@@ -712,8 +626,6 @@ def _list_dag_runs_impl(
     airflow_url: str = "http://localhost:8080",
     limit: int = 100,
     offset: int = 0,
-    auth_username: str | None = None,
-    auth_password: str | None = None,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for listing DAG runs from Airflow.
@@ -722,8 +634,6 @@ def _list_dag_runs_impl(
         airflow_url: The base URL of the Airflow webserver (default: http://localhost:8080)
         limit: Maximum number of DAG runs to return (default: 100)
         offset: Offset for pagination (default: 0)
-        auth_username: Optional username for Basic Authentication
-        auth_password: Optional password for Basic Authentication
         auth_token: Optional Bearer token for token-based authentication
 
     Returns:
@@ -736,8 +646,6 @@ def _list_dag_runs_impl(
             "dags/~/dagRuns",
             airflow_url,
             params,
-            auth_username=auth_username,
-            auth_password=auth_password,
             auth_token=auth_token,
         )
 
@@ -777,8 +685,6 @@ def list_dag_runs() -> str:
     return _list_dag_runs_impl(
         airflow_url=_config.url,
         auth_token=_config.auth_token,
-        auth_username=_config.auth_username,
-        auth_password=_config.auth_password,
     )
 
 
@@ -786,8 +692,6 @@ def _list_assets_impl(
     airflow_url: str = "http://localhost:8080",
     limit: int = 100,
     offset: int = 0,
-    auth_username: str | None = None,
-    auth_password: str | None = None,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for listing assets from Airflow.
@@ -796,8 +700,6 @@ def _list_assets_impl(
         airflow_url: The base URL of the Airflow webserver (default: http://localhost:8080)
         limit: Maximum number of assets to return (default: 100)
         offset: Offset for pagination (default: 0)
-        auth_username: Optional username for Basic Authentication
-        auth_password: Optional password for Basic Authentication
         auth_token: Optional Bearer token for token-based authentication
 
     Returns:
@@ -809,8 +711,6 @@ def _list_assets_impl(
             "assets",
             airflow_url,
             params,
-            auth_username=auth_username,
-            auth_password=auth_password,
             auth_token=auth_token,
         )
 
@@ -850,8 +750,6 @@ def list_assets() -> str:
     return _list_assets_impl(
         airflow_url=_config.url,
         auth_token=_config.auth_token,
-        auth_username=_config.auth_username,
-        auth_password=_config.auth_password,
     )
 
 
@@ -859,8 +757,6 @@ def _list_connections_impl(
     airflow_url: str = "http://localhost:8080",
     limit: int = 100,
     offset: int = 0,
-    auth_username: str | None = None,
-    auth_password: str | None = None,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for listing connections from Airflow.
@@ -872,8 +768,6 @@ def _list_connections_impl(
         airflow_url: The base URL of the Airflow webserver (default: http://localhost:8080)
         limit: Maximum number of connections to return (default: 100)
         offset: Offset for pagination (default: 0)
-        auth_username: Optional username for Basic Authentication
-        auth_password: Optional password for Basic Authentication
         auth_token: Optional Bearer token for token-based authentication
 
     Returns:
@@ -887,8 +781,6 @@ def _list_connections_impl(
             "connections",
             airflow_url,
             params,
-            auth_username=auth_username,
-            auth_password=auth_password,
             auth_token=auth_token,
         )
 
@@ -958,16 +850,12 @@ def list_connections() -> str:
     return _list_connections_impl(
         airflow_url=_config.url,
         auth_token=_config.auth_token,
-        auth_username=_config.auth_username,
-        auth_password=_config.auth_password,
     )
 
 
 def _get_variable_impl(
     variable_key: str,
     airflow_url: str = "http://localhost:8080",
-    auth_username: str | None = None,
-    auth_password: str | None = None,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for getting a specific variable from Airflow.
@@ -975,8 +863,6 @@ def _get_variable_impl(
     Args:
         variable_key: The key of the variable to get
         airflow_url: The base URL of the Airflow webserver (default: http://localhost:8080)
-        auth_username: Optional username for Basic Authentication
-        auth_password: Optional password for Basic Authentication
         auth_token: Optional Bearer token for token-based authentication
 
     Returns:
@@ -986,8 +872,6 @@ def _get_variable_impl(
         data = _call_airflow_api(
             f"variables/{variable_key}",
             airflow_url,
-            auth_username=auth_username,
-            auth_password=auth_password,
             auth_token=auth_token,
         )
 
@@ -1002,8 +886,6 @@ def _list_variables_impl(
     airflow_url: str = "http://localhost:8080",
     limit: int = 100,
     offset: int = 0,
-    auth_username: str | None = None,
-    auth_password: str | None = None,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for listing variables from Airflow.
@@ -1012,8 +894,6 @@ def _list_variables_impl(
         airflow_url: The base URL of the Airflow webserver (default: http://localhost:8080)
         limit: Maximum number of variables to return (default: 100)
         offset: Offset for pagination (default: 0)
-        auth_username: Optional username for Basic Authentication
-        auth_password: Optional password for Basic Authentication
         auth_token: Optional Bearer token for token-based authentication
 
     Returns:
@@ -1025,8 +905,6 @@ def _list_variables_impl(
             "variables",
             airflow_url,
             params,
-            auth_username=auth_username,
-            auth_password=auth_password,
             auth_token=auth_token,
         )
 
@@ -1040,16 +918,12 @@ def _list_variables_impl(
 
 def _get_version_impl(
     airflow_url: str = "http://localhost:8080",
-    auth_username: str | None = None,
-    auth_password: str | None = None,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for getting Airflow version information.
 
     Args:
         airflow_url: The base URL of the Airflow webserver (default: http://localhost:8080)
-        auth_username: Optional username for Basic Authentication
-        auth_password: Optional password for Basic Authentication
         auth_token: Optional Bearer token for token-based authentication
 
     Returns:
@@ -1059,8 +933,6 @@ def _get_version_impl(
         data = _call_airflow_api(
             "version",
             airflow_url,
-            auth_username=auth_username,
-            auth_password=auth_password,
             auth_token=auth_token,
         )
 
@@ -1073,16 +945,12 @@ def _get_version_impl(
 
 def _get_config_impl(
     airflow_url: str = "http://localhost:8080",
-    auth_username: str | None = None,
-    auth_password: str | None = None,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for getting Airflow configuration.
 
     Args:
         airflow_url: The base URL of the Airflow webserver (default: http://localhost:8080)
-        auth_username: Optional username for Basic Authentication
-        auth_password: Optional password for Basic Authentication
         auth_token: Optional Bearer token for token-based authentication
 
     Returns:
@@ -1094,8 +962,6 @@ def _get_config_impl(
         data = _call_airflow_api(
             "config",
             airflow_url,
-            auth_username=auth_username,
-            auth_password=auth_password,
             auth_token=auth_token,
         )
 
@@ -1112,8 +978,6 @@ def _get_config_impl(
 def _get_pool_impl(
     pool_name: str,
     airflow_url: str = "http://localhost:8080",
-    auth_username: str | None = None,
-    auth_password: str | None = None,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for getting details about a specific pool.
@@ -1121,8 +985,6 @@ def _get_pool_impl(
     Args:
         pool_name: The name of the pool to get details for
         airflow_url: The base URL of the Airflow webserver (default: http://localhost:8080)
-        auth_username: Optional username for Basic Authentication
-        auth_password: Optional password for Basic Authentication
         auth_token: Optional Bearer token for token-based authentication
 
     Returns:
@@ -1132,8 +994,6 @@ def _get_pool_impl(
         data = _call_airflow_api(
             f"pools/{pool_name}",
             airflow_url,
-            auth_username=auth_username,
-            auth_password=auth_password,
             auth_token=auth_token,
         )
 
@@ -1148,8 +1008,6 @@ def _list_pools_impl(
     airflow_url: str = "http://localhost:8080",
     limit: int = 100,
     offset: int = 0,
-    auth_username: str | None = None,
-    auth_password: str | None = None,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for listing pools from Airflow.
@@ -1158,8 +1016,6 @@ def _list_pools_impl(
         airflow_url: The base URL of the Airflow webserver (default: http://localhost:8080)
         limit: Maximum number of pools to return (default: 100)
         offset: Offset for pagination (default: 0)
-        auth_username: Optional username for Basic Authentication
-        auth_password: Optional password for Basic Authentication
         auth_token: Optional Bearer token for token-based authentication
 
     Returns:
@@ -1171,8 +1027,6 @@ def _list_pools_impl(
             "pools",
             airflow_url,
             params,
-            auth_username=auth_username,
-            auth_password=auth_password,
             auth_token=auth_token,
         )
 
@@ -1188,8 +1042,6 @@ def _list_plugins_impl(
     airflow_url: str = "http://localhost:8080",
     limit: int = 100,
     offset: int = 0,
-    auth_username: str | None = None,
-    auth_password: str | None = None,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for listing installed plugins from Airflow.
@@ -1198,8 +1050,6 @@ def _list_plugins_impl(
         airflow_url: The base URL of the Airflow webserver (default: http://localhost:8080)
         limit: Maximum number of plugins to return (default: 100)
         offset: Offset for pagination (default: 0)
-        auth_username: Optional username for Basic Authentication
-        auth_password: Optional password for Basic Authentication
         auth_token: Optional Bearer token for token-based authentication
 
     Returns:
@@ -1211,8 +1061,6 @@ def _list_plugins_impl(
             "plugins",
             airflow_url,
             params,
-            auth_username=auth_username,
-            auth_password=auth_password,
             auth_token=auth_token,
         )
 
@@ -1226,16 +1074,12 @@ def _list_plugins_impl(
 
 def _list_providers_impl(
     airflow_url: str = "http://localhost:8080",
-    auth_username: str | None = None,
-    auth_password: str | None = None,
     auth_token: str | None = None,
 ) -> str:
     """Internal implementation for listing installed providers from Airflow.
 
     Args:
         airflow_url: The base URL of the Airflow webserver (default: http://localhost:8080)
-        auth_username: Optional username for Basic Authentication
-        auth_password: Optional password for Basic Authentication
         auth_token: Optional Bearer token for token-based authentication
 
     Returns:
@@ -1245,8 +1089,6 @@ def _list_providers_impl(
         data = _call_airflow_api(
             "providers",
             airflow_url,
-            auth_username=auth_username,
-            auth_password=auth_password,
             auth_token=auth_token,
         )
 
@@ -1290,8 +1132,6 @@ def get_pool(pool_name: str) -> str:
         pool_name=pool_name,
         airflow_url=_config.url,
         auth_token=_config.auth_token,
-        auth_username=_config.auth_username,
-        auth_password=_config.auth_password,
     )
 
 
@@ -1325,8 +1165,6 @@ def list_pools() -> str:
     return _list_pools_impl(
         airflow_url=_config.url,
         auth_token=_config.auth_token,
-        auth_username=_config.auth_username,
-        auth_password=_config.auth_password,
     )
 
 
@@ -1359,8 +1197,6 @@ def list_plugins() -> str:
     return _list_plugins_impl(
         airflow_url=_config.url,
         auth_token=_config.auth_token,
-        auth_username=_config.auth_username,
-        auth_password=_config.auth_password,
     )
 
 
@@ -1386,8 +1222,6 @@ def list_providers() -> str:
     return _list_providers_impl(
         airflow_url=_config.url,
         auth_token=_config.auth_token,
-        auth_username=_config.auth_username,
-        auth_password=_config.auth_password,
     )
 
 
@@ -1419,8 +1253,6 @@ def get_variable(variable_key: str) -> str:
         variable_key=variable_key,
         airflow_url=_config.url,
         auth_token=_config.auth_token,
-        auth_username=_config.auth_username,
-        auth_password=_config.auth_password,
     )
 
 
@@ -1453,8 +1285,6 @@ def list_variables() -> str:
     return _list_variables_impl(
         airflow_url=_config.url,
         auth_token=_config.auth_token,
-        auth_username=_config.auth_username,
-        auth_password=_config.auth_password,
     )
 
 
@@ -1484,8 +1314,6 @@ def get_airflow_version() -> str:
     return _get_version_impl(
         airflow_url=_config.url,
         auth_token=_config.auth_token,
-        auth_username=_config.auth_username,
-        auth_password=_config.auth_password,
     )
 
 
@@ -1521,6 +1349,4 @@ def get_airflow_config() -> str:
     return _get_config_impl(
         airflow_url=_config.url,
         auth_token=_config.auth_token,
-        auth_username=_config.auth_username,
-        auth_password=_config.auth_password,
     )

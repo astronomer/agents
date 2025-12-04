@@ -24,7 +24,7 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for Ap
   - **Standalone server**: Run as an independent MCP server
   - **Airflow plugin**: Integrate directly into Airflow 3.x webserver
 
-- **Authentication support**: Bearer token and Basic auth
+- **Authentication support**: Bearer token authentication
 
 ## Installation
 
@@ -107,22 +107,14 @@ With authentication (using environment variables):
 ```bash
 export AIRFLOW_API_URL=http://localhost:8080
 export AIRFLOW_AUTH_TOKEN=your_token
-# or
-export AIRFLOW_USERNAME=admin
-export AIRFLOW_PASSWORD=admin
 
 make run
 ```
 
-Or pass authentication via command-line flags:
+Or pass authentication via command-line flag:
 
 ```bash
-# Using bearer token
 uv run python -m airflow_mcp --airflow-url http://localhost:8080 --auth-token YOUR_TOKEN
-
-# Using basic auth
-uv run python -m airflow_mcp --airflow-url http://localhost:8080 \
-  --auth-username admin --auth-password admin
 ```
 
 **Transport modes:**
@@ -311,14 +303,10 @@ All tools use a global configuration that can be set via:
 1. **Command-line flags** (standalone mode):
    - `--airflow-url`: Airflow webserver URL
    - `--auth-token`: Bearer token for authentication
-   - `--auth-username`: Username for Basic auth
-   - `--auth-password`: Password for Basic auth
 
 2. **Environment variables**:
    - `AIRFLOW_API_URL`: Airflow webserver URL
    - `AIRFLOW_AUTH_TOKEN`: Bearer token
-   - `AIRFLOW_USERNAME`: Username for Basic auth
-   - `AIRFLOW_PASSWORD`: Password for Basic auth
 
 ## Requirements
 
