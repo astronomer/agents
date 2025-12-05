@@ -135,40 +135,6 @@ def _get_dag_details_impl(
         return str(e)
 
 
-def _list_dags_impl(
-    airflow_url: str = DEFAULT_AIRFLOW_URL,
-    limit: int = DEFAULT_LIMIT,
-    offset: int = DEFAULT_OFFSET,
-    auth_token: str | None = None,
-) -> str:
-    """Internal implementation for listing DAGs from Airflow.
-
-    Args:
-        airflow_url: The base URL of the Airflow webserver (default: http://localhost:8080)
-        limit: Maximum number of DAGs to return (default: 100)
-        offset: Offset for pagination (default: 0)
-        auth_token: Optional Bearer token for token-based authentication
-
-    Returns:
-        JSON string containing the list of DAGs with their metadata
-    """
-    try:
-        params = {"limit": limit, "offset": offset}
-        data = _call_airflow_api(
-            "dags",
-            airflow_url,
-            params,
-            auth_token=auth_token,
-        )
-
-        if "dags" in data:
-            return _wrap_list_response(data["dags"], "dags", data)
-        else:
-            return f"No DAGs found. Response: {data}"
-    except Exception as e:
-        return str(e)
-
-
 @mcp.tool()
 def get_dag_details(dag_id: str) -> str:
     """Get detailed information about a specific Apache Airflow DAG.
@@ -209,6 +175,40 @@ def get_dag_details(dag_id: str) -> str:
         airflow_url=_config.url,
         auth_token=_config.auth_token,
     )
+
+
+def _list_dags_impl(
+    airflow_url: str = DEFAULT_AIRFLOW_URL,
+    limit: int = DEFAULT_LIMIT,
+    offset: int = DEFAULT_OFFSET,
+    auth_token: str | None = None,
+) -> str:
+    """Internal implementation for listing DAGs from Airflow.
+
+    Args:
+        airflow_url: The base URL of the Airflow webserver (default: http://localhost:8080)
+        limit: Maximum number of DAGs to return (default: 100)
+        offset: Offset for pagination (default: 0)
+        auth_token: Optional Bearer token for token-based authentication
+
+    Returns:
+        JSON string containing the list of DAGs with their metadata
+    """
+    try:
+        params = {"limit": limit, "offset": offset}
+        data = _call_airflow_api(
+            "dags",
+            airflow_url,
+            params,
+            auth_token=auth_token,
+        )
+
+        if "dags" in data:
+            return _wrap_list_response(data["dags"], "dags", data)
+        else:
+            return f"No DAGs found. Response: {data}"
+    except Exception as e:
+        return str(e)
 
 
 @mcp.tool()
