@@ -11,7 +11,24 @@ DEFAULT_LIMIT = 100
 DEFAULT_OFFSET = 0
 
 # Create MCP server
-mcp = FastMCP("Airflow MCP Server")
+mcp = FastMCP(
+    "Airflow MCP Server",
+    instructions="""
+    This server provides access to Apache Airflow's REST API through MCP tools.
+
+    Use these tools to:
+    - List and inspect DAGs (Directed Acyclic Graphs / workflows)
+    - View DAG runs and their execution status
+    - Check task instances and their states
+    - Inspect Airflow connections, variables, and pools
+    - Monitor DAG statistics and warnings
+    - View system configuration and version information
+
+    When the user asks about Airflow workflows, pipelines, or data orchestration,
+    use these tools to provide detailed, accurate information directly from the
+    Airflow instance.
+    """,
+)
 
 
 # Global configuration for Airflow API access
