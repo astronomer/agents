@@ -44,4 +44,4 @@ jobs:
     - name: Build and test Docker image
       run: |
         make docker-build
-        docker run --rm airflow-mcp python -m airflow_mcp --help
+        docker run --rm astro-airflow-mcp python -m astro_airflow_mcp --help

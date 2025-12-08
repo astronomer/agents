@@ -41,51 +41,6 @@ wheels = [
 ]
 
 [[package]]
-name = "airflow-mcp"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "fastmcp" },
-    { name = "requests" },
-]
-
-[package.optional-dependencies]
-plugin = [
-    { name = "apache-airflow" },
-    { name = "fastapi" },
-]
-
-[package.dependency-groups]
-dev = [
-    { name = "bandit", extra = ["toml"] },
-    { name = "mypy" },
-    { name = "pre-commit" },
-    { name = "pytest" },
-    { name = "pytest-mock" },
-    { name = "ruff" },
-    { name = "types-requests" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "apache-airflow", marker = "extra == 'plugin'", specifier = ">=3.0.0" },
-    { name = "fastapi", marker = "extra == 'plugin'", specifier = ">=0.100.0" },
-    { name = "fastmcp", specifier = ">=0.1.0" },
-    { name = "requests", specifier = ">=2.31.0" },
-]
-
-[package.metadata.dependency-groups]
-dev = [
-    { name = "bandit", extras = ["toml"], specifier = ">=1.7.0" },
-    { name = "mypy", specifier = ">=1.8.0" },
-    { name = "pre-commit", specifier = ">=3.5.0" },
-    { name = "pytest", specifier = ">=7.0.0" },
-    { name = "pytest-mock", specifier = ">=3.12.0" },
-    { name = "ruff", specifier = ">=0.1.0" },
-    { name = "types-requests", specifier = ">=2.31.0" },
-]
-
-[[package]]
 name = "alembic"
 version = "1.17.2"
 source = { registry = "https://pypi.org/simple" }
@@ -328,6 +283,51 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/46/08/4dfec9b90758a59acc6be32ac82e98d1fbfc321cb5cfa410436dbacf821c/asgiref-3.10.0.tar.gz", hash = "sha256:d89f2d8cd8b56dada7d52fa7dc8075baa08fb836560710d38c292a7a3f78c04e", size = 37483 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/17/9c/fc2331f538fbf7eedba64b2052e99ccf9ba9d6888e2f41441ee28847004b/asgiref-3.10.0-py3-none-any.whl", hash = "sha256:aef8a81283a34d0ab31630c9b7dfe70c812c95eba78171367ca8745e88124734", size = 24050 },
+]
+
+[[package]]
+name = "astro-airflow-mcp"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "fastmcp" },
+    { name = "requests" },
+]
+
+[package.optional-dependencies]
+plugin = [
+    { name = "apache-airflow" },
+    { name = "fastapi" },
+]
+
+[package.dependency-groups]
+dev = [
+    { name = "bandit", extra = ["toml"] },
+    { name = "mypy" },
+    { name = "pre-commit" },
+    { name = "pytest" },
+    { name = "pytest-mock" },
+    { name = "ruff" },
+    { name = "types-requests" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "apache-airflow", marker = "extra == 'plugin'", specifier = ">=3.0.0" },
+    { name = "fastapi", marker = "extra == 'plugin'", specifier = ">=0.100.0" },
+    { name = "fastmcp", specifier = ">=0.1.0" },
+    { name = "requests", specifier = ">=2.31.0" },
+]
+
+[package.metadata.dependency-groups]
+dev = [
+    { name = "bandit", extras = ["toml"], specifier = ">=1.7.0" },
+    { name = "mypy", specifier = ">=1.8.0" },
+    { name = "pre-commit", specifier = ">=3.5.0" },
+    { name = "pytest", specifier = ">=7.0.0" },
+    { name = "pytest-mock", specifier = ">=3.12.0" },
+    { name = "ruff", specifier = ">=0.1.0" },
+    { name = "types-requests", specifier = ">=2.31.0" },
 ]
 
 [[package]]

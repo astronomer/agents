@@ -4,8 +4,8 @@ import argparse
 import logging
 import os
 
-from airflow_mcp.logging import configure_logging, get_logger
-from airflow_mcp.server import configure, mcp
+from astro_airflow_mcp.logging import configure_logging, get_logger
+from astro_airflow_mcp.server import configure, mcp
 
 logger = get_logger("main")
 

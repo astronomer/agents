@@ -23,7 +23,7 @@ except ImportError:
 try:
     from fastapi import FastAPI
 
-    from airflow_mcp.server import mcp
+    from astro_airflow_mcp.server import mcp
 
     # Get the native MCP protocol ASGI app from FastMCP
     mcp_protocol_app = mcp.http_app(path="/")

@@ -4,7 +4,7 @@
 
 # Airflow MCP Server
 
-[![CI](https://github.com/astronomer/airflow-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/astronomer/airflow-mcp/actions/workflows/ci.yml)
+[![CI](https://github.com/astronomer/astro-airflow-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/astronomer/astro-airflow-mcp/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
@@ -29,10 +29,10 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for Ap
 
 ## Installation
 
-We recommend installing airflow-mcp with [uv](https://docs.astral.sh/uv/):
+We recommend installing astro-airflow-mcp with [uv](https://docs.astral.sh/uv/):
 
 ```bash
-uv pip install airflow-mcp
+uv pip install astro-airflow-mcp
 ```
 
 ## Usage
@@ -42,7 +42,7 @@ uv pip install airflow-mcp
 After installation, start the MCP server:
 
 ```bash
-airflow-mcp
+astro-airflow-mcp
 ```
 
 By default, this will:
@@ -56,13 +56,13 @@ The server provides a set of tools that AI assistants can use to interact with y
 
 ```bash
 # Connect to a different Airflow instance
-airflow-mcp --airflow-url https://my-airflow.example.com --auth-token my_token
+astro-airflow-mcp --airflow-url https://my-airflow.example.com --auth-token my_token
 
 # Use a different port
-airflow-mcp --port 9000
+astro-airflow-mcp --port 9000
 
 # Use stdio mode (for Claude Desktop)
-airflow-mcp --transport stdio
+astro-airflow-mcp --transport stdio
 ```
 
 ### Using with MCP Clients
@@ -75,7 +75,7 @@ Add to your Claude Desktop configuration:
 {
   "mcpServers": {
     "airflow": {
-      "command": "airflow-mcp",
+      "command": "astro-airflow-mcp",
       "env": {
         "AIRFLOW_API_URL": "http://localhost:8080",
         "AIRFLOW_AUTH_TOKEN": "your_token"
@@ -93,7 +93,7 @@ Configure in Cursor's MCP settings:
 {
   "mcpServers": {
     "airflow": {
-      "command": "airflow-mcp"
+      "command": "astro-airflow-mcp"
     }
   }
 }

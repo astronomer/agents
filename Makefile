@@ -25,16 +25,16 @@ install-hooks:  ## Install pre-commit hooks
 	@echo "✓ Pre-commit hooks installed"
 
 run:  ## Run the MCP server (defaults: http mode, localhost:8000, airflow at localhost:8080)
-	uv run python -m airflow_mcp
+	uv run python -m astro_airflow_mcp
 
 docker-build:  ## Build Docker image
-	docker build -t airflow-mcp .
+	docker build -t astro-airflow-mcp .
 
 docker-run:  ## Run Docker container (http mode with 0.0.0.0 binding for container access)
 	docker run -p 8000:8000 \
 		-e AIRFLOW_API_URL=http://host.docker.internal:8080 \
-		airflow-mcp \
-		python -m airflow_mcp --host 0.0.0.0
+		astro-airflow-mcp \
+		python -m astro_airflow_mcp --host 0.0.0.0
 
 build:  ## Build distribution packages (wheel and sdist)
 	uv build
@@ -50,10 +50,10 @@ format:  ## Format code with ruff - auto-fixes issues
 	uv run ruff check --fix src/ tests/
 
 type-check:  ## Run type checking (mypy) - excludes tests
-	uv run mypy src/airflow_mcp/ --ignore-missing-imports --no-strict-optional
+	uv run mypy src/astro_airflow_mcp/ --ignore-missing-imports --no-strict-optional
 
 security:  ## Run security checks (bandit) - excludes tests
-	uv run bandit -c pyproject.toml -r src/airflow_mcp/
+	uv run bandit -c pyproject.toml -r src/astro_airflow_mcp/
 
 check: lint type-check security  ## Run all checks (lint, type-check, security)
 	@echo "✓ All checks passed"

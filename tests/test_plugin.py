@@ -5,7 +5,7 @@ import pytest
 
 def test_plugin_import():
     """Test that the plugin can be imported."""
-    from airflow_mcp.plugin import AirflowMCPPlugin
+    from astro_airflow_mcp.plugin import AirflowMCPPlugin
 
     assert AirflowMCPPlugin is not None
     assert AirflowMCPPlugin.name == "airflow_mcp"
@@ -13,7 +13,7 @@ def test_plugin_import():
 
 def test_plugin_has_fastapi_apps():
     """Test that the plugin defines fastapi_apps."""
-    from airflow_mcp.plugin import AirflowMCPPlugin
+    from astro_airflow_mcp.plugin import AirflowMCPPlugin
 
     assert hasattr(AirflowMCPPlugin, "fastapi_apps")
     assert isinstance(AirflowMCPPlugin.fastapi_apps, list)
@@ -21,7 +21,7 @@ def test_plugin_has_fastapi_apps():
 
 def test_plugin_on_load():
     """Test that the plugin on_load method exists and can be called."""
-    from airflow_mcp.plugin import AirflowMCPPlugin
+    from astro_airflow_mcp.plugin import AirflowMCPPlugin
 
     # Should not raise an error
     AirflowMCPPlugin.on_load()
@@ -29,7 +29,7 @@ def test_plugin_on_load():
 
 def test_mcp_server_available():
     """Test that the MCP server object is accessible."""
-    from airflow_mcp.server import mcp
+    from astro_airflow_mcp.server import mcp
 
     assert mcp is not None
     assert hasattr(mcp, "run")
@@ -38,7 +38,7 @@ def test_mcp_server_available():
 
 def test_mcp_http_app():
     """Test that the MCP server can create an HTTP app."""
-    from airflow_mcp.server import mcp
+    from astro_airflow_mcp.server import mcp
 
     try:
         app = mcp.http_app(path="/test")
@@ -49,7 +49,7 @@ def test_mcp_http_app():
 
 def test_plugin_docstring():
     """Test that the plugin has proper documentation."""
-    from airflow_mcp.plugin import AirflowMCPPlugin
+    from astro_airflow_mcp.plugin import AirflowMCPPlugin
 
     assert AirflowMCPPlugin.__doc__ is not None
     assert "MCP" in AirflowMCPPlugin.__doc__

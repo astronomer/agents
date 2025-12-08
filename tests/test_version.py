@@ -1,16 +1,16 @@
 """Tests for version information."""
 
-import airflow_mcp
+import astro_airflow_mcp
 
 
 def test_version_exists():
     """Test that __version__ attribute exists."""
-    assert hasattr(airflow_mcp, "__version__")
+    assert hasattr(astro_airflow_mcp, "__version__")
 
 
 def test_version_format():
     """Test that __version__ is a valid version string."""
-    version = airflow_mcp.__version__
+    version = astro_airflow_mcp.__version__
     assert isinstance(version, str)
     assert len(version) > 0
     # Should follow semantic versioning (e.g., "0.1.0")

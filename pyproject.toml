@@ -1,5 +1,5 @@
 [project]
-name = "airflow-mcp"
+name = "astro-airflow-mcp"
 version = "0.1.0"
 description = "A FastMCP server for Airflow integration that can run standalone or as an Airflow 3 plugin"
 readme = "README.md"
@@ -16,20 +16,20 @@ plugin = [
 ]
 
 [project.scripts]
-airflow-mcp = "airflow_mcp.__main__:main"
+astro-airflow-mcp = "astro_airflow_mcp.__main__:main"
 
 [project.entry-points."airflow.plugins"]
-airflow_mcp = "airflow_mcp.plugin:AirflowMCPPlugin"
+airflow_mcp = "astro_airflow_mcp.plugin:AirflowMCPPlugin"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatchling.build.targets.wheel]
-packages = ["src/airflow_mcp"]
+packages = ["src/astro_airflow_mcp"]
 
 [tool.hatchling.build.targets.wheel.force-include]
-"src/airflow_mcp/templates" = "airflow_mcp/templates"
+"src/astro_airflow_mcp/templates" = "astro_airflow_mcp/templates"
 
 [tool.uv]
 dev-dependencies = [

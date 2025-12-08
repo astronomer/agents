@@ -42,7 +42,7 @@ jobs:
     needs: build
     environment:
       name: pypi
-      url: https://pypi.org/p/airflow-mcp
+      url: https://pypi.org/p/astro-airflow-mcp
     permissions:
       id-token: write  # Required for trusted publishing
       contents: read

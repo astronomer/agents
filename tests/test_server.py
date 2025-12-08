@@ -5,7 +5,7 @@ import json
 import pytest
 import requests
 
-from airflow_mcp.server import (
+from astro_airflow_mcp.server import (
     DEFAULT_AIRFLOW_URL,
     _call_airflow_api,
     _get_dag_details_impl,
@@ -113,7 +113,7 @@ class TestImplFunctions:
             "is_paused": False,
             "description": "Test DAG",
         }
-        mocker.patch("airflow_mcp.server._call_airflow_api", return_value=mock_dag_data)
+        mocker.patch("astro_airflow_mcp.server._call_airflow_api", return_value=mock_dag_data)
 
         result = _get_dag_details_impl("example_dag")
         result_data = json.loads(result)
@@ -125,7 +125,7 @@ class TestImplFunctions:
     def test_get_dag_details_impl_error(self, mocker):
         """Test _get_dag_details_impl with API error."""
         mocker.patch(
-            "airflow_mcp.server._call_airflow_api",
+            "astro_airflow_mcp.server._call_airflow_api",
             side_effect=Exception("DAG not found"),
         )
 
@@ -142,7 +142,7 @@ class TestImplFunctions:
             ],
             "total_entries": 2,
         }
-        mocker.patch("airflow_mcp.server._call_airflow_api", return_value=mock_response)
+        mocker.patch("astro_airflow_mcp.server._call_airflow_api", return_value=mock_response)
 
         result = _list_dags_impl(limit=10, offset=0)
         result_data = json.loads(result)
@@ -155,7 +155,7 @@ class TestImplFunctions:
     def test_list_dags_impl_empty(self, mocker):
         """Test _list_dags_impl with no DAGs."""
         mock_response = {"dags": [], "total_entries": 0}
-        mocker.patch("airflow_mcp.server._call_airflow_api", return_value=mock_response)
+        mocker.patch("astro_airflow_mcp.server._call_airflow_api", return_value=mock_response)
 
         result = _list_dags_impl()
         result_data = json.loads(result)
@@ -170,7 +170,7 @@ class TestConfiguration:
 
     def test_configure_url(self):
         """Test configure() updates global URL."""
-        from airflow_mcp.server import _config
+        from astro_airflow_mcp.server import _config
 
         original_url = _config.url
         try:
@@ -182,7 +182,7 @@ class TestConfiguration:
 
     def test_configure_auth_token(self):
         """Test configure() updates global auth token."""
-        from airflow_mcp.server import _config
+        from astro_airflow_mcp.server import _config
 
         original_token = _config.auth_token
         try:
@@ -194,7 +194,7 @@ class TestConfiguration:
 
     def test_configure_both(self):
         """Test configure() updates both URL and token."""
-        from airflow_mcp.server import _config
+        from astro_airflow_mcp.server import _config
 
         original_url = _config.url
         original_token = _config.auth_token

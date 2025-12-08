@@ -22,7 +22,7 @@ ENV AIRFLOW_API_URL=http://localhost:8080
 ENV PYTHONUNBUFFERED=1
 
 # Default command runs in stdio mode (for MCP clients)
-CMD ["python", "-m", "airflow_mcp"]
+CMD ["python", "-m", "astro_airflow_mcp"]
 
 # To run with HTTP transport, override with:
-# docker run -p 8000:8000 airflow-mcp python -m airflow_mcp --transport http --host 0.0.0.0 --port 8000
+# docker run -p 8000:8000 astro-airflow-mcp python -m astro_airflow_mcp --transport http --host 0.0.0.0 --port 8000

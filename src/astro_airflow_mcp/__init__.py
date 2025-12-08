@@ -2,4 +2,4 @@
 
 from importlib.metadata import version
 
-__version__ = version("airflow-mcp")
+__version__ = version("astro-airflow-mcp")
