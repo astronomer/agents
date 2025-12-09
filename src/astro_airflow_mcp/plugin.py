@@ -54,7 +54,7 @@ class AirflowMCPPlugin(AirflowPlugin):
     Exposes MCP protocol endpoints at /mcp for AI clients (Cursor, Claude Desktop, etc.)
     """
 
-    name = "airflow_mcp"
+    name = "astro_airflow_mcp"
     fastapi_apps = fastapi_apps_config
 
     @staticmethod

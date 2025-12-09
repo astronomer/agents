@@ -8,7 +8,7 @@ def test_plugin_import():
     from astro_airflow_mcp.plugin import AirflowMCPPlugin
 
     assert AirflowMCPPlugin is not None
-    assert AirflowMCPPlugin.name == "airflow_mcp"
+    assert AirflowMCPPlugin.name == "astro_airflow_mcp"
 
 
 def test_plugin_has_fastapi_apps():
