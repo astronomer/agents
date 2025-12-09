@@ -93,7 +93,11 @@ Configure in Cursor's MCP settings:
 {
   "mcpServers": {
     "airflow": {
-      "command": "astro-airflow-mcp"
+      "command": "astro-airflow-mcp",
+      "args": [
+        "--transport",
+        "stdio"
+      ]
     }
   }
 }
