@@ -77,7 +77,7 @@ Add to your Claude Desktop configuration:
     "airflow": {
       "command": "astro-airflow-mcp",
       "env": {
-        "AIRFLOW_API_URL": "http://localhost:8080",
+        "AIRFLOW_API_URL": "http://your.airflow.domain.com",
         "AIRFLOW_AUTH_TOKEN": "your_token"
       }
     }
