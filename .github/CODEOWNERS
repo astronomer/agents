@@ -2,4 +2,4 @@
 # These owners will be automatically requested for review when PRs are opened
 
 # Global owners - own everything in the repository
-* @astro-airflow-mcp-admins
+* @astronomer/astro-airflow-mcp-admins
