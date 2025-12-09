@@ -1,6 +1,6 @@
 [project]
 name = "astro-airflow-mcp"
-version = "0.1.0"
+version = "v0.1.1"
 description = "A FastMCP server for Airflow integration that can run standalone or as an Airflow 3 plugin"
 readme = "README.md"
 requires-python = ">=3.10"
