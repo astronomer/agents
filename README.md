@@ -32,6 +32,12 @@ We recommend installing astro-airflow-mcp with [uv](https://docs.astral.sh/uv/):
 uv pip install astro-airflow-mcp
 ```
 
+If installing into an Astro project as an Airflow plugin, add the package to your `requirements.txt`:
+
+```bash
+echo astro-airflow-mcp >> requirements.txt
+```
+
 ## Usage
 
 ### Running the Server
