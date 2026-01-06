@@ -1,5 +1,6 @@
 """FastMCP server for Airflow integration."""
 
+import json
 from typing import Any
 
 import requests
@@ -101,6 +102,43 @@ def _call_airflow_api(
         raise Exception(f"Error calling API endpoint '{endpoint}': {str(e)}") from e
 
 
+def _post_airflow_api(
+    endpoint: str,
+    airflow_url: str = DEFAULT_AIRFLOW_URL,
+    json_data: dict[str, Any] | None = None,
+    auth_token: str | None = None,
+) -> dict[str, Any]:
+    """Call Airflow REST API with POST method.
+
+    Args:
+        endpoint: API endpoint path (e.g., 'dags/{dag_id}/dagRuns')
+        airflow_url: Base URL of the Airflow webserver
+        json_data: Optional JSON body to send with the request
+        auth_token: Optional Bearer token for token-based authentication
+
+    Returns:
+        Parsed JSON response from the API
+
+    Raises:
+        Exception: If the API call fails with error details
+    """
+    try:
+        api_url = f"{airflow_url}/api/v2/{endpoint}"
+        headers: dict[str, str] = {"Content-Type": "application/json"}
+
+        # Handle authentication
+        if auth_token:
+            headers["Authorization"] = f"Bearer {auth_token}"
+
+        response = requests.post(api_url, json=json_data, headers=headers, timeout=30)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        raise Exception(f"Error connecting to Airflow API: {str(e)}") from e
+    except Exception as e:
+        raise Exception(f"Error calling API endpoint '{endpoint}': {str(e)}") from e
+
+
 def _wrap_list_response(items: list[dict[str, Any]], key_name: str, data: dict[str, Any]) -> str:
     """Wrap API list response with pagination metadata.
 
@@ -112,7 +150,6 @@ def _wrap_list_response(items: list[dict[str, Any]], key_name: str, data: dict[s
     Returns:
         JSON string with pagination metadata
     """
-    import json
 
     total_entries = data.get("total_entries", len(items))
     result: dict[str, Any] = {
@@ -144,8 +181,6 @@ def _get_dag_details_impl(
             airflow_url,
             auth_token=auth_token,
         )
-
-        import json
 
         return json.dumps(data, indent=2)
     except Exception as e:
@@ -281,8 +316,6 @@ def _get_dag_source_impl(
             auth_token=auth_token,
         )
 
-        import json
-
         return json.dumps(source_data, indent=2)
     except Exception as e:
         return str(e)
@@ -335,8 +368,6 @@ def _get_dag_stats_impl(
             airflow_url,
             auth_token=auth_token,
         )
-
-        import json
 
         return json.dumps(stats_data, indent=2)
     except Exception as e:
@@ -521,8 +552,6 @@ def _get_task_impl(
             auth_token=auth_token,
         )
 
-        import json
-
         return json.dumps(data, indent=2)
     except Exception as e:
         return str(e)
@@ -586,8 +615,6 @@ def _get_task_instance_impl(
             airflow_url,
             auth_token=auth_token,
         )
-
-        import json
 
         return json.dumps(data, indent=2)
     except Exception as e:
@@ -778,6 +805,156 @@ def list_dag_runs() -> str:
     )
 
 
+def _get_dag_run_impl(
+    dag_id: str,
+    dag_run_id: str,
+    airflow_url: str = DEFAULT_AIRFLOW_URL,
+    auth_token: str | None = None,
+) -> str:
+    """Internal implementation for getting a specific DAG run from Airflow.
+
+    Args:
+        dag_id: The ID of the DAG
+        dag_run_id: The ID of the DAG run
+        airflow_url: The base URL of the Airflow webserver (default: http://localhost:8080)
+        auth_token: Optional Bearer token for token-based authentication
+
+    Returns:
+        JSON string containing the DAG run details
+    """
+    try:
+        data = _call_airflow_api(
+            f"dags/{dag_id}/dagRuns/{dag_run_id}",
+            airflow_url,
+            auth_token=auth_token,
+        )
+
+        return json.dumps(data, indent=2)
+    except Exception as e:
+        return str(e)
+
+
+@mcp.tool()
+def get_dag_run(dag_id: str, dag_run_id: str) -> str:
+    """Get detailed information about a specific DAG run execution.
+
+    Use this tool when the user asks about:
+    - "Show me details for DAG run X" or "What's the status of run Y?"
+    - "When did this run start/finish?" or "How long did run Z take?"
+    - "Why did this run fail?" or "Get execution details for run X"
+    - "What was the configuration for this run?" or "Show me run metadata"
+    - "What's the state of DAG run X?" or "Did run Y succeed?"
+
+    Returns detailed information about a specific DAG run execution including:
+    - dag_run_id: Unique identifier for this execution
+    - dag_id: Which DAG this run belongs to
+    - state: Current state (running, success, failed, queued, etc.)
+    - execution_date: When this run was scheduled to execute
+    - start_date: When execution actually started
+    - end_date: When execution completed (if finished)
+    - duration: How long the run took (in seconds)
+    - run_type: Type of run (manual, scheduled, backfill, etc.)
+    - conf: Configuration parameters passed to this run
+    - external_trigger: Whether this was triggered externally
+    - data_interval_start: Start of the data interval
+    - data_interval_end: End of the data interval
+    - last_scheduling_decision: Last scheduling decision timestamp
+    - note: Optional note attached to the run
+
+    Args:
+        dag_id: The ID of the DAG (e.g., "example_dag")
+        dag_run_id: The ID of the DAG run (e.g., "manual__2024-01-01T00:00:00+00:00")
+
+    Returns:
+        JSON with complete details about the specified DAG run
+    """
+    return _get_dag_run_impl(
+        dag_id=dag_id,
+        dag_run_id=dag_run_id,
+        airflow_url=_config.url,
+        auth_token=_config.auth_token,
+    )
+
+
+def _trigger_dag_impl(
+    dag_id: str,
+    conf: dict | None = None,
+    airflow_url: str = DEFAULT_AIRFLOW_URL,
+    auth_token: str | None = None,
+) -> str:
+    """Internal implementation for triggering a new DAG run.
+
+    Args:
+        dag_id: The ID of the DAG to trigger
+        conf: Optional configuration dictionary to pass to the DAG run
+        airflow_url: The base URL of the Airflow webserver (default: http://localhost:8080)
+        auth_token: Optional Bearer token for token-based authentication
+
+    Returns:
+        JSON string containing the triggered DAG run details
+    """
+    try:
+        # logical_date is required by Airflow 3 API but can be null
+        json_body: dict[str, Any] = {"logical_date": None}
+        if conf:
+            json_body["conf"] = conf
+
+        data = _post_airflow_api(
+            f"dags/{dag_id}/dagRuns",
+            airflow_url,
+            json_data=json_body,
+            auth_token=auth_token,
+        )
+
+        return json.dumps(data, indent=2)
+    except Exception as e:
+        return str(e)
+
+
+@mcp.tool()
+def trigger_dag(dag_id: str, conf: dict | None = None) -> str:
+    """Trigger a new DAG run (start a workflow execution manually).
+
+    Use this tool when the user asks to:
+    - "Run DAG X" or "Start DAG Y" or "Execute DAG Z"
+    - "Trigger a run of DAG X" or "Kick off DAG Y"
+    - "Run this workflow" or "Start this pipeline"
+    - "Execute DAG X with config Y" or "Trigger DAG with parameters"
+    - "Start a manual run" or "Manually execute this DAG"
+
+    This creates a new DAG run that will be picked up by the scheduler and executed.
+    You can optionally pass configuration parameters that will be available to the
+    DAG during execution via the `conf` context variable.
+
+    IMPORTANT: This is a write operation that modifies Airflow state by creating
+    a new DAG run. Use with caution.
+
+    Returns information about the newly triggered DAG run including:
+    - dag_run_id: Unique identifier for the new execution
+    - dag_id: Which DAG was triggered
+    - state: Initial state (typically 'queued')
+    - execution_date: When this run is scheduled to execute
+    - start_date: When execution started (may be null if queued)
+    - run_type: Type of run (will be 'manual')
+    - conf: Configuration passed to the run
+    - external_trigger: Set to true for manual triggers
+
+    Args:
+        dag_id: The ID of the DAG to trigger (e.g., "example_dag")
+        conf: Optional configuration dictionary to pass to the DAG run.
+              This will be available in the DAG via context['dag_run'].conf
+
+    Returns:
+        JSON with details about the newly triggered DAG run
+    """
+    return _trigger_dag_impl(
+        dag_id=dag_id,
+        conf=conf,
+        airflow_url=_config.url,
+        auth_token=_config.auth_token,
+    )
+
+
 def _list_assets_impl(
     airflow_url: str = DEFAULT_AIRFLOW_URL,
     limit: int = DEFAULT_LIMIT,
@@ -863,7 +1040,6 @@ def _list_connections_impl(
     Returns:
         JSON string containing the list of connections with their metadata
     """
-    import json
 
     try:
         params = {"limit": limit, "offset": offset}
@@ -965,8 +1141,6 @@ def _get_variable_impl(
             auth_token=auth_token,
         )
 
-        import json
-
         return json.dumps(data, indent=2)
     except Exception as e:
         return str(e)
@@ -1026,8 +1200,6 @@ def _get_version_impl(
             auth_token=auth_token,
         )
 
-        import json
-
         return json.dumps(data, indent=2)
     except Exception as e:
         return str(e)
@@ -1046,7 +1218,6 @@ def _get_config_impl(
     Returns:
         JSON string containing the Airflow configuration organized by sections
     """
-    import json
 
     try:
         data = _call_airflow_api(
@@ -1086,8 +1257,6 @@ def _get_pool_impl(
             airflow_url,
             auth_token=auth_token,
         )
-
-        import json
 
         return json.dumps(data, indent=2)
     except Exception as e:
