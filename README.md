@@ -10,10 +10,12 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for Ap
 ## Features
 
 - **MCP Tools** for accessing Airflow data:
-  - DAG management (list, get details, get source code, stats, warnings, import errors)
-  - Task management (list, get details, get task instances)
+  - DAG management (list, get details, get source code, stats, warnings, import errors, trigger runs)
+  - Task management (list, get details, get task instances, get logs)
   - Pool management (list, get details)
   - Variable management (list, get specific variables)
+  - Connection management (list connections with credentials excluded)
+  - Asset/Dataset tracking (data lineage and dependencies)
   - Plugin and provider information
   - Configuration and version details
 
@@ -142,20 +144,23 @@ The MCP server provides the following tools:
 | `get_dag_stats` | Get DAG run statistics |
 | `list_dag_warnings` | Get DAG import warnings |
 | `list_import_errors` | Get import errors from DAG files that failed to parse |
+| `list_dag_runs` | Get DAG run history |
+| `get_dag_run` | Get specific DAG run details |
+| `trigger_dag` | Trigger a new DAG run (start a workflow execution) |
 | `list_tasks` | Get all tasks in a DAG |
 | `get_task` | Get details about a specific task |
 | `get_task_instance` | Get task instance execution details |
+| `get_task_logs` | Get logs for a specific task instance execution |
 | `list_pools` | Get all resource pools |
 | `get_pool` | Get details about a specific pool |
 | `list_variables` | Get all Airflow variables |
 | `get_variable` | Get a specific variable by key |
+| `list_connections` | Get all connections (credentials excluded for security) |
+| `list_assets` | Get data assets/datasets for data lineage |
 | `list_plugins` | Get installed Airflow plugins |
 | `list_providers` | Get installed provider packages |
 | `get_airflow_config` | Get Airflow configuration |
 | `get_airflow_version` | Get Airflow version information |
-| `list_dag_runs` | Get DAG run history |
-| `get_dag_run` | Get specific DAG run details |
-| `get_health` | Get Airflow health status |
 
 ## Development
 
