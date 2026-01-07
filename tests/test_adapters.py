@@ -64,15 +64,40 @@ class TestAirflowV2Adapter:
         assert headers == {}
         assert auth is None
 
-    def test_get_dag_stats_returns_not_available(self):
-        """Test V2 adapter returns not available for dagStats."""
+    def test_get_dag_stats_call(self, mocker):
+        """Test V2 adapter calls dagStats endpoint correctly."""
         adapter = AirflowV2Adapter(
             "http://localhost:8080",
             "2.9.0",
         )
-        result = adapter.get_dag_stats()
-        assert result["available"] is False
-        assert "alternative" in result
+
+        mock_response = mocker.Mock()
+        mock_response.json.return_value = {
+            "dags": [
+                {
+                    "dag_id": "example_dag",
+                    "stats": [{"state": "success", "count": 5}],
+                }
+            ],
+            "total_entries": 1,
+        }
+        mock_response.status_code = 200
+        mock_response.raise_for_status = mocker.Mock()
+
+        mock_client = mocker.Mock()
+        mock_client.get.return_value = mock_response
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+
+        mocker.patch("httpx.Client", return_value=mock_client)
+
+        result = adapter.get_dag_stats(dag_ids=["example_dag"])
+
+        assert result["total_entries"] == 1
+        mock_client.get.assert_called_once()
+        call_args = mock_client.get.call_args
+        assert "/api/v1/dagStats" in call_args[0][0]
+        assert call_args[1]["params"]["dag_ids"] == "example_dag"
 
     def test_list_dags_call(self, mocker):
         """Test list_dags makes correct API call."""

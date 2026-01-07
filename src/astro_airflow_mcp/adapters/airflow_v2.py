@@ -141,13 +141,11 @@ class AirflowV2Adapter(AirflowAdapter):
         return self._call(f"pools/{pool_name}")
 
     def get_dag_stats(self, dag_ids: list[str] | None = None) -> dict[str, Any]:
-        """Get DAG run statistics.
-
-        Note: dagStats endpoint is only available in Airflow 3.x.
-        """
-        return self._handle_not_found(
-            "dagStats", alternative="Use list_dag_runs to get DAG run information"
-        )
+        """Get DAG run statistics by state."""
+        params = {}
+        if dag_ids:
+            params["dag_ids"] = ",".join(dag_ids)
+        return self._call("dagStats", params=params)
 
     def list_dag_warnings(self, limit: int = 100, offset: int = 0) -> dict[str, Any]:
         """List DAG warnings."""
