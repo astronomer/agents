@@ -621,6 +621,47 @@ def _get_task_instance_impl(
         return str(e)
 
 
+def _get_task_logs_impl(
+    dag_id: str,
+    dag_run_id: str,
+    task_id: str,
+    try_number: int = 1,
+    map_index: int = -1,
+    airflow_url: str = DEFAULT_AIRFLOW_URL,
+    auth_token: str | None = None,
+) -> str:
+    """Internal implementation for getting task instance logs from Airflow.
+
+    Args:
+        dag_id: The ID of the DAG
+        dag_run_id: The ID of the DAG run
+        task_id: The ID of the task
+        try_number: The task try number (1-indexed, default: 1)
+        map_index: For mapped tasks, which map index (-1 for unmapped, default: -1)
+        airflow_url: The base URL of the Airflow webserver (default: http://localhost:8080)
+        auth_token: Optional Bearer token for token-based authentication
+
+    Returns:
+        JSON string containing the task logs
+    """
+    try:
+        endpoint = f"dags/{dag_id}/dagRuns/{dag_run_id}/taskInstances/{task_id}/logs/{try_number}"
+        params: dict[str, Any] = {"full_content": True}
+        if map_index != -1:
+            params["map_index"] = map_index
+
+        data = _call_airflow_api(
+            endpoint,
+            airflow_url,
+            params=params,
+            auth_token=auth_token,
+        )
+
+        return json.dumps(data, indent=2)
+    except Exception as e:
+        return str(e)
+
+
 @mcp.tool()
 def get_task(dag_id: str, task_id: str) -> str:
     """Get detailed information about a specific task definition in a DAG.
@@ -734,6 +775,56 @@ def get_task_instance(dag_id: str, dag_run_id: str, task_id: str) -> str:
         dag_id=dag_id,
         dag_run_id=dag_run_id,
         task_id=task_id,
+        airflow_url=_config.url,
+        auth_token=_config.auth_token,
+    )
+
+
+@mcp.tool()
+def get_task_logs(
+    dag_id: str,
+    dag_run_id: str,
+    task_id: str,
+    try_number: int = 1,
+    map_index: int = -1,
+) -> str:
+    """Get logs for a specific task instance execution.
+
+    Use this tool when the user asks about:
+    - "Show me the logs for task X" or "Get logs for task Y"
+    - "What did task Z output?" or "Show me task execution logs"
+    - "Why did task A fail?" (to see error messages in logs)
+    - "What happened during task B execution?"
+    - "Show me the stdout/stderr for task C"
+    - "Debug task D" or "Troubleshoot task E"
+
+    Returns the actual log output from the task execution, which includes:
+    - Task execution output (stdout/stderr)
+    - Error messages and stack traces (if task failed)
+    - Timing information
+    - Any logged messages from the task code
+
+    This is essential for debugging failed tasks or understanding what
+    happened during task execution.
+
+    Args:
+        dag_id: The ID of the DAG (e.g., "example_dag")
+        dag_run_id: The ID of the DAG run (e.g., "manual__2024-01-01T00:00:00+00:00")
+        task_id: The ID of the task within the DAG (e.g., "extract_data")
+        try_number: The task try/attempt number, 1-indexed (default: 1).
+                    Use higher numbers to get logs from retry attempts.
+        map_index: For mapped tasks, which map index to get logs for.
+                   Use -1 for non-mapped tasks (default: -1).
+
+    Returns:
+        JSON with the task logs content
+    """
+    return _get_task_logs_impl(
+        dag_id=dag_id,
+        dag_run_id=dag_run_id,
+        task_id=task_id,
+        try_number=try_number,
+        map_index=map_index,
         airflow_url=_config.url,
         auth_token=_config.auth_token,
     )
