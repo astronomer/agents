@@ -9,21 +9,29 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for Ap
 
 ## Features
 
+- **Airflow 2.x and 3.x Support**: Automatic version detection with adapter pattern
 - **MCP Tools** for accessing Airflow data:
   - DAG management (list, get details, get source code, stats, warnings, import errors, trigger runs)
   - Task management (list, get details, get task instances, get logs)
   - Pool management (list, get details)
   - Variable management (list, get specific variables)
   - Connection management (list connections with credentials excluded)
-  - Asset/Dataset tracking (data lineage and dependencies)
+  - Asset/Dataset management (unified naming across versions, data lineage)
   - Plugin and provider information
   - Configuration and version details
-
+- **Consolidated Tools** for agent workflows:
+  - `explore_dag`: Get comprehensive DAG information in one call
+  - `diagnose_dag_run`: Debug failed DAG runs with task instance details
+  - `get_system_health`: System overview with health, errors, and warnings
+- **MCP Resources**: Static Airflow info exposed as resources (version, providers, plugins, config)
+- **MCP Prompts**: Guided workflows for common tasks (troubleshooting, health checks, onboarding)
 - **Dual deployment modes**:
   - **Standalone server**: Run as an independent MCP server
   - **Airflow plugin**: Integrate directly into Airflow 3.x webserver
-
-- **Authentication support**: Bearer token authentication
+- **Flexible Authentication**:
+  - Bearer token (Airflow 2.x and 3.x)
+  - Username/password with automatic OAuth2 token exchange (Airflow 3.x)
+  - Basic auth (Airflow 2.x)
 
 
 ## Installation
@@ -60,7 +68,10 @@ The server provides a set of tools that AI assistants can use to interact with y
 **Custom configuration:**
 
 ```bash
-# Connect to a different Airflow instance
+# Airflow 3.x with username/password (OAuth2 token exchange)
+astro-airflow-mcp --airflow-url https://my-airflow.example.com --username admin --password admin
+
+# Airflow 2.x or 3.x with bearer token
 astro-airflow-mcp --airflow-url https://my-airflow.example.com --auth-token my_token
 
 # Use a different port
@@ -75,6 +86,23 @@ astro-airflow-mcp --transport stdio
 #### Claude Desktop
 
 Add to your Claude Desktop configuration:
+
+```json
+{
+  "mcpServers": {
+    "airflow": {
+      "command": "astro-airflow-mcp",
+      "env": {
+        "AIRFLOW_API_URL": "http://your.airflow.domain.com",
+        "AIRFLOW_USERNAME": "admin",
+        "AIRFLOW_PASSWORD": "admin"
+      }
+    }
+  }
+}
+```
+
+Or with a bearer token:
 
 ```json
 {
@@ -134,14 +162,22 @@ Configure in Cursor's MCP settings:
 
 ## Available Tools
 
-The MCP server provides the following tools:
+### Consolidated Tools (Agent-Optimized)
+
+| Tool | Description |
+|------|-------------|
+| `explore_dag` | Get comprehensive DAG info: metadata, tasks, recent runs, source code |
+| `diagnose_dag_run` | Debug a DAG run: run details, failed task instances, logs |
+| `get_system_health` | System overview: health status, import errors, warnings, DAG stats |
+
+### Core Tools
 
 | Tool | Description |
 |------|-------------|
 | `list_dags` | Get all DAGs and their metadata |
 | `get_dag_details` | Get detailed info about a specific DAG |
 | `get_dag_source` | Get the source code of a DAG |
-| `get_dag_stats` | Get DAG run statistics |
+| `get_dag_stats` | Get DAG run statistics (Airflow 3.x only) |
 | `list_dag_warnings` | Get DAG import warnings |
 | `list_import_errors` | Get import errors from DAG files that failed to parse |
 | `list_dag_runs` | Get DAG run history |
@@ -156,11 +192,29 @@ The MCP server provides the following tools:
 | `list_variables` | Get all Airflow variables |
 | `get_variable` | Get a specific variable by key |
 | `list_connections` | Get all connections (credentials excluded for security) |
-| `list_assets` | Get data assets/datasets for data lineage |
+| `list_assets` | Get assets/datasets (unified naming across versions) |
 | `list_plugins` | Get installed Airflow plugins |
 | `list_providers` | Get installed provider packages |
 | `get_airflow_config` | Get Airflow configuration |
 | `get_airflow_version` | Get Airflow version information |
+| `get_health` | Get Airflow health status |
+
+### MCP Resources
+
+| Resource URI | Description |
+|--------------|-------------|
+| `airflow://version` | Airflow version information |
+| `airflow://providers` | Installed provider packages |
+| `airflow://plugins` | Installed Airflow plugins |
+| `airflow://config` | Airflow configuration |
+
+### MCP Prompts
+
+| Prompt | Description |
+|--------|-------------|
+| `troubleshoot_failed_dag` | Guided workflow for diagnosing DAG failures |
+| `daily_health_check` | Morning health check routine |
+| `onboard_new_dag` | Guide for understanding a new DAG |
 
 ## Development
 
@@ -202,19 +256,38 @@ All tools use a global configuration that can be set via:
 1. **Command-line flags** (standalone mode):
    - `--airflow-url`: Airflow webserver URL
    - `--auth-token`: Bearer token for authentication
+   - `--username`: Username for authentication (Airflow 3.x uses OAuth2 token exchange)
+   - `--password`: Password for authentication
 
 2. **Environment variables**:
    - `AIRFLOW_API_URL`: Airflow webserver URL
    - `AIRFLOW_AUTH_TOKEN`: Bearer token
+   - `AIRFLOW_USERNAME`: Username for authentication
+   - `AIRFLOW_PASSWORD`: Password for authentication
 
 ## Architecture
 
-The server is built using [FastMCP](https://github.com/jlowin/fastmcp), which provides:
-- Native MCP protocol support (SSE + JSON-RPC)
-- Easy integration with FastAPI applications
-- Automatic tool registration via decorators
+The server is built using [FastMCP](https://github.com/jlowin/fastmcp) with an adapter pattern for Airflow version compatibility:
 
-In standalone mode, it runs as an independent ASGI application. In plugin mode, it's mounted into Airflow's FastAPI webserver using Airflow 3.x's plugin system.
+### Core Components
+
+- **Adapters** (`adapters/`): Version-specific API implementations
+  - `AirflowAdapter` (base): Abstract interface for all Airflow API operations
+  - `AirflowV2Adapter`: Airflow 2.x API (`/api/v1`) with basic auth
+  - `AirflowV3Adapter`: Airflow 3.x API (`/api/v2`) with OAuth2 token exchange
+- **Version Detection**: Automatic detection at startup by probing API endpoints
+- **Models** (`models.py`): Pydantic models for type-safe API responses
+
+### Version Handling Strategy
+
+1. **Major versions (2.x vs 3.x)**: Adapter pattern with runtime version detection
+2. **Minor versions (3.1 vs 3.2)**: Runtime feature detection with graceful fallbacks
+3. **New API parameters**: Pass-through `**kwargs` for forward compatibility
+
+### Deployment Modes
+
+- **Standalone**: Independent ASGI application with HTTP/SSE transport
+- **Plugin**: Mounted into Airflow 3.x FastAPI webserver
 
 ## Contributing
 

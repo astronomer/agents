@@ -48,14 +48,14 @@ def main():
     parser.add_argument(
         "--username",
         type=str,
-        default=os.getenv("AIRFLOW_USERNAME", "admin"),
-        help="Username for Airflow API token authentication (Airflow 3.x, default: admin)",
+        default=os.getenv("AIRFLOW_USERNAME"),
+        help="Username for Airflow API token authentication",
     )
     parser.add_argument(
         "--password",
         type=str,
-        default=os.getenv("AIRFLOW_PASSWORD", "admin"),
-        help="Password for Airflow API token authentication (Airflow 3.x, default: admin)",
+        default=os.getenv("AIRFLOW_PASSWORD"),
+        help="Password for Airflow API token authentication",
     )
 
     args = parser.parse_args()

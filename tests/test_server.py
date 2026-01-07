@@ -122,7 +122,7 @@ class TestCallAirflowAPI:
 
 
 class TestImplFunctions:
-    """Tests for _impl functions using mocked API calls."""
+    """Tests for _impl functions using mocked adapters."""
 
     def test_get_dag_details_impl_success(self, mocker):
         """Test _get_dag_details_impl with successful response."""
@@ -131,7 +131,9 @@ class TestImplFunctions:
             "is_paused": False,
             "description": "Test DAG",
         }
-        mocker.patch("astro_airflow_mcp.server._call_airflow_api", return_value=mock_dag_data)
+        mock_adapter = mocker.Mock()
+        mock_adapter.get_dag.return_value = mock_dag_data
+        mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
 
         result = _get_dag_details_impl("example_dag")
         result_data = json.loads(result)
@@ -141,11 +143,10 @@ class TestImplFunctions:
         assert result_data["description"] == "Test DAG"
 
     def test_get_dag_details_impl_error(self, mocker):
-        """Test _get_dag_details_impl with API error."""
-        mocker.patch(
-            "astro_airflow_mcp.server._call_airflow_api",
-            side_effect=Exception("DAG not found"),
-        )
+        """Test _get_dag_details_impl with adapter error."""
+        mock_adapter = mocker.Mock()
+        mock_adapter.get_dag.side_effect = Exception("DAG not found")
+        mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
 
         result = _get_dag_details_impl("nonexistent_dag")
 
@@ -160,7 +161,9 @@ class TestImplFunctions:
             ],
             "total_entries": 2,
         }
-        mocker.patch("astro_airflow_mcp.server._call_airflow_api", return_value=mock_response)
+        mock_adapter = mocker.Mock()
+        mock_adapter.list_dags.return_value = mock_response
+        mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
 
         result = _list_dags_impl(limit=10, offset=0)
         result_data = json.loads(result)
@@ -173,7 +176,9 @@ class TestImplFunctions:
     def test_list_dags_impl_empty(self, mocker):
         """Test _list_dags_impl with no DAGs."""
         mock_response = {"dags": [], "total_entries": 0}
-        mocker.patch("astro_airflow_mcp.server._call_airflow_api", return_value=mock_response)
+        mock_adapter = mocker.Mock()
+        mock_adapter.list_dags.return_value = mock_response
+        mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
 
         result = _list_dags_impl()
         result_data = json.loads(result)
@@ -373,6 +378,70 @@ class TestAirflowTokenManager:
 
         assert manager._token is None
         assert manager._token_fetched_at is None
+
+    def test_fetch_token_404_marks_unavailable(self, mocker):
+        """Test that 404 response marks token endpoint as unavailable (Airflow 2.x)."""
+        mock_response = mocker.Mock()
+        mock_response.status_code = 404
+        mocker.patch("requests.get", return_value=mock_response)
+
+        manager = AirflowTokenManager(airflow_url="http://localhost:8080")
+        manager._fetch_token()
+
+        assert manager._token is None
+        assert manager._token_endpoint_available is False
+        # Should default to admin:admin for Airflow 2.x
+        assert manager.username == "admin"
+        assert manager.password == "admin"
+
+    def test_fetch_token_404_keeps_provided_credentials(self, mocker):
+        """Test that 404 keeps user-provided credentials instead of defaulting."""
+        mock_response = mocker.Mock()
+        mock_response.status_code = 404
+        mocker.patch("requests.post", return_value=mock_response)
+
+        manager = AirflowTokenManager(
+            airflow_url="http://localhost:8080",
+            username="custom_user",
+            password="custom_pass",
+        )
+        manager._fetch_token()
+
+        assert manager._token is None
+        assert manager._token_endpoint_available is False
+        # Should keep provided credentials
+        assert manager.username == "custom_user"
+        assert manager.password == "custom_pass"
+
+    def test_get_token_skips_unavailable_endpoint(self, mocker):
+        """Test that get_token doesn't retry when endpoint is marked unavailable."""
+        mock_get = mocker.patch("requests.get")
+
+        manager = AirflowTokenManager(airflow_url="http://localhost:8080")
+        manager._token_endpoint_available = False
+
+        token = manager.get_token()
+
+        assert token is None
+        mock_get.assert_not_called()
+
+    def test_get_basic_auth(self):
+        """Test get_basic_auth returns credentials."""
+        manager = AirflowTokenManager(
+            airflow_url="http://localhost:8080",
+            username="admin",
+            password="secret",
+        )
+        auth = manager.get_basic_auth()
+
+        assert auth == ("admin", "secret")
+
+    def test_get_basic_auth_none_without_credentials(self):
+        """Test get_basic_auth returns None without credentials."""
+        manager = AirflowTokenManager(airflow_url="http://localhost:8080")
+        auth = manager.get_basic_auth()
+
+        assert auth is None
 
 
 class TestAPIRetryOnAuthError:
