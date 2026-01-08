@@ -95,6 +95,7 @@ class AirflowAdapter(ABC):
             Exception: For other HTTP errors
         """
         headers, auth = self._setup_auth()
+        headers["Accept"] = "application/json"
         url = f"{self.airflow_url}{self.api_base_path}/{endpoint}"
 
         # Merge params with extra_params for forward compatibility
@@ -104,6 +105,38 @@ class AirflowAdapter(ABC):
 
         with httpx.Client(timeout=30.0) as client:
             response = client.get(url, params=all_params, headers=headers, auth=auth)
+
+            if response.status_code == 404:
+                raise NotFoundError(endpoint)
+
+            response.raise_for_status()
+            return response.json()
+
+    def _post(
+        self,
+        endpoint: str,
+        json_data: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Make HTTP POST call to Airflow API.
+
+        Args:
+            endpoint: API endpoint path (without base path)
+            json_data: JSON body to send
+
+        Returns:
+            Parsed JSON response
+
+        Raises:
+            NotFoundError: If endpoint returns 404
+            Exception: For other HTTP errors
+        """
+        headers, auth = self._setup_auth()
+        headers["Accept"] = "application/json"
+        headers["Content-Type"] = "application/json"
+        url = f"{self.airflow_url}{self.api_base_path}/{endpoint}"
+
+        with httpx.Client(timeout=30.0) as client:
+            response = client.post(url, json=json_data, headers=headers, auth=auth)
 
             if response.status_code == 404:
                 raise NotFoundError(endpoint)
@@ -173,6 +206,22 @@ class AirflowAdapter(ABC):
         """Get details of a specific DAG run."""
         pass
 
+    @abstractmethod
+    def trigger_dag_run(
+        self, dag_id: str, logical_date: str | None = None, conf: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Trigger a new DAG run.
+
+        Args:
+            dag_id: The ID of the DAG to trigger
+            logical_date: Optional logical/execution date for the run
+            conf: Optional configuration dictionary to pass to the DAG run
+
+        Returns:
+            Details of the triggered DAG run
+        """
+        pass
+
     # Task Operations
     @abstractmethod
     def list_tasks(self, dag_id: str) -> dict[str, Any]:
@@ -187,6 +236,20 @@ class AirflowAdapter(ABC):
     @abstractmethod
     def get_task_instance(self, dag_id: str, dag_run_id: str, task_id: str) -> dict[str, Any]:
         """Get details of a task instance."""
+        pass
+
+    @abstractmethod
+    def get_task_instances(
+        self, dag_id: str, dag_run_id: str, limit: int = 100, offset: int = 0
+    ) -> dict[str, Any]:
+        """List all task instances for a DAG run.
+
+        Args:
+            dag_id: DAG ID
+            dag_run_id: DAG run ID
+            limit: Maximum number of task instances to return
+            offset: Offset for pagination
+        """
         pass
 
     @abstractmethod

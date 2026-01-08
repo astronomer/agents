@@ -53,6 +53,28 @@ class AirflowV2Adapter(AirflowAdapter):
         """Get details of a specific DAG run."""
         return self._call(f"dags/{dag_id}/dagRuns/{dag_run_id}")
 
+    def trigger_dag_run(
+        self, dag_id: str, logical_date: str | None = None, conf: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Trigger a new DAG run.
+
+        Args:
+            dag_id: The ID of the DAG to trigger
+            logical_date: Optional execution date for the run (Airflow 2 uses execution_date)
+            conf: Optional configuration dictionary to pass to the DAG run
+
+        Returns:
+            Details of the triggered DAG run
+        """
+        json_body: dict[str, Any] = {}
+        if logical_date:
+            # Airflow 2.x uses execution_date instead of logical_date
+            json_body["execution_date"] = logical_date
+        if conf:
+            json_body["conf"] = conf
+
+        return self._post(f"dags/{dag_id}/dagRuns", json_data=json_body)
+
     def list_tasks(self, dag_id: str) -> dict[str, Any]:
         """List all tasks in a DAG."""
         return self._call(f"dags/{dag_id}/tasks")
@@ -64,6 +86,22 @@ class AirflowV2Adapter(AirflowAdapter):
     def get_task_instance(self, dag_id: str, dag_run_id: str, task_id: str) -> dict[str, Any]:
         """Get details of a task instance."""
         return self._call(f"dags/{dag_id}/dagRuns/{dag_run_id}/taskInstances/{task_id}")
+
+    def get_task_instances(
+        self, dag_id: str, dag_run_id: str, limit: int = 100, offset: int = 0
+    ) -> dict[str, Any]:
+        """List all task instances for a DAG run.
+
+        Args:
+            dag_id: DAG ID
+            dag_run_id: DAG run ID
+            limit: Maximum number of task instances to return
+            offset: Offset for pagination
+        """
+        return self._call(
+            f"dags/{dag_id}/dagRuns/{dag_run_id}/taskInstances",
+            params={"limit": limit, "offset": offset},
+        )
 
     def get_task_logs(
         self,

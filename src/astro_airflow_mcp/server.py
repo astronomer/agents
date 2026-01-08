@@ -1107,17 +1107,8 @@ def _trigger_dag_impl(
         JSON string containing the triggered DAG run details
     """
     try:
-        # logical_date is required by Airflow 3 API but can be null
-        json_body: dict[str, Any] = {"logical_date": None}
-        if conf:
-            json_body["conf"] = conf
-
-        data = _post_airflow_api(
-            f"dags/{dag_id}/dagRuns",
-            _config.url,
-            json_data=json_body,
-        )
-
+        adapter = _get_adapter()
+        data = adapter.trigger_dag_run(dag_id=dag_id, conf=conf)
         return json.dumps(data, indent=2)
     except Exception as e:
         return str(e)
@@ -1137,11 +1128,8 @@ def _get_failed_task_instances(
         List of failed task instance details
     """
     try:
-        endpoint = f"dags/{dag_id}/dagRuns/{dag_run_id}/taskInstances"
-        data = _call_airflow_api(
-            endpoint,
-            _config.url,
-        )
+        adapter = _get_adapter()
+        data = adapter.get_task_instances(dag_id, dag_run_id)
 
         failed_states = {"failed", "upstream_failed"}
         failed_tasks = []
@@ -1924,34 +1912,24 @@ def explore_dag(dag_id: str) -> str:
         JSON with comprehensive DAG information
     """
     result: dict[str, Any] = {"dag_id": dag_id}
+    adapter = _get_adapter()
 
     # Get DAG details
     try:
-        dag_data = _call_airflow_api(
-            f"dags/{dag_id}",
-            _config.url,
-        )
-        result["dag_info"] = dag_data
+        result["dag_info"] = adapter.get_dag(dag_id)
     except Exception as e:
         result["dag_info"] = {"error": str(e)}
 
     # Get tasks
     try:
-        tasks_data = _call_airflow_api(
-            f"dags/{dag_id}/tasks",
-            _config.url,
-        )
+        tasks_data = adapter.list_tasks(dag_id)
         result["tasks"] = tasks_data.get("tasks", [])
     except Exception as e:
         result["tasks"] = {"error": str(e)}
 
     # Get DAG source
     try:
-        source_data = _call_airflow_api(
-            f"dagSources/{dag_id}",
-            _config.url,
-        )
-        result["source"] = source_data
+        result["source"] = adapter.get_dag_source(dag_id)
     except Exception as e:
         result["source"] = {"error": str(e)}
 
@@ -1984,24 +1962,18 @@ def diagnose_dag_run(dag_id: str, dag_run_id: str) -> str:
         JSON with diagnostic information about the DAG run
     """
     result: dict[str, Any] = {"dag_id": dag_id, "dag_run_id": dag_run_id}
+    adapter = _get_adapter()
 
     # Get DAG run details
     try:
-        run_data = _call_airflow_api(
-            f"dags/{dag_id}/dagRuns/{dag_run_id}",
-            _config.url,
-        )
-        result["run_info"] = run_data
+        result["run_info"] = adapter.get_dag_run(dag_id, dag_run_id)
     except Exception as e:
         result["run_info"] = {"error": str(e)}
         return json.dumps(result, indent=2)
 
     # Get task instances for this run
     try:
-        tasks_data = _call_airflow_api(
-            f"dags/{dag_id}/dagRuns/{dag_run_id}/taskInstances",
-            _config.url,
-        )
+        tasks_data = adapter.get_task_instances(dag_id, dag_run_id)
         task_instances = tasks_data.get("task_instances", [])
         result["task_instances"] = task_instances
 
@@ -2056,24 +2028,17 @@ def get_system_health() -> str:
         JSON with system health overview
     """
     result: dict[str, Any] = {}
+    adapter = _get_adapter()
 
     # Get version info
     try:
-        version_data = _call_airflow_api(
-            "version",
-            _config.url,
-        )
-        result["version"] = version_data
+        result["version"] = adapter.get_version()
     except Exception as e:
         result["version"] = {"error": str(e)}
 
     # Get import errors
     try:
-        errors_data = _call_airflow_api(
-            "importErrors",
-            _config.url,
-            params={"limit": 100},
-        )
+        errors_data = adapter.list_import_errors(limit=100)
         import_errors = errors_data.get("import_errors", [])
         result["import_errors"] = {
             "count": len(import_errors),
@@ -2084,11 +2049,7 @@ def get_system_health() -> str:
 
     # Get DAG warnings
     try:
-        warnings_data = _call_airflow_api(
-            "dagWarnings",
-            _config.url,
-            params={"limit": 100},
-        )
+        warnings_data = adapter.list_dag_warnings(limit=100)
         dag_warnings = warnings_data.get("dag_warnings", [])
         result["dag_warnings"] = {
             "count": len(dag_warnings),
@@ -2097,13 +2058,9 @@ def get_system_health() -> str:
     except Exception as e:
         result["dag_warnings"] = {"error": str(e)}
 
-    # Get DAG stats (Airflow 3.x only)
+    # Get DAG stats
     try:
-        stats_data = _call_airflow_api(
-            "dagStats",
-            _config.url,
-        )
-        result["dag_stats"] = stats_data
+        result["dag_stats"] = adapter.get_dag_stats()
     except Exception:
         result["dag_stats"] = {"available": False, "note": "dagStats endpoint not available"}
 

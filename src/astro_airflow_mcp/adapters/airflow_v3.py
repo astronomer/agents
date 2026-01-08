@@ -116,6 +116,25 @@ class AirflowV3Adapter(AirflowAdapter):
         """Get details of a specific DAG run."""
         return self._call(f"dags/{dag_id}/dagRuns/{dag_run_id}")
 
+    def trigger_dag_run(
+        self, dag_id: str, logical_date: str | None = None, conf: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Trigger a new DAG run.
+
+        Args:
+            dag_id: The ID of the DAG to trigger
+            logical_date: Optional logical date for the run (can be null in Airflow 3)
+            conf: Optional configuration dictionary to pass to the DAG run
+
+        Returns:
+            Details of the triggered DAG run
+        """
+        json_body: dict[str, Any] = {"logical_date": logical_date}
+        if conf:
+            json_body["conf"] = conf
+
+        return self._post(f"dags/{dag_id}/dagRuns", json_data=json_body)
+
     def list_tasks(self, dag_id: str) -> dict[str, Any]:
         """List all tasks in a DAG."""
         return self._call(f"dags/{dag_id}/tasks")

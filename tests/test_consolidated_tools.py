@@ -1,6 +1,7 @@
 """Tests for consolidated MCP tools."""
 
 import json
+from unittest.mock import MagicMock
 
 
 # Helper to get the underlying function from a decorated MCP tool
@@ -24,15 +25,13 @@ class TestExploreDag:
         mock_tasks = {"tasks": [{"task_id": "task1"}, {"task_id": "task2"}]}
         mock_source = {"content": "print('hello')"}
 
-        def mock_api_call(endpoint, *args, **kwargs):
-            if "dags/example_dag/tasks" in endpoint:
-                return mock_tasks
-            elif "dagSources" in endpoint:
-                return mock_source
-            else:
-                return mock_dag
+        # Create mock adapter
+        mock_adapter = MagicMock()
+        mock_adapter.get_dag.return_value = mock_dag
+        mock_adapter.list_tasks.return_value = mock_tasks
+        mock_adapter.get_dag_source.return_value = mock_source
 
-        mocker.patch("astro_airflow_mcp.server._call_airflow_api", side_effect=mock_api_call)
+        mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
 
         explore_dag_fn = get_tool_fn(server_module, "explore_dag")
         result = explore_dag_fn("example_dag")
@@ -49,14 +48,13 @@ class TestExploreDag:
 
         mock_dag = {"dag_id": "example_dag"}
 
-        def mock_api_call(endpoint, *args, **kwargs):
-            if "tasks" in endpoint:
-                raise Exception("Tasks endpoint failed")
-            elif "dagSources" in endpoint:
-                raise Exception("Source endpoint failed")
-            return mock_dag
+        # Create mock adapter with partial failures
+        mock_adapter = MagicMock()
+        mock_adapter.get_dag.return_value = mock_dag
+        mock_adapter.list_tasks.side_effect = Exception("Tasks endpoint failed")
+        mock_adapter.get_dag_source.side_effect = Exception("Source endpoint failed")
 
-        mocker.patch("astro_airflow_mcp.server._call_airflow_api", side_effect=mock_api_call)
+        mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
 
         explore_dag_fn = get_tool_fn(server_module, "explore_dag")
         result = explore_dag_fn("example_dag")
@@ -87,12 +85,12 @@ class TestDiagnoseDagRun:
             ]
         }
 
-        def mock_api_call(endpoint, *args, **kwargs):
-            if "taskInstances" in endpoint:
-                return mock_task_instances
-            return mock_run
+        # Create mock adapter
+        mock_adapter = MagicMock()
+        mock_adapter.get_dag_run.return_value = mock_run
+        mock_adapter.get_task_instances.return_value = mock_task_instances
 
-        mocker.patch("astro_airflow_mcp.server._call_airflow_api", side_effect=mock_api_call)
+        mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
 
         diagnose_fn = get_tool_fn(server_module, "diagnose_dag_run")
         result = diagnose_fn("example_dag", "manual__2024-01-01")
@@ -113,10 +111,11 @@ class TestDiagnoseDagRun:
         """Test diagnose_dag_run handles missing run."""
         import astro_airflow_mcp.server as server_module
 
-        mocker.patch(
-            "astro_airflow_mcp.server._call_airflow_api",
-            side_effect=Exception("Run not found"),
-        )
+        # Create mock adapter that raises exception
+        mock_adapter = MagicMock()
+        mock_adapter.get_dag_run.side_effect = Exception("Run not found")
+
+        mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
 
         diagnose_fn = get_tool_fn(server_module, "diagnose_dag_run")
         result = diagnose_fn("example_dag", "nonexistent")
@@ -137,18 +136,14 @@ class TestGetSystemHealth:
         mock_warnings = {"dag_warnings": []}
         mock_stats = {"dags": []}
 
-        def mock_api_call(endpoint, *args, **kwargs):
-            if "version" in endpoint:
-                return mock_version
-            elif "importErrors" in endpoint:
-                return mock_import_errors
-            elif "dagWarnings" in endpoint:
-                return mock_warnings
-            elif "dagStats" in endpoint:
-                return mock_stats
-            return {}
+        # Create mock adapter
+        mock_adapter = MagicMock()
+        mock_adapter.get_version.return_value = mock_version
+        mock_adapter.list_import_errors.return_value = mock_import_errors
+        mock_adapter.list_dag_warnings.return_value = mock_warnings
+        mock_adapter.get_dag_stats.return_value = mock_stats
 
-        mocker.patch("astro_airflow_mcp.server._call_airflow_api", side_effect=mock_api_call)
+        mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
 
         health_fn = get_tool_fn(server_module, "get_system_health")
         result = health_fn()
@@ -170,18 +165,14 @@ class TestGetSystemHealth:
         mock_warnings = {"dag_warnings": []}
         mock_stats = {"dags": []}
 
-        def mock_api_call(endpoint, *args, **kwargs):
-            if "version" in endpoint:
-                return mock_version
-            elif "importErrors" in endpoint:
-                return mock_import_errors
-            elif "dagWarnings" in endpoint:
-                return mock_warnings
-            elif "dagStats" in endpoint:
-                return mock_stats
-            return {}
+        # Create mock adapter
+        mock_adapter = MagicMock()
+        mock_adapter.get_version.return_value = mock_version
+        mock_adapter.list_import_errors.return_value = mock_import_errors
+        mock_adapter.list_dag_warnings.return_value = mock_warnings
+        mock_adapter.get_dag_stats.return_value = mock_stats
 
-        mocker.patch("astro_airflow_mcp.server._call_airflow_api", side_effect=mock_api_call)
+        mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
 
         health_fn = get_tool_fn(server_module, "get_system_health")
         result = health_fn()
@@ -202,18 +193,14 @@ class TestGetSystemHealth:
         }
         mock_stats = {"dags": []}
 
-        def mock_api_call(endpoint, *args, **kwargs):
-            if "version" in endpoint:
-                return mock_version
-            elif "importErrors" in endpoint:
-                return mock_import_errors
-            elif "dagWarnings" in endpoint:
-                return mock_warnings
-            elif "dagStats" in endpoint:
-                return mock_stats
-            return {}
+        # Create mock adapter
+        mock_adapter = MagicMock()
+        mock_adapter.get_version.return_value = mock_version
+        mock_adapter.list_import_errors.return_value = mock_import_errors
+        mock_adapter.list_dag_warnings.return_value = mock_warnings
+        mock_adapter.get_dag_stats.return_value = mock_stats
 
-        mocker.patch("astro_airflow_mcp.server._call_airflow_api", side_effect=mock_api_call)
+        mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
 
         health_fn = get_tool_fn(server_module, "get_system_health")
         result = health_fn()
@@ -230,18 +217,14 @@ class TestGetSystemHealth:
         mock_import_errors = {"import_errors": []}
         mock_warnings = {"dag_warnings": []}
 
-        def mock_api_call(endpoint, *args, **kwargs):
-            if "version" in endpoint:
-                return mock_version
-            elif "importErrors" in endpoint:
-                return mock_import_errors
-            elif "dagWarnings" in endpoint:
-                return mock_warnings
-            elif "dagStats" in endpoint:
-                raise Exception("Endpoint not found")
-            return {}
+        # Create mock adapter where dag_stats raises exception
+        mock_adapter = MagicMock()
+        mock_adapter.get_version.return_value = mock_version
+        mock_adapter.list_import_errors.return_value = mock_import_errors
+        mock_adapter.list_dag_warnings.return_value = mock_warnings
+        mock_adapter.get_dag_stats.side_effect = Exception("Endpoint not found")
 
-        mocker.patch("astro_airflow_mcp.server._call_airflow_api", side_effect=mock_api_call)
+        mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
 
         health_fn = get_tool_fn(server_module, "get_system_health")
         result = health_fn()
