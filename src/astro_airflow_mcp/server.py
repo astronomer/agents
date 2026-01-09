@@ -6,6 +6,7 @@ from typing import Any
 
 import requests
 from fastmcp import FastMCP
+from fastmcp.server.middleware.logging import LoggingMiddleware
 
 from astro_airflow_mcp.adapters import AirflowAdapter, create_adapter
 from astro_airflow_mcp.logging import get_logger
@@ -193,6 +194,9 @@ mcp = FastMCP(
     Airflow instance.
     """,
 )
+
+# Add logging middleware to log all MCP tool calls
+mcp.add_middleware(LoggingMiddleware(include_payloads=True))
 
 
 # Global configuration for Airflow API access
