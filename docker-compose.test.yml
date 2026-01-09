@@ -45,6 +45,8 @@ services:
       _AIRFLOW_WWW_USER_PASSWORD: admin
     ports:
       - "8080:8080"
+    volumes:
+      - ./tests/integration/dags:/opt/airflow/dags/test_dags:ro
     command: standalone
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
@@ -86,6 +88,7 @@ services:
       - "8081:8080"
     volumes:
       - ./tests/integration/passwords.json:/tmp/passwords.json:ro
+      - ./tests/integration/dags:/opt/airflow/dags/test_dags:ro
     command: >
       bash -c "cp /tmp/passwords.json /opt/airflow/passwords.json && airflow standalone"
     healthcheck:
