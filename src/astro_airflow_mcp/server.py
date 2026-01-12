@@ -1169,7 +1169,7 @@ def _trigger_dag_and_wait_impl(
         dag_id: The ID of the DAG to trigger
         conf: Optional configuration dictionary to pass to the DAG run
         poll_interval: Seconds between status checks (default: 5.0)
-        timeout: Maximum time to wait in seconds (default: 1800.0 / 30 minutes)
+        timeout: Maximum time to wait in seconds (default: 3600.0 / 60 minutes)
 
     Returns:
         JSON string containing the final DAG run status and any failed task details
@@ -1323,7 +1323,7 @@ def trigger_dag_and_wait(
     DAGs, consider using `trigger_dag` instead and checking status separately with
     `get_dag_run`.
 
-    Default timeout is 30 minutes. Adjust the `timeout` parameter for longer DAGs.
+    Default timeout is 60 minutes. Adjust the `timeout` parameter for longer DAGs.
 
     Returns information about the completed DAG run including:
     - dag_id: Which DAG was run
@@ -1339,7 +1339,7 @@ def trigger_dag_and_wait(
         dag_id: The ID of the DAG to trigger (e.g., "example_dag")
         conf: Optional configuration dictionary to pass to the DAG run.
               This will be available in the DAG via context['dag_run'].conf
-        timeout: Maximum time to wait in seconds (default: 1800.0 / 30 minutes)
+        timeout: Maximum time to wait in seconds (default: 3600.0 / 60 minutes)
 
     Returns:
         JSON with final DAG run status and any failed task details
