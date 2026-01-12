@@ -231,8 +231,8 @@ make test
 # Run all checks
 make check
 
-# Run pre-commit hooks
-make pre-commit
+# Run prek hooks
+make prek
 ```
 
 ### Local Testing with Astro CLI
@@ -295,4 +295,4 @@ The server is built using [FastMCP](https://github.com/jlowin/fastmcp) with an a
 Contributions welcome! Please ensure:
 - All tests pass (`make test`)
 - Code passes linting (`make check`)
-- Pre-commit hooks pass (`make pre-commit`)
+- prek hooks pass (`make prek`)

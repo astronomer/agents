@@ -1,6 +1,6 @@
 # Makefile for airflow-mcp development
 
-.PHONY: help install install-dev install-dev-ci install-hooks run docker-build docker-run build test test-integration test-integration-v2 test-integration-v3 lint format type-check security check clean pre-commit
+.PHONY: help install install-dev install-dev-ci install-hooks run docker-build docker-run build test test-integration test-integration-v2 test-integration-v3 lint format type-check security check clean prek
 
 help:  ## Show this help message
 	@echo "Available commands:"
@@ -20,9 +20,9 @@ install-dev-ci:  ## Install the package with dev dependencies (CI - system Pytho
 	uv pip install --system -r /tmp/requirements.txt
 	uv pip install --system -e .
 
-install-hooks:  ## Install pre-commit hooks
-	pre-commit install
-	@echo "✓ Pre-commit hooks installed"
+install-hooks:  ## Install prek hooks
+	prek install
+	@echo "✓ prek hooks installed"
 
 run:  ## Run the MCP server (defaults: http mode, localhost:8000, airflow at localhost:8080)
 	uv run python -m astro_airflow_mcp
@@ -80,11 +80,11 @@ security:  ## Run security checks (bandit) - excludes tests
 check: lint type-check security  ## Run all checks (lint, type-check, security)
 	@echo "✓ All checks passed"
 
-pre-commit:  ## Run pre-commit on all files
-	pre-commit run --all-files
+prek:  ## Run prek on all files
+	prek run --all-files
 
-pre-commit-update:  ## Update pre-commit hook versions
-	pre-commit autoupdate
+prek-update:  ## Update prek hook versions
+	prek autoupdate
 
 clean:  ## Clean up build artifacts and cache files
 	rm -rf build/
@@ -99,5 +99,5 @@ clean:  ## Clean up build artifacts and cache files
 setup: install-dev install-hooks  ## Complete setup (install dev deps + hooks)
 	@echo "✓ Development environment ready"
 
-ci: pre-commit test  ## Run CI checks (pre-commit + tests)
+ci: prek test  ## Run CI checks (prek + tests)
 	@echo "✓ CI checks passed"

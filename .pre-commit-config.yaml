@@ -1,7 +1,7 @@
-# Pre-commit hooks for airflow-mcp
-# See https://pre-commit.com for more information
-# To install: pip install pre-commit && pre-commit install
-# To run manually: pre-commit run --all-files
+# prek hooks for airflow-mcp
+# See https://github.com/j178/prek for more information
+# To install: uv tool install prek && prek install
+# To run manually: prek run --all-files
 
 repos:
   # General file checks
