@@ -437,3 +437,82 @@ class TestConfigEndpoint:
         else:
             # Airflow 2.x without expose_config returns error info
             print(f"Config access returned: {result}")
+
+
+class TestPauseUnpauseEndpoints:
+    """Test pause and unpause DAG operations."""
+
+    @pytest.fixture
+    def adapter(self, airflow_url: str, airflow_username: str, airflow_password: str):
+        """Create adapter for tests."""
+        return create_adapter(
+            airflow_url,
+            basic_auth_getter=lambda: (airflow_username, airflow_password),
+        )
+
+    def test_pause_dag(self, adapter):
+        """Should pause a DAG."""
+        # Get initial state
+        initial = adapter.get_dag(TEST_DAG_ID)
+        initial_paused = initial.get("is_paused")
+
+        try:
+            # Pause the DAG
+            result = adapter.pause_dag(TEST_DAG_ID)
+
+            assert result.get("dag_id") == TEST_DAG_ID
+            assert result.get("is_paused") is True
+            print(f"Paused DAG {TEST_DAG_ID}")
+        finally:
+            # Restore original state if it was unpaused
+            if not initial_paused:
+                adapter.unpause_dag(TEST_DAG_ID)
+
+    def test_unpause_dag(self, adapter):
+        """Should unpause a DAG."""
+        # Get initial state
+        initial = adapter.get_dag(TEST_DAG_ID)
+        initial_paused = initial.get("is_paused")
+
+        try:
+            # Unpause the DAG
+            result = adapter.unpause_dag(TEST_DAG_ID)
+
+            assert result.get("dag_id") == TEST_DAG_ID
+            assert result.get("is_paused") is False
+            print(f"Unpaused DAG {TEST_DAG_ID}")
+        finally:
+            # Restore original state if it was paused
+            if initial_paused:
+                adapter.pause_dag(TEST_DAG_ID)
+
+    def test_pause_unpause_roundtrip(self, adapter):
+        """Should successfully pause and unpause a DAG."""
+        # Get initial state
+        initial = adapter.get_dag(TEST_DAG_ID)
+        initial_paused = initial.get("is_paused")
+
+        try:
+            # Pause the DAG
+            paused = adapter.pause_dag(TEST_DAG_ID)
+            assert paused.get("is_paused") is True
+
+            # Verify via get_dag
+            verify_paused = adapter.get_dag(TEST_DAG_ID)
+            assert verify_paused.get("is_paused") is True
+
+            # Unpause the DAG
+            unpaused = adapter.unpause_dag(TEST_DAG_ID)
+            assert unpaused.get("is_paused") is False
+
+            # Verify via get_dag
+            verify_unpaused = adapter.get_dag(TEST_DAG_ID)
+            assert verify_unpaused.get("is_paused") is False
+
+            print(f"Successfully completed pause/unpause roundtrip for {TEST_DAG_ID}")
+        finally:
+            # Restore original state
+            if initial_paused:
+                adapter.pause_dag(TEST_DAG_ID)
+            else:
+                adapter.unpause_dag(TEST_DAG_ID)

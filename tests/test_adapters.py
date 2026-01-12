@@ -439,3 +439,202 @@ class TestFeatureDetection:
         assert result["available"] is False
         assert "testEndpoint" in result["note"]
         assert result["alternative"] == "Use alternative"
+
+
+class TestPatchMethod:
+    """Tests for _patch HTTP method."""
+
+    def test_patch_method_v2(self, mocker):
+        """Test V2 adapter _patch makes correct API call."""
+        adapter = AirflowV2Adapter(
+            "http://localhost:8080",
+            "2.9.0",
+            token_getter=lambda: "test_token",
+        )
+
+        mock_response = mocker.Mock()
+        mock_response.json.return_value = {"dag_id": "test_dag", "is_paused": True}
+        mock_response.status_code = 200
+        mock_response.raise_for_status = mocker.Mock()
+
+        mock_client = mocker.Mock()
+        mock_client.patch.return_value = mock_response
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+
+        mocker.patch("httpx.Client", return_value=mock_client)
+
+        result = adapter._patch("dags/test_dag", json_data={"is_paused": True})
+
+        assert result["is_paused"] is True
+        mock_client.patch.assert_called_once()
+        call_args = mock_client.patch.call_args
+        assert "/api/v1/dags/test_dag" in call_args[0][0]
+        assert call_args[1]["json"] == {"is_paused": True}
+
+    def test_patch_method_v3(self, mocker):
+        """Test V3 adapter _patch makes correct API call."""
+        adapter = AirflowV3Adapter(
+            "http://localhost:8080",
+            "3.0.0",
+            token_getter=lambda: "test_token",
+        )
+
+        mock_response = mocker.Mock()
+        mock_response.json.return_value = {"dag_id": "test_dag", "is_paused": False}
+        mock_response.status_code = 200
+        mock_response.raise_for_status = mocker.Mock()
+
+        mock_client = mocker.Mock()
+        mock_client.patch.return_value = mock_response
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+
+        mocker.patch("httpx.Client", return_value=mock_client)
+
+        result = adapter._patch("dags/test_dag", json_data={"is_paused": False})
+
+        assert result["is_paused"] is False
+        mock_client.patch.assert_called_once()
+        call_args = mock_client.patch.call_args
+        assert "/api/v2/dags/test_dag" in call_args[0][0]
+
+    def test_patch_method_handles_404(self, mocker):
+        """Test _patch raises NotFoundError on 404."""
+        adapter = AirflowV2Adapter(
+            "http://localhost:8080",
+            "2.9.0",
+        )
+
+        mock_response = mocker.Mock()
+        mock_response.status_code = 404
+
+        mock_client = mocker.Mock()
+        mock_client.patch.return_value = mock_response
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+
+        mocker.patch("httpx.Client", return_value=mock_client)
+
+        with pytest.raises(NotFoundError) as exc_info:
+            adapter._patch("dags/nonexistent_dag", json_data={"is_paused": True})
+
+        assert "nonexistent_dag" in str(exc_info.value)
+
+
+class TestPauseDag:
+    """Tests for pause_dag and unpause_dag methods."""
+
+    def test_pause_dag_v2(self, mocker):
+        """Test V2 adapter pause_dag calls correct endpoint."""
+        adapter = AirflowV2Adapter(
+            "http://localhost:8080",
+            "2.9.0",
+        )
+
+        mock_response = mocker.Mock()
+        mock_response.json.return_value = {
+            "dag_id": "example_dag",
+            "is_paused": True,
+        }
+        mock_response.status_code = 200
+        mock_response.raise_for_status = mocker.Mock()
+
+        mock_client = mocker.Mock()
+        mock_client.patch.return_value = mock_response
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+
+        mocker.patch("httpx.Client", return_value=mock_client)
+
+        result = adapter.pause_dag("example_dag")
+
+        assert result["is_paused"] is True
+        call_args = mock_client.patch.call_args
+        assert "/api/v1/dags/example_dag" in call_args[0][0]
+        assert call_args[1]["json"] == {"is_paused": True}
+
+    def test_unpause_dag_v2(self, mocker):
+        """Test V2 adapter unpause_dag calls correct endpoint."""
+        adapter = AirflowV2Adapter(
+            "http://localhost:8080",
+            "2.9.0",
+        )
+
+        mock_response = mocker.Mock()
+        mock_response.json.return_value = {
+            "dag_id": "example_dag",
+            "is_paused": False,
+        }
+        mock_response.status_code = 200
+        mock_response.raise_for_status = mocker.Mock()
+
+        mock_client = mocker.Mock()
+        mock_client.patch.return_value = mock_response
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+
+        mocker.patch("httpx.Client", return_value=mock_client)
+
+        result = adapter.unpause_dag("example_dag")
+
+        assert result["is_paused"] is False
+        call_args = mock_client.patch.call_args
+        assert "/api/v1/dags/example_dag" in call_args[0][0]
+        assert call_args[1]["json"] == {"is_paused": False}
+
+    def test_pause_dag_v3(self, mocker):
+        """Test V3 adapter pause_dag calls correct endpoint."""
+        adapter = AirflowV3Adapter(
+            "http://localhost:8080",
+            "3.0.0",
+        )
+
+        mock_response = mocker.Mock()
+        mock_response.json.return_value = {
+            "dag_id": "example_dag",
+            "is_paused": True,
+        }
+        mock_response.status_code = 200
+        mock_response.raise_for_status = mocker.Mock()
+
+        mock_client = mocker.Mock()
+        mock_client.patch.return_value = mock_response
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+
+        mocker.patch("httpx.Client", return_value=mock_client)
+
+        result = adapter.pause_dag("example_dag")
+
+        assert result["is_paused"] is True
+        call_args = mock_client.patch.call_args
+        assert "/api/v2/dags/example_dag" in call_args[0][0]
+
+    def test_unpause_dag_v3(self, mocker):
+        """Test V3 adapter unpause_dag calls correct endpoint."""
+        adapter = AirflowV3Adapter(
+            "http://localhost:8080",
+            "3.0.0",
+        )
+
+        mock_response = mocker.Mock()
+        mock_response.json.return_value = {
+            "dag_id": "example_dag",
+            "is_paused": False,
+        }
+        mock_response.status_code = 200
+        mock_response.raise_for_status = mocker.Mock()
+
+        mock_client = mocker.Mock()
+        mock_client.patch.return_value = mock_response
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+
+        mocker.patch("httpx.Client", return_value=mock_client)
+
+        result = adapter.unpause_dag("example_dag")
+
+        assert result["is_paused"] is False
+        call_args = mock_client.patch.call_args
+        assert "/api/v2/dags/example_dag" in call_args[0][0]

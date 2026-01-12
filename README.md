@@ -11,7 +11,7 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for Ap
 
 - **Airflow 2.x and 3.x Support**: Automatic version detection with adapter pattern
 - **MCP Tools** for accessing Airflow data:
-  - DAG management (list, get details, get source code, stats, warnings, import errors, trigger runs)
+  - DAG management (list, get details, get source code, stats, warnings, import errors, trigger, pause/unpause)
   - Task management (list, get details, get task instances, get logs)
   - Pool management (list, get details)
   - Variable management (list, get specific variables)
@@ -183,6 +183,8 @@ Configure in Cursor's MCP settings:
 | `list_dag_runs` | Get DAG run history |
 | `get_dag_run` | Get specific DAG run details |
 | `trigger_dag` | Trigger a new DAG run (start a workflow execution) |
+| `pause_dag` | Pause a DAG to prevent new scheduled runs |
+| `unpause_dag` | Unpause a DAG to resume scheduled runs |
 | `list_tasks` | Get all tasks in a DAG |
 | `get_task` | Get details about a specific task |
 | `get_task_instance` | Get task instance execution details |

@@ -1355,6 +1355,93 @@ def trigger_dag_and_wait(
     )
 
 
+def _pause_dag_impl(dag_id: str) -> str:
+    """Internal implementation for pausing a DAG.
+
+    Args:
+        dag_id: The ID of the DAG to pause
+
+    Returns:
+        JSON string containing the updated DAG details
+    """
+    try:
+        adapter = _get_adapter()
+        data = adapter.pause_dag(dag_id)
+        return json.dumps(data, indent=2)
+    except Exception as e:
+        return str(e)
+
+
+@mcp.tool()
+def pause_dag(dag_id: str) -> str:
+    """Pause a DAG to prevent new scheduled runs from starting.
+
+    Use this tool when the user asks to:
+    - "Pause DAG X" or "Stop DAG Y from running"
+    - "Disable DAG Z" or "Prevent new runs of DAG X"
+    - "Turn off DAG scheduling" or "Suspend DAG execution"
+
+    When a DAG is paused:
+    - No new scheduled runs will be created
+    - Currently running tasks will complete
+    - Manual triggers are still possible
+    - The DAG remains visible in the UI with a paused indicator
+
+    IMPORTANT: This is a write operation that modifies Airflow state.
+    The DAG will remain paused until explicitly unpaused.
+
+    Args:
+        dag_id: The ID of the DAG to pause (e.g., "example_dag")
+
+    Returns:
+        JSON with updated DAG details showing is_paused=True
+    """
+    return _pause_dag_impl(dag_id=dag_id)
+
+
+def _unpause_dag_impl(dag_id: str) -> str:
+    """Internal implementation for unpausing a DAG.
+
+    Args:
+        dag_id: The ID of the DAG to unpause
+
+    Returns:
+        JSON string containing the updated DAG details
+    """
+    try:
+        adapter = _get_adapter()
+        data = adapter.unpause_dag(dag_id)
+        return json.dumps(data, indent=2)
+    except Exception as e:
+        return str(e)
+
+
+@mcp.tool()
+def unpause_dag(dag_id: str) -> str:
+    """Unpause a DAG to allow scheduled runs to resume.
+
+    Use this tool when the user asks to:
+    - "Unpause DAG X" or "Resume DAG Y"
+    - "Enable DAG Z" or "Start DAG scheduling again"
+    - "Turn on DAG X" or "Activate DAG Y"
+
+    When a DAG is unpaused:
+    - The scheduler will create new runs based on the schedule
+    - Any missed runs (depending on catchup setting) may be created
+    - The DAG will appear active in the UI
+
+    IMPORTANT: This is a write operation that modifies Airflow state.
+    New DAG runs will be scheduled according to the DAG's schedule_interval.
+
+    Args:
+        dag_id: The ID of the DAG to unpause (e.g., "example_dag")
+
+    Returns:
+        JSON with updated DAG details showing is_paused=False
+    """
+    return _unpause_dag_impl(dag_id=dag_id)
+
+
 def _list_assets_impl(
     limit: int = DEFAULT_LIMIT,
     offset: int = DEFAULT_OFFSET,

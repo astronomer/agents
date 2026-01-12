@@ -144,6 +144,38 @@ class AirflowAdapter(ABC):
             response.raise_for_status()
             return response.json()
 
+    def _patch(
+        self,
+        endpoint: str,
+        json_data: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Make HTTP PATCH call to Airflow API.
+
+        Args:
+            endpoint: API endpoint path (without base path)
+            json_data: JSON body to send
+
+        Returns:
+            Parsed JSON response
+
+        Raises:
+            NotFoundError: If endpoint returns 404
+            Exception: For other HTTP errors
+        """
+        headers, auth = self._setup_auth()
+        headers["Accept"] = "application/json"
+        headers["Content-Type"] = "application/json"
+        url = f"{self.airflow_url}{self.api_base_path}/{endpoint}"
+
+        with httpx.Client(timeout=30.0) as client:
+            response = client.patch(url, json=json_data, headers=headers, auth=auth)
+
+            if response.status_code == 404:
+                raise NotFoundError(endpoint)
+
+            response.raise_for_status()
+            return response.json()
+
     def _handle_not_found(self, endpoint: str, alternative: str | None = None) -> dict[str, Any]:
         """Create a structured response for unavailable endpoints.
 
@@ -191,6 +223,30 @@ class AirflowAdapter(ABC):
     @abstractmethod
     def get_dag_source(self, dag_id: str) -> dict[str, Any]:
         """Get source code of a DAG."""
+        pass
+
+    @abstractmethod
+    def pause_dag(self, dag_id: str) -> dict[str, Any]:
+        """Pause a DAG to prevent new runs from being scheduled.
+
+        Args:
+            dag_id: The ID of the DAG to pause
+
+        Returns:
+            Updated DAG details with is_paused=True
+        """
+        pass
+
+    @abstractmethod
+    def unpause_dag(self, dag_id: str) -> dict[str, Any]:
+        """Unpause a DAG to allow new runs to be scheduled.
+
+        Args:
+            dag_id: The ID of the DAG to unpause
+
+        Returns:
+            Updated DAG details with is_paused=False
+        """
         pass
 
     # DAG Run Operations

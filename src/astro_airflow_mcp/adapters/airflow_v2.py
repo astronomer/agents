@@ -35,6 +35,28 @@ class AirflowV2Adapter(AirflowAdapter):
         # Get source using file_token
         return self._call(f"dagSources/{file_token}")
 
+    def pause_dag(self, dag_id: str) -> dict[str, Any]:
+        """Pause a DAG to prevent new runs from being scheduled.
+
+        Args:
+            dag_id: The ID of the DAG to pause
+
+        Returns:
+            Updated DAG details with is_paused=True
+        """
+        return self._patch(f"dags/{dag_id}", json_data={"is_paused": True})
+
+    def unpause_dag(self, dag_id: str) -> dict[str, Any]:
+        """Unpause a DAG to allow new runs to be scheduled.
+
+        Args:
+            dag_id: The ID of the DAG to unpause
+
+        Returns:
+            Updated DAG details with is_paused=False
+        """
+        return self._patch(f"dags/{dag_id}", json_data={"is_paused": False})
+
     def list_dag_runs(
         self, dag_id: str | None = None, limit: int = 100, offset: int = 0, **kwargs: Any
     ) -> dict[str, Any]:
