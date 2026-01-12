@@ -3,19 +3,16 @@
 import json
 import time
 
+import httpx
 import pytest
-import requests
 
 from astro_airflow_mcp.server import (
-    DEFAULT_AIRFLOW_URL,
     TOKEN_REFRESH_BUFFER_SECONDS,
     AirflowTokenManager,
-    _call_airflow_api,
     _config,
     _get_auth_token,
     _get_dag_details_impl,
     _list_dags_impl,
-    _post_airflow_api,
     configure,
 )
 
@@ -30,95 +27,6 @@ def reset_config():
     _config.url = original_url
     _config.auth_token = original_token
     _config.token_manager = original_manager
-
-
-class TestCallAirflowAPI:
-    """Tests for the _call_airflow_api function."""
-
-    def test_basic_api_call(self, mocker):
-        """Test basic API call without authentication."""
-        mock_response = mocker.Mock()
-        mock_response.json.return_value = {"dags": []}
-        mock_response.raise_for_status = mocker.Mock()
-        mock_get = mocker.patch("requests.get", return_value=mock_response)
-
-        result = _call_airflow_api("dags")
-
-        assert result == {"dags": []}
-        mock_get.assert_called_once_with(
-            f"{DEFAULT_AIRFLOW_URL}/api/v2/dags",
-            params=None,
-            headers={},
-            timeout=30,
-        )
-
-    def test_api_call_with_auth_token(self, mocker):
-        """Test API call with Bearer token authentication."""
-        mock_response = mocker.Mock()
-        mock_response.json.return_value = {"version": "3.0.0"}
-        mock_response.raise_for_status = mocker.Mock()
-        mock_get = mocker.patch("requests.get", return_value=mock_response)
-
-        result = _call_airflow_api("version", auth_token="test_token_123")
-
-        assert result == {"version": "3.0.0"}
-        mock_get.assert_called_once()
-        call_kwargs = mock_get.call_args[1]
-        assert call_kwargs["headers"]["Authorization"] == "Bearer test_token_123"
-
-    def test_api_call_with_params(self, mocker):
-        """Test API call with query parameters."""
-        mock_response = mocker.Mock()
-        mock_response.json.return_value = {"dags": [], "total_entries": 0}
-        mock_response.raise_for_status = mocker.Mock()
-        mock_get = mocker.patch("requests.get", return_value=mock_response)
-
-        params = {"limit": 50, "offset": 10}
-        result = _call_airflow_api("dags", params=params)
-
-        assert result == {"dags": [], "total_entries": 0}
-        mock_get.assert_called_once()
-        call_kwargs = mock_get.call_args[1]
-        assert call_kwargs["params"] == params
-
-    def test_api_call_with_custom_url(self, mocker):
-        """Test API call with custom Airflow URL."""
-        mock_response = mocker.Mock()
-        mock_response.json.return_value = {"status": "ok"}
-        mock_response.raise_for_status = mocker.Mock()
-        mock_get = mocker.patch("requests.get", return_value=mock_response)
-
-        custom_url = "https://custom.airflow.com"
-        result = _call_airflow_api("health", airflow_url=custom_url)
-
-        assert result == {"status": "ok"}
-        mock_get.assert_called_once()
-        call_args = mock_get.call_args[0]
-        assert call_args[0] == f"{custom_url}/api/v2/health"
-
-    def test_api_call_request_exception(self, mocker):
-        """Test API call handles request exceptions."""
-        mocker.patch(
-            "requests.get",
-            side_effect=requests.exceptions.ConnectionError("Connection failed"),
-        )
-
-        with pytest.raises(Exception) as exc_info:
-            _call_airflow_api("dags")
-
-        assert "Error connecting to Airflow API" in str(exc_info.value)
-        assert "Connection failed" in str(exc_info.value)
-
-    def test_api_call_http_error(self, mocker):
-        """Test API call handles HTTP errors."""
-        mock_response = mocker.Mock()
-        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("404 Not Found")
-        mocker.patch("requests.get", return_value=mock_response)
-
-        with pytest.raises(Exception) as exc_info:
-            _call_airflow_api("dags/nonexistent")
-
-        assert "Error connecting to Airflow API" in str(exc_info.value)
 
 
 class TestImplFunctions:
@@ -274,13 +182,19 @@ class TestAirflowTokenManager:
     def test_fetch_token_with_credentials(self, mocker):
         """Test token fetch with username/password credentials."""
         mock_response = mocker.Mock()
+        mock_response.status_code = 200
         mock_response.json.return_value = {
             "access_token": "test_jwt_token",
             "token_type": "bearer",
             "expires_in": 3600,
         }
         mock_response.raise_for_status = mocker.Mock()
-        mock_post = mocker.patch("requests.post", return_value=mock_response)
+
+        mock_client = mocker.Mock()
+        mock_client.post.return_value = mock_response
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+        mocker.patch("httpx.Client", return_value=mock_client)
 
         manager = AirflowTokenManager(
             airflow_url="http://localhost:8080",
@@ -292,38 +206,41 @@ class TestAirflowTokenManager:
         assert manager._token == "test_jwt_token"
         assert manager._token_fetched_at is not None
         assert manager._token_lifetime_seconds == 3600
-        mock_post.assert_called_once_with(
+        mock_client.post.assert_called_once_with(
             "http://localhost:8080/auth/token",
             json={"username": "admin", "password": "secret"},
             headers={"Content-Type": "application/json"},
-            timeout=30,
         )
 
     def test_fetch_token_credential_less(self, mocker):
         """Test credential-less token fetch (all_admins mode)."""
         mock_response = mocker.Mock()
+        mock_response.status_code = 200
         mock_response.json.return_value = {
             "access_token": "admin_token",
             "token_type": "bearer",
         }
         mock_response.raise_for_status = mocker.Mock()
-        mock_get = mocker.patch("requests.get", return_value=mock_response)
+
+        mock_client = mocker.Mock()
+        mock_client.get.return_value = mock_response
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+        mocker.patch("httpx.Client", return_value=mock_client)
 
         manager = AirflowTokenManager(airflow_url="http://localhost:8080")
         manager._fetch_token()
 
         assert manager._token == "admin_token"
-        mock_get.assert_called_once_with(
-            "http://localhost:8080/auth/token",
-            timeout=30,
-        )
+        mock_client.get.assert_called_once_with("http://localhost:8080/auth/token")
 
     def test_fetch_token_failure(self, mocker):
         """Test token fetch handles request failures."""
-        mocker.patch(
-            "requests.post",
-            side_effect=requests.exceptions.ConnectionError("Connection failed"),
-        )
+        mock_client = mocker.Mock()
+        mock_client.post.side_effect = httpx.RequestError("Connection failed")
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+        mocker.patch("httpx.Client", return_value=mock_client)
 
         manager = AirflowTokenManager(
             airflow_url="http://localhost:8080",
@@ -337,9 +254,15 @@ class TestAirflowTokenManager:
     def test_get_token_fetches_when_needed(self, mocker):
         """Test get_token fetches token when refresh needed."""
         mock_response = mocker.Mock()
+        mock_response.status_code = 200
         mock_response.json.return_value = {"access_token": "new_token"}
         mock_response.raise_for_status = mocker.Mock()
-        mocker.patch("requests.post", return_value=mock_response)
+
+        mock_client = mocker.Mock()
+        mock_client.post.return_value = mock_response
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+        mocker.patch("httpx.Client", return_value=mock_client)
 
         manager = AirflowTokenManager(
             airflow_url="http://localhost:8080",
@@ -352,7 +275,7 @@ class TestAirflowTokenManager:
 
     def test_get_token_returns_cached(self, mocker):
         """Test get_token returns cached token when valid."""
-        mock_post = mocker.patch("requests.post")
+        mock_client = mocker.patch("httpx.Client")
 
         manager = AirflowTokenManager(
             airflow_url="http://localhost:8080",
@@ -366,7 +289,7 @@ class TestAirflowTokenManager:
         token = manager.get_token()
 
         assert token == "cached_token"
-        mock_post.assert_not_called()
+        mock_client.assert_not_called()
 
     def test_invalidate(self):
         """Test token invalidation."""
@@ -383,7 +306,12 @@ class TestAirflowTokenManager:
         """Test that 404 response marks token endpoint as unavailable (Airflow 2.x)."""
         mock_response = mocker.Mock()
         mock_response.status_code = 404
-        mocker.patch("requests.get", return_value=mock_response)
+
+        mock_client = mocker.Mock()
+        mock_client.get.return_value = mock_response
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+        mocker.patch("httpx.Client", return_value=mock_client)
 
         manager = AirflowTokenManager(airflow_url="http://localhost:8080")
         manager._fetch_token()
@@ -398,7 +326,12 @@ class TestAirflowTokenManager:
         """Test that 404 keeps user-provided credentials instead of defaulting."""
         mock_response = mocker.Mock()
         mock_response.status_code = 404
-        mocker.patch("requests.post", return_value=mock_response)
+
+        mock_client = mocker.Mock()
+        mock_client.post.return_value = mock_response
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+        mocker.patch("httpx.Client", return_value=mock_client)
 
         manager = AirflowTokenManager(
             airflow_url="http://localhost:8080",
@@ -415,7 +348,7 @@ class TestAirflowTokenManager:
 
     def test_get_token_skips_unavailable_endpoint(self, mocker):
         """Test that get_token doesn't retry when endpoint is marked unavailable."""
-        mock_get = mocker.patch("requests.get")
+        mock_client = mocker.patch("httpx.Client")
 
         manager = AirflowTokenManager(airflow_url="http://localhost:8080")
         manager._token_endpoint_available = False
@@ -423,7 +356,7 @@ class TestAirflowTokenManager:
         token = manager.get_token()
 
         assert token is None
-        mock_get.assert_not_called()
+        mock_client.assert_not_called()
 
     def test_get_basic_auth(self):
         """Test get_basic_auth returns credentials."""
@@ -442,72 +375,6 @@ class TestAirflowTokenManager:
         auth = manager.get_basic_auth()
 
         assert auth is None
-
-
-class TestAPIRetryOnAuthError:
-    """Tests for API retry behavior on 401/403 errors."""
-
-    def test_call_api_retry_on_401(self, mocker, reset_config):
-        """Test _call_airflow_api retries on 401 with fresh token."""
-        # Setup token manager
-        mock_manager = mocker.Mock()
-        mock_manager.get_token.side_effect = ["old_token", "new_token"]
-        _config.token_manager = mock_manager
-        _config.auth_token = None
-
-        # First call returns 401, second succeeds
-        mock_response_401 = mocker.Mock()
-        mock_response_401.status_code = 401
-
-        mock_response_ok = mocker.Mock()
-        mock_response_ok.status_code = 200
-        mock_response_ok.json.return_value = {"data": "success"}
-        mock_response_ok.raise_for_status = mocker.Mock()
-
-        mock_get = mocker.patch("requests.get", side_effect=[mock_response_401, mock_response_ok])
-
-        result = _call_airflow_api("dags")
-
-        assert result == {"data": "success"}
-        assert mock_get.call_count == 2
-        mock_manager.invalidate.assert_called_once()
-
-    def test_call_api_no_retry_with_explicit_token(self, mocker):
-        """Test _call_airflow_api does not retry when explicit token provided."""
-        mock_response = mocker.Mock()
-        mock_response.status_code = 401
-        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("401")
-        mocker.patch("requests.get", return_value=mock_response)
-
-        with pytest.raises(Exception) as exc_info:
-            _call_airflow_api("dags", auth_token="explicit_token")
-
-        assert "Error connecting to Airflow API" in str(exc_info.value)
-
-    def test_post_api_retry_on_403(self, mocker, reset_config):
-        """Test _post_airflow_api retries on 403 with fresh token."""
-        # Setup token manager
-        mock_manager = mocker.Mock()
-        mock_manager.get_token.side_effect = ["old_token", "new_token"]
-        _config.token_manager = mock_manager
-        _config.auth_token = None
-
-        # First call returns 403, second succeeds
-        mock_response_403 = mocker.Mock()
-        mock_response_403.status_code = 403
-
-        mock_response_ok = mocker.Mock()
-        mock_response_ok.status_code = 200
-        mock_response_ok.json.return_value = {"dag_run_id": "test_run"}
-        mock_response_ok.raise_for_status = mocker.Mock()
-
-        mock_post = mocker.patch("requests.post", side_effect=[mock_response_403, mock_response_ok])
-
-        result = _post_airflow_api("dags/test/dagRuns", json_data={})
-
-        assert result == {"dag_run_id": "test_run"}
-        assert mock_post.call_count == 2
-        mock_manager.invalidate.assert_called_once()
 
 
 class TestGetAuthToken:

@@ -4,7 +4,7 @@ import json
 import time
 from typing import Any
 
-import requests
+import httpx
 from fastmcp import FastMCP
 from fastmcp.server.middleware.logging import LoggingMiddleware
 
@@ -115,19 +115,19 @@ class AirflowTokenManager:
         token_url = f"{self.airflow_url}/auth/token"
 
         try:
-            if self.username and self.password:
-                # Use credentials to fetch token
-                logger.debug("Fetching token with username/password credentials")
-                response = requests.post(
-                    token_url,
-                    json={"username": self.username, "password": self.password},
-                    headers={"Content-Type": "application/json"},
-                    timeout=30,
-                )
-            else:
-                # Try credential-less fetch (for all_admins mode)
-                logger.debug("Attempting credential-less token fetch")
-                response = requests.get(token_url, timeout=30)
+            with httpx.Client(timeout=30.0) as client:
+                if self.username and self.password:
+                    # Use credentials to fetch token
+                    logger.debug("Fetching token with username/password credentials")
+                    response = client.post(
+                        token_url,
+                        json={"username": self.username, "password": self.password},
+                        headers={"Content-Type": "application/json"},
+                    )
+                else:
+                    # Try credential-less fetch (for all_admins mode)
+                    logger.debug("Attempting credential-less token fetch")
+                    response = client.get(token_url)
 
             # Check for 404 - indicates Airflow 2.x without token endpoint
             if response.status_code == 404:
@@ -165,7 +165,7 @@ class AirflowTokenManager:
                 logger.warning(f"Unexpected token response format: {data}")
                 self._token = None
 
-        except requests.exceptions.RequestException as e:
+        except httpx.RequestError as e:
             logger.warning(f"Failed to fetch token from {token_url}: {e}")
             self._token = None
 
@@ -321,113 +321,7 @@ def _invalidate_token() -> None:
         _config.token_manager.invalidate()
 
 
-# Helper functions for API calls and response formatting
-def _call_airflow_api(
-    endpoint: str,
-    airflow_url: str = DEFAULT_AIRFLOW_URL,
-    params: dict[str, Any] | None = None,
-    auth_token: str | None = None,
-    _retry: bool = True,
-) -> dict[str, Any]:
-    """Call Airflow REST API with error handling and optional authentication.
-
-    Args:
-        endpoint: API endpoint path (e.g., 'dags', 'dagRuns')
-        airflow_url: Base URL of the Airflow webserver
-        params: Optional query parameters
-        auth_token: Optional Bearer token for token-based authentication
-        _retry: Internal flag to control retry on auth failure (default True)
-
-    Returns:
-        Parsed JSON response from the API
-
-    Raises:
-        Exception: If the API call fails with error details
-
-    Note:
-        If auth_token is provided, Bearer token authentication is used.
-        If not provided, the global token (from token manager or config) is used.
-        On 401/403 errors, the token is invalidated and the request is retried once.
-    """
-    try:
-        api_url = f"{airflow_url}/api/v2/{endpoint}"
-        headers: dict[str, str] = {}
-
-        # Handle authentication - use provided token or get from global config
-        token = auth_token if auth_token else _get_auth_token()
-        if token:
-            headers["Authorization"] = f"Bearer {token}"
-
-        response = requests.get(api_url, params=params, headers=headers, timeout=30)
-
-        # Handle auth errors with retry
-        if response.status_code in (401, 403) and _retry and not auth_token:
-            logger.debug(f"Auth error ({response.status_code}), invalidating token and retrying")
-            _invalidate_token()
-            return _call_airflow_api(endpoint, airflow_url, params, auth_token=None, _retry=False)
-
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        raise Exception(f"Error connecting to Airflow API: {str(e)}") from e
-    except Exception as e:
-        raise Exception(f"Error calling API endpoint '{endpoint}': {str(e)}") from e
-
-
-def _post_airflow_api(
-    endpoint: str,
-    airflow_url: str = DEFAULT_AIRFLOW_URL,
-    json_data: dict[str, Any] | None = None,
-    auth_token: str | None = None,
-    _retry: bool = True,
-) -> dict[str, Any]:
-    """Call Airflow REST API with POST method.
-
-    Args:
-        endpoint: API endpoint path (e.g., 'dags/{dag_id}/dagRuns')
-        airflow_url: Base URL of the Airflow webserver
-        json_data: Optional JSON body to send with the request
-        auth_token: Optional Bearer token for token-based authentication
-        _retry: Internal flag to control retry on auth failure (default True)
-
-    Returns:
-        Parsed JSON response from the API
-
-    Raises:
-        Exception: If the API call fails with error details
-
-    Note:
-        If auth_token is provided, Bearer token authentication is used.
-        If not provided, the global token (from token manager or config) is used.
-        On 401/403 errors, the token is invalidated and the request is retried once.
-    """
-    try:
-        api_url = f"{airflow_url}/api/v2/{endpoint}"
-        headers: dict[str, str] = {"Content-Type": "application/json"}
-
-        # Handle authentication - use provided token or get from global config
-        token = auth_token if auth_token else _get_auth_token()
-        if token:
-            headers["Authorization"] = f"Bearer {token}"
-
-        response = requests.post(api_url, json=json_data, headers=headers, timeout=30)
-
-        # Handle auth errors with retry
-        if response.status_code in (401, 403) and _retry and not auth_token:
-            logger.debug(f"Auth error ({response.status_code}), invalidating token and retrying")
-            _invalidate_token()
-            return _post_airflow_api(
-                endpoint, airflow_url, json_data, auth_token=None, _retry=False
-            )
-
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        raise Exception(f"Error connecting to Airflow API: {str(e)}") from e
-    except Exception as e:
-        raise Exception(f"Error calling API endpoint '{endpoint}': {str(e)}") from e
-
-
+# Helper functions for response formatting
 def _wrap_list_response(items: list[dict[str, Any]], key_name: str, data: dict[str, Any]) -> str:
     """Wrap API list response with pagination metadata.
 
