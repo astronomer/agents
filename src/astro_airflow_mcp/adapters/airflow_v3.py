@@ -238,9 +238,8 @@ class AirflowV3Adapter(AirflowAdapter):
                 if not all_results["errors"]:
                     del all_results["errors"]
                 return all_results
-            else:
-                # Pass empty dag_ids to avoid 500 error
-                return self._call("dagStats", params={"dag_ids": ""})
+            # Pass empty dag_ids to avoid 500 error
+            return self._call("dagStats", params={"dag_ids": ""})
         except NotFoundError:
             return self._handle_not_found(
                 "dagStats", alternative="Use list_dag_runs to compute statistics"

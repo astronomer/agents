@@ -108,15 +108,14 @@ def create_adapter(
             token_getter=token_getter,
             basic_auth_getter=basic_auth_getter,
         )
-    elif major_version >= 3:
+    if major_version >= 3:
         return AirflowV3Adapter(
             airflow_url,
             full_version,
             token_getter=token_getter,
             basic_auth_getter=basic_auth_getter,
         )
-    else:
-        raise RuntimeError(f"Unsupported Airflow version: {major_version}")
+    raise RuntimeError(f"Unsupported Airflow version: {major_version}")
 
 
 __all__ = [

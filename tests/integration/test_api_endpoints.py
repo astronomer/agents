@@ -173,7 +173,7 @@ class TestResourceEndpoints:
                 assert conn["password"] in (
                     None,
                     "",
-                    "***FILTERED***",  # noqa: S105
+                    "***FILTERED***",
                 ), f"Password not filtered for {conn.get('connection_id')}"
         print(f"Found {len(result['connections'])} connections")
 

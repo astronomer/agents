@@ -44,7 +44,7 @@ try:
     fastapi_apps_config = [{"app": app, "url_prefix": "/mcp", "name": "Airflow MCP Server"}]
 
 except ImportError as e:
-    logger.warning(f"FastAPI integration not available: {e}")
+    logger.warning("FastAPI integration not available: %s", e)
     fastapi_apps_config = []
 
 

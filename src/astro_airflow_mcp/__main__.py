@@ -73,11 +73,11 @@ def main():
     )
 
     # Log Airflow connection configuration
-    logger.info(f"Airflow URL: {args.airflow_url}")
+    logger.info("Airflow URL: %s", args.airflow_url)
     if args.auth_token:
         logger.info("Authentication: Direct bearer token")
     elif args.username:
-        logger.info(f"Authentication: Token manager (username: {args.username})")
+        logger.info("Authentication: Token manager (username: %s)", args.username)
     else:
         logger.info("Authentication: Token manager (credential-less mode)")
 

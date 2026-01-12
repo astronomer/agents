@@ -49,26 +49,37 @@ line-length = 100
 target-version = "py310"
 
 [tool.ruff.lint]
-select = [
-    "E",   # pycodestyle errors
-    "W",   # pycodestyle warnings
-    "F",   # pyflakes
-    "I",   # isort
-    "B",   # flake8-bugbear
-    "C4",  # flake8-comprehensions
-    "UP",  # pyupgrade
-    "ARG", # flake8-unused-arguments
-    "SIM", # flake8-simplify
+extend-select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade
+    "ARG",    # flake8-unused-arguments
+    "SIM",    # flake8-simplify
+    "ISC",    # implicit string concatenation
+    "LOG",    # flake8-logging
+    "TC",     # type-checking imports
+    "G",      # flake8-logging-format
+    "RET",    # flake8-return
+    "PIE",    # flake8-pie (PIE790: unnecessary pass)
+    "PT",     # flake8-pytest-style
+    "RUF",    # Ruff-specific rules
+    "ASYNC",  # flake8-async
+    "TID252", # relative imports from parent
 ]
 ignore = [
-    "E501",  # line too long (handled by formatter)
-    "B008",  # do not perform function calls in argument defaults
+    "E501",   # line too long (handled by formatter)
+    "B008",   # do not perform function calls in argument defaults
     "ARG002", # unused method argument
+    "RUF012", # mutable class attributes (common pattern)
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]  # Allow unused imports in __init__.py
-"tests/**/*.py" = ["ARG001", "ARG002"]  # Allow unused arguments in tests
+"tests/**/*.py" = ["ARG001", "ARG002", "PT011"]  # Allow unused arguments and broad pytest.raises in tests
 
 [tool.bandit]
 exclude_dirs = ["tests", "examples"]

@@ -162,11 +162,11 @@ class AirflowTokenManager:
                     self._token_lifetime_seconds = float(data["expires_in"])
                 logger.info("Successfully fetched Airflow API token")
             else:
-                logger.warning(f"Unexpected token response format: {data}")
+                logger.warning("Unexpected token response format: %s", data)
                 self._token = None
 
         except httpx.RequestError as e:
-            logger.warning(f"Failed to fetch token from {token_url}: {e}")
+            logger.warning("Failed to fetch token from %s: %s", token_url, e)
             self._token = None
 
     def invalidate(self) -> None:
@@ -226,13 +226,13 @@ def _get_adapter() -> AirflowAdapter:
     """
     global _adapter
     if _adapter is None:
-        logger.info(f"Initializing adapter for {_config.url}")
+        logger.info("Initializing adapter for %s", _config.url)
         _adapter = create_adapter(
             airflow_url=_config.url,
             token_getter=_get_auth_token,
             basic_auth_getter=_get_basic_auth,
         )
-        logger.info(f"Created adapter for Airflow {_adapter.version}")
+        logger.info("Created adapter for Airflow %s", _adapter.version)
     return _adapter
 
 
@@ -417,8 +417,7 @@ def _list_dags_impl(
 
         if "dags" in data:
             return _wrap_list_response(data["dags"], "dags", data)
-        else:
-            return f"No DAGs found. Response: {data}"
+        return f"No DAGs found. Response: {data}"
     except Exception as e:
         return str(e)
 
@@ -553,8 +552,7 @@ def _list_dag_warnings_impl(
 
         if "dag_warnings" in data:
             return _wrap_list_response(data["dag_warnings"], "dag_warnings", data)
-        else:
-            return f"No DAG warnings found. Response: {data}"
+        return f"No DAG warnings found. Response: {data}"
     except Exception as e:
         return str(e)
 
@@ -578,8 +576,7 @@ def _list_import_errors_impl(
 
         if "import_errors" in data:
             return _wrap_list_response(data["import_errors"], "import_errors", data)
-        else:
-            return f"No import errors found. Response: {data}"
+        return f"No import errors found. Response: {data}"
     except Exception as e:
         return str(e)
 
@@ -670,8 +667,7 @@ def _list_tasks_impl(dag_id: str) -> str:
 
         if "tasks" in data:
             return _wrap_list_response(data["tasks"], "tasks", data)
-        else:
-            return f"No tasks found. Response: {data}"
+        return f"No tasks found. Response: {data}"
     except Exception as e:
         return str(e)
 
@@ -899,8 +895,7 @@ def _list_dag_runs_impl(
 
         if "dag_runs" in data:
             return _wrap_list_response(data["dag_runs"], "dag_runs", data)
-        else:
-            return f"No DAG runs found. Response: {data}"
+        return f"No DAG runs found. Response: {data}"
     except Exception as e:
         return str(e)
 
@@ -1355,8 +1350,7 @@ def _list_assets_impl(
 
         if "assets" in data:
             return _wrap_list_response(data["assets"], "assets", data)
-        else:
-            return f"No assets found. Response: {data}"
+        return f"No assets found. Response: {data}"
     except Exception as e:
         return str(e)
 
@@ -1438,8 +1432,7 @@ def _list_connections_impl(
             }
 
             return json.dumps(result, indent=2)
-        else:
-            return f"No connections found. Response: {data}"
+        return f"No connections found. Response: {data}"
     except Exception as e:
         return str(e)
 
@@ -1514,8 +1507,7 @@ def _list_variables_impl(
 
         if "variables" in data:
             return _wrap_list_response(data["variables"], "variables", data)
-        else:
-            return f"No variables found. Response: {data}"
+        return f"No variables found. Response: {data}"
     except Exception as e:
         return str(e)
 
@@ -1548,8 +1540,7 @@ def _get_config_impl() -> str:
             # Add summary metadata and pass through sections
             result = {"total_sections": len(data["sections"]), "sections": data["sections"]}
             return json.dumps(result, indent=2)
-        else:
-            return f"No configuration found. Response: {data}"
+        return f"No configuration found. Response: {data}"
     except Exception as e:
         return str(e)
 
@@ -1592,8 +1583,7 @@ def _list_pools_impl(
 
         if "pools" in data:
             return _wrap_list_response(data["pools"], "pools", data)
-        else:
-            return f"No pools found. Response: {data}"
+        return f"No pools found. Response: {data}"
     except Exception as e:
         return str(e)
 
@@ -1617,8 +1607,7 @@ def _list_plugins_impl(
 
         if "plugins" in data:
             return _wrap_list_response(data["plugins"], "plugins", data)
-        else:
-            return f"No plugins found. Response: {data}"
+        return f"No plugins found. Response: {data}"
     except Exception as e:
         return str(e)
 
@@ -1635,8 +1624,7 @@ def _list_providers_impl() -> str:
 
         if "providers" in data:
             return _wrap_list_response(data["providers"], "providers", data)
-        else:
-            return f"No providers found. Response: {data}"
+        return f"No providers found. Response: {data}"
     except Exception as e:
         return str(e)
 

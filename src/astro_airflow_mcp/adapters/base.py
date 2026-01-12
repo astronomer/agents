@@ -47,7 +47,6 @@ class AirflowAdapter(ABC):
     @abstractmethod
     def api_base_path(self) -> str:
         """API base path for this version (e.g., '/api/v1' or '/api/v2')."""
-        pass
 
     def _setup_auth(self) -> tuple[dict[str, str], tuple[str, str] | None]:
         """Set up authentication using token or basic auth.
@@ -213,17 +212,14 @@ class AirflowAdapter(ABC):
     @abstractmethod
     def list_dags(self, limit: int = 100, offset: int = 0, **kwargs: Any) -> dict[str, Any]:
         """List all DAGs."""
-        pass
 
     @abstractmethod
     def get_dag(self, dag_id: str) -> dict[str, Any]:
         """Get details of a specific DAG."""
-        pass
 
     @abstractmethod
     def get_dag_source(self, dag_id: str) -> dict[str, Any]:
         """Get source code of a DAG."""
-        pass
 
     @abstractmethod
     def pause_dag(self, dag_id: str) -> dict[str, Any]:
@@ -235,7 +231,6 @@ class AirflowAdapter(ABC):
         Returns:
             Updated DAG details with is_paused=True
         """
-        pass
 
     @abstractmethod
     def unpause_dag(self, dag_id: str) -> dict[str, Any]:
@@ -247,7 +242,6 @@ class AirflowAdapter(ABC):
         Returns:
             Updated DAG details with is_paused=False
         """
-        pass
 
     # DAG Run Operations
     @abstractmethod
@@ -255,12 +249,10 @@ class AirflowAdapter(ABC):
         self, dag_id: str | None = None, limit: int = 100, offset: int = 0, **kwargs: Any
     ) -> dict[str, Any]:
         """List DAG runs."""
-        pass
 
     @abstractmethod
     def get_dag_run(self, dag_id: str, dag_run_id: str) -> dict[str, Any]:
         """Get details of a specific DAG run."""
-        pass
 
     @abstractmethod
     def trigger_dag_run(
@@ -276,23 +268,19 @@ class AirflowAdapter(ABC):
         Returns:
             Details of the triggered DAG run
         """
-        pass
 
     # Task Operations
     @abstractmethod
     def list_tasks(self, dag_id: str) -> dict[str, Any]:
         """List all tasks in a DAG."""
-        pass
 
     @abstractmethod
     def get_task(self, dag_id: str, task_id: str) -> dict[str, Any]:
         """Get details of a specific task."""
-        pass
 
     @abstractmethod
     def get_task_instance(self, dag_id: str, dag_run_id: str, task_id: str) -> dict[str, Any]:
         """Get details of a task instance."""
-        pass
 
     @abstractmethod
     def get_task_instances(
@@ -306,7 +294,6 @@ class AirflowAdapter(ABC):
             limit: Maximum number of task instances to return
             offset: Offset for pagination
         """
-        pass
 
     @abstractmethod
     def get_task_logs(
@@ -328,41 +315,34 @@ class AirflowAdapter(ABC):
             map_index: Map index for mapped tasks (-1 for unmapped, default -1)
             full_content: Whether to return full log content (default True)
         """
-        pass
 
     # Asset/Dataset Operations
     @abstractmethod
     def list_assets(self, limit: int = 100, offset: int = 0, **kwargs: Any) -> dict[str, Any]:
         """List assets/datasets."""
-        pass
 
     # Variable Operations
     @abstractmethod
     def list_variables(self, limit: int = 100, offset: int = 0) -> dict[str, Any]:
         """List Airflow variables."""
-        pass
 
     @abstractmethod
     def get_variable(self, variable_key: str) -> dict[str, Any]:
         """Get a specific variable."""
-        pass
 
     # Connection Operations
     @abstractmethod
     def list_connections(self, limit: int = 100, offset: int = 0) -> dict[str, Any]:
         """List Airflow connections (passwords filtered)."""
-        pass
 
     # Pool Operations
     @abstractmethod
     def list_pools(self, limit: int = 100, offset: int = 0) -> dict[str, Any]:
         """List Airflow pools."""
-        pass
 
     @abstractmethod
     def get_pool(self, pool_name: str) -> dict[str, Any]:
         """Get details of a specific pool."""
-        pass
 
     # DAG Statistics and Warnings
     @abstractmethod
@@ -372,36 +352,29 @@ class AirflowAdapter(ABC):
         Args:
             dag_ids: Optional list of DAG IDs to get stats for.
         """
-        pass
 
     @abstractmethod
     def list_dag_warnings(self, limit: int = 100, offset: int = 0) -> dict[str, Any]:
         """List DAG warnings."""
-        pass
 
     @abstractmethod
     def list_import_errors(self, limit: int = 100, offset: int = 0) -> dict[str, Any]:
         """List import errors from DAG files."""
-        pass
 
     # Plugin and Provider Operations
     @abstractmethod
     def list_plugins(self, limit: int = 100, offset: int = 0) -> dict[str, Any]:
         """List installed Airflow plugins."""
-        pass
 
     @abstractmethod
     def list_providers(self) -> dict[str, Any]:
         """List installed Airflow provider packages."""
-        pass
 
     # System Operations
     @abstractmethod
     def get_version(self) -> dict[str, Any]:
         """Get Airflow version info."""
-        pass
 
     @abstractmethod
     def get_config(self) -> dict[str, Any]:
         """Get Airflow configuration."""
-        pass
