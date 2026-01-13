@@ -27,7 +27,16 @@ A Claude Code and OpenCode plugin for data engineering workflows. Built by [Astr
 
 ### Claude Code
 
-Test locally:
+**Install from local marketplace:**
+```bash
+# Add the marketplace
+claude plugin marketplace add ./claude-code-plugin
+
+# Install the plugin
+claude plugin install data@astronomer
+```
+
+**Or test locally (session only):**
 ```bash
 claude --plugin-dir ./claude-code-plugin
 ```
@@ -35,6 +44,18 @@ claude --plugin-dir ./claude-code-plugin
 ### OpenCode
 
 Coming soon.
+
+## Plugin Structure
+
+```
+claude-code-plugin/
+├── .claude-plugin/
+│   ├── marketplace.json   # Marketplace catalog (lists available plugins)
+│   └── plugin.json        # Plugin manifest (metadata)
+└── .mcp.json              # MCP server config (must be at plugin root, not inside .claude-plugin/)
+```
+
+**Important:** The `.mcp.json` file must be at the plugin root directory, not inside `.claude-plugin/`. The `source` field in `marketplace.json` is relative to the marketplace root.
 
 ## Configuration
 
@@ -44,19 +65,6 @@ The plugin uses the Astro CLI AI config directory (`~/.astro/ai/config/`).
 
 - [Claude Code](https://claude.ai/claude-code) CLI (v1.0.33+)
 - [Astro CLI](https://www.astronomer.io/docs/astro/cli/install-cli) (for Airflow integration)
-
-## Architecture
-
-```
-data-ai-plugins/
-├── claude-code-plugin/     # Claude Code plugin
-│   ├── .claude-plugin/     # Plugin manifest
-│   └── .mcp.json           # MCP server config (astro-airflow-mcp)
-├── opencode-plugin/        # OpenCode plugin (coming soon)
-└── packages/               # MCP servers (coming soon)
-    ├── data-jupyter/
-    └── data-warehouse/
-```
 
 ## Development
 
