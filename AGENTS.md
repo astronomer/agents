@@ -4,23 +4,24 @@
 
 ```
 project-root/
-├── shared-skills/                # Canonical skill source (shared)
+├── shared-skills/                  # Canonical skill source (shared)
 │   └── skill-name/
-│       └── SKILL.md              # Skill with YAML frontmatter
+│       └── SKILL.md                # Skill with YAML frontmatter
 ├── claude-code-plugin/
 │   ├── .claude-plugin/
-│   │   ├── marketplace.json      # Marketplace catalog (lists plugins)
-│   │   └── plugin.json           # Plugin manifest (metadata)
+│   │   ├── marketplace.json        # Marketplace catalog (lists plugins)
+│   │   └── plugin.json             # Plugin manifest (metadata)
 │   ├── skills -> ../shared-skills  # Symlink to shared skills
-│   └── .mcp.json                 # MCP server config for Claude Code
-├── .opencode/
-│   └── skills -> ../shared-skills  # Symlink for OpenCode discovery
-└── opencode.json                 # MCP server config for OpenCode
+│   └── .mcp.json                   # MCP server config for Claude Code
+└── opencode/
+    ├── opencode.json               # MCP server config for OpenCode
+    └── .opencode/
+        └── skills -> ../../shared-skills  # Symlink for OpenCode discovery
 ```
 
 **Important**: `.mcp.json` must be at the plugin root, not inside `.claude-plugin/`. The `source` field in `marketplace.json` is relative to the marketplace root.
 
-Skills are stored in `shared-skills/` and symlinked to both `claude-code-plugin/skills/` and `.opencode/skills/` so both Claude Code and OpenCode can discover them.
+Skills are stored in `shared-skills/` and symlinked to both `claude-code-plugin/skills/` and `opencode/.opencode/skills/` so both Claude Code and OpenCode can discover them.
 
 ## Installing the Plugin
 
@@ -76,7 +77,7 @@ Configure in `claude-code-plugin/.mcp.json`:
 
 ### OpenCode
 
-Configure in `opencode.json` at project root:
+Configure in `opencode/opencode.json`:
 
 ```json
 {
@@ -90,10 +91,10 @@ Configure in `opencode.json` at project root:
 }
 ```
 
-Verify MCP servers are connected:
+Verify MCP servers are connected (run from `opencode/` directory):
 
 ```bash
-opencode mcp list
+cd opencode && opencode mcp list
 ```
 
 ## Key Files
@@ -101,7 +102,7 @@ opencode mcp list
 - `marketplace.json` - Lists plugins in this marketplace, references plugin source paths
 - `plugin.json` - Plugin metadata (name, version, description, author)
 - `claude-code-plugin/.mcp.json` - MCP server config for Claude Code (auto-added on plugin install)
-- `opencode.json` - MCP server config for OpenCode
+- `opencode/opencode.json` - MCP server config for OpenCode
 - `shared-skills/*/SKILL.md` - Skills shared by both Claude Code and OpenCode
 
 ## Config Location
@@ -110,7 +111,11 @@ This plugin uses `~/.astro/ai/config/` for user configuration (warehouse credent
 
 ## Testing with OpenCode
 
-OpenCode discovers skills from `.opencode/skills/` in the project directory. Since skills are symlinked to `shared-skills/`, they work with both tools.
+OpenCode config and skills live in the `opencode/` subdirectory. Run OpenCode from there:
+
+```bash
+cd opencode
+```
 
 ### Verify Skills are Discovered
 
@@ -123,11 +128,11 @@ This outputs all discovered skills with their names, descriptions, and file path
 ### Run OpenCode
 
 ```bash
-# Start OpenCode TUI in the project
+# Start OpenCode TUI
 opencode
 
 # Or run with a specific message
 opencode run "help me write a DAG"
 ```
 
-OpenCode will automatically discover and use skills from `.opencode/skills/` based on the task context.
+OpenCode will automatically discover skills from `.opencode/skills/` and MCP servers from `opencode.json`.
