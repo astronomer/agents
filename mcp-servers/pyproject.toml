@@ -1,0 +1,52 @@
+[project]
+name = "data-plugin"
+version = "0.1.0"
+description = "Data engineering MCP plugin for Claude Code and OpenCode"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Astronomer", email = "support@astronomer.io" }]
+keywords = ["data-engineering", "airflow", "snowflake", "jupyter", "mcp", "astronomer"]
+
+dependencies = [
+    "mcp>=1.0.0",
+    "jupyter-client>=8.0.0",
+    "ipykernel>=6.0.0",
+    "pyyaml>=6.0",
+    "pydantic>=2.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+snowflake = ["snowflake-connector-python>=3.0.0"]
+bigquery = ["google-cloud-bigquery>=3.0.0"]
+databricks = ["databricks-sql-connector>=3.0.0"]
+redshift = ["redshift-connector>=2.0.0"]
+all = ["data-plugin[snowflake,bigquery,databricks,redshift]"]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "ruff>=0.1.0",
+]
+
+[project.scripts]
+data-jupyter = "data_plugin.jupyter.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/data_plugin"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
