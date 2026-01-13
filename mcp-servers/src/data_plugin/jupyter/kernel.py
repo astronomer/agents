@@ -8,7 +8,6 @@ in Python without the Go->Python IPC layer.
 import asyncio
 import logging
 import shutil
-import subprocess
 import sys
 import time
 from dataclasses import dataclass, field
