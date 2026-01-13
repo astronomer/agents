@@ -7,7 +7,7 @@
     },
     "jupyter": {
       "type": "local",
-      "command": ["uv", "run", "--directory", "../packages/data-jupyter", "data-jupyter"]
+      "command": ["uvx", "data-jupyter"]
     }
   }
 }

@@ -25,8 +25,9 @@ help:  ## Show this help message
 	@echo ""
 
 # Installation targets
-install:  ## [quick] Install core dependencies
+install:  ## [quick] Install core dependencies and local MCP server
 	cd $(JUPYTER_DIR) && uv sync
+	uv tool install --force $(JUPYTER_DIR)
 
 install-dev:  ## [dev] Install with dev dependencies
 	cd $(JUPYTER_DIR) && uv sync --extra dev

@@ -25,6 +25,15 @@ A Claude Code and OpenCode plugin for data engineering workflows. Built by [Astr
 
 ## Installation
 
+### Prerequisites
+
+Install the local MCP servers (required before installing the plugin):
+```bash
+make install
+```
+
+This installs `data-jupyter` as a local tool via `uv tool install`, making it available system-wide.
+
 ### Claude Code
 
 **Install from local marketplace:**

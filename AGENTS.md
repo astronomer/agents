@@ -16,12 +16,12 @@ project-root/
 └── opencode/
     ├── opencode.json               # MCP server config for OpenCode
     └── .opencode/
-        └── skills -> ../../shared-skills  # Symlink for OpenCode discovery
+        └── skill -> ../../shared-skills   # Symlink for OpenCode discovery (singular)
 ```
 
 **Important**: `.mcp.json` must be at the plugin root, not inside `.claude-plugin/`. The `source` field in `marketplace.json` is relative to the marketplace root.
 
-Skills are stored in `shared-skills/` and symlinked to both `claude-code-plugin/skills/` and `opencode/.opencode/skills/` so both Claude Code and OpenCode can discover them.
+Skills are stored in `shared-skills/` and symlinked to both `claude-code-plugin/skills/` and `opencode/.opencode/skill/` (note: OpenCode uses singular `skill`) so both Claude Code and OpenCode can discover them.
 
 ## Installing the Plugin
 
@@ -59,6 +59,20 @@ description: When to use this skill (Claude uses this to decide when to invoke i
 - Users can also invoke directly with `/plugin-name:skill-name` (e.g., `/data:dag-authoring`)
 
 ## MCP Servers
+
+### Installing Local MCP Servers
+
+Local packages (like `data-jupyter`) must be installed as uv tools before the plugin can use them:
+
+```bash
+# Install all local MCP servers
+make install
+
+# Or install manually
+uv tool install --force packages/data-jupyter
+```
+
+This makes the package available via `uvx data-jupyter` system-wide. Re-run with `--force` after making changes to the package.
 
 ### Claude Code
 
@@ -135,4 +149,4 @@ opencode
 opencode run "help me write a DAG"
 ```
 
-OpenCode will automatically discover skills from `.opencode/skills/` and MCP servers from `opencode.json`.
+OpenCode will automatically discover skills from `.opencode/skill/` and MCP servers from `opencode.json`.
