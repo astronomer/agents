@@ -3,17 +3,23 @@
 ## Plugin Structure
 
 ```
-claude-code-plugin/
-├── .claude-plugin/
-│   ├── marketplace.json   # Marketplace catalog (lists plugins)
-│   └── plugin.json        # Plugin manifest (metadata)
-├── skills/                # Skills directory (auto-discovered)
+project-root/
+├── shared-skills/                # Canonical skill source (shared)
 │   └── skill-name/
-│       └── SKILL.md       # Skill with YAML frontmatter
-└── .mcp.json              # MCP server config (MUST be at plugin root)
+│       └── SKILL.md              # Skill with YAML frontmatter
+├── claude-code-plugin/
+│   ├── .claude-plugin/
+│   │   ├── marketplace.json      # Marketplace catalog (lists plugins)
+│   │   └── plugin.json           # Plugin manifest (metadata)
+│   ├── skills -> ../shared-skills  # Symlink to shared skills
+│   └── .mcp.json                 # MCP server config (MUST be at plugin root)
+└── .opencode/
+    └── skills -> ../shared-skills  # Symlink for OpenCode discovery
 ```
 
 **Important**: `.mcp.json` must be at the plugin root, not inside `.claude-plugin/`. The `source` field in `marketplace.json` is relative to the marketplace root.
+
+Skills are stored in `shared-skills/` and symlinked to both `claude-code-plugin/skills/` and `.opencode/skills/` so both Claude Code and OpenCode can discover them.
 
 ## Installing the Plugin
 
@@ -75,3 +81,27 @@ Configure in `.mcp.json`:
 ## Config Location
 
 This plugin uses `~/.astro/ai/config/` for user configuration (warehouse credentials, etc.).
+
+## Testing with OpenCode
+
+OpenCode discovers skills from `.opencode/skills/` in the project directory. Since skills are symlinked to `shared-skills/`, they work with both tools.
+
+### Verify Skills are Discovered
+
+```bash
+opencode debug skill
+```
+
+This outputs all discovered skills with their names, descriptions, and file paths.
+
+### Run OpenCode
+
+```bash
+# Start OpenCode TUI in the project
+opencode
+
+# Or run with a specific message
+opencode run "help me write a DAG"
+```
+
+OpenCode will automatically discover and use skills from `.opencode/skills/` based on the task context.
