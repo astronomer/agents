@@ -26,3 +26,18 @@ def ensure_session_dir(session_id: str) -> Path:
     session_dir.mkdir(parents=True, exist_ok=True)
     return session_dir
 
+
+def get_session_data_dir(session_id: str) -> Path:
+    """Get the data directory for a session (for query results, etc.).
+
+    Args:
+        session_id: The session identifier
+
+    Returns:
+        Path to the session data directory
+    """
+    session_dir = ensure_session_dir(session_id)
+    data_dir = session_dir / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    return data_dir
+
