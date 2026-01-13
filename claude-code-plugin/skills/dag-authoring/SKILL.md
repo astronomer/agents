@@ -1,16 +1,214 @@
 ---
 name: dag-authoring
-description: Best practices for writing Apache Airflow DAGs. Use when the user is creating new DAGs, writing pipeline code, or asks about DAG patterns, conventions, or anti-patterns.
+description: Workflow and best practices for writing Apache Airflow DAGs. Use when the user wants to create a new DAG, write pipeline code, debug DAG issues, or asks about DAG patterns and conventions. This skill integrates with the Airflow MCP for validation and testing.
 ---
 
-# DAG Authoring Best Practices
+# DAG Authoring Skill
 
-Follow these guidelines when writing Airflow DAGs to ensure maintainability, security, and reliability.
+This skill guides you through creating, validating, and testing Airflow DAGs using the Airflow MCP tools for feedback at every step.
 
-## Core Principles
+## Workflow Overview
+
+```
+┌─────────────────────────────────────┐
+│ 1. DISCOVER                         │
+│    Understand codebase & environment│
+└─────────────────────────────────────┘
+                 ↓
+┌─────────────────────────────────────┐
+│ 2. PLAN                             │
+│    Propose structure, get approval  │
+└─────────────────────────────────────┘
+                 ↓
+┌─────────────────────────────────────┐
+│ 3. IMPLEMENT                        │
+│    Write DAG following patterns     │
+└─────────────────────────────────────┘
+                 ↓
+┌─────────────────────────────────────┐
+│ 4. VALIDATE                         │
+│    Check import errors, warnings    │
+└─────────────────────────────────────┘
+                 ↓
+┌─────────────────────────────────────┐
+│ 5. TEST (with user consent)         │
+│    Trigger, monitor, check logs     │
+└─────────────────────────────────────┘
+                 ↓
+┌─────────────────────────────────────┐
+│ 6. ITERATE                          │
+│    Fix issues, re-validate          │
+└─────────────────────────────────────┘
+```
+
+---
+
+## Phase 1: Discover
+
+Before writing code, understand the context.
+
+### Explore the Codebase
+
+Use file tools to find existing patterns:
+- `Glob` for `**/dags/**/*.py` to find existing DAGs
+- `Read` similar DAGs to understand conventions
+- Check `requirements.txt` for available packages
+
+### Query the Airflow Environment
+
+Use MCP tools to understand what's available:
+
+| Tool | Purpose |
+|------|---------|
+| `list_connections` | What external systems are configured |
+| `list_variables` | What configuration values exist |
+| `list_providers` | What operator packages are installed |
+| `get_airflow_version` | Version constraints and features |
+| `list_dags` | Existing DAGs and naming conventions |
+| `list_pools` | Resource pools for concurrency |
+
+**Example discovery questions:**
+- "Is there a Snowflake connection?" → `list_connections`
+- "What Airflow version?" → `get_airflow_version`
+- "Are S3 operators available?" → `list_providers`
+
+---
+
+## Phase 2: Plan
+
+Based on discovery, propose:
+
+1. **DAG structure** - Tasks, dependencies, schedule
+2. **Operators to use** - Based on available providers
+3. **Connections needed** - Existing or to be created
+4. **Variables needed** - Existing or to be created
+5. **Packages needed** - Additions to requirements.txt
+
+**Get user approval before implementing.**
+
+---
+
+## Phase 3: Implement
+
+Write the DAG following best practices (see below). Key steps:
+
+1. Create DAG file in appropriate location
+2. Update `requirements.txt` if needed
+3. Save the file
+
+---
+
+## Phase 4: Validate
+
+**Use the Airflow MCP as a feedback loop.**
+
+### Step 1: Check Import Errors
+
+After saving, wait a few seconds for Airflow to parse:
+
+```
+list_import_errors
+```
+
+- If your file appears → **fix and retry**
+- If no errors → **continue**
+
+Common causes: missing imports, syntax errors, missing packages.
+
+### Step 2: Verify DAG Exists
+
+```
+get_dag_details(dag_id="your_dag_id")
+```
+
+Check: DAG exists, schedule correct, tags set, paused status.
+
+### Step 3: Check Warnings
+
+```
+list_dag_warnings
+```
+
+Look for deprecation warnings or configuration issues.
+
+### Step 4: Explore DAG Structure
+
+```
+explore_dag(dag_id="your_dag_id")
+```
+
+Returns in one call: metadata, tasks, dependencies, source code.
+
+---
+
+## Phase 5: Test
+
+**CRITICAL: Always ask user permission before triggering.**
+
+DAGs can: write to production, send emails, incur costs.
+
+### Ask First
+
+> "The DAG validated successfully. Would you like me to trigger a test run?"
+
+### If Approved
+
+**Trigger and wait:**
+```
+trigger_dag_and_wait(dag_id="your_dag_id", conf={}, timeout=300)
+```
+
+**Or trigger and monitor separately:**
+```
+trigger_dag(dag_id="your_dag_id")
+get_dag_run(dag_id, dag_run_id)
+```
+
+### If Something Fails
+
+```
+get_task_logs(dag_id, dag_run_id, task_id)
+```
+
+Or comprehensive diagnosis:
+```
+diagnose_dag_run(dag_id, dag_run_id)
+```
+
+---
+
+## Phase 6: Iterate
+
+If issues found:
+1. Fix the code
+2. Re-validate (Phase 4)
+3. Re-test with permission (Phase 5)
+
+---
+
+## MCP Tools Quick Reference
+
+| Phase | Tool | Purpose |
+|-------|------|---------|
+| Discover | `list_connections` | Available connections |
+| Discover | `list_variables` | Configuration values |
+| Discover | `list_providers` | Installed operators |
+| Discover | `get_airflow_version` | Version info |
+| Validate | `list_import_errors` | Parse errors (check first!) |
+| Validate | `get_dag_details` | Verify DAG config |
+| Validate | `list_dag_warnings` | Configuration warnings |
+| Validate | `explore_dag` | Full DAG inspection |
+| Test | `trigger_dag` | Start a run |
+| Test | `trigger_dag_and_wait` | Run and wait |
+| Test | `get_dag_run` | Check run status |
+| Test | `get_task_logs` | Debug failures |
+| Test | `diagnose_dag_run` | Troubleshooting |
+
+---
+
+## Best Practices
 
 ### Use TaskFlow API
-Prefer the modern TaskFlow API over traditional DAG definitions:
 
 ```python
 from airflow.decorators import dag, task
@@ -21,7 +219,8 @@ from datetime import datetime
     start_date=datetime(2025, 1, 1),
     schedule='@daily',
     catchup=False,
-    default_args={'owner': 'airflow', 'retries': 2},
+    default_args={'owner': 'data-team', 'retries': 2},
+    tags=['etl', 'production'],
 )
 def my_pipeline():
     @task
@@ -34,160 +233,65 @@ def my_pipeline():
 
     @task
     def load(transformed: list):
-        print(f"Loading {len(transformed)} records")
+        print(f"Loaded {len(transformed)} records")
 
-    data = extract()
-    transformed = transform(data)
-    load(transformed)
+    load(transform(extract()))
 
 my_pipeline()
 ```
 
 ### Never Hard-Code Credentials
-Always use Airflow connections or variables for sensitive data:
 
 ```python
-# WRONG - Never do this
+# WRONG
 conn_string = "postgresql://user:password@host:5432/db"
 
 # CORRECT - Use connections
 from airflow.hooks.base import BaseHook
 conn = BaseHook.get_connection("my_postgres_conn")
 
-# CORRECT - Use variables for non-connection config
+# CORRECT - Use variables
 from airflow.models import Variable
 api_key = Variable.get("my_api_key")
 
-# CORRECT - Use templating in operators
+# CORRECT - Templating
 sql = "SELECT * FROM {{ var.value.table_name }}"
 ```
 
-### Use Built-in Operators
-Prefer provider operators over custom implementations:
+### Use Provider Operators
 
 ```python
-# CORRECT - Use provider operators
 from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
 from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
 from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
-
-# Avoid writing custom code when an operator exists
 ```
 
-### Ensure Tasks Are Idempotent
-Tasks should produce the same result when run multiple times:
+### Ensure Idempotency
 
 ```python
 @task
 def load_data(data_interval_start, data_interval_end):
-    # CORRECT - Delete before insert for idempotency
-    delete_existing_data(data_interval_start, data_interval_end)
-    insert_new_data(data_interval_start, data_interval_end)
+    # Delete before insert
+    delete_existing(data_interval_start, data_interval_end)
+    insert_new(data_interval_start, data_interval_end)
 ```
 
-### Break Complex Logic into Small Tasks
-Keep tasks focused and reusable:
-
-```python
-# WRONG - Monolithic task
-@task
-def do_everything():
-    data = extract_from_api()
-    cleaned = clean_data(data)
-    transformed = apply_business_logic(cleaned)
-    validate(transformed)
-    load_to_warehouse(transformed)
-
-# CORRECT - Small, focused tasks
-@task
-def extract(): ...
-
-@task
-def clean(data): ...
-
-@task
-def transform(data): ...
-
-@task
-def validate(data): ...
-
-@task
-def load(data): ...
-```
-
-## Configuration Best Practices
-
-### Keep Config Outside Code
-Use Airflow variables and connections, not hardcoded values:
-
-```python
-# Configuration in variables, not code
-DATASET = Variable.get("bigquery_dataset")
-TABLE = Variable.get("target_table")
-
-# Or use params for DAG-level config
-@dag(
-    params={
-        "dataset": Param(default="production", type="string"),
-        "batch_size": Param(default=1000, type="integer"),
-    }
-)
-```
-
-### Always Specify Dependencies in requirements.txt
-Ensure ALL packages are declared:
-
-```text
-# requirements.txt
-apache-airflow-providers-snowflake>=5.0.0
-apache-airflow-providers-google>=10.0.0
-pandas>=2.0.0
-requests>=2.28.0
-```
-
-### Use Explicit Scheduling
-Don't rely on defaults - be explicit:
-
-```python
-@dag(
-    schedule='@daily',      # Explicit schedule
-    catchup=False,          # Explicit catchup behavior
-    start_date=datetime(2025, 1, 1),  # Explicit start date
-    tags=['production', 'etl'],
-)
-```
-
-## Data Intervals and Templating
-
-### Use Data Intervals Correctly
-Understand the difference between logical_date, data_interval_start, and data_interval_end:
+### Use Data Intervals
 
 ```python
 @task
-def process_data(data_interval_start, data_interval_end):
-    """Process data for the interval."""
-    print(f"Processing data from {data_interval_start} to {data_interval_end}")
+def process(data_interval_start, data_interval_end):
+    print(f"Processing {data_interval_start} to {data_interval_end}")
 
-# In SQL with templating
+# In SQL
 sql = """
     SELECT * FROM events
     WHERE event_time >= '{{ data_interval_start }}'
-    AND event_time < '{{ data_interval_end }}'
+      AND event_time < '{{ data_interval_end }}'
 """
 ```
 
-### Template Variables Reference
-Common template variables:
-- `{{ data_interval_start }}` - Start of the data interval
-- `{{ data_interval_end }}` - End of the data interval
-- `{{ ds }}` - Logical date as YYYY-MM-DD
-- `{{ var.value.my_var }}` - Airflow variable
-- `{{ var.json.my_json.key }}` - JSON variable access
-- `{{ conn.my_conn.host }}` - Connection attribute
-
-## Task Organization
-
-### Use Task Groups for Logical Grouping
+### Organize with Task Groups
 
 ```python
 from airflow.decorators import task_group
@@ -195,55 +299,35 @@ from airflow.decorators import task_group
 @task_group
 def extract_sources():
     @task
-    def extract_postgres(): ...
+    def from_postgres(): ...
 
     @task
-    def extract_api(): ...
+    def from_api(): ...
 
-    return extract_postgres(), extract_api()
-
-@task_group
-def quality_checks(data):
-    @task
-    def check_nulls(data): ...
-
-    @task
-    def check_duplicates(data): ...
-
-    check_nulls(data)
-    check_duplicates(data)
+    return from_postgres(), from_api()
 ```
 
-### Use Setup/Teardown for Resource Management
+### Use Setup/Teardown
 
 ```python
-from airflow.decorators import task, setup, teardown
+from airflow.decorators import setup, teardown
 
 @setup
-def create_temp_table():
-    """Create temporary staging table."""
-    ...
+def create_temp_table(): ...
 
 @teardown
-def drop_temp_table():
-    """Clean up temporary table."""
-    ...
+def drop_temp_table(): ...
 
 @task
-def process_data():
-    """Main processing using temp table."""
-    ...
+def process(): ...
 
-# Wire them up
 create = create_temp_table()
-process = process_data()
+process_task = process()
 cleanup = drop_temp_table()
 
-create >> process >> cleanup
+create >> process_task >> cleanup
 cleanup.as_teardown(setups=[create])
 ```
-
-## Data Quality
 
 ### Include Data Quality Checks
 
@@ -253,131 +337,75 @@ from airflow.providers.common.sql.operators.sql import (
     SQLTableCheckOperator,
 )
 
-# Column-level checks
-column_checks = SQLColumnCheckOperator(
+SQLColumnCheckOperator(
     task_id="check_columns",
     table="my_table",
     column_mapping={
         "id": {"null_check": {"equal_to": 0}},
-        "email": {"unique_check": {"equal_to": 0}},
     },
 )
 
-# Table-level checks
-table_checks = SQLTableCheckOperator(
+SQLTableCheckOperator(
     task_id="check_table",
     table="my_table",
-    checks={
-        "row_count": {"check_statement": "COUNT(*) > 0"},
-        "recent_data": {"check_statement": "MAX(updated_at) > CURRENT_DATE - 1"},
-    },
+    checks={"row_count": {"check_statement": "COUNT(*) > 0"}},
 )
 ```
 
-## Anti-Patterns to Avoid
+---
+
+## Anti-Patterns
 
 ### DON'T: Access Metadata DB Directly
-```python
-# WRONG - Don't do this
-from airflow.settings import Session
-with Session() as session:
-    session.query(DagModel).all()  # Will fail in Airflow 3
 
-# CORRECT - Use the REST API or Airflow client
+```python
+# WRONG - Fails in Airflow 3
+from airflow.settings import Session
+session.query(DagModel).all()
 ```
 
 ### DON'T: Use Deprecated Imports
+
 ```python
-# WRONG - Deprecated
+# WRONG
 from airflow.operators.dummy_operator import DummyOperator
 
-# CORRECT - Use standard provider
+# CORRECT
 from airflow.providers.standard.operators.empty import EmptyOperator
 ```
 
 ### DON'T: Use SubDAGs
+
 ```python
-# WRONG - SubDAGs are removed
+# WRONG
 from airflow.operators.subdag import SubDagOperator
 
-# CORRECT - Use TaskGroups instead
+# CORRECT
 from airflow.decorators import task_group
 ```
 
-### DON'T: Rely on XCom Pickling
-```python
-# WRONG - Pickling is removed in Airflow 3
-return custom_python_object  # Will fail
-
-# CORRECT - Return JSON-serializable data
-return {"key": "value", "list": [1, 2, 3]}
-```
-
 ### DON'T: Use Deprecated Context Keys
+
 ```python
-# WRONG - Removed in Airflow 3
+# WRONG
 execution_date = context["execution_date"]
 
-# CORRECT - Use current context keys
+# CORRECT
 logical_date = context["dag_run"].logical_date
 data_start = context["data_interval_start"]
 ```
 
-## Example: Complete ETL Pipeline
+### DON'T: Hard-Code File Paths
 
 ```python
-from airflow.decorators import dag, task, task_group
-from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
-from airflow.providers.common.sql.operators.sql import SQLTableCheckOperator
-from datetime import datetime
+# WRONG
+open("include/data.csv")
 
-@dag(
-    dag_id='sales_etl',
-    start_date=datetime(2025, 1, 1),
-    schedule='@daily',
-    catchup=False,
-    default_args={
-        'owner': 'data-team',
-        'retries': 2,
-        'retry_delay': timedelta(minutes=5),
-    },
-    tags=['etl', 'sales', 'production'],
-)
-def sales_etl():
-    """Daily ETL pipeline for sales data."""
+# CORRECT - Files in dags/
+import os
+dag_dir = os.path.dirname(__file__)
+open(os.path.join(dag_dir, "data.csv"))
 
-    @task
-    def extract_sales(data_interval_start, data_interval_end):
-        """Extract sales data for the interval."""
-        # Implementation here
-        return {"records": 1000}
-
-    @task_group
-    def quality_checks():
-        """Run data quality validations."""
-        SQLTableCheckOperator(
-            task_id="check_completeness",
-            conn_id="snowflake_default",
-            table="staging.sales",
-            checks={"has_data": {"check_statement": "COUNT(*) > 0"}},
-        )
-
-    @task
-    def transform_and_load(extraction_result):
-        """Apply transformations and load to warehouse."""
-        # Implementation here
-        pass
-
-    # Define flow
-    extracted = extract_sales()
-    quality_checks()
-    transform_and_load(extracted)
-
-sales_etl()
+# CORRECT - Files in include/
+open(f"{os.getenv('AIRFLOW_HOME')}/include/data.csv")
 ```
-
-## Resources
-
-- [Astronomer Learn](https://www.astronomer.io/docs/learn)
-- [Airflow Best Practices](https://airflow.apache.org/docs/apache-airflow/stable/best-practices.html)
-- [TaskFlow API Guide](https://www.astronomer.io/docs/learn/airflow-decorators)
