@@ -1,7 +1,7 @@
 .PHONY: help install install-dev install-all sync lint format check test run build clean
 
 # Directory containing the Python project
-MCP_DIR := mcp-servers
+JUPYTER_DIR := packages/data-jupyter
 
 # Default target
 help:  ## Show this help message
@@ -26,45 +26,45 @@ help:  ## Show this help message
 
 # Installation targets
 install:  ## [quick] Install core dependencies
-	cd $(MCP_DIR) && uv sync
+	cd $(JUPYTER_DIR) && uv sync
 
 install-dev:  ## [dev] Install with dev dependencies
-	cd $(MCP_DIR) && uv sync --extra dev
+	cd $(JUPYTER_DIR) && uv sync --extra dev
 
 install-all:  ## [dev] Install with all optional dependencies
-	cd $(MCP_DIR) && uv sync --all-extras
+	cd $(JUPYTER_DIR) && uv sync --all-extras
 
 sync:  ## [dev] Sync dependencies from lockfile
-	cd $(MCP_DIR) && uv sync --frozen
+	cd $(JUPYTER_DIR) && uv sync --frozen
 
 # Development targets
 lint:  ## [test] Run ruff linter
-	cd $(MCP_DIR) && uv run ruff check src/
+	cd $(JUPYTER_DIR) && uv run ruff check src/
 
 format:  ## [dev] Format code with ruff
-	cd $(MCP_DIR) && uv run ruff format src/
-	cd $(MCP_DIR) && uv run ruff check --fix src/
+	cd $(JUPYTER_DIR) && uv run ruff format src/
+	cd $(JUPYTER_DIR) && uv run ruff check --fix src/
 
 check:  ## [test] Run linter and format check
-	cd $(MCP_DIR) && uv run ruff check src/
-	cd $(MCP_DIR) && uv run ruff format --check src/
+	cd $(JUPYTER_DIR) && uv run ruff check src/
+	cd $(JUPYTER_DIR) && uv run ruff format --check src/
 
 test:  ## [test] Run tests with pytest
-	cd $(MCP_DIR) && uv run pytest
+	cd $(JUPYTER_DIR) && uv run pytest
 
 # Run target
 run:  ## [quick] Run the Jupyter MCP server
-	cd $(MCP_DIR) && uv run data-jupyter
+	cd $(JUPYTER_DIR) && uv run data-jupyter
 
 # Build targets
 build:  ## [build] Build the package
-	cd $(MCP_DIR) && uv build
+	cd $(JUPYTER_DIR) && uv build
 
 clean:  ## [util] Remove build artifacts
-	rm -rf $(MCP_DIR)/dist/
-	rm -rf $(MCP_DIR)/build/
-	rm -rf $(MCP_DIR)/.pytest_cache/
-	rm -rf $(MCP_DIR)/.ruff_cache/
-	find $(MCP_DIR) -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-	find $(MCP_DIR) -type f -name "*.pyc" -delete 2>/dev/null || true
+	rm -rf $(JUPYTER_DIR)/dist/
+	rm -rf $(JUPYTER_DIR)/build/
+	rm -rf $(JUPYTER_DIR)/.pytest_cache/
+	rm -rf $(JUPYTER_DIR)/.ruff_cache/
+	find $(JUPYTER_DIR) -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	find $(JUPYTER_DIR) -type f -name "*.pyc" -delete 2>/dev/null || true
 

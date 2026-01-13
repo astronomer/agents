@@ -4,7 +4,7 @@ This server exposes tools for Python code execution, package installation,
 and kernel lifecycle management via the Model Context Protocol (MCP).
 
 Usage:
-    python -m data_plugin.jupyter.server
+    python -m data_jupyter.server
 
 Or via the installed script:
     data-jupyter
@@ -15,7 +15,7 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from data_plugin.jupyter.kernel import KernelManager
+from data_jupyter.kernel import KernelManager
 
 # Configure logging
 logging.basicConfig(

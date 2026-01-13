@@ -8,7 +8,7 @@ These tools are exposed via FastMCP and provide:
 
 from typing import Any
 
-from data_plugin.jupyter.kernel import KernelManager
+from data_jupyter.kernel import KernelManager
 
 
 async def execute_python(
