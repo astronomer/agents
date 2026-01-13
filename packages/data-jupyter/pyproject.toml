@@ -17,7 +17,7 @@ dev = [
 ]
 
 [project.scripts]
-data-jupyter = "data_jupyter.server:main"
+data-jupyter = "src.server:main"
 
 [build-system]
 requires = ["hatchling"]

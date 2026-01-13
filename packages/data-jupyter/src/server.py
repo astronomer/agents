@@ -15,7 +15,7 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from data_jupyter.kernel import KernelManager
+from .kernel import KernelManager
 
 # Configure logging
 logging.basicConfig(

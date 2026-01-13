@@ -3,6 +3,10 @@
     "airflow": {
       "command": "uvx",
       "args": ["astro-airflow-mcp", "--transport", "stdio"]
+    },
+    "jupyter": {
+      "command": "uv",
+      "args": ["run", "--directory", "../packages/data-jupyter", "data-jupyter"]
     }
   }
 }

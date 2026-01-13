@@ -16,7 +16,7 @@ from typing import Any
 
 from jupyter_client import KernelManager as JupyterKernelManager
 
-from data_jupyter.config import ensure_session_dir, get_kernel_venv_dir
+from .config import ensure_session_dir, get_kernel_venv_dir
 
 logger = logging.getLogger(__name__)
 
@@ -431,7 +431,7 @@ class KernelManager:
         if self._state.prelude_executed or self._state.current_session_dir is None:
             return
 
-        from data_jupyter.prelude import render_session_prelude
+        from .prelude import render_session_prelude
 
         prelude_code = render_session_prelude(self._state.current_session_dir)
 
