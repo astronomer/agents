@@ -1,0 +1,13 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "airflow": {
+      "type": "local",
+      "command": ["uvx", "astro-airflow-mcp", "--transport", "stdio"]
+    },
+    "jupyter": {
+      "type": "local",
+      "command": ["uv", "run", "--directory", "./packages/data-jupyter", "data-jupyter"]
+    }
+  }
+}
