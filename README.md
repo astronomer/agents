@@ -40,24 +40,30 @@ A Claude Code and OpenCode plugin for data engineering workflows. Built by [Astr
 
 ## Configuration
 
-`data` uses a configuration file for data warehouse credentials and settings.
+`data` uses the existing Astro CLI AI config directory (`~/.astro/ai/config/`).
+
+### Warehouse Configuration (`~/.astro/ai/config/warehouse.yml`)
 
 ```yaml
-# ~/.config/data/config.yaml
-warehouses:
-  my-snowflake:
-    type: snowflake
-    account: xxx
-    user: xxx
-    # additional connection parameters
+dwh:
+  type: snowflake
+  auth_type: private_key
+  account: ${SNOWFLAKE_ACCOUNT}
+  user: ${SNOWFLAKE_USER}
+  private_key: ${SNOWFLAKE_PRIVATE_KEY}
+  warehouse: COMPUTE_WH
+  role: ANALYST
+  databases:
+    - ANALYTICS
+    - RAW
+```
 
-  my-bigquery:
-    type: bigquery
-    project: xxx
-    # additional connection parameters
+### Secrets (`~/.astro/ai/config/.env`)
 
-airflow:
-  # Astro CLI configuration
+```bash
+SNOWFLAKE_ACCOUNT=abc12345.us-east-1
+SNOWFLAKE_USER=my_user
+SNOWFLAKE_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----...
 ```
 
 ## Requirements

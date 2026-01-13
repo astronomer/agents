@@ -273,8 +273,8 @@ The Claude Code wrapper provides skills, commands, and hooks that leverage the s
     "name": "Astronomer",
     "email": "support@astronomer.io"
   },
-  "homepage": "https://github.com/astronomer/data",
-  "repository": "https://github.com/astronomer/data",
+  "homepage": "https://github.com/astronomer/data-ai-plugins",
+  "repository": "https://github.com/astronomer/data-ai-plugins",
   "keywords": ["data-engineering", "airflow", "snowflake", "bigquery", "jupyter", "astronomer"]
 }
 ```
@@ -288,21 +288,21 @@ The Claude Code wrapper provides skills, commands, and hooks that leverage the s
       "command": "python",
       "args": ["-m", "data_plugin.jupyter.server"],
       "env": {
-        "DATA_PLUGIN_CONFIG": "~/.config/data/config.yaml"
+        "ASTRO_AI_CONFIG": "~/.astro/ai/config/"
       }
     },
     "data-warehouse": {
       "command": "python",
       "args": ["-m", "data_plugin.warehouse.server"],
       "env": {
-        "DATA_PLUGIN_CONFIG": "~/.config/data/config.yaml"
+        "ASTRO_AI_CONFIG": "~/.astro/ai/config/"
       }
     },
     "data-airflow": {
       "command": "python",
       "args": ["-m", "data_plugin.airflow.server"],
       "env": {
-        "DATA_PLUGIN_CONFIG": "~/.config/data/config.yaml"
+        "ASTRO_AI_CONFIG": "~/.astro/ai/config/"
       }
     }
   }
@@ -467,21 +467,21 @@ The OpenCode wrapper provides TypeScript hooks and tool configurations that leve
         "command": "python",
         "args": ["-m", "data_plugin.jupyter.server"],
         "env": {
-          "DATA_PLUGIN_CONFIG": "~/.config/data/config.yaml"
+          "ASTRO_AI_CONFIG": "~/.astro/ai/config/"
         }
       },
       "data-warehouse": {
         "command": "python",
         "args": ["-m", "data_plugin.warehouse.server"],
         "env": {
-          "DATA_PLUGIN_CONFIG": "~/.config/data/config.yaml"
+          "ASTRO_AI_CONFIG": "~/.astro/ai/config/"
         }
       },
       "data-airflow": {
         "command": "python",
         "args": ["-m", "data_plugin.airflow.server"],
         "env": {
-          "DATA_PLUGIN_CONFIG": "~/.config/data/config.yaml"
+          "ASTRO_AI_CONFIG": "~/.astro/ai/config/"
         }
       }
     }
@@ -531,60 +531,65 @@ export const CCForDataPlugin = async ({ project, client, $ }: PluginContext) => 
 
 ## Configuration
 
-### Config File (`~/.config/data/config.yaml`)
+Uses the existing Astro CLI AI config directory (`~/.astro/ai/config/`).
+
+### Directory Structure
+
+```
+~/.astro/ai/
+├── config/
+│   ├── warehouse.yml    # Warehouse connections
+│   └── .env             # Secrets (gitignored)
+├── kernel_venv/         # Jupyter kernel virtualenv
+├── sessions/            # Session history
+└── prompt-history.jsonl # Prompt history
+```
+
+### Warehouse Configuration (`~/.astro/ai/config/warehouse.yml`)
 
 ```yaml
-# Warehouse connections
-warehouses:
-  production-snowflake:
-    type: snowflake
-    account: abc12345.us-east-1
-    user: ${SNOWFLAKE_USER}
-    password: ${SNOWFLAKE_PASSWORD}
-    warehouse: COMPUTE_WH
-    database: ANALYTICS
-    role: ANALYST
+# Primary data warehouse
+dwh:
+  type: snowflake
+  auth_type: private_key
+  account: ${SNOWFLAKE_ACCOUNT}
+  user: ${SNOWFLAKE_USER}
+  private_key: ${SNOWFLAKE_PRIVATE_KEY}
+  warehouse: COMPUTE_WH
+  role: ANALYST
+  databases:
+    - ANALYTICS
+    - RAW
 
-  dev-bigquery:
-    type: bigquery
-    project: my-project-123
-    credentials_file: ~/.config/gcloud/application_default_credentials.json
-    location: US
+# Additional warehouses (optional)
+bigquery:
+  type: bigquery
+  project: ${GCP_PROJECT}
+  credentials_file: ~/.config/gcloud/application_default_credentials.json
+  location: US
 
-  staging-databricks:
-    type: databricks
-    host: adb-1234567890.azuredatabricks.net
-    http_path: /sql/1.0/warehouses/abc123
-    token: ${DATABRICKS_TOKEN}
+databricks:
+  type: databricks
+  host: ${DATABRICKS_HOST}
+  http_path: ${DATABRICKS_HTTP_PATH}
+  token: ${DATABRICKS_TOKEN}
+```
 
-  local-redshift:
-    type: redshift
-    host: localhost
-    port: 5439
-    database: dev
-    user: ${REDSHIFT_USER}
-    password: ${REDSHIFT_PASSWORD}
+### Secrets (`~/.astro/ai/config/.env`)
 
-# Default warehouse for queries
-default_warehouse: production-snowflake
+```bash
+# Snowflake
+SNOWFLAKE_ACCOUNT=abc12345.us-east-1
+SNOWFLAKE_USER=my_user
+SNOWFLAKE_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----...
 
-# Jupyter kernel settings
-jupyter:
-  python_path: /usr/local/bin/python3
-  startup_script: |
-    import pandas as pd
-    import numpy as np
-    pd.set_option('display.max_columns', None)
-  packages:
-    - pandas
-    - numpy
-    - sqlalchemy
+# BigQuery
+GCP_PROJECT=my-project-123
 
-# Airflow settings
-airflow:
-  dags_folder: ./dags
-  astro_project_path: .
-  api_url: http://localhost:8080/api/v1
+# Databricks
+DATABRICKS_HOST=adb-1234567890.azuredatabricks.net
+DATABRICKS_HTTP_PATH=/sql/1.0/warehouses/abc123
+DATABRICKS_TOKEN=dapi...
 ```
 
 ---
