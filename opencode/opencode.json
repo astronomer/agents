@@ -3,7 +3,14 @@
   "mcp": {
     "airflow": {
       "type": "local",
-      "command": ["uvx", "astro-airflow-mcp", "--transport", "stdio"]
+      "command": [
+        "bash",
+        "-c",
+        "if [[ -z \"${AIRFLOW_API_URL:-}\" ]]; then port=$(awk '/^api-server:/{f=1} f&&/port:/{print $2;exit}' \"${ASTRO_WORKING_DIR:-$PWD}/.astro/config.yaml\" 2>/dev/null); [[ -z \"$port\" || \"$port\" -eq 0 ]] && port=$(awk '/^api-server:/{f=1} f&&/port:/{print $2;exit}' ~/.astro/config.yaml 2>/dev/null); [[ -z \"$port\" || \"$port\" -eq 0 ]] && port=8080; export AIRFLOW_API_URL=\"http://localhost:$port\"; fi; exec uvx astro-airflow-mcp \"$@\"",
+        "--",
+        "--transport",
+        "stdio"
+      ]
     },
     "jupyter": {
       "type": "local",
