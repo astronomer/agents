@@ -2,7 +2,7 @@
   "mcpServers": {
     "airflow": {
       "command": "uvx",
-      "args": ["astro-airflow-mcp", "--transport", "stdio"]
+      "args": ["astro-airflow-mcp", "--transport", "stdio", "--project-dir", "${PWD}"]
     },
     "jupyter": {
       "command": "uvx",
