@@ -1,8 +1,8 @@
-# cc-for-data Plugin Scaffolding Plan
+# data Plugin Scaffolding Plan
 
 ## Overview
 
-This document outlines the plan for building `cc-for-data` as a **dual-platform plugin** for both [Claude Code](https://claude.ai/claude-code) and [OpenCode](https://opencode.ai). The core functionality is implemented as shared MCP (Model Context Protocol) servers, with thin platform-specific wrappers for each CLI tool.
+This document outlines the plan for building `data` as a **dual-platform plugin** for both [Claude Code](https://claude.ai/claude-code) and [OpenCode](https://opencode.ai). The core functionality is implemented as shared MCP (Model Context Protocol) servers, with thin platform-specific wrappers for each CLI tool.
 
 **Key Components:**
 - **MCP Servers (Python)** - Shared core functionality for Jupyter kernel, data warehouse discovery, and Airflow integration
@@ -14,11 +14,11 @@ This document outlines the plan for building `cc-for-data` as a **dual-platform 
 ## Repository Architecture
 
 ```
-cc-for-data/
+data/
 ├── mcp-servers/                        # SHARED - Python MCP servers (FastMCP)
 │   ├── pyproject.toml                  # Monorepo Python package config
 │   ├── src/
-│   │   └── cc_for_data/
+│   │   └── data_plugin/
 │   │       ├── __init__.py
 │   │       ├── config.py               # Shared config loading
 │   │       ├── jupyter/                # Jupyter kernel MCP server
@@ -49,10 +49,10 @@ cc-for-data/
 │   │   ├── plugin.json                 # Plugin manifest
 │   │   └── marketplace.json            # For distribution
 │   ├── commands/                       # Slash commands (markdown)
-│   │   ├── explore.md                  # /cc-for-data:explore
-│   │   ├── query.md                    # /cc-for-data:query
-│   │   ├── dag.md                      # /cc-for-data:dag
-│   │   └── connect.md                  # /cc-for-data:connect
+│   │   ├── explore.md                  # /data:explore
+│   │   ├── query.md                    # /data:query
+│   │   ├── dag.md                      # /data:dag
+│   │   └── connect.md                  # /data:connect
 │   ├── skills/                         # Agent skills (markdown)
 │   │   ├── warehouse-exploration/
 │   │   │   └── SKILL.md
@@ -99,7 +99,7 @@ All core functionality lives in Python MCP servers using [FastMCP](https://githu
 | **Target audience** | Data engineers know Python | Less familiar |
 | **MCP server examples** | Most database MCP servers are Python | Growing |
 
-### MCP Server: Jupyter Kernel (`cc_for_data.jupyter`)
+### MCP Server: Jupyter Kernel (`data_plugin.jupyter`)
 
 Manages a Jupyter kernel for executing Python and SQL code with persistent state.
 
@@ -119,7 +119,7 @@ Manages a Jupyter kernel for executing Python and SQL code with persistent state
 from mcp.server.fastmcp import FastMCP
 from jupyter_client import KernelManager
 
-mcp = FastMCP("cc-for-data-jupyter")
+mcp = FastMCP("data-jupyter")
 
 @mcp.tool()
 async def execute_python(code: str) -> str:
@@ -140,7 +140,7 @@ async def execute_sql(query: str, warehouse: str | None = None) -> str:
 - Pre-load common data science packages (pandas, numpy)
 - SQL execution uses the warehouse connection established in the kernel
 
-### MCP Server: Warehouse Discovery (`cc_for_data.warehouse`)
+### MCP Server: Warehouse Discovery (`data_plugin.warehouse`)
 
 Provides tools for exploring data warehouse schemas across multiple platforms.
 
@@ -203,7 +203,7 @@ class RedshiftConnector(WarehouseConnector):
 ```python
 from mcp.server.fastmcp import FastMCP
 
-mcp = FastMCP("cc-for-data-warehouse")
+mcp = FastMCP("data-warehouse")
 
 @mcp.tool()
 async def list_schemas() -> list[str]:
@@ -218,7 +218,7 @@ async def get_table_info(schema: str, table: str) -> dict:
     return await connector.get_table_info(schema, table)
 ```
 
-### MCP Server: Airflow (`cc_for_data.airflow`)
+### MCP Server: Airflow (`data_plugin.airflow`)
 
 Integration with Astro CLI / local Airflow development.
 
@@ -239,7 +239,7 @@ Integration with Astro CLI / local Airflow development.
 from mcp.server.fastmcp import FastMCP
 import httpx
 
-mcp = FastMCP("cc-for-data-airflow")
+mcp = FastMCP("data-airflow")
 
 AIRFLOW_API = "http://localhost:8080/api/v1"
 
@@ -266,15 +266,15 @@ The Claude Code wrapper provides skills, commands, and hooks that leverage the s
 
 ```json
 {
-  "name": "cc-for-data",
+  "name": "data",
   "version": "0.1.0",
   "description": "Data engineering plugin for Claude Code - warehouse exploration, pipeline authoring, and Airflow integration",
   "author": {
     "name": "Astronomer",
     "email": "support@astronomer.io"
   },
-  "homepage": "https://github.com/astronomer/cc-for-data",
-  "repository": "https://github.com/astronomer/cc-for-data",
+  "homepage": "https://github.com/astronomer/data",
+  "repository": "https://github.com/astronomer/data",
   "keywords": ["data-engineering", "airflow", "snowflake", "bigquery", "jupyter", "astronomer"]
 }
 ```
@@ -284,25 +284,25 @@ The Claude Code wrapper provides skills, commands, and hooks that leverage the s
 ```json
 {
   "mcpServers": {
-    "cc-for-data-jupyter": {
+    "data-jupyter": {
       "command": "python",
-      "args": ["-m", "cc_for_data.jupyter.server"],
+      "args": ["-m", "data_plugin.jupyter.server"],
       "env": {
-        "CC_FOR_DATA_CONFIG": "~/.cc-for-data/config.yaml"
+        "DATA_PLUGIN_CONFIG": "~/.config/data/config.yaml"
       }
     },
-    "cc-for-data-warehouse": {
+    "data-warehouse": {
       "command": "python",
-      "args": ["-m", "cc_for_data.warehouse.server"],
+      "args": ["-m", "data_plugin.warehouse.server"],
       "env": {
-        "CC_FOR_DATA_CONFIG": "~/.cc-for-data/config.yaml"
+        "DATA_PLUGIN_CONFIG": "~/.config/data/config.yaml"
       }
     },
-    "cc-for-data-airflow": {
+    "data-airflow": {
       "command": "python",
-      "args": ["-m", "cc_for_data.airflow.server"],
+      "args": ["-m", "data_plugin.airflow.server"],
       "env": {
-        "CC_FOR_DATA_CONFIG": "~/.cc-for-data/config.yaml"
+        "DATA_PLUGIN_CONFIG": "~/.config/data/config.yaml"
       }
     }
   }
@@ -318,8 +318,8 @@ The Claude Code wrapper provides skills, commands, and hooks that leverage the s
 name: warehouse-exploration
 description: Use this skill when the user wants to explore data in their warehouse, understand schema, find tables, or run ad-hoc queries.
 allowed_tools:
-  - mcp__cc-for-data-warehouse__*
-  - mcp__cc-for-data-jupyter__execute_sql
+  - mcp__data-warehouse__*
+  - mcp__data-jupyter__execute_sql
 ---
 
 When exploring a data warehouse:
@@ -350,8 +350,8 @@ When exploring a data warehouse:
 name: pipeline-authoring
 description: Use this skill when the user wants to create, modify, or debug Airflow DAGs and data pipelines.
 allowed_tools:
-  - mcp__cc-for-data-airflow__*
-  - mcp__cc-for-data-jupyter__execute_python
+  - mcp__data-airflow__*
+  - mcp__data-jupyter__execute_python
   - Write
   - Edit
   - Read
@@ -382,7 +382,7 @@ When authoring Airflow pipelines:
 
 ### Commands
 
-#### `/cc-for-data:explore`
+#### `/data:explore`
 
 ```markdown
 ---
@@ -399,7 +399,7 @@ Use the warehouse discovery tools to:
 3. Begin interactive exploration based on user goals
 ```
 
-#### `/cc-for-data:query`
+#### `/data:query`
 
 ```markdown
 ---
@@ -415,7 +415,7 @@ $ARGUMENTS
 Show the results in a readable format and offer to help analyze them.
 ```
 
-#### `/cc-for-data:dag`
+#### `/data:dag`
 
 ```markdown
 ---
@@ -439,7 +439,7 @@ The OpenCode wrapper provides TypeScript hooks and tool configurations that leve
 
 ```json
 {
-  "name": "cc-for-data-opencode",
+  "name": "data-opencode",
   "version": "0.1.0",
   "description": "Data engineering plugin for OpenCode",
   "main": "dist/index.js",
@@ -463,30 +463,30 @@ The OpenCode wrapper provides TypeScript hooks and tool configurations that leve
 {
   "mcp": {
     "servers": {
-      "cc-for-data-jupyter": {
+      "data-jupyter": {
         "command": "python",
-        "args": ["-m", "cc_for_data.jupyter.server"],
+        "args": ["-m", "data_plugin.jupyter.server"],
         "env": {
-          "CC_FOR_DATA_CONFIG": "~/.cc-for-data/config.yaml"
+          "DATA_PLUGIN_CONFIG": "~/.config/data/config.yaml"
         }
       },
-      "cc-for-data-warehouse": {
+      "data-warehouse": {
         "command": "python",
-        "args": ["-m", "cc_for_data.warehouse.server"],
+        "args": ["-m", "data_plugin.warehouse.server"],
         "env": {
-          "CC_FOR_DATA_CONFIG": "~/.cc-for-data/config.yaml"
+          "DATA_PLUGIN_CONFIG": "~/.config/data/config.yaml"
         }
       },
-      "cc-for-data-airflow": {
+      "data-airflow": {
         "command": "python",
-        "args": ["-m", "cc_for_data.airflow.server"],
+        "args": ["-m", "data_plugin.airflow.server"],
         "env": {
-          "CC_FOR_DATA_CONFIG": "~/.cc-for-data/config.yaml"
+          "DATA_PLUGIN_CONFIG": "~/.config/data/config.yaml"
         }
       }
     }
   },
-  "plugin": ["cc-for-data-opencode"]
+  "plugin": ["data-opencode"]
 }
 ```
 
@@ -499,13 +499,13 @@ export const CCForDataPlugin = async ({ project, client, $ }: PluginContext) => 
   // Log plugin initialization
   client.app.log({
     level: "info",
-    message: "cc-for-data plugin loaded"
+    message: "data plugin loaded"
   });
 
   return {
     // Hook: Log tool executions for debugging
     "tool.execute.before": async (event: { tool: string; args: unknown }) => {
-      if (event.tool.startsWith("cc-for-data")) {
+      if (event.tool.startsWith("data")) {
         client.app.log({
           level: "debug",
           message: `Executing ${event.tool}`,
@@ -531,7 +531,7 @@ export const CCForDataPlugin = async ({ project, client, $ }: PluginContext) => 
 
 ## Configuration
 
-### Config File (`~/.cc-for-data/config.yaml`)
+### Config File (`~/.config/data/config.yaml`)
 
 ```yaml
 # Warehouse connections
@@ -593,7 +593,7 @@ airflow:
 
 ### Phase 1: Foundation
 - [ ] Set up Python monorepo with `pyproject.toml` (using `uv` or `poetry`)
-- [ ] Implement shared config loading (`cc_for_data.config`)
+- [ ] Implement shared config loading (`data_plugin.config`)
 - [ ] Create Jupyter kernel MCP server with basic tools
 - [ ] Test MCP server standalone with `mcp dev`
 
@@ -643,7 +643,7 @@ airflow:
 
 ```toml
 [project]
-name = "cc-for-data"
+name = "data"
 version = "0.1.0"
 dependencies = [
     "mcp>=1.0.0",              # MCP SDK (includes FastMCP)
@@ -659,13 +659,13 @@ bigquery = ["google-cloud-bigquery>=3.0.0"]
 databricks = ["databricks-sql-connector>=3.0.0"]
 redshift = ["redshift-connector>=2.0.0"]
 all = [
-    "cc-for-data[snowflake,bigquery,databricks,redshift]"
+    "data[snowflake,bigquery,databricks,redshift]"
 ]
 
 [project.scripts]
-cc-for-data-jupyter = "cc_for_data.jupyter.server:main"
-cc-for-data-warehouse = "cc_for_data.warehouse.server:main"
-cc-for-data-airflow = "cc_for_data.airflow.server:main"
+data-jupyter = "data_plugin.jupyter.server:main"
+data-warehouse = "data_plugin.warehouse.server:main"
+data-airflow = "data_plugin.airflow.server:main"
 ```
 
 ### TypeScript (OpenCode Plugin)

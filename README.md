@@ -1,10 +1,10 @@
-# cc-for-data
+# data
 
-A Claude Code plugin for data engineering workflows. Built by [Astronomer](https://www.astronomer.io/).
+A Claude Code and OpenCode plugin for data engineering workflows. Built by [Astronomer](https://www.astronomer.io/).
 
 ## Overview
 
-cc-for-data extends Claude Code with specialized capabilities for data practitioners, enabling AI-assisted data engineering directly in your terminal. It provides intelligent tools for data warehouse exploration, pipeline authoring, and workflow orchestration.
+`data` extends Claude Code and OpenCode with specialized capabilities for data practitioners, enabling AI-assisted data engineering directly in your terminal. It provides intelligent tools for data warehouse exploration, pipeline authoring, and workflow orchestration.
 
 ## Features
 
@@ -40,10 +40,10 @@ cc-for-data extends Claude Code with specialized capabilities for data practitio
 
 ## Configuration
 
-cc-for-data uses a configuration file for data warehouse credentials and settings.
+`data` uses a configuration file for data warehouse credentials and settings.
 
 ```yaml
-# ~/.cc-for-data/config.yaml
+# ~/.config/data/config.yaml
 warehouses:
   my-snowflake:
     type: snowflake
