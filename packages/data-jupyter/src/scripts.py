@@ -212,45 +212,6 @@ def render_get_tables_info(database: str, schema: str, tables: list[str]) -> str
     )
 
 
-def render_load_query_result(session_data_dir: str, query_num: int) -> str:
-    """Render the load_query_result.py template.
-
-    Args:
-        session_data_dir: Directory for session data
-        query_num: Query number to load
-
-    Returns:
-        Rendered Python code
-    """
-    # Escape backslashes for Python string literals
-    escaped_dir = session_data_dir.replace("\\", "\\\\")
-
-    template = _load_template("load_query_result.py")
-    return _render_template(
-        template,
-        {
-            "SessionDataDir": escaped_dir,
-            "QueryNum": str(query_num),
-        },
-    )
-
-
-def render_list_query_results(session_data_dir: str) -> str:
-    """Render the list_query_results.py template.
-
-    Args:
-        session_data_dir: Directory for session data
-
-    Returns:
-        Rendered Python code
-    """
-    # Escape backslashes for Python string literals
-    escaped_dir = session_data_dir.replace("\\", "\\\\")
-
-    template = _load_template("list_query_results.py")
-    return _render_template(template, {"SessionDataDir": escaped_dir})
-
-
 def render_session_prelude(session_dir: str) -> str:
     """Render the session_prelude.py template.
 

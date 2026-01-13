@@ -21,11 +21,9 @@ from .kernel import KernelManager
 from .scripts import (
     ValidationError,
     render_get_tables_info,
-    render_list_query_results,
     render_list_schemas_configured,
     render_list_schemas_single_db,
     render_list_tables,
-    render_load_query_result,
     render_run_sql,
 )
 from .warehouse import WarehouseConfig
@@ -569,86 +567,6 @@ async def get_tables_info(
         if result.output:
             return f"Output:\n{result.output}\n\nError:\n{error_msg}"
         return f"Error: Failed to get tables info: {error_msg}"
-
-    return result.output if result.output else "(no output)"
-
-
-@mcp.tool()
-async def list_query_results(
-    session_id: str | None = None,
-) -> str:
-    """List all saved SQL query results from the current session.
-
-    Shows query numbers, row counts, and query previews.
-    Calling this tool repeatedly will return the same results.
-
-    Args:
-        session_id: Optional session identifier for state isolation
-
-    Returns:
-        List of saved query results, or message if none
-    """
-    kernel_manager = get_kernel_manager()
-
-    # Set session
-    effective_session_id = session_id or "default"
-    await kernel_manager.set_session(effective_session_id)
-
-    # Get session data directory
-    session_data_dir = get_session_data_dir(effective_session_id)
-
-    # Render and execute the script
-    code = render_list_query_results(str(session_data_dir))
-
-    result = await kernel_manager.execute(code, timeout=30.0)
-
-    if not result.success:
-        error_msg = result.error or "Unknown error"
-        if result.output:
-            return f"Output:\n{result.output}\n\nError:\n{error_msg}"
-        return f"Error: Failed to list query results: {error_msg}"
-
-    return result.output if result.output else "No query results saved yet."
-
-
-@mcp.tool()
-async def get_query_result(
-    query_num: int,
-    session_id: str | None = None,
-) -> str:
-    """Load a previously saved SQL query result from a parquet file.
-
-    Use list_query_results first to see available results.
-
-    Args:
-        query_num: The query number to load (e.g., 1 for query_001.parquet)
-        session_id: Optional session identifier for state isolation
-
-    Returns:
-        Query result data, or error message
-    """
-    kernel_manager = get_kernel_manager()
-
-    if query_num < 1:
-        return "Error: query_num must be at least 1"
-
-    # Set session
-    effective_session_id = session_id or "default"
-    await kernel_manager.set_session(effective_session_id)
-
-    # Get session data directory
-    session_data_dir = get_session_data_dir(effective_session_id)
-
-    # Render and execute the script
-    code = render_load_query_result(str(session_data_dir), query_num)
-
-    result = await kernel_manager.execute(code, timeout=30.0)
-
-    if not result.success:
-        error_msg = result.error or "Unknown error"
-        if result.output:
-            return f"Output:\n{result.output}\n\nError:\n{error_msg}"
-        return f"Error: Failed to load query result: {error_msg}"
 
     return result.output if result.output else "(no output)"
 
