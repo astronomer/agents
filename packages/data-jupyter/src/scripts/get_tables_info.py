@@ -29,11 +29,13 @@ WHERE TABLE_SCHEMA = '{{.Schema}}' AND TABLE_NAME IN (""" + ", ".join(f"'{t}'" f
 ORDER BY TABLE_NAME, ORDINAL_POSITION
 """
 
-# Get table metadata
-_tables_df = run_sql(_tables_query, limit=-1)
-
-# Get column information for all tables
-_columns_df = run_sql(_columns_query, limit=-1)
+# Get table metadata and column information in parallel
+from concurrent.futures import ThreadPoolExecutor
+with ThreadPoolExecutor(max_workers=2) as _executor:
+    _tables_future = _executor.submit(run_sql, _tables_query, limit=-1)
+    _columns_future = _executor.submit(run_sql, _columns_query, limit=-1)
+    _tables_df = _tables_future.result()
+    _columns_df = _columns_future.result()
 
 # Group columns by table name
 _columns_by_table = {}
