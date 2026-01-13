@@ -12,9 +12,10 @@ project-root/
 │   │   ├── marketplace.json      # Marketplace catalog (lists plugins)
 │   │   └── plugin.json           # Plugin manifest (metadata)
 │   ├── skills -> ../shared-skills  # Symlink to shared skills
-│   └── .mcp.json                 # MCP server config (MUST be at plugin root)
-└── .opencode/
-    └── skills -> ../shared-skills  # Symlink for OpenCode discovery
+│   └── .mcp.json                 # MCP server config for Claude Code
+├── .opencode/
+│   └── skills -> ../shared-skills  # Symlink for OpenCode discovery
+└── opencode.json                 # MCP server config for OpenCode
 ```
 
 **Important**: `.mcp.json` must be at the plugin root, not inside `.claude-plugin/`. The `source` field in `marketplace.json` is relative to the marketplace root.
@@ -58,7 +59,9 @@ description: When to use this skill (Claude uses this to decide when to invoke i
 
 ## MCP Servers
 
-Configure in `.mcp.json`:
+### Claude Code
+
+Configure in `claude-code-plugin/.mcp.json`:
 
 ```json
 {
@@ -71,12 +74,35 @@ Configure in `.mcp.json`:
 }
 ```
 
+### OpenCode
+
+Configure in `opencode.json` at project root:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "server-name": {
+      "type": "local",
+      "command": ["uvx", "package-name", "--transport", "stdio"]
+    }
+  }
+}
+```
+
+Verify MCP servers are connected:
+
+```bash
+opencode mcp list
+```
+
 ## Key Files
 
 - `marketplace.json` - Lists plugins in this marketplace, references plugin source paths
 - `plugin.json` - Plugin metadata (name, version, description, author)
-- `.mcp.json` - MCP server configurations that get auto-added when plugin is installed
-- `skills/*/SKILL.md` - Skills that Claude can invoke
+- `claude-code-plugin/.mcp.json` - MCP server config for Claude Code (auto-added on plugin install)
+- `opencode.json` - MCP server config for OpenCode
+- `shared-skills/*/SKILL.md` - Skills shared by both Claude Code and OpenCode
 
 ## Config Location
 
