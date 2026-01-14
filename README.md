@@ -1,83 +1,156 @@
-# data
+# agents
 
-A Claude Code and OpenCode plugin for data engineering workflows. Built by [Astronomer](https://www.astronomer.io/).
+AI agent tooling for data engineering workflows. Built by [Astronomer](https://www.astronomer.io/).
 
-## Overview
+This repo contains MCP servers, skills, and plugins that extend AI coding assistants (Claude Code, OpenCode) with specialized data engineering capabilities.
 
-`data` extends Claude Code and OpenCode with specialized capabilities for data practitioners, enabling AI-assisted data engineering directly in your terminal.
+## data plugin
 
-## Current Status
+The `data` plugin bundles everything in this repo into a single installable package for Claude Code or OpenCode.
 
-**Phase 1**: Airflow MCP integration via [astro-airflow-mcp](https://github.com/astronomer/astro-airflow-mcp)
+### Features
 
-## Features
+**MCP Servers:**
+- **Airflow** - Full Airflow REST API integration via [astro-airflow-mcp](https://github.com/astronomer/astro-airflow-mcp): DAG management, triggering, task logs, system health
+- **Jupyter** - Persistent Python kernel for code execution, SQL queries against configured warehouses, schema discovery
 
-### Airflow Integration
-- Full access to Airflow REST API
-- DAG management, triggering, and debugging
-- Task logs and execution details
-- System health monitoring
-
-### Coming Soon
-- Data warehouse discovery (Snowflake, BigQuery, Databricks, Redshift)
-- Jupyter kernel integration for Python/SQL execution
-- Skills and commands for guided workflows
+**Skills:**
+| Skill | Description |
+|-------|-------------|
+| `dag-authoring` | Create and validate Airflow DAGs with best practices |
+| `airflow-migration` | Migrate DAGs from Airflow 2.x to 3.x |
+| `data-analysis` | SQL-based analysis to answer business questions |
+| `explore` | Discover what data exists for a concept or domain |
+| `freshness` | Check how current your data is |
+| `profile` | Comprehensive table profiling and quality assessment |
+| `sources` | Trace upstream lineage - where does this data come from? |
+| `impacts` | Analyze downstream dependencies - what breaks if I change this? |
+| `diagnose` | Debug failed DAG runs and find root causes |
 
 ## Installation
 
+> **Note:** These instructions require cloning the repo locally. We're working on simpler installation via a published package.
+
 ### Prerequisites
 
-Install the local MCP servers (required before installing the plugin):
-```bash
-make install
-```
-
-This installs `data-jupyter` as a local tool via `uv tool install`, making it available system-wide.
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI (v1.0.33+) or [OpenCode](https://opencode.ai)
+- [uv](https://docs.astral.sh/uv/) package manager
+- [Astro CLI](https://www.astronomer.io/docs/astro/cli/install-cli) (for Airflow features)
 
 ### Claude Code
 
-**Install from local marketplace:**
 ```bash
-# Add the marketplace
-claude plugin marketplace add ./claude-code-plugin
+# Clone the repo
+git clone https://github.com/astronomer/agents.git
+cd agents
 
-# Install the plugin
+# Install local MCP servers
+make install
+
+# Add the marketplace and install the plugin
+claude plugin marketplace add ./claude-code-plugin
 claude plugin install data@astronomer
 ```
 
-**Or test locally (session only):**
+Or test without installing:
 ```bash
 claude --plugin-dir ./claude-code-plugin
 ```
 
 ### OpenCode
 
-Coming soon.
+```bash
+# Clone and install
+git clone https://github.com/astronomer/agents.git
+cd agents
+make install
 
-## Plugin Structure
-
+# Run from the opencode directory
+cd opencode
+opencode
 ```
-claude-code-plugin/
-├── .claude-plugin/
-│   ├── marketplace.json   # Marketplace catalog (lists available plugins)
-│   └── plugin.json        # Plugin manifest (metadata)
-└── .mcp.json              # MCP server config (must be at plugin root, not inside .claude-plugin/)
-```
-
-**Important:** The `.mcp.json` file must be at the plugin root directory, not inside `.claude-plugin/`. The `source` field in `marketplace.json` is relative to the marketplace root.
 
 ## Configuration
 
-The plugin uses the Astro CLI AI config directory (`~/.astro/ai/config/`).
+### Warehouse Connections
 
-## Requirements
+Configure data warehouse connections at `~/.astro/ai/config/warehouse.yml`:
 
-- [Claude Code](https://claude.ai/claude-code) CLI (v1.0.33+)
-- [Astro CLI](https://www.astronomer.io/docs/astro/cli/install-cli) (for Airflow integration)
+```yaml
+my_warehouse:
+  type: snowflake
+  account: ${SNOWFLAKE_ACCOUNT}
+  user: ${SNOWFLAKE_USER}
+  private_key_path: ~/.ssh/snowflake_key.p8
+  warehouse: COMPUTE_WH
+  role: ANALYST
+  databases:
+    - ANALYTICS
+    - RAW
+```
+
+Store credentials in `~/.astro/ai/config/.env`:
+
+```bash
+SNOWFLAKE_ACCOUNT=xyz12345.us-east-1
+SNOWFLAKE_USER=myuser
+```
+
+Supported warehouses: Snowflake, BigQuery, Databricks, Redshift.
+
+### Airflow
+
+The Airflow MCP auto-discovers your project when you run Claude Code from an Airflow project directory (contains `airflow.cfg` or `dags/` folder).
+
+## Usage
+
+Once installed, skills are invoked automatically based on what you ask. You can also invoke them directly:
+
+```
+/data:dag-authoring      # Start guided DAG creation
+/data:explore            # Discover available data
+/data:diagnose           # Debug a failed DAG run
+```
+
+Example prompts:
+- "Create a DAG that loads data from S3 to Snowflake daily"
+- "What tables contain customer data?"
+- "Why did my etl_pipeline DAG fail yesterday?"
+- "Profile the orders table and check data quality"
+- "What downstream jobs depend on the users table?"
 
 ## Development
 
-See [PLAN.md](./PLAN.md) for the development roadmap.
+See [CLAUDE.md](./CLAUDE.md) for plugin development guidelines.
+
+### Repo Structure
+
+```
+agents/
+├── packages/
+│   └── data-jupyter/        # Jupyter kernel MCP server
+├── shared-skills/           # Skills (shared by Claude Code & OpenCode)
+├── claude-code-plugin/      # Claude Code plugin config
+└── opencode/                # OpenCode config
+```
+
+### Adding Skills
+
+Create a new skill in `shared-skills/<name>/SKILL.md` with YAML frontmatter:
+
+```yaml
+---
+name: my-skill
+description: When to invoke this skill
+---
+
+# Skill instructions here...
+```
+
+After adding skills, reinstall the plugin:
+```bash
+claude plugin uninstall data@astronomer && claude plugin install data@astronomer
+```
 
 ## License
 
