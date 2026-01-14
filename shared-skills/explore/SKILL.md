@@ -7,6 +7,102 @@ description: Discover and explore data for a concept or domain. Use when the use
 
 Discover what data exists for a concept or domain. Answer "What data do we have about X?"
 
+## Fast Table Validation
+
+**When you have multiple candidate tables, quickly validate before committing to complex queries.**
+
+### Strategy: Progressive Complexity
+
+Start with the **simplest possible query**, then add complexity only after each step succeeds:
+
+```
+Step 1: Does the data exist?     → Simple LIMIT query, no JOINs
+Step 2: How much data?           → COUNT(*) with same filters  
+Step 3: What are the key IDs?    → SELECT DISTINCT foreign_keys LIMIT 100
+Step 4: Get related details      → JOIN on the specific IDs from step 3
+```
+
+**Never jump from step 1 to complex aggregations.** If step 1 returns 50 rows, use those IDs directly:
+
+```sql
+-- After finding deployment_ids in step 1:
+SELECT o.org_name, d.deployment_name
+FROM DEPLOYMENTS d
+JOIN ORGANIZATIONS o ON d.org_id = o.org_id  
+WHERE d.deployment_id IN ('id1', 'id2', 'id3')  -- IDs from step 1
+```
+
+### When a Metadata Table Returns 0 Results
+
+If a smaller metadata/config table (like `*_LOG`, `*_CONFIG`) returns 0 results, **check the execution/fact table** before concluding data doesn't exist.
+
+Metadata tables may have gaps or lag. The actual execution data (in tables with millions/billions of rows) is often more complete.
+
+### Use Row Counts as a Signal
+
+When `list_tables` returns row counts:
+- **Millions+ rows** → likely execution/fact data (actual events, transactions, runs)
+- **Thousands of rows** → likely metadata/config (what's configured, not what happened)
+
+For questions like "who is using X" or "how many times did Y happen", prioritize high-row-count tables first - they contain actual activity data.
+
+⚠️ **CRITICAL: Tables with 1B+ rows require special handling**
+
+If you see a table with billions of rows (like 6B), you MUST:
+1. Use simple queries only: `SELECT col1, col2 FROM table WHERE filter LIMIT 100`
+2. NO JOINs, NO GROUP BY, NO aggregations on the first query
+3. Only add complexity after the simple query succeeds
+
+**If your query times out**, simplify it - don't give up. Remove JOINs, remove GROUP BY, add LIMIT.
+
+### Example: Finding Feature Usage
+
+If looking for "customers using feature X" and you see:
+- `FEATURE_CONFIG` (50K rows) - likely config/metadata
+- `USER_EVENTS` (500M rows) - likely execution data
+
+**Try the larger table first** with a quick validation:
+```sql
+SELECT COUNT(*) FROM USER_EVENTS WHERE feature ILIKE '%X%' AND event_ts >= DATEADD(day, -30, CURRENT_DATE)
+```
+If count > 0, proceed. If 0, try the config table.
+
+### Querying Large Tables (100M+ rows)
+
+**Pattern: Find examples first, aggregate later**
+
+For billion-row tables, even ILIKE with date filters can timeout. Use LIMIT on a **simple query** (no JOINs, no GROUP BY):
+
+```sql
+-- Step 1: Find examples (fast - stops after finding matches)
+-- NO JOINS, NO GROUP BY - just find rows
+SELECT col_a, col_b, foreign_key_id 
+FROM huge_table
+WHERE col_a ILIKE '%term%'
+  AND ts >= DATEADD(day, -30, CURRENT_DATE)
+LIMIT 100
+
+-- Step 2: Use foreign keys from step 1 to get details
+SELECT o.name, o.details
+FROM other_table o
+WHERE o.id IN ('id1', 'id2', 'id3')  -- IDs from step 1
+```
+
+**CRITICAL: LIMIT only helps without GROUP BY**
+
+```sql
+-- ❌ STILL SLOW: LIMIT with GROUP BY - must scan ALL rows first to compute groups
+SELECT col, COUNT(*) FROM huge_table WHERE x ILIKE '%term%' GROUP BY col LIMIT 100
+
+-- ✅ FAST: LIMIT without GROUP BY - stops after finding 100 rows
+SELECT col, id FROM huge_table WHERE x ILIKE '%term%' LIMIT 100
+```
+
+**Anti-patterns for large tables:**
+- ❌ JOINs + GROUP BY + LIMIT (LIMIT doesn't help)
+- ❌ `UPPER(col) LIKE '%TERM%'` (use ILIKE instead)
+- ❌ Wide date ranges without LIMIT
+
 ## Exploration Process
 
 ### Step 1: Search for Relevant Tables
