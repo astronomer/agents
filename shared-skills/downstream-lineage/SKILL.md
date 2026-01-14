@@ -1,5 +1,5 @@
 ---
-name: impacts
+name: downstream-lineage
 description: Trace downstream data lineage and impact analysis. Use when the user asks what depends on this data, what breaks if something changes, downstream dependencies, or needs to assess change risk before modifying a table or DAG.
 ---
 
