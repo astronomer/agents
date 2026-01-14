@@ -3,7 +3,7 @@
   "mcp": {
     "airflow": {
       "type": "local",
-      "command": ["uvx", "astro-airflow-mcp", "--transport", "stdio"]
+      "command": ["uvx", "astro-airflow-mcp==0.2.2", "--transport", "stdio", "--airflow-project-dir", "${PWD}"]
     },
     "jupyter": {
       "type": "local",
