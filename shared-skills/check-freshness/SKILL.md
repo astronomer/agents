@@ -1,5 +1,5 @@
 ---
-name: freshness
+name: check-freshness
 description: Quick data freshness check. Use when the user asks if data is up to date, when a table was last updated, if data is stale, or needs to verify data currency before using it.
 ---
 

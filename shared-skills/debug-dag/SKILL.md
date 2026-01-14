@@ -1,5 +1,5 @@
 ---
-name: diagnose
+name: debug-dag
 description: Debug a failed Airflow DAG run. Use when the user mentions DAG failures, task errors, broken pipelines, or asks why a DAG/task failed. Provides root cause analysis and remediation steps.
 ---
 

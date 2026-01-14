@@ -1,5 +1,5 @@
 ---
-name: sources
+name: upstream-lineage
 description: Trace upstream data lineage. Use when the user asks where data comes from, what feeds a table, upstream dependencies, data sources, or needs to understand data origins.
 ---
 

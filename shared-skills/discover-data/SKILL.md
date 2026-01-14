@@ -1,5 +1,5 @@
 ---
-name: explore
+name: discover-data
 description: Discover and explore data for a concept or domain. Use when the user asks what data exists for a topic (e.g., "ARR", "customers", "orders"), wants to find relevant tables, or needs to understand what data is available before analysis.
 ---
 
