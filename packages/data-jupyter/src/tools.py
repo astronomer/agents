@@ -6,9 +6,12 @@ These tools are exposed via FastMCP and provide:
 - Kernel lifecycle management
 """
 
+import logging
 from typing import Any
 
 from .kernel import KernelManager
+
+logger = logging.getLogger(__name__)
 
 
 async def execute_python(
@@ -72,6 +75,7 @@ async def install_packages(
             "packages": packages,
         }
     except Exception as e:
+        logger.warning(f"Failed to install packages {packages}: {e}")
         return {"success": False, "error": str(e)}
 
 
@@ -92,6 +96,7 @@ async def start_kernel(kernel_manager: KernelManager) -> dict[str, Any]:
             "status": kernel_manager.get_status(),
         }
     except Exception as e:
+        logger.error(f"Failed to start kernel: {e}")
         return {"success": False, "error": str(e)}
 
 
@@ -111,6 +116,7 @@ async def stop_kernel(kernel_manager: KernelManager) -> dict[str, Any]:
             "message": "Kernel stopped successfully",
         }
     except Exception as e:
+        logger.error(f"Failed to stop kernel: {e}")
         return {"success": False, "error": str(e)}
 
 
@@ -143,5 +149,5 @@ async def restart_kernel(kernel_manager: KernelManager) -> dict[str, Any]:
             "status": kernel_manager.get_status(),
         }
     except Exception as e:
+        logger.error(f"Failed to restart kernel: {e}")
         return {"success": False, "error": str(e)}
-

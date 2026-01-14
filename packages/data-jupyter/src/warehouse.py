@@ -6,6 +6,7 @@ and generating Python prelude code for establishing database connections.
 Mirrors functionality from ai-cli/agent/clients/warehouse/.
 """
 
+import logging
 import os
 import re
 from dataclasses import dataclass, field
@@ -14,6 +15,8 @@ from typing import Any
 
 import yaml
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 
 def get_config_dir() -> Path:
@@ -122,9 +125,7 @@ class SnowflakeConfig:
         user, user_env = _substitute_env_vars(data.get("user", ""))
         password, password_env = _substitute_env_vars(data.get("password", ""))
         private_key, pk_env = _substitute_env_vars(data.get("private_key", ""))
-        passphrase, passphrase_env = _substitute_env_vars(
-            data.get("private_key_passphrase", "")
-        )
+        passphrase, passphrase_env = _substitute_env_vars(data.get("private_key_passphrase", ""))
 
         return cls(
             account=account,
@@ -158,15 +159,11 @@ class SnowflakeConfig:
         """
         if not self.account or self.account.startswith("${"):
             env_hint = f" (set {self.account_env_var})" if self.account_env_var else ""
-            raise ValueError(
-                f"warehouse '{name}': account is required{env_hint}"
-            )
+            raise ValueError(f"warehouse '{name}': account is required{env_hint}")
 
         if not self.user or self.user.startswith("${"):
             env_hint = f" (set {self.user_env_var})" if self.user_env_var else ""
-            raise ValueError(
-                f"warehouse '{name}': user is required{env_hint}"
-            )
+            raise ValueError(f"warehouse '{name}': user is required{env_hint}")
 
         if self.auth_type == "password":
             if not self.password or self.password.startswith("${"):
@@ -240,7 +237,8 @@ import os
             if self.private_key_path:
                 # Generate passphrase code
                 if self.private_key_passphrase_env_var:
-                    passphrase_code = f"os.environ.get({self.private_key_passphrase_env_var!r}, '').encode() or None"
+                    env_var = self.private_key_passphrase_env_var
+                    passphrase_code = f"os.environ.get({env_var!r}, '').encode() or None"
                 elif self.private_key_passphrase:
                     passphrase_code = f"{self.private_key_passphrase!r}.encode()"
                 else:
@@ -249,17 +247,17 @@ import os
                 lines.append(f"""def _load_private_key():
     from cryptography.hazmat.backends import default_backend
     from cryptography.hazmat.primitives import serialization
-    
+
     key_path = Path({self.private_key_path!r}).expanduser()
     passphrase = {passphrase_code}
-    
+
     with open(key_path, 'rb') as f:
         p_key = serialization.load_pem_private_key(
             f.read(),
             password=passphrase,
             backend=default_backend()
         )
-    
+
     return p_key.private_bytes(
         encoding=serialization.Encoding.DER,
         format=serialization.PrivateFormat.PKCS8,
@@ -270,7 +268,8 @@ import os
             else:
                 # Generate passphrase code
                 if self.private_key_passphrase_env_var:
-                    passphrase_code = f"os.environ.get({self.private_key_passphrase_env_var!r}, '').encode() or None"
+                    env_var = self.private_key_passphrase_env_var
+                    passphrase_code = f"os.environ.get({env_var!r}, '').encode() or None"
                 elif self.private_key_passphrase:
                     passphrase_code = f"{self.private_key_passphrase!r}.encode()"
                 else:
@@ -285,16 +284,16 @@ import os
                 lines.append(f"""def _load_private_key_content():
     from cryptography.hazmat.backends import default_backend
     from cryptography.hazmat.primitives import serialization
-    
+
     key_content = {key_content_code}
     passphrase = {passphrase_code}
-    
+
     p_key = serialization.load_pem_private_key(
         key_content.encode(),
         password=passphrase,
         backend=default_backend()
     )
-    
+
     return p_key.private_bytes(
         encoding=serialization.Encoding.DER,
         format=serialization.PrivateFormat.PKCS8,
@@ -310,12 +309,12 @@ import os
         lines.append("""
 def run_sql(query: str, limit: int = 100, return_df: bool = False) -> pl.DataFrame:
     \"\"\"Execute SQL query and return results as a Polars DataFrame.
-    
+
     Args:
         query: SQL query to execute
         limit: Maximum rows to return (default: 100, use -1 for unlimited)
         return_df: If True, return DataFrame instead of printing (for parquet saving)
-    
+
     Returns:
         Polars DataFrame with query results
     \"\"\"
@@ -342,11 +341,11 @@ def run_sql(query: str, limit: int = 100, return_df: bool = False) -> pl.DataFra
 
 def run_sql_pandas(query: str, limit: int = 100) -> pd.DataFrame:
     \"\"\"Execute SQL query and return results as a Pandas DataFrame.
-    
+
     Args:
         query: SQL query to execute
         limit: Maximum rows to return (default: 100, use -1 for unlimited)
-    
+
     Returns:
         Pandas DataFrame with query results
     \"\"\"
@@ -495,4 +494,3 @@ class WarehouseConfig:
             available = list(self.connectors.keys())
             raise KeyError(f"Warehouse '{name}' not found (available: {available})")
         return self.connectors[name]
-

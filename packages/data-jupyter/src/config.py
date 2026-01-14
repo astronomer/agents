@@ -1,6 +1,9 @@
 """Configuration utilities for the data-jupyter package."""
 
+import logging
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def get_kernel_venv_dir() -> Path:
@@ -40,4 +43,3 @@ def get_session_data_dir(session_id: str) -> Path:
     data_dir = session_dir / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
     return data_dir
-

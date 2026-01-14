@@ -1,11 +1,50 @@
 ---
 name: dag-authoring
-description: Workflow and best practices for writing Apache Airflow DAGs. Use when the user wants to create a new DAG, write pipeline code, debug DAG issues, or asks about DAG patterns and conventions. This skill integrates with the Airflow MCP for validation and testing.
+description: Workflow and best practices for writing Apache Airflow DAGs. Use when the user wants to create a new DAG, write pipeline code, or asks about DAG patterns and conventions. For testing and debugging DAGs, see the dag-testing skill.
 ---
 
 # DAG Authoring Skill
 
-This skill guides you through creating, validating, and testing Airflow DAGs using the Airflow MCP tools for feedback at every step.
+This skill guides you through creating and validating Airflow DAGs using best practices and MCP tools.
+
+> **For testing and debugging DAGs**, see the **dag-testing** skill which covers the full test → debug → fix → retest workflow.
+
+---
+
+## ⚠️ CRITICAL WARNING: Use MCP Tools, NOT CLI Commands ⚠️
+
+> **STOP! Before running ANY Airflow-related command, read this.**
+>
+> You MUST use MCP tools for ALL Airflow interactions. CLI commands like `astro dev run`, `airflow dags`, or shell commands to read logs are **FORBIDDEN**.
+>
+> **Why?** MCP tools provide structured, reliable output. CLI commands are fragile, produce unstructured text, and often fail silently.
+
+---
+
+## CLI vs MCP Quick Reference
+
+**ALWAYS use Airflow MCP tools. NEVER use CLI commands.**
+
+| ❌ DO NOT USE | ✅ USE INSTEAD |
+|---------------|----------------|
+| `astro dev run dags list` | `list_dags` MCP tool |
+| `airflow dags list` | `list_dags` MCP tool |
+| `astro dev run dags test` | `trigger_dag_and_wait` MCP tool |
+| `airflow tasks test` | `trigger_dag_and_wait` MCP tool |
+| `cat` / `grep` on Airflow logs | `get_task_logs` MCP tool |
+| `find` in dags folder | `list_dags` or `explore_dag` MCP tool |
+| Any `astro dev run ...` | Equivalent MCP tool |
+| Any `airflow ...` CLI | Equivalent MCP tool |
+| `ls` on `/usr/local/airflow/dags/` | `list_dags` or `explore_dag` MCP tool |
+| `cat ... \| jq` to filter MCP results | Read the JSON directly from MCP response |
+
+**Remember:**
+- ✅ Airflow is ALREADY running — the MCP server handles the connection
+- ❌ Do NOT attempt to start, stop, or manage the Airflow environment
+- ❌ Do NOT use shell commands to check DAG status, logs, or errors
+- ❌ Do NOT use bash to parse or filter MCP tool results — read the JSON directly
+- ❌ Do NOT use `ls`, `find`, or `cat` on Airflow container paths (`/usr/local/airflow/...`)
+- ✅ ALWAYS use MCP tools — they return structured JSON you can read directly
 
 ## Workflow Overview
 
@@ -100,15 +139,13 @@ Write the DAG following best practices (see below). Key steps:
 
 ## Phase 4: Validate
 
-**Use the Airflow MCP as a feedback loop.**
+**Use the Airflow MCP as a feedback loop. Do NOT use CLI commands.**
 
 ### Step 1: Check Import Errors
 
-After saving, wait a few seconds for Airflow to parse:
+After saving, call the MCP tool (Airflow will have already parsed the file):
 
-```
-list_import_errors
-```
+**MCP tool:** `list_import_errors`
 
 - If your file appears → **fix and retry**
 - If no errors → **continue**
@@ -117,25 +154,19 @@ Common causes: missing imports, syntax errors, missing packages.
 
 ### Step 2: Verify DAG Exists
 
-```
-get_dag_details(dag_id="your_dag_id")
-```
+**MCP tool:** `get_dag_details(dag_id="your_dag_id")`
 
 Check: DAG exists, schedule correct, tags set, paused status.
 
 ### Step 3: Check Warnings
 
-```
-list_dag_warnings
-```
+**MCP tool:** `list_dag_warnings`
 
 Look for deprecation warnings or configuration issues.
 
 ### Step 4: Explore DAG Structure
 
-```
-explore_dag(dag_id="your_dag_id")
-```
+**MCP tool:** `explore_dag(dag_id="your_dag_id")`
 
 Returns in one call: metadata, tasks, dependencies, source code.
 
@@ -143,37 +174,23 @@ Returns in one call: metadata, tasks, dependencies, source code.
 
 ## Phase 5: Test
 
-**CRITICAL: Always ask user permission before triggering.**
+> **📘 See the dag-testing skill for comprehensive testing guidance.**
 
-DAGs can: write to production, send emails, incur costs.
+Once validation passes, test the DAG using the workflow in the **dag-testing** skill:
 
-### Ask First
+1. **Get user consent** — Always ask before triggering
+2. **Trigger and wait** — Use `trigger_dag_and_wait(dag_id, timeout=300)`
+3. **Analyze results** — Check success/failure status
+4. **Debug if needed** — Use `diagnose_dag_run` and `get_task_logs`
 
-> "The DAG validated successfully. Would you like me to trigger a test run?"
-
-### If Approved
-
-**Trigger and wait:**
-```
-trigger_dag_and_wait(dag_id="your_dag_id", conf={}, timeout=300)
-```
-
-**Or trigger and monitor separately:**
-```
-trigger_dag(dag_id="your_dag_id")
-get_dag_run(dag_id, dag_run_id)
-```
-
-### If Something Fails
+### Quick Test (Minimal)
 
 ```
-get_task_logs(dag_id, dag_run_id, task_id)
+# Ask user first, then:
+trigger_dag_and_wait(dag_id="your_dag_id", timeout=300)
 ```
 
-Or comprehensive diagnosis:
-```
-diagnose_dag_run(dag_id, dag_run_id)
-```
+For the full test → debug → fix → retest loop, see **dag-testing**.
 
 ---
 
@@ -181,8 +198,11 @@ diagnose_dag_run(dag_id, dag_run_id)
 
 If issues found:
 1. Fix the code
-2. Re-validate (Phase 4)
-3. Re-test with permission (Phase 5)
+2. Check for import errors with `list_import_errors` MCP tool
+3. Re-validate using MCP tools (Phase 4)
+4. Re-test using the **dag-testing** skill workflow (Phase 5)
+
+**Never use CLI commands to check status or logs. Always use MCP tools.**
 
 ---
 
@@ -198,11 +218,8 @@ If issues found:
 | Validate | `get_dag_details` | Verify DAG config |
 | Validate | `list_dag_warnings` | Configuration warnings |
 | Validate | `explore_dag` | Full DAG inspection |
-| Test | `trigger_dag` | Start a run |
-| Test | `trigger_dag_and_wait` | Run and wait |
-| Test | `get_dag_run` | Check run status |
-| Test | `get_task_logs` | Debug failures |
-| Test | `diagnose_dag_run` | Troubleshooting |
+
+> **Testing tools** — See the **dag-testing** skill for `trigger_dag_and_wait`, `diagnose_dag_run`, `get_task_logs`, etc.
 
 ---
 
@@ -409,3 +426,11 @@ open(os.path.join(dag_dir, "data.csv"))
 # CORRECT - Files in include/
 open(f"{os.getenv('AIRFLOW_HOME')}/include/data.csv")
 ```
+
+---
+
+## Related Skills
+
+- **dag-testing**: For testing DAGs, debugging failures, and the test → fix → retest loop
+- **diagnose**: For general Airflow troubleshooting
+- **airflow-migration**: For migrating DAGs to newer Airflow versions

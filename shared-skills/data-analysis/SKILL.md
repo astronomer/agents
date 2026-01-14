@@ -32,10 +32,28 @@ If unclear, ask clarifying questions before proceeding.
 
 ### Step 2: Identify Data Sources
 
-Use `explore` skill to find relevant tables:
-- Prefer marts/aggregates over raw tables when available
-- Check if pre-computed metrics exist before calculating from scratch
-- Understand the grain of each table (one row per what?)
+Use `explore` skill to find relevant tables.
+
+⚠️ **CRITICAL: Before querying any large fact table, search for pre-aggregated tables first:**
+
+```sql
+-- Search for METRICS/MART/AGG tables that might already have what you need
+SELECT table_schema, table_name, row_count, comment
+FROM INFORMATION_SCHEMA.TABLES
+WHERE (table_schema LIKE '%METRICS%' OR table_schema LIKE '%MART%' OR table_name LIKE '%AGG%')
+  AND (LOWER(table_name) LIKE '%<concept>%' OR LOWER(comment) LIKE '%<concept>%')
+```
+
+Pre-aggregated tables are **orders of magnitude faster** and often contain exactly what you need. A metrics table with 100K rows will return in seconds; a fact table with 6B rows may timeout even with filters.
+
+**Table selection principles:**
+- **Check metrics/mart tables FIRST** - they exist for a reason
+- Use row counts as a signal: millions+ rows = fact table (slow), thousands = config/metadata
+- If a fact table has billions of rows, **never start with JOINs or GROUP BY**
+
+**When multiple tables could work:**
+- Run a quick `SELECT ... LIMIT 100` (no JOINs) to validate data exists
+- If 0 results or timeout, try the next candidate table
 
 ### Step 3: Build Incrementally
 
@@ -46,7 +64,7 @@ Use `explore` skill to find relevant tables:
 SELECT COUNT(*) FROM table WHERE date_col >= '2024-01-01'
 
 -- Step 2: Check a sample
-SELECT * FROM table WHERE date_col >= '2024-01-01' LIMIT 10
+SELECT col1, col2, col3 FROM table WHERE date_col >= '2024-01-01' LIMIT 10
 
 -- Step 3: Build your aggregation
 SELECT
@@ -58,6 +76,24 @@ WHERE date_col >= '2024-01-01'
 GROUP BY dimension_col
 ORDER BY total DESC
 ```
+
+⚠️ **For tables with 100M+ rows, modify this pattern:**
+
+```sql
+-- Step 1: Simple filter check (NO JOINs, NO GROUP BY)
+SELECT col1, col2, foreign_key FROM huge_table
+WHERE filter_col ILIKE '%term%'
+  AND date_col >= DATEADD(day, -30, CURRENT_DATE)
+LIMIT 100
+
+-- Step 2: Only if Step 1 succeeds, use the IDs you found
+SELECT d.name, o.org_name
+FROM dimension_table d
+JOIN org_table o ON d.org_id = o.org_id
+WHERE d.id IN ('id1', 'id2', 'id3')  -- IDs from Step 1
+```
+
+**If a query times out:** Remove JOINs, remove GROUP BY, add narrower date filters, add LIMIT. Don't give up - simplify.
 
 ### Step 4: Write Efficient Queries
 
@@ -224,7 +260,7 @@ ORDER BY 1, 2
 ## Anti-Patterns to Avoid
 
 ### The Mega-Query
-❌ Don't try to answer 5 questions in one query with complex CASE statements and multiple subqueries. 
+❌ Don't try to answer 5 questions in one query with complex CASE statements and multiple subqueries.
 
 ✅ Run 5 simple queries instead - easier to debug, faster to run, clearer results.
 
@@ -244,4 +280,3 @@ After analysis is complete, suggest relevant follow-ups:
 - "To dive deeper into table X, use the profile skill"
 - "To understand where this data comes from, use the sources skill"
 - "To set up automated monitoring, consider creating a dashboard"
-
