@@ -17,7 +17,7 @@ Start with the **simplest possible query**, then add complexity only after each 
 
 ```
 Step 1: Does the data exist?     → Simple LIMIT query, no JOINs
-Step 2: How much data?           → COUNT(*) with same filters  
+Step 2: How much data?           → COUNT(*) with same filters
 Step 3: What are the key IDs?    → SELECT DISTINCT foreign_keys LIMIT 100
 Step 4: Get related details      → JOIN on the specific IDs from step 3
 ```
@@ -28,7 +28,7 @@ Step 4: Get related details      → JOIN on the specific IDs from step 3
 -- After finding deployment_ids in step 1:
 SELECT o.org_name, d.deployment_name
 FROM DEPLOYMENTS d
-JOIN ORGANIZATIONS o ON d.org_id = o.org_id  
+JOIN ORGANIZATIONS o ON d.org_id = o.org_id
 WHERE d.deployment_id IN ('id1', 'id2', 'id3')  -- IDs from step 1
 ```
 
@@ -76,7 +76,7 @@ For billion-row tables, even ILIKE with date filters can timeout. Use LIMIT on a
 ```sql
 -- Step 1: Find examples (fast - stops after finding matches)
 -- NO JOINS, NO GROUP BY - just find rows
-SELECT col_a, col_b, foreign_key_id 
+SELECT col_a, col_b, foreign_key_id
 FROM huge_table
 WHERE col_a ILIKE '%term%'
   AND ts >= DATEADD(day, -30, CURRENT_DATE)

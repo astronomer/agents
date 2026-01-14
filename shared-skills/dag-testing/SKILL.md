@@ -17,7 +17,7 @@ trigger_dag_and_wait(dag_id="<dag_id>", timeout=300)
 
 **DO NOT:**
 - ❌ Call `list_dags` first
-- ❌ Call `get_dag_details` first  
+- ❌ Call `get_dag_details` first
 - ❌ Call `list_import_errors` first
 - ❌ Use `grep` or `ls` or any bash command
 - ❌ Do any "pre-flight checks"
@@ -385,4 +385,3 @@ Task logs typically show:
 
 - **dag-authoring**: For creating new DAGs (includes validation before testing)
 - **diagnose**: For general Airflow troubleshooting
-
