@@ -6,8 +6,11 @@ them with validated parameters. Mirrors functionality from ai-cli/agent/services
 Templates use Go template syntax ({{.Param}}) for compatibility with the ai-cli.
 """
 
+import logging
 import re
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # Directory containing the script templates
 SCRIPTS_DIR = Path(__file__).parent / "scripts"
@@ -227,4 +230,3 @@ def render_session_prelude(session_dir: str) -> str:
     template = _load_template("session_prelude.py")
     # session_prelude.py uses $session_dir (Python Template syntax)
     return template.replace("$session_dir", escaped_dir)
-

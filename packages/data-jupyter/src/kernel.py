@@ -10,7 +10,7 @@ import logging
 import shutil
 import sys
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -111,7 +111,8 @@ class KernelManager:
         # Check if uv is available
         if not shutil.which("uv"):
             raise RuntimeError(
-                "uv is not installed. Install it with: curl -LsSf https://astral.sh/uv/install.sh | sh"
+                "uv is not installed. "
+                "Install it with: curl -LsSf https://astral.sh/uv/install.sh | sh"
             )
 
         # Create venv if it doesn't exist
@@ -185,7 +186,7 @@ class KernelManager:
                 stderr=asyncio.subprocess.PIPE,
             )
             await asyncio.wait_for(proc.communicate(), timeout=30)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("Kernel registration timed out")
         except Exception as e:
             logger.warning("Failed to register kernel: %s", e)
@@ -327,11 +328,13 @@ class KernelManager:
 
                 try:
                     # Get message with timeout
+                    # Capture remaining_time in lambda default arg to avoid closure issue
+                    poll_timeout = min(1.0, remaining_time)
                     msg = await asyncio.wait_for(
                         loop.run_in_executor(
-                            None, lambda: self._kc.get_iopub_msg(timeout=min(1.0, remaining_time))
+                            None, lambda t=poll_timeout: self._kc.get_iopub_msg(timeout=t)
                         ),
-                        timeout=min(1.0, remaining_time) + 0.5,
+                        timeout=poll_timeout + 0.5,
                     )
 
                     # Skip messages from other executions
@@ -352,7 +355,7 @@ class KernelManager:
                     elif msg_type == "status" and content["execution_state"] == "idle":
                         execution_complete = True
 
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     continue
                 except Exception as e:
                     logger.debug("Error getting message: %s", e)
@@ -460,4 +463,3 @@ class KernelManager:
             else None,
             "prelude_executed": self._state.prelude_executed,
         }
-

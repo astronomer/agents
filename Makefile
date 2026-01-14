@@ -68,4 +68,3 @@ clean:  ## [util] Remove build artifacts
 	rm -rf $(JUPYTER_DIR)/.ruff_cache/
 	find $(JUPYTER_DIR) -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	find $(JUPYTER_DIR) -type f -name "*.pyc" -delete 2>/dev/null || true
-

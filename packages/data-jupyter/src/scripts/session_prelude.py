@@ -5,7 +5,7 @@ session_dir = Path("$session_dir")
 session_dir.mkdir(parents=True, exist_ok=True)
 
 
-def build_save_path(filename, subdir=""):
+def build_save_path(filename: str, subdir: str = "") -> Path:
     """Build the full path for saving a file in the session directory.
 
     Uses pathlib's path resolution to prevent all traversal attacks including
@@ -58,11 +58,11 @@ def build_save_path(filename, subdir=""):
     except (ValueError, OSError) as e:
         raise ValueError(f"Invalid path: {e}")
 
+
 # Configure matplotlib for non-interactive backend (saves to files only)
 import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
+
+matplotlib.use("Agg")
 
 print("Session directory:", session_dir)
 print("Use build_save_path('filename.png', 'charts') to save files")
-

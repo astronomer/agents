@@ -20,14 +20,9 @@ for _row in _result_df.iter_rows(named=True):
     _db = _row.get("database", "{{.Database}}")
     _schema = _row.get("schema_name", "")
     _count = _row.get("table_count", 0)
-    
+
     if _db not in _schemas:
         _schemas[_db] = []
     _schemas[_db].append({"name": _schema, "table_count": _count})
 
 print(json.dumps(_schemas, indent=2, default=str))
-
-
-
-
-

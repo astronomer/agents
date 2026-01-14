@@ -35,6 +35,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Timeout constants (in seconds)
+TIMEOUT_ENV_SETUP = 10.0
+TIMEOUT_CODE_EXECUTION = 30.0
+TIMEOUT_SCHEMA_QUERY = 60.0
+TIMEOUT_SQL_EXECUTION = 120.0
+
 # Global kernel manager instance
 _kernel_manager: KernelManager | None = None
 
@@ -79,6 +85,33 @@ def _get_next_query_num(session_id: str) -> int:
     count = _query_counters.get(session_id, 0) + 1
     _query_counters[session_id] = count
     return count
+
+
+def _handle_execution_error(
+    error: str | None,
+    output: str | None,
+    session_id: str,
+    operation: str,
+) -> str:
+    """Handle execution errors, clearing connection on connection errors.
+
+    Args:
+        error: Error message from execution
+        output: Output from execution (may contain error info)
+        session_id: Current session ID
+        operation: Name of the operation for error message
+
+    Returns:
+        Formatted error message string
+    """
+    error_msg = error or "Unknown error"
+    if _is_connection_error(error_msg) or (output and _is_connection_error(output)):
+        _clear_warehouse_connection(session_id)
+        logger.warning("Warehouse connection error detected, will reconnect on next query")
+
+    if output:
+        return f"Output:\n{output}\n\nError:\n{error_msg}"
+    return f"Error: {operation} failed: {error_msg}"
 
 
 async def _ensure_warehouse_connection(
@@ -128,7 +161,7 @@ async def _ensure_warehouse_connection(
             env_setup_code += f"os.environ[{var_name!r}] = {var_value!r}\n"
         env_setup_code += "print('Environment variables injected')"
 
-        env_result = await kernel_manager.execute(env_setup_code, timeout=10.0)
+        env_result = await kernel_manager.execute(env_setup_code, timeout=TIMEOUT_ENV_SETUP)
         if not env_result.success:
             logger.warning(f"Failed to inject env vars: {env_result.error}")
         else:
@@ -136,7 +169,7 @@ async def _ensure_warehouse_connection(
 
     # Execute the prelude to establish connection
     prelude = connector.to_python_prelude()
-    result = await kernel_manager.execute(prelude, timeout=60.0)
+    result = await kernel_manager.execute(prelude, timeout=TIMEOUT_SCHEMA_QUERY)
 
     if not result.success:
         error_msg = result.error or "Unknown error"
@@ -370,20 +403,12 @@ async def run_sql(
         session_data_dir=str(session_data_dir),
     )
 
-    result = await kernel_manager.execute(code, timeout=120.0)
+    result = await kernel_manager.execute(code, timeout=TIMEOUT_SQL_EXECUTION)
 
     if not result.success:
-        error_msg = result.error or "Unknown error"
-        # Check for connection errors and reset prelude flag
-        if _is_connection_error(error_msg) or (
-            result.output and _is_connection_error(result.output)
-        ):
-            _clear_warehouse_connection(effective_session_id)
-            logger.warning("Warehouse connection error detected, will reconnect on next query")
-
-        if result.output:
-            return f"Output:\n{result.output}\n\nError:\n{error_msg}"
-        return f"Error: SQL execution failed: {error_msg}"
+        return _handle_execution_error(
+            result.error, result.output, effective_session_id, "SQL execution"
+        )
 
     return result.output if result.output else "(no output)"
 
@@ -435,18 +460,12 @@ async def list_schemas(
     except Exception as e:
         return f"Error: Failed to load warehouse config: {e}"
 
-    result = await kernel_manager.execute(code, timeout=60.0)
+    result = await kernel_manager.execute(code, timeout=TIMEOUT_SCHEMA_QUERY)
 
     if not result.success:
-        error_msg = result.error or "Unknown error"
-        if _is_connection_error(error_msg) or (
-            result.output and _is_connection_error(result.output)
-        ):
-            _clear_warehouse_connection(effective_session_id)
-
-        if result.output:
-            return f"Output:\n{result.output}\n\nError:\n{error_msg}"
-        return f"Error: Failed to list schemas: {error_msg}"
+        return _handle_execution_error(
+            result.error, result.output, effective_session_id, "List schemas"
+        )
 
     return result.output if result.output else "(no output)"
 
@@ -493,18 +512,12 @@ async def list_tables(
     except ValidationError as e:
         return f"Error: {e}"
 
-    result = await kernel_manager.execute(code, timeout=60.0)
+    result = await kernel_manager.execute(code, timeout=TIMEOUT_SCHEMA_QUERY)
 
     if not result.success:
-        error_msg = result.error or "Unknown error"
-        if _is_connection_error(error_msg) or (
-            result.output and _is_connection_error(result.output)
-        ):
-            _clear_warehouse_connection(effective_session_id)
-
-        if result.output:
-            return f"Output:\n{result.output}\n\nError:\n{error_msg}"
-        return f"Error: Failed to list tables: {error_msg}"
+        return _handle_execution_error(
+            result.error, result.output, effective_session_id, "List tables"
+        )
 
     return result.output if result.output else "(no output)"
 
@@ -516,8 +529,9 @@ async def get_tables_info(
     tables: list[str],
     session_id: str | None = None,
 ) -> str:
-    """Get detailed information about multiple tables including columns, data types, and descriptions.
+    """Get detailed information about multiple tables.
 
+    Returns columns, data types, and descriptions for each table.
     Use this to understand table structures before writing queries.
     More efficient than calling get_table_info multiple times.
 
@@ -555,18 +569,12 @@ async def get_tables_info(
     except ValidationError as e:
         return f"Error: {e}"
 
-    result = await kernel_manager.execute(code, timeout=60.0)
+    result = await kernel_manager.execute(code, timeout=TIMEOUT_SCHEMA_QUERY)
 
     if not result.success:
-        error_msg = result.error or "Unknown error"
-        if _is_connection_error(error_msg) or (
-            result.output and _is_connection_error(result.output)
-        ):
-            _clear_warehouse_connection(effective_session_id)
-
-        if result.output:
-            return f"Output:\n{result.output}\n\nError:\n{error_msg}"
-        return f"Error: Failed to get tables info: {error_msg}"
+        return _handle_execution_error(
+            result.error, result.output, effective_session_id, "Get tables info"
+        )
 
     return result.output if result.output else "(no output)"
 

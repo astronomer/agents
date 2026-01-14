@@ -81,8 +81,8 @@ ORDER BY total DESC
 
 ```sql
 -- Step 1: Simple filter check (NO JOINs, NO GROUP BY)
-SELECT col1, col2, foreign_key FROM huge_table 
-WHERE filter_col ILIKE '%term%' 
+SELECT col1, col2, foreign_key FROM huge_table
+WHERE filter_col ILIKE '%term%'
   AND date_col >= DATEADD(day, -30, CURRENT_DATE)
 LIMIT 100
 
@@ -260,7 +260,7 @@ ORDER BY 1, 2
 ## Anti-Patterns to Avoid
 
 ### The Mega-Query
-❌ Don't try to answer 5 questions in one query with complex CASE statements and multiple subqueries. 
+❌ Don't try to answer 5 questions in one query with complex CASE statements and multiple subqueries.
 
 ✅ Run 5 simple queries instead - easier to debug, faster to run, clearer results.
 
@@ -280,4 +280,3 @@ After analysis is complete, suggest relevant follow-ups:
 - "To dive deeper into table X, use the profile skill"
 - "To understand where this data comes from, use the sources skill"
 - "To set up automated monitoring, consider creating a dashboard"
-

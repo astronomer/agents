@@ -30,12 +30,7 @@ for _row in _result_df.iter_rows(named=True):
         _table["comment"] = _row.get("comment")
     _tables.append(_table)
 
-_output = {
-    "database": _db,
-    "schema": _schema,
-    "tables": _tables,
-    "count": len(_tables)
-}
+_output = {"database": _db, "schema": _schema, "tables": _tables, "count": len(_tables)}
 
 if len(_tables) == 0:
     # Check if schema exists
@@ -51,7 +46,3 @@ if len(_tables) == 0:
         _output["message"] = "Schema exists but contains no tables"
 
 print(json.dumps(_output, indent=2, default=str))
-
-
-
-
