@@ -12,11 +12,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-snowflake = [
-    "snowflake-connector-python[pandas]>=3.0.0,<4.0.0",
-    "polars>=0.20.0,<2.0.0",
-    "cryptography>=42.0.0,<45.0.0",
-]
 dev = [
     "ruff>=0.4.0",
     "pytest>=8.0.0",
