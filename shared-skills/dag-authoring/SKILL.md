@@ -7,6 +7,39 @@ description: Workflow and best practices for writing Apache Airflow DAGs. Use wh
 
 This skill guides you through creating, validating, and testing Airflow DAGs using the Airflow MCP tools for feedback at every step.
 
+---
+
+## ⚠️ CRITICAL WARNING: Use MCP Tools, NOT CLI Commands ⚠️
+
+> **STOP! Before running ANY Airflow-related command, read this.**
+>
+> You MUST use MCP tools for ALL Airflow interactions. CLI commands like `astro dev run`, `airflow dags`, or shell commands to read logs are **FORBIDDEN**.
+>
+> **Why?** MCP tools provide structured, reliable output. CLI commands are fragile, produce unstructured text, and often fail silently.
+
+---
+
+## CLI vs MCP Quick Reference
+
+**ALWAYS use Airflow MCP tools. NEVER use CLI commands.**
+
+| ❌ DO NOT USE | ✅ USE INSTEAD |
+|---------------|----------------|
+| `astro dev run dags list` | `list_dags` MCP tool |
+| `airflow dags list` | `list_dags` MCP tool |
+| `astro dev run dags test` | `trigger_dag_and_wait` MCP tool |
+| `airflow tasks test` | `trigger_dag_and_wait` MCP tool |
+| `cat` / `grep` on Airflow logs | `get_task_logs` MCP tool |
+| `find` in dags folder | `list_dags` or `explore_dag` MCP tool |
+| Any `astro dev run ...` | Equivalent MCP tool |
+| Any `airflow ...` CLI | Equivalent MCP tool |
+
+**Remember:**
+- ✅ Airflow is ALREADY running — the MCP server handles the connection
+- ❌ Do NOT attempt to start, stop, or manage the Airflow environment
+- ❌ Do NOT use shell commands to check DAG status, logs, or errors
+- ✅ ALWAYS use MCP tools — they return structured JSON, not fragile CLI output
+
 ## Workflow Overview
 
 ```
@@ -100,15 +133,13 @@ Write the DAG following best practices (see below). Key steps:
 
 ## Phase 4: Validate
 
-**Use the Airflow MCP as a feedback loop.**
+**Use the Airflow MCP as a feedback loop. Do NOT use CLI commands.**
 
 ### Step 1: Check Import Errors
 
-After saving, wait a few seconds for Airflow to parse:
+After saving, call the MCP tool (Airflow will have already parsed the file):
 
-```
-list_import_errors
-```
+**MCP tool:** `list_import_errors`
 
 - If your file appears → **fix and retry**
 - If no errors → **continue**
@@ -117,25 +148,19 @@ Common causes: missing imports, syntax errors, missing packages.
 
 ### Step 2: Verify DAG Exists
 
-```
-get_dag_details(dag_id="your_dag_id")
-```
+**MCP tool:** `get_dag_details(dag_id="your_dag_id")`
 
 Check: DAG exists, schedule correct, tags set, paused status.
 
 ### Step 3: Check Warnings
 
-```
-list_dag_warnings
-```
+**MCP tool:** `list_dag_warnings`
 
 Look for deprecation warnings or configuration issues.
 
 ### Step 4: Explore DAG Structure
 
-```
-explore_dag(dag_id="your_dag_id")
-```
+**MCP tool:** `explore_dag(dag_id="your_dag_id")`
 
 Returns in one call: metadata, tasks, dependencies, source code.
 
@@ -153,27 +178,25 @@ DAGs can: write to production, send emails, incur costs.
 
 ### If Approved
 
-**Trigger and wait:**
-```
-trigger_dag_and_wait(dag_id="your_dag_id", conf={}, timeout=300)
-```
+**Recommended - Trigger and wait for completion:**
 
-**Or trigger and monitor separately:**
-```
-trigger_dag(dag_id="your_dag_id")
-get_dag_run(dag_id, dag_run_id)
-```
+**MCP tool:** `trigger_dag_and_wait(dag_id="your_dag_id", conf={}, timeout=300)`
+
+This is the preferred approach as it triggers the DAG and waits for completion in a single call, providing immediate feedback on success or failure.
+
+**Alternative - Trigger and monitor separately:**
+
+**MCP tools:** `trigger_dag(dag_id="your_dag_id")` then `get_dag_run(dag_id, dag_run_id)`
+
+Use this only when you need more control over polling intervals or want to do other work while the DAG runs.
 
 ### If Something Fails
 
-```
-get_task_logs(dag_id, dag_run_id, task_id)
-```
+**MCP tool:** `get_task_logs(dag_id, dag_run_id, task_id)`
 
-Or comprehensive diagnosis:
-```
-diagnose_dag_run(dag_id, dag_run_id)
-```
+And/or comprehensive diagnosis:
+
+**MCP tool:** `diagnose_dag_run(dag_id, dag_run_id)`
 
 ---
 
@@ -181,8 +204,11 @@ diagnose_dag_run(dag_id, dag_run_id)
 
 If issues found:
 1. Fix the code
-2. Re-validate (Phase 4)
-3. Re-test with permission (Phase 5)
+2. Check for import errors with `list_import_errors` MCP tool
+3. Re-validate using MCP tools (Phase 4)
+4. Re-test with permission using MCP tools (Phase 5)
+
+**Never use CLI commands to check status or logs. Always use MCP tools.**
 
 ---
 
@@ -198,8 +224,8 @@ If issues found:
 | Validate | `get_dag_details` | Verify DAG config |
 | Validate | `list_dag_warnings` | Configuration warnings |
 | Validate | `explore_dag` | Full DAG inspection |
-| Test | `trigger_dag` | Start a run |
-| Test | `trigger_dag_and_wait` | Run and wait |
+| Test | `trigger_dag_and_wait` | Run and wait (recommended) |
+| Test | `trigger_dag` | Start a run (alternative) |
 | Test | `get_dag_run` | Check run status |
 | Test | `get_task_logs` | Debug failures |
 | Test | `diagnose_dag_run` | Troubleshooting |
