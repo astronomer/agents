@@ -22,6 +22,13 @@ from .cache import (
 )
 from .config import get_session_data_dir
 from .kernel import KernelManager
+from .mocks import (
+    get_mock_list_schemas,
+    get_mock_list_tables,
+    get_mock_response,
+    get_mock_tables_info,
+    is_dry_run,
+)
 from .scripts import (
     ValidationError,
     render_get_tables_info,
@@ -370,6 +377,10 @@ async def run_sql(
     Returns:
         Query results as formatted table, or error message
     """
+    # DRY_RUN mode: return mock response instead of executing real query
+    if is_dry_run():
+        return get_mock_response(query, "run_sql")
+
     kernel_manager = get_kernel_manager()
 
     if not query or not query.strip():
@@ -434,6 +445,10 @@ async def list_schemas(
     Returns:
         JSON with schema information, or error message
     """
+    # DRY_RUN mode: return mock response
+    if is_dry_run():
+        return get_mock_list_schemas()
+
     kernel_manager = get_kernel_manager()
 
     # Set session
@@ -493,6 +508,10 @@ async def list_tables(
     Returns:
         JSON with table information, or error message
     """
+    # DRY_RUN mode: return mock response
+    if is_dry_run():
+        return get_mock_list_tables(database, schema)
+
     kernel_manager = get_kernel_manager()
 
     if not database:
@@ -548,6 +567,10 @@ async def get_tables_info(
     Returns:
         JSON with detailed table information, or error message
     """
+    # DRY_RUN mode: return mock response
+    if is_dry_run():
+        return get_mock_tables_info(database, schema, tables)
+
     kernel_manager = get_kernel_manager()
 
     if not database:

@@ -54,3 +54,10 @@ Thumbs.db
 
 # Generated schema files (project-specific)
 .astro/
+
+# Skill testing runtime (Ralph Loop)
+.ralph/
+.ralph-history/
+.ralph_test_output.txt
+*.early_exit
+/tmp/flow-trace.json
