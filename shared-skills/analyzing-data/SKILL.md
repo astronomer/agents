@@ -7,6 +7,18 @@ description: Queries data warehouse and answers questions about data. Use when t
 
 Answer business questions and perform analysis using SQL queries against the data warehouse.
 
+## Quick Start (Read This First!)
+
+**For most queries, follow this 3-step flow:**
+
+1. **Check CLAUDE.md Quick Reference** → Find the table for your concept
+2. **Run `lookup_concept`** → Verify cache has the mapping
+3. **Execute `run_sql`** → Query the table directly
+
+**Skip discovery tools** (`list_schemas`, `list_tables`, `get_tables_info`) unless the concept isn't in Quick Reference.
+
+---
+
 ## Core Principle: Query Optimization
 
 **Write optimized SQL queries when needed - ALWAYS prioritize smaller, faster queries over complex mega-queries.**
@@ -73,6 +85,30 @@ If `lookup_concept` returns a table → go directly to `run_sql`, skip all disco
 1. Search codebase for SQL models (`**/models/**/*.sql`)
 2. Query INFORMATION_SCHEMA as fallback
 3. After successful query, ALWAYS call `learn_concept` to cache for next time
+
+## Query Efficiency Guidelines
+
+**Optimize tool usage based on query type:**
+
+### Simple Queries (prefer direct SQL)
+
+For these patterns, go straight to `run_sql` after checking Quick Reference:
+- "How many X?" → Single COUNT query
+- "List X" / "Show me X" → Single SELECT with LIMIT
+- "Who uses X?" → Single filter query
+
+**Don't waste time on discovery for simple queries.** Check CLAUDE.md Quick Reference or `lookup_concept` first, then run SQL.
+
+### Complex Queries (use incremental approach)
+
+For multi-entity or analytical queries:
+1. Start with the **primary entity** from Quick Reference
+2. Build incrementally with focused queries
+3. Only use discovery (`list_tables`, `get_tables_info`) if Quick Reference doesn't have the table
+
+**Avoid over-exploration.** If you've made 3+ discovery calls without finding what you need, step back and reassess.
+
+---
 
 ## Analysis Process
 

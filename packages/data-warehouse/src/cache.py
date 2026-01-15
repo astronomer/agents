@@ -9,7 +9,9 @@ Cache files are stored at ~/.astro/ai/cache/:
 
 import json
 import logging
+import os
 import re
+import tempfile
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -432,6 +434,10 @@ _template_cache: TemplateCache | None = None
 def get_schema_cache() -> SchemaCache:
     """Get the global schema cache instance."""
     global _schema_cache
+    # Support disabling cache for A/B testing (used by split-test.py)
+    if os.environ.get("DISABLE_CONCEPT_CACHE", "").lower() == "true":
+        # Return a fresh, non-persisting cache in temp directory
+        return SchemaCache(cache_dir=Path(tempfile.gettempdir()) / "disabled-cache")
     if _schema_cache is None:
         _schema_cache = SchemaCache()
     return _schema_cache
@@ -443,3 +449,79 @@ def get_template_cache() -> TemplateCache:
     if _template_cache is None:
         _template_cache = TemplateCache()
     return _template_cache
+
+
+def load_concepts_from_warehouse_md(path: Path | None = None) -> int:
+    """Parse warehouse.md and populate cache with Quick Reference entries.
+
+    Looks for the Quick Reference table in warehouse.md and loads all
+    concept → table mappings into the cache.
+
+    Args:
+        path: Path to warehouse.md. If None, searches common locations.
+
+    Returns:
+        Number of concepts loaded into cache.
+    """
+    # Find warehouse.md if not provided
+    if path is None:
+        locations = [
+            Path(".astro/warehouse.md"),
+            Path.home() / ".astro" / "ai" / "config" / "warehouse.md",
+        ]
+        for loc in locations:
+            if loc.exists():
+                path = loc
+                break
+
+    if path is None or not path.exists():
+        logger.warning("warehouse.md not found")
+        return 0
+
+    content = path.read_text(encoding="utf-8")
+
+    # Parse Quick Reference table
+    # Format: | concept | TABLE | KEY_COL | DATE_COL |
+    concepts_loaded = 0
+    in_quick_ref = False
+    schema_cache = get_schema_cache()
+
+    for line in content.split("\n"):
+        line = line.strip()
+
+        # Detect Quick Reference section
+        if "## Quick Reference" in line:
+            in_quick_ref = True
+            continue
+
+        # Stop at next section
+        if in_quick_ref and line.startswith("## ") and "Quick Reference" not in line:
+            break
+
+        # Skip non-table lines
+        if not in_quick_ref or not line.startswith("|"):
+            continue
+
+        # Skip header and separator rows
+        if "Concept" in line or "---" in line or "Table" in line:
+            continue
+
+        # Parse table row: | concept | table | key_col | date_col |
+        parts = [p.strip() for p in line.split("|")]
+        parts = [p for p in parts if p]  # Remove empty strings
+
+        if len(parts) >= 2:
+            concept = parts[0].lower()
+            table = parts[1]
+            key_column = parts[2] if len(parts) > 2 and parts[2] != "-" else None
+            date_column = parts[3] if len(parts) > 3 and parts[3] != "-" else None
+
+            # Skip if table doesn't look valid (should have dots)
+            if "." not in table:
+                continue
+
+            schema_cache.set_concept(concept, table, key_column, date_column)
+            concepts_loaded += 1
+            logger.info(f"Loaded concept from warehouse.md: {concept} → {table}")
+
+    return concepts_loaded
