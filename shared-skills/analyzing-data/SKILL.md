@@ -18,11 +18,17 @@ Answer business questions and perform analysis using SQL queries against the dat
 - Use LIMIT during exploration, remove for final analysis
 - Aggregate at the appropriate grain - don't over-fetch then reduce
 
-## REQUIRED First Step: Check warehouse.md
+## REQUIRED First Steps
 
-**⚠️ MANDATORY: Before calling ANY MCP discovery tools (list_schemas, list_tables, get_tables_info), you MUST check for warehouse.md first.**
+### Step 0: Is this a Product-Specific Query?
 
-### Step 1: Check for warehouse.md (DO THIS FIRST)
+If the query is about a **product feature** (operators, integrations, SDKs):
+
+→ See `reference/discovery.md` to choose the right discovery approach (docs vs warehouse).
+
+### Step 1: Check for warehouse.md
+
+**⚠️ MANDATORY: Before calling ANY MCP discovery tools (list_schemas, list_tables, get_tables_info), check for warehouse.md first.**
 
 Use the Glob tool to check for these files:
 - `.astro/warehouse.md` (project-specific)
