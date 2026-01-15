@@ -1,4 +1,4 @@
-"""Configuration utilities for the data-jupyter package."""
+"""Configuration utilities for the data-warehouse package."""
 
 import logging
 from pathlib import Path

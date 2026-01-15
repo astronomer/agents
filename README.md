@@ -12,20 +12,22 @@ The `data` plugin bundles everything in this repo into a single installable pack
 
 **MCP Servers:**
 - **Airflow** - Full Airflow REST API integration via [astro-airflow-mcp](https://github.com/astronomer/astro-airflow-mcp): DAG management, triggering, task logs, system health
-- **Jupyter** - Persistent Python kernel for code execution, SQL queries against configured warehouses, schema discovery
+- **Data Warehouse** - SQL queries against configured warehouses (Snowflake, BigQuery, etc.), schema discovery, persistent Python kernel for analysis
 
 **Skills:**
 | Skill | Description |
 |-------|-------------|
+| `init-warehouse` | Initialize schema discovery - generates `.astro/warehouse.md` with all table metadata |
+| `data-analysis` | SQL-based analysis to answer business questions (uses warehouse.md for fast lookups) |
 | `dag-authoring` | Create and validate Airflow DAGs with best practices |
-| `airflow-migration` | Migrate DAGs from Airflow 2.x to 3.x |
-| `data-analysis` | SQL-based analysis to answer business questions |
-| `explore` | Discover what data exists for a concept or domain |
-| `freshness` | Check how current your data is |
-| `profile` | Comprehensive table profiling and quality assessment |
-| `sources` | Trace upstream lineage - where does this data come from? |
-| `impacts` | Analyze downstream dependencies - what breaks if I change this? |
-| `diagnose` | Debug failed DAG runs and find root causes |
+| `dag-testing` | Test and debug Airflow DAGs locally |
+| `airflow-2-to-3-migration` | Migrate DAGs from Airflow 2.x to 3.x |
+| `discover-data` | Discover what data exists for a concept or domain |
+| `check-freshness` | Check how current your data is |
+| `profile-table` | Comprehensive table profiling and quality assessment |
+| `upstream-lineage` | Trace upstream lineage - where does this data come from? |
+| `downstream-lineage` | Analyze downstream dependencies - what breaks if I change this? |
+| `debug-dag` | Debug failed DAG runs and find root causes |
 
 ## Installation
 
@@ -107,10 +109,30 @@ The Airflow MCP auto-discovers your project when you run Claude Code from an Air
 Once installed, skills are invoked automatically based on what you ask. You can also invoke them directly:
 
 ```
+/data:init-warehouse     # Initialize schema discovery (run once per project)
+/data:data-analysis      # Analyze data with SQL
 /data:dag-authoring      # Start guided DAG creation
-/data:explore            # Discover available data
-/data:diagnose           # Debug a failed DAG run
+/data:discover-data      # Discover available data
+/data:debug-dag          # Debug a failed DAG run
 ```
+
+### Getting Started
+
+1. **Initialize your warehouse** (recommended first step):
+   ```
+   /data:init-warehouse
+   ```
+   This generates `.astro/warehouse.md` with all your table metadata, enabling instant lookups.
+
+2. **Ask questions naturally**:
+   - "What tables contain customer data?"
+   - "Who uses HITLOperator the most?"
+   - "Show me ARR trends by product"
+
+3. **Work with Airflow**:
+   - "Create a DAG that loads data from S3 to Snowflake daily"
+   - "Why did my etl_pipeline DAG fail yesterday?"
+   - "Test my DAG locally"
 
 Example prompts:
 - "Create a DAG that loads data from S3 to Snowflake daily"
@@ -128,8 +150,12 @@ See [CLAUDE.md](./CLAUDE.md) for plugin development guidelines.
 ```
 agents/
 ├── packages/
-│   └── data-jupyter/        # Jupyter kernel MCP server
+│   └── data-warehouse/      # Data warehouse MCP server (SQL, schema discovery, Python kernel)
 ├── shared-skills/           # Skills (shared by Claude Code & OpenCode)
+│   ├── init-warehouse/      # /data:init - schema discovery
+│   ├── data-analysis/       # SQL-based analysis
+│   ├── dag-authoring/       # DAG creation
+│   └── ...                  # Other skills
 ├── claude-code-plugin/      # Claude Code plugin config
 └── opencode/                # OpenCode config
 ```

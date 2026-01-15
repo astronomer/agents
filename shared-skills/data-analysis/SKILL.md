@@ -18,6 +18,48 @@ Answer business questions and perform analysis using SQL queries against the dat
 - Use LIMIT during exploration, remove for final analysis
 - Aggregate at the appropriate grain - don't over-fetch then reduce
 
+## Quick Start: Check warehouse.md First
+
+Before any discovery, check for existing schema documentation:
+
+### First: Check if initialized
+
+```
+Check if .astro/warehouse.md or ~/.astro/ai/config/warehouse.md exists
+```
+
+**If NOT initialized**, tell the user:
+
+> I don't see a warehouse schema file. For faster queries, run `/data:init` to discover
+> your warehouse schema once. This creates `.astro/warehouse.md` with all table metadata,
+> enabling instant lookups without repeated warehouse queries.
+>
+> I can still help with your question, but discovery will be slower.
+
+Then proceed with full discovery (Priority 3).
+
+### Priority 1: Read warehouse.md (if exists)
+
+```
+Read .astro/warehouse.md (or ~/.astro/ai/config/warehouse.md)
+→ Look up concept in "Quick Reference" table
+→ Find table details with columns, row counts, warnings
+```
+
+### Priority 2: Check Runtime Cache
+
+```
+lookup_concept("customers")  → Returns cached table if known
+lookup_concept("task_runs")  → Returns HQ.MODEL_ASTRO.TASK_RUNS if learned
+```
+
+### Priority 3: Full Discovery
+
+Only if warehouse.md doesn't exist AND cache miss:
+- Search codebase for SQL models
+- Query INFORMATION_SCHEMA
+- Then `learn_concept` to cache for next time
+
 ## Analysis Process
 
 ### Step 1: Clarify the Question
@@ -32,7 +74,17 @@ If unclear, ask clarifying questions before proceeding.
 
 ### Step 2: Identify Data Sources
 
-Use `explore` skill to find relevant tables.
+**Search codebase FIRST, then query warehouse.**
+
+1. **Primary: Search codebase** (saves warehouse queries, provides business context):
+   - `**/models/**/*.sql` - dbt SQL models with column definitions
+   - `**/dags/**/*.sql` - Airflow SQL files with schema docs
+   - `**/schema.yml` - dbt schema with descriptions
+   - Look for column comments, YAML frontmatter, data quality rules
+
+2. **Fallback: Query INFORMATION_SCHEMA** when codebase docs are missing
+
+For detailed discovery patterns, see `reference/discovery.md`.
 
 ⚠️ **CRITICAL: Before querying any large fact table, search for pre-aggregated tables first:**
 
@@ -273,6 +325,42 @@ ORDER BY 1, 2
 ❌ Don't spend time optimizing a query that runs once for ad-hoc analysis.
 
 ✅ Optimize queries that run repeatedly (dashboards, pipelines).
+
+## Caching Workflow
+
+The system learns from successful queries to speed up future analysis.
+
+### After Successful Query
+
+When a query succeeds, teach the cache:
+
+```
+learn_concept("customers", "HQ.MODEL_ASTRO.ORGANIZATIONS",
+              key_column="ORG_ID", date_column="CREATED_AT")
+
+learn_concept("task_runs", "HQ.MODEL_ASTRO.TASK_RUNS",
+              key_column="TASK_RUN_ID", date_column="START_TS")
+```
+
+### Cache Tools
+
+| Tool | Purpose |
+|------|---------|
+| `lookup_concept("X")` | Find cached table for concept X |
+| `learn_concept("X", "DB.SCHEMA.TABLE")` | Teach new concept mapping |
+| `get_cached_table("DB.SCHEMA.TABLE")` | Get cached column info |
+| `cache_status()` | Show cache statistics |
+| `clear_cache()` | Clear stale entries |
+
+### Cache Benefits
+
+| Query # | Without Cache | With Cache |
+|---------|---------------|------------|
+| 1st "who uses X" | 3-4 tool calls | 3-4 tool calls |
+| 2nd "who uses Y" | 3-4 tool calls | 1-2 tool calls |
+| 10th similar | 3-4 tool calls | 1 tool call |
+
+Cache persists at `~/.astro/ai/cache/` and auto-expires after 7 days.
 
 ## Next Steps
 
