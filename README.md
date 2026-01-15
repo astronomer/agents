@@ -17,8 +17,8 @@ The `data` plugin bundles everything in this repo into a single installable pack
 **Skills:**
 | Skill | Description |
 |-------|-------------|
-| `init-warehouse` | Initialize schema discovery - generates `.astro/warehouse.md` with all table metadata |
-| `data-analysis` | SQL-based analysis to answer business questions (uses warehouse.md for fast lookups) |
+| `init-warehouse` | Initialize schema discovery - generates `.astro/warehouse.md` and optionally adds Quick Reference to CLAUDE.md |
+| `data-analysis` | SQL-based analysis to answer business questions (uses CLAUDE.md Quick Reference + cache for fast lookups) |
 | `dag-authoring` | Create and validate Airflow DAGs with best practices |
 | `dag-testing` | Test and debug Airflow DAGs locally |
 | `airflow-2-to-3-migration` | Migrate DAGs from Airflow 2.x to 3.x |
@@ -122,7 +122,7 @@ Once installed, skills are invoked automatically based on what you ask. You can 
    ```
    /data:init-warehouse
    ```
-   This generates `.astro/warehouse.md` with all your table metadata, enabling instant lookups.
+   This generates `.astro/warehouse.md` with schema metadata and offers to add a Quick Reference to your CLAUDE.md for fastest query performance.
 
 2. **Ask questions naturally**:
    - "What tables contain customer data?"
