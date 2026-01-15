@@ -1,6 +1,6 @@
 ---
-name: data-analysis
-description: Perform data analysis using SQL queries. Use when the user wants to analyze data, answer business questions, create metrics, compare datasets, or investigate trends. Guides query construction and result interpretation.
+name: analyzing-data
+description: Queries data warehouse and answers questions about data. Use when the user asks ANY question requiring database/warehouse queries - including "who uses X", "how many Y", "show me Z", "find customers", "what is the count", data lookups, metrics, trends, or SQL. CRITICAL - when filtering on categorical columns (operators, features, types), always explore what values exist first to find related variants. Always invoke this skill before calling warehouse MCP tools directly.
 ---
 
 # Data Analysis
@@ -18,47 +18,55 @@ Answer business questions and perform analysis using SQL queries against the dat
 - Use LIMIT during exploration, remove for final analysis
 - Aggregate at the appropriate grain - don't over-fetch then reduce
 
-## Quick Start: Check warehouse.md First
+## REQUIRED First Step: Check warehouse.md
 
-Before any discovery, check for existing schema documentation:
+**⚠️ MANDATORY: Before calling ANY MCP discovery tools (list_schemas, list_tables, get_tables_info), you MUST check for warehouse.md first.**
 
-### First: Check if initialized
+### Step 1: Check for warehouse.md (DO THIS FIRST)
 
+Use the Glob tool to check for these files:
+- `.astro/warehouse.md` (project-specific)
+- `~/.astro/ai/config/warehouse.md` (global)
+
+### Step 2: If warehouse.md EXISTS
+
+1. **Read the file** using the Read tool
+2. **Find your table** in the "Quick Reference" section at the top
+3. **Go directly to run_sql** - skip all discovery tools
+4. **Note any warnings** about large tables needing date filters
+
+Example flow:
 ```
-Check if .astro/warehouse.md or ~/.astro/ai/config/warehouse.md exists
-```
-
-**If NOT initialized**, tell the user:
-
-> I don't see a warehouse schema file. For faster queries, run `/data:init` to discover
-> your warehouse schema once. This creates `.astro/warehouse.md` with all table metadata,
-> enabling instant lookups without repeated warehouse queries.
->
-> I can still help with your question, but discovery will be slower.
-
-Then proceed with full discovery (Priority 3).
-
-### Priority 1: Read warehouse.md (if exists)
-
-```
-Read .astro/warehouse.md (or ~/.astro/ai/config/warehouse.md)
-→ Look up concept in "Quick Reference" table
-→ Find table details with columns, row counts, warnings
+Glob(".astro/warehouse.md") → Found!
+Read(".astro/warehouse.md") → See Quick Reference table
+Find "task_runs" → HQ.MODEL_ASTRO.TASK_RUNS, date_column: START_TS
+run_sql("SELECT ... FROM HQ.MODEL_ASTRO.TASK_RUNS WHERE START_TS >= ...")
 ```
 
-### Priority 2: Check Runtime Cache
+**DO NOT call list_schemas/list_tables/get_tables_info if warehouse.md exists.**
 
+### Step 3: If warehouse.md does NOT exist
+
+Tell the user:
+
+> I don't see a warehouse schema file. For 3.5x faster queries, run `/data:init` first.
+> I can still help, but discovery will be slower.
+
+Then proceed with discovery in this order:
+
+**3a. Check runtime cache FIRST:**
 ```
-lookup_concept("customers")  → Returns cached table if known
-lookup_concept("task_runs")  → Returns HQ.MODEL_ASTRO.TASK_RUNS if learned
+lookup_concept("customers")     # For customer queries
+lookup_concept("task_runs")     # For operator/task queries
+lookup_concept("deployments")   # For deployment queries
 ```
 
-### Priority 3: Full Discovery
+If `lookup_concept` returns a table → go directly to `run_sql`, skip all discovery.
 
-Only if warehouse.md doesn't exist AND cache miss:
-- Search codebase for SQL models
-- Query INFORMATION_SCHEMA
-- Then `learn_concept` to cache for next time
+**3b. If cache miss, do full discovery:**
+1. Search codebase for SQL models (`**/models/**/*.sql`)
+2. Query INFORMATION_SCHEMA as fallback
+3. After successful query, ALWAYS call `learn_concept` to cache for next time
 
 ## Analysis Process
 
@@ -72,6 +80,16 @@ Before writing any SQL, ensure you understand:
 
 If unclear, ask clarifying questions before proceeding.
 
+⚠️ **CRITICAL - Value Discovery**: When filtering on categorical columns (operators, features, types, statuses), ALWAYS run a discovery query FIRST to find related values:
+
+```sql
+SELECT DISTINCT column_name, COUNT(*) FROM table
+WHERE column_name ILIKE '%search_term%'
+GROUP BY 1 ORDER BY 2 DESC
+```
+
+Items often have variants (e.g., "FeatureX" → FeatureX, FeatureXPro, FeatureXSensor). See `reference/discovery.md` for details.
+
 ### Step 2: Identify Data Sources
 
 **Search codebase FIRST, then query warehouse.**
@@ -84,7 +102,10 @@ If unclear, ask clarifying questions before proceeding.
 
 2. **Fallback: Query INFORMATION_SCHEMA** when codebase docs are missing
 
-For detailed discovery patterns, see `reference/discovery.md`.
+For detailed patterns, see `reference/discovery.md`:
+- **Value discovery**: When filtering on categorical columns (operators, features, types), explore what values exist BEFORE filtering
+- **Table discovery**: Finding the right tables for a concept
+- **Large table handling**: Strategies for billion-row tables
 
 ⚠️ **CRITICAL: Before querying any large fact table, search for pre-aggregated tables first:**
 
@@ -326,41 +347,62 @@ ORDER BY 1, 2
 
 ✅ Optimize queries that run repeatedly (dashboards, pipelines).
 
-## Caching Workflow
+## REQUIRED After Successful Query: Update Cache
 
-The system learns from successful queries to speed up future analysis.
+**⚠️ MANDATORY: After EVERY successful query, call `learn_concept` to cache the mapping.**
 
-### After Successful Query
+This ensures future queries skip discovery entirely.
 
-When a query succeeds, teach the cache:
+### After query succeeds, call:
 
 ```
+learn_concept(
+    concept="<what user asked about>",
+    table="DATABASE.SCHEMA.TABLE",
+    key_column="<primary key or main ID>",
+    date_column="<timestamp column for filtering>"
+)
+```
+
+### Examples:
+
+```
+# After querying HITLOperator usage
+learn_concept("hitl_operator", "HQ.MODEL_ASTRO.TASK_RUNS",
+              key_column="TASK_RUN_ID", date_column="START_TS")
+
+# After querying customer data
 learn_concept("customers", "HQ.MODEL_ASTRO.ORGANIZATIONS",
               key_column="ORG_ID", date_column="CREATED_AT")
 
-learn_concept("task_runs", "HQ.MODEL_ASTRO.TASK_RUNS",
-              key_column="TASK_RUN_ID", date_column="START_TS")
+# After querying deployments
+learn_concept("deployments", "HQ.MODEL_ASTRO.DEPLOYMENTS",
+              key_column="DEPLOYMENT_ID", date_column="CREATED_AT")
 ```
 
-### Cache Tools
+### Cache Tools Available:
 
-| Tool | Purpose |
-|------|---------|
-| `lookup_concept("X")` | Find cached table for concept X |
-| `learn_concept("X", "DB.SCHEMA.TABLE")` | Teach new concept mapping |
-| `get_cached_table("DB.SCHEMA.TABLE")` | Get cached column info |
-| `cache_status()` | Show cache statistics |
-| `clear_cache()` | Clear stale entries |
+| Tool | When to Use |
+|------|-------------|
+| `lookup_concept("X")` | Before discovery - check if we already know the table |
+| `learn_concept(...)` | After successful query - save the mapping |
+| `get_cached_table("DB.SCHEMA.TABLE")` | Get cached column info for a table |
+| `cache_status()` | Debug - see what's cached |
+| `clear_cache()` | Reset if cache is stale |
 
-### Cache Benefits
+### Flow with Cache:
 
-| Query # | Without Cache | With Cache |
-|---------|---------------|------------|
-| 1st "who uses X" | 3-4 tool calls | 3-4 tool calls |
-| 2nd "who uses Y" | 3-4 tool calls | 1-2 tool calls |
-| 10th similar | 3-4 tool calls | 1 tool call |
+```
+1. User asks: "Who uses FeatureX?"
+2. lookup_concept("featurex") → Not found
+3. Read warehouse.md → Find table
+4. run_sql(...) → Success!
+5. learn_concept("featurex", "HQ.MODEL_ASTRO.TASK_RUNS", ...)  ← DO THIS
 
-Cache persists at `~/.astro/ai/cache/` and auto-expires after 7 days.
+Next time user asks about FeatureX:
+1. lookup_concept("featurex") → Found! HQ.MODEL_ASTRO.TASK_RUNS
+2. run_sql(...) → Skip all discovery
+```
 
 ## Next Steps
 

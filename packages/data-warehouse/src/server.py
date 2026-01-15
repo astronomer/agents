@@ -52,32 +52,6 @@ _kernel_manager: KernelManager | None = None
 _warehouse_prelude_executed: dict[str, bool] = {}
 _query_counters: dict[str, int] = {}
 
-# Warehouse schema file locations (checked in order)
-WAREHOUSE_SCHEMA_PATHS = [
-    ".astro/warehouse.md",
-    "warehouse.md",
-]
-
-
-def _check_warehouse_schema_file() -> str | None:
-    """Check if a warehouse schema file exists and return a hint if found.
-
-    Returns:
-        Hint message if warehouse.md exists, None otherwise
-    """
-    import os
-
-    cwd = os.getcwd()
-    for rel_path in WAREHOUSE_SCHEMA_PATHS:
-        full_path = Path(cwd) / rel_path
-        if full_path.exists():
-            return (
-                f"💡 **HINT:** Found `{rel_path}` - read it first for instant table lookups! "
-                f"It has a Quick Reference mapping concepts to tables.\n\n"
-            )
-    return None
-
-
 # Connection error patterns
 CONNECTION_ERROR_PATTERNS = [
     "connection",
@@ -460,9 +434,6 @@ async def list_schemas(
     Returns:
         JSON with schema information, or error message
     """
-    # Check for warehouse.md first
-    hint = _check_warehouse_schema_file()
-
     kernel_manager = get_kernel_manager()
 
     # Set session
@@ -500,8 +471,7 @@ async def list_schemas(
             result.error, result.output, effective_session_id, "List schemas"
         )
 
-    output = result.output if result.output else "(no output)"
-    return f"{hint}{output}" if hint else output
+    return result.output if result.output else "(no output)"
 
 
 @mcp.tool(structured_output=False)
@@ -523,9 +493,6 @@ async def list_tables(
     Returns:
         JSON with table information, or error message
     """
-    # Check for warehouse.md first
-    hint = _check_warehouse_schema_file()
-
     kernel_manager = get_kernel_manager()
 
     if not database:
@@ -556,8 +523,7 @@ async def list_tables(
             result.error, result.output, effective_session_id, "List tables"
         )
 
-    output = result.output if result.output else "(no output)"
-    return f"{hint}{output}" if hint else output
+    return result.output if result.output else "(no output)"
 
 
 @mcp.tool(structured_output=False)
@@ -582,9 +548,6 @@ async def get_tables_info(
     Returns:
         JSON with detailed table information, or error message
     """
-    # Check for warehouse.md first
-    hint = _check_warehouse_schema_file()
-
     kernel_manager = get_kernel_manager()
 
     if not database:
@@ -617,8 +580,7 @@ async def get_tables_info(
             result.error, result.output, effective_session_id, "Get tables info"
         )
 
-    output = result.output if result.output else "(no output)"
-    return f"{hint}{output}" if hint else output
+    return result.output if result.output else "(no output)"
 
 
 # =============================================================================

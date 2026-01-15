@@ -2,6 +2,43 @@
 
 Discover what data exists for a concept or domain. Answer "What data do we have about X?"
 
+## Value Discovery (Explore Before Filtering)
+
+⚠️ **CRITICAL: When filtering on categorical columns (operators, features, types, statuses), ALWAYS explore what values exist BEFORE writing your main query.**
+
+When the user asks about a specific item, it may be part of a family of related items. Run a discovery query first:
+
+```sql
+-- ALWAYS do this first when filtering on categorical columns
+SELECT DISTINCT column_name, COUNT(*) as occurrences
+FROM table
+WHERE column_name ILIKE '%search_term%'
+GROUP BY column_name
+ORDER BY occurrences DESC
+```
+
+**Example - User asks "Who uses FeatureX?"**
+
+```sql
+-- ❌ BAD: Jump straight to exact match (misses related items)
+SELECT * FROM activity WHERE feature = 'FeatureX'
+
+-- ✅ GOOD: First discover what related values exist
+SELECT DISTINCT feature, COUNT(*)
+FROM activity
+WHERE feature ILIKE '%FeatureX%'
+GROUP BY feature
+
+-- Result might show: FeatureX, FeatureXPro, FeatureXLite, FeatureXSensor
+-- Then query for ALL related values
+```
+
+**This pattern applies to:**
+- **Operators/Features**: Often have variants (Entry, Branch, Sensor, Pro, Lite)
+- **Statuses**: May have related states (pending, pending_approval, pending_review)
+- **Types**: Often have subtypes (user, user_admin, user_readonly)
+- **Products**: May have tiers or editions
+
 ## Fast Table Validation
 
 **When you have multiple candidate tables, quickly validate before committing to complex queries.**

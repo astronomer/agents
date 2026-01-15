@@ -81,16 +81,33 @@ For each database in configured_databases:
 
 **Run all subagents in parallel** (single message with multiple Task calls).
 
-### Step 4: Merge Results
+### Step 4: Discover Categorical Value Families
+
+For key categorical columns (like OPERATOR, STATUS, TYPE, FEATURE), discover value families to help with filtering:
+
+```sql
+-- Find distinct values and group into families
+SELECT DISTINCT column_name, COUNT(*) as occurrences
+FROM table
+WHERE column_name IS NOT NULL
+GROUP BY column_name
+ORDER BY occurrences DESC
+LIMIT 50
+```
+
+Group related values into families by common prefix/suffix (e.g., `Export*` for ExportCSV, ExportJSON, ExportParquet).
+
+### Step 5: Merge Results
 
 Combine warehouse metadata + codebase context:
 
 1. **Quick Reference table** - concept → table mappings (pre-populated from code if found)
-2. **Database sections** - one per database
-3. **Schema subsections** - tables grouped by schema
-4. **Table details** - columns, row counts, **descriptions from code**, warnings
+2. **Categorical Columns** - value families for key filter columns
+3. **Database sections** - one per database
+4. **Schema subsections** - tables grouped by schema
+5. **Table details** - columns, row counts, **descriptions from code**, warnings
 
-### Step 5: Generate warehouse.md
+### Step 6: Generate warehouse.md
 
 Write the file to:
 - `.astro/warehouse.md` (default - project-specific, version-controllable)
@@ -109,6 +126,15 @@ Write the file to:
 |---------|-------|------------|-------------|
 | customers | HQ.MODEL_ASTRO.ORGANIZATIONS | ORG_ID | CREATED_AT |
 <!-- Add your concept mappings here -->
+
+## Categorical Columns
+
+When filtering on these columns, explore value families first (values often have variants):
+
+| Table | Column | Value Families |
+|-------|--------|----------------|
+| {TABLE} | {COLUMN} | `{PREFIX}*` ({VALUE1}, {VALUE2}, ...) |
+<!-- Populated by /data:init from actual warehouse data -->
 
 ## Data Layer Hierarchy
 
