@@ -343,7 +343,7 @@ async def kernel_status() -> dict[str, Any]:
 # =============================================================================
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 async def run_sql(
     query: str,
     limit: int = 100,
@@ -413,7 +413,7 @@ async def run_sql(
     return result.output if result.output else "(no output)"
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 async def list_schemas(
     database: str | None = None,
     session_id: str | None = None,
@@ -470,7 +470,7 @@ async def list_schemas(
     return result.output if result.output else "(no output)"
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 async def list_tables(
     database: str,
     schema: str,
@@ -522,7 +522,7 @@ async def list_tables(
     return result.output if result.output else "(no output)"
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 async def get_tables_info(
     database: str,
     schema: str,
