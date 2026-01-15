@@ -153,11 +153,14 @@ agents/
 │   └── data-warehouse/      # Data warehouse MCP server (SQL, schema discovery, Python kernel)
 ├── shared-skills/           # Skills (shared by Claude Code & OpenCode)
 │   ├── init-warehouse/      # /data:init - schema discovery
-│   ├── data-analysis/       # SQL-based analysis
+│   ├── analyzing-data/      # SQL-based analysis
 │   ├── dag-authoring/       # DAG creation
 │   └── ...                  # Other skills
 ├── claude-code-plugin/      # Claude Code plugin config
-└── opencode/                # OpenCode config
+├── opencode/                # OpenCode config
+├── scripts/                 # Testing and development tools
+├── tests/                   # Test fixtures and expected flows
+└── docs/                    # Additional documentation
 ```
 
 ### Adding Skills
@@ -177,6 +180,25 @@ After adding skills, reinstall the plugin:
 ```bash
 claude plugin uninstall data@astronomer && claude plugin install data@astronomer
 ```
+
+### Testing Skills
+
+The repo includes a testing framework for iterating on skills without hitting real warehouses:
+
+```bash
+# Enable dry-run mode with mock responses
+export DRY_RUN_MODE=true
+export MOCK_RESPONSES_FILE=tests/mocks/hitl-mocks.yaml
+
+# Test a query
+claude --plugin-dir ./claude-code-plugin "Find HITL customers"
+```
+
+See [`docs/skill-testing.md`](./docs/skill-testing.md) for the full framework documentation including:
+- DRY_RUN mode for mock responses
+- Flow tracing and comparison
+- Ralph Loop for automated iteration
+- A/B testing configurations
 
 ## License
 

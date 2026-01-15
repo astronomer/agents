@@ -1,0 +1,6 @@
+How many customers do we have?
+Find customers using SnowflakeOperator
+How many customers do we have?
+Count all organizations
+How many task runs happened last week?
+Show me active deployments
