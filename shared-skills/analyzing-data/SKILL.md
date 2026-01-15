@@ -24,7 +24,7 @@ Answer business questions and perform analysis using SQL queries against the dat
 
 If the query is about a **product feature** (operators, integrations, SDKs):
 
-→ See `reference/discovery.md` to choose the right discovery approach (docs vs warehouse).
+→ See `reference/discovery-warehouse.md` for table discovery patterns.
 
 ### Step 1: Check for warehouse.md
 
@@ -94,7 +94,7 @@ WHERE column_name ILIKE '%search_term%'
 GROUP BY 1 ORDER BY 2 DESC
 ```
 
-Items often have variants (e.g., "FeatureX" → FeatureX, FeatureXPro, FeatureXSensor). See `reference/discovery.md` for details.
+Items often have variants (e.g., "FeatureX" → FeatureX, FeatureXPro, FeatureXSensor). See `reference/discovery-warehouse.md` for patterns.
 
 ### Step 2: Identify Data Sources
 
@@ -108,8 +108,8 @@ Items often have variants (e.g., "FeatureX" → FeatureX, FeatureXPro, FeatureXS
 
 2. **Fallback: Query INFORMATION_SCHEMA** when codebase docs are missing
 
-For detailed patterns, see `reference/discovery.md`:
-- **Value discovery**: When filtering on categorical columns (operators, features, types), explore what values exist BEFORE filtering
+For detailed patterns, see `reference/discovery-warehouse.md`:
+- **Value discovery**: When filtering on categorical columns, explore what values exist BEFORE filtering
 - **Table discovery**: Finding the right tables for a concept
 - **Large table handling**: Strategies for billion-row tables
 
