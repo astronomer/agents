@@ -283,6 +283,42 @@ When `--refresh` is specified:
 5. Update row counts and add new tables
 6. Mark removed tables with `<!-- REMOVED -->` comment
 
+## Cache Staleness & Schema Drift
+
+The runtime cache has a **7-day TTL** by default. After 7 days, cached entries expire and will be re-discovered on next use.
+
+### When to Refresh
+
+Run `/data:init --refresh` when:
+- **Schema changes**: Tables added, renamed, or removed
+- **Column changes**: New columns added or types changed
+- **After deployments**: If your data pipeline deploys schema migrations
+- **Weekly**: As a good practice, even if no known changes
+
+### Signs of Stale Cache
+
+Watch for these indicators:
+- Queries fail with "table not found" errors
+- Results seem wrong or outdated
+- New tables aren't being discovered
+
+### Manual Cache Reset
+
+If you suspect cache issues:
+
+```
+# Check cache status
+cache_status()
+
+# Clear stale entries (older than 7 days)
+clear_cache(cache_type="all", purge_stale_only=True)
+
+# Full reset
+clear_cache(cache_type="all")
+```
+
+Then run `/data:init --refresh` to repopulate.
+
 ## Codebase Patterns Recognized
 
 | Pattern | Source | What We Extract |

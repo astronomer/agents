@@ -32,47 +32,16 @@ Answer business questions and perform analysis using SQL queries against the dat
 
 ## REQUIRED First Steps
 
-### Step 0: Is this a Product-Specific Query?
+### Step 1: Check CLAUDE.md Quick Reference
 
-If the query is about a **product feature** (operators, integrations, SDKs):
+**Look in CLAUDE.md for the "Data Warehouse Quick Reference" section.** This contains concept → table mappings that are always in context.
 
-→ See `reference/discovery-warehouse.md` for table discovery patterns.
+If your concept is in the Quick Reference → go directly to `run_sql`.
 
-### Step 1: Check for warehouse.md
+### Step 2: Check Runtime Cache
 
-**⚠️ MANDATORY: Before calling ANY MCP discovery tools (list_schemas, list_tables, get_tables_info), check for warehouse.md first.**
+If not in CLAUDE.md Quick Reference, check the cache:
 
-Use the Glob tool to check for these files:
-- `.astro/warehouse.md` (project-specific)
-- `~/.astro/ai/config/warehouse.md` (global)
-
-### Step 2: If warehouse.md EXISTS
-
-1. **Read the file** using the Read tool
-2. **Find your table** in the "Quick Reference" section at the top
-3. **Go directly to run_sql** - skip all discovery tools
-4. **Note any warnings** about large tables needing date filters
-
-Example flow:
-```
-Glob(".astro/warehouse.md") → Found!
-Read(".astro/warehouse.md") → See Quick Reference table
-Find "task_runs" → HQ.MODEL_ASTRO.TASK_RUNS, date_column: START_TS
-run_sql("SELECT ... FROM HQ.MODEL_ASTRO.TASK_RUNS WHERE START_TS >= ...")
-```
-
-**DO NOT call list_schemas/list_tables/get_tables_info if warehouse.md exists.**
-
-### Step 3: If warehouse.md does NOT exist
-
-Tell the user:
-
-> I don't see a warehouse schema file. For 3.5x faster queries, run `/data:init` first.
-> I can still help, but discovery will be slower.
-
-Then proceed with discovery in this order:
-
-**3a. Check runtime cache FIRST:**
 ```
 lookup_concept("customers")     # For customer queries
 lookup_concept("task_runs")     # For operator/task queries
@@ -81,10 +50,23 @@ lookup_concept("deployments")   # For deployment queries
 
 If `lookup_concept` returns a table → go directly to `run_sql`, skip all discovery.
 
-**3b. If cache miss, do full discovery:**
+### Step 3: Only if NOT in Quick Reference AND NOT in Cache
+
+**Tell the user:**
+
+> This concept isn't in my Quick Reference. For faster queries, run `/data:init` to set up schema discovery.
+> I'll search for the table now.
+
+**Then proceed with discovery:**
 1. Search codebase for SQL models (`**/models/**/*.sql`)
 2. Query INFORMATION_SCHEMA as fallback
 3. After successful query, ALWAYS call `learn_concept` to cache for next time
+
+### Product-Specific Queries
+
+If the query is about a **product feature** (operators, integrations, SDKs):
+
+→ See `reference/discovery-warehouse.md` for value discovery patterns (finding variants like `FeatureX`, `FeatureXPro`, etc.)
 
 ## Query Efficiency Guidelines
 
@@ -436,10 +418,11 @@ learn_concept("deployments", "HQ.MODEL_ASTRO.DEPLOYMENTS",
 
 ```
 1. User asks: "Who uses FeatureX?"
-2. lookup_concept("featurex") → Not found
-3. Read warehouse.md → Find table
-4. run_sql(...) → Success!
-5. learn_concept("featurex", "HQ.MODEL_ASTRO.TASK_RUNS", ...)  ← DO THIS
+2. Check CLAUDE.md Quick Reference → Not listed
+3. lookup_concept("featurex") → Not found
+4. Discovery: search codebase or INFORMATION_SCHEMA → Find table
+5. run_sql(...) → Success!
+6. learn_concept("featurex", "HQ.MODEL_ASTRO.TASK_RUNS", ...)  ← DO THIS
 
 Next time user asks about FeatureX:
 1. lookup_concept("featurex") → Found! HQ.MODEL_ASTRO.TASK_RUNS
