@@ -1,11 +1,23 @@
 ---
-name: data-analysis
-description: Perform data analysis using SQL queries. Use when the user wants to analyze data, answer business questions, create metrics, compare datasets, or investigate trends. Guides query construction and result interpretation.
+name: analyzing-data
+description: Queries data warehouse and answers questions about data. Use when the user asks ANY question requiring database/warehouse queries - including "who uses X", "how many Y", "show me Z", "find customers", "what is the count", data lookups, metrics, trends, or SQL. CRITICAL - when filtering on categorical columns (operators, features, types), always explore what values exist first to find related variants. Always invoke this skill before calling warehouse MCP tools directly.
 ---
 
 # Data Analysis
 
 Answer business questions and perform analysis using SQL queries against the data warehouse.
+
+## Quick Start (Read This First!)
+
+**For most queries, follow this 3-step flow:**
+
+1. **Check CLAUDE.md Quick Reference** → Find the table for your concept
+2. **Run `lookup_concept`** → Verify cache has the mapping
+3. **Execute `run_sql`** → Query the table directly
+
+**Skip discovery tools** (`list_schemas`, `list_tables`, `get_tables_info`) unless the concept isn't in Quick Reference.
+
+---
 
 ## Core Principle: Query Optimization
 
@@ -17,6 +29,68 @@ Answer business questions and perform analysis using SQL queries against the dat
 - Select only the columns you need, never SELECT *
 - Use LIMIT during exploration, remove for final analysis
 - Aggregate at the appropriate grain - don't over-fetch then reduce
+
+## REQUIRED First Steps
+
+### Step 1: Check CLAUDE.md Quick Reference
+
+**Look in CLAUDE.md for the "Data Warehouse Quick Reference" section.** This contains concept → table mappings that are always in context.
+
+If your concept is in the Quick Reference → go directly to `run_sql`.
+
+### Step 2: Check Runtime Cache
+
+If not in CLAUDE.md Quick Reference, check the cache:
+
+```
+lookup_concept("customers")     # For customer queries
+lookup_concept("task_runs")     # For operator/task queries
+lookup_concept("deployments")   # For deployment queries
+```
+
+If `lookup_concept` returns a table → go directly to `run_sql`, skip all discovery.
+
+### Step 3: Only if NOT in Quick Reference AND NOT in Cache
+
+**Tell the user:**
+
+> This concept isn't in my Quick Reference. For faster queries, run `/data:init` to set up schema discovery.
+> I'll search for the table now.
+
+**Then proceed with discovery:**
+1. Search codebase for SQL models (`**/models/**/*.sql`)
+2. Query INFORMATION_SCHEMA as fallback
+3. After successful query, ALWAYS call `learn_concept` to cache for next time
+
+### Product-Specific Queries
+
+If the query is about a **product feature** (operators, integrations, SDKs):
+
+→ See `reference/discovery-warehouse.md` for value discovery patterns (finding variants like `FeatureX`, `FeatureXPro`, etc.)
+
+## Query Efficiency Guidelines
+
+**Optimize tool usage based on query type:**
+
+### Simple Queries (prefer direct SQL)
+
+For these patterns, go straight to `run_sql` after checking Quick Reference:
+- "How many X?" → Single COUNT query
+- "List X" / "Show me X" → Single SELECT with LIMIT
+- "Who uses X?" → Single filter query
+
+**Don't waste time on discovery for simple queries.** Check CLAUDE.md Quick Reference or `lookup_concept` first, then run SQL.
+
+### Complex Queries (use incremental approach)
+
+For multi-entity or analytical queries:
+1. Start with the **primary entity** from Quick Reference
+2. Build incrementally with focused queries
+3. Only use discovery (`list_tables`, `get_tables_info`) if Quick Reference doesn't have the table
+
+**Avoid over-exploration.** If you've made 3+ discovery calls without finding what you need, step back and reassess.
+
+---
 
 ## Analysis Process
 
@@ -30,9 +104,32 @@ Before writing any SQL, ensure you understand:
 
 If unclear, ask clarifying questions before proceeding.
 
+⚠️ **CRITICAL - Value Discovery**: When filtering on categorical columns (operators, features, types, statuses), ALWAYS run a discovery query FIRST to find related values:
+
+```sql
+SELECT DISTINCT column_name, COUNT(*) FROM table
+WHERE column_name ILIKE '%search_term%'
+GROUP BY 1 ORDER BY 2 DESC
+```
+
+Items often have variants (e.g., "FeatureX" → FeatureX, FeatureXPro, FeatureXSensor). See `reference/discovery-warehouse.md` for patterns.
+
 ### Step 2: Identify Data Sources
 
-Use `explore` skill to find relevant tables.
+**Search codebase FIRST, then query warehouse.**
+
+1. **Primary: Search codebase** (saves warehouse queries, provides business context):
+   - `**/models/**/*.sql` - dbt SQL models with column definitions
+   - `**/dags/**/*.sql` - Airflow SQL files with schema docs
+   - `**/schema.yml` - dbt schema with descriptions
+   - Look for column comments, YAML frontmatter, data quality rules
+
+2. **Fallback: Query INFORMATION_SCHEMA** when codebase docs are missing
+
+For detailed patterns, see `reference/discovery-warehouse.md`:
+- **Value discovery**: When filtering on categorical columns, explore what values exist BEFORE filtering
+- **Table discovery**: Finding the right tables for a concept
+- **Large table handling**: Strategies for billion-row tables
 
 ⚠️ **CRITICAL: Before querying any large fact table, search for pre-aggregated tables first:**
 
@@ -273,6 +370,64 @@ ORDER BY 1, 2
 ❌ Don't spend time optimizing a query that runs once for ad-hoc analysis.
 
 ✅ Optimize queries that run repeatedly (dashboards, pipelines).
+
+## REQUIRED After Successful Query: Update Cache
+
+**⚠️ MANDATORY: After EVERY successful query, call `learn_concept` to cache the mapping.**
+
+This ensures future queries skip discovery entirely.
+
+### After query succeeds, call:
+
+```
+learn_concept(
+    concept="<what user asked about>",
+    table="DATABASE.SCHEMA.TABLE",
+    key_column="<primary key or main ID>",
+    date_column="<timestamp column for filtering>"
+)
+```
+
+### Examples:
+
+```
+# After querying HITLOperator usage
+learn_concept("hitl_operator", "HQ.MODEL_ASTRO.TASK_RUNS",
+              key_column="TASK_RUN_ID", date_column="START_TS")
+
+# After querying customer data
+learn_concept("customers", "HQ.MODEL_ASTRO.ORGANIZATIONS",
+              key_column="ORG_ID", date_column="CREATED_AT")
+
+# After querying deployments
+learn_concept("deployments", "HQ.MODEL_ASTRO.DEPLOYMENTS",
+              key_column="DEPLOYMENT_ID", date_column="CREATED_AT")
+```
+
+### Cache Tools Available:
+
+| Tool | When to Use |
+|------|-------------|
+| `lookup_concept("X")` | Before discovery - check if we already know the table |
+| `learn_concept(...)` | After successful query - save the mapping |
+| `get_cached_table("DB.SCHEMA.TABLE")` | Get cached column info for a table |
+| `cache_status()` | Debug - see what's cached |
+| `clear_cache()` | Reset if cache is stale |
+
+### Flow with Cache:
+
+```
+1. User asks: "Who uses FeatureX?"
+2. Check CLAUDE.md Quick Reference → Not listed
+3. lookup_concept("featurex") → Not found
+4. Discovery: search codebase or INFORMATION_SCHEMA → Find table
+5. run_sql(...) → Success!
+6. learn_concept("featurex", "HQ.MODEL_ASTRO.TASK_RUNS", ...)  ← DO THIS
+
+Next time user asks about FeatureX:
+1. lookup_concept("featurex") → Found! HQ.MODEL_ASTRO.TASK_RUNS
+2. run_sql(...) → Skip all discovery
+```
 
 ## Next Steps
 

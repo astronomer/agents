@@ -4,9 +4,9 @@
       "command": "uvx",
       "args": ["astro-airflow-mcp@0.2.2", "--transport", "stdio", "--airflow-project-dir", "${PWD}"]
     },
-    "jupyter": {
+    "warehouse": {
       "command": "uvx",
-      "args": ["data-jupyter"]
+      "args": ["data-warehouse"]
     }
   }
 }

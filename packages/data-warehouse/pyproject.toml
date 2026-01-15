@@ -1,7 +1,7 @@
 [project]
-name = "data-jupyter"
+name = "data-warehouse"
 version = "0.1.0"
-description = "Jupyter kernel MCP server for Python code execution"
+description = "MCP server for data warehouse operations (SQL, schema exploration)"
 requires-python = ">=3.11"
 dependencies = [
     "mcp>=1.0.0",
@@ -19,7 +19,7 @@ dev = [
 ]
 
 [project.scripts]
-data-jupyter = "src.server:main"
+data-warehouse = "src.server:main"
 
 [build-system]
 requires = ["hatchling"]

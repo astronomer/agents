@@ -51,3 +51,6 @@ Thumbs.db
 
 # Local development
 *.log
+
+# Generated schema files (project-specific)
+.astro/

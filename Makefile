@@ -1,7 +1,7 @@
 .PHONY: help install install-dev install-all sync lint format check test run build clean
 
 # Directory containing the Python project
-JUPYTER_DIR := packages/data-jupyter
+WAREHOUSE_DIR := packages/data-warehouse
 
 # Default target
 help:  ## Show this help message
@@ -26,45 +26,45 @@ help:  ## Show this help message
 
 # Installation targets
 install:  ## [quick] Install core dependencies and local MCP server
-	cd $(JUPYTER_DIR) && uv sync
-	uv tool install --force $(JUPYTER_DIR)
+	cd $(WAREHOUSE_DIR) && uv sync
+	uv tool install --force $(WAREHOUSE_DIR)
 
 install-dev:  ## [dev] Install with dev dependencies
-	cd $(JUPYTER_DIR) && uv sync --extra dev
+	cd $(WAREHOUSE_DIR) && uv sync --extra dev
 
 install-all:  ## [dev] Install with all optional dependencies
-	cd $(JUPYTER_DIR) && uv sync --all-extras
+	cd $(WAREHOUSE_DIR) && uv sync --all-extras
 
 sync:  ## [dev] Sync dependencies from lockfile
-	cd $(JUPYTER_DIR) && uv sync --frozen
+	cd $(WAREHOUSE_DIR) && uv sync --frozen
 
 # Development targets
 lint:  ## [test] Run ruff linter
-	cd $(JUPYTER_DIR) && uv run ruff check src/
+	cd $(WAREHOUSE_DIR) && uv run ruff check src/
 
 format:  ## [dev] Format code with ruff
-	cd $(JUPYTER_DIR) && uv run ruff format src/
-	cd $(JUPYTER_DIR) && uv run ruff check --fix src/
+	cd $(WAREHOUSE_DIR) && uv run ruff format src/
+	cd $(WAREHOUSE_DIR) && uv run ruff check --fix src/
 
 check:  ## [test] Run linter and format check
-	cd $(JUPYTER_DIR) && uv run ruff check src/
-	cd $(JUPYTER_DIR) && uv run ruff format --check src/
+	cd $(WAREHOUSE_DIR) && uv run ruff check src/
+	cd $(WAREHOUSE_DIR) && uv run ruff format --check src/
 
 test:  ## [test] Run tests with pytest
-	cd $(JUPYTER_DIR) && uv run pytest
+	cd $(WAREHOUSE_DIR) && uv run pytest
 
 # Run target
-run:  ## [quick] Run the Jupyter MCP server
-	cd $(JUPYTER_DIR) && uv run data-jupyter
+run:  ## [quick] Run the data warehouse MCP server
+	cd $(WAREHOUSE_DIR) && uv run data-warehouse
 
 # Build targets
 build:  ## [build] Build the package
-	cd $(JUPYTER_DIR) && uv build
+	cd $(WAREHOUSE_DIR) && uv build
 
 clean:  ## [util] Remove build artifacts
-	rm -rf $(JUPYTER_DIR)/dist/
-	rm -rf $(JUPYTER_DIR)/build/
-	rm -rf $(JUPYTER_DIR)/.pytest_cache/
-	rm -rf $(JUPYTER_DIR)/.ruff_cache/
-	find $(JUPYTER_DIR) -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-	find $(JUPYTER_DIR) -type f -name "*.pyc" -delete 2>/dev/null || true
+	rm -rf $(WAREHOUSE_DIR)/dist/
+	rm -rf $(WAREHOUSE_DIR)/build/
+	rm -rf $(WAREHOUSE_DIR)/.pytest_cache/
+	rm -rf $(WAREHOUSE_DIR)/.ruff_cache/
+	find $(WAREHOUSE_DIR) -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	find $(WAREHOUSE_DIR) -type f -name "*.pyc" -delete 2>/dev/null || true

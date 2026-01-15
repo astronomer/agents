@@ -1,13 +1,13 @@
-"""FastMCP server for Jupyter kernel code execution.
+"""FastMCP server for data warehouse operations.
 
 This server exposes tools for Python code execution, package installation,
 kernel lifecycle management, and SQL database operations via the Model Context Protocol (MCP).
 
 Usage:
-    python -m data_jupyter.server
+    python -m src.server
 
 Or via the installed script:
-    data-jupyter
+    data-warehouse
 """
 
 import logging
@@ -16,6 +16,10 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
+from .cache import (
+    get_schema_cache,
+    get_template_cache,
+)
 from .config import get_session_data_dir
 from .kernel import KernelManager
 from .scripts import (
@@ -191,7 +195,7 @@ def _write_sql_file(query: str, query_num: int, session_data_dir: Path) -> Path:
 
 
 # Create the FastMCP server
-mcp = FastMCP("data-jupyter")
+mcp = FastMCP("data-warehouse")
 
 
 @mcp.tool()
@@ -579,8 +583,185 @@ async def get_tables_info(
     return result.output if result.output else "(no output)"
 
 
+# =============================================================================
+# Cache Management Tools
+# =============================================================================
+
+
+@mcp.tool()
+async def cache_status() -> dict[str, Any]:
+    """Get schema cache statistics and health.
+
+    Shows how many concepts, tables, and query templates are cached,
+    plus counts of stale entries that may need refresh.
+
+    Returns:
+        Dictionary with cache statistics
+    """
+    schema_cache = get_schema_cache()
+    template_cache = get_template_cache()
+
+    return {
+        "schema_cache": schema_cache.get_stats(),
+        "template_cache": template_cache.get_stats(),
+    }
+
+
+@mcp.tool()
+async def clear_cache(
+    cache_type: str = "all",
+    purge_stale_only: bool = False,
+) -> str:
+    """Clear the schema and query template cache.
+
+    Use this when schema has changed or cache is causing issues.
+
+    Args:
+        cache_type: What to clear: "all", "schemas", "concepts", or "templates"
+        purge_stale_only: If true, only remove entries older than TTL (7 days)
+
+    Returns:
+        Summary of what was cleared
+    """
+    schema_cache = get_schema_cache()
+    template_cache = get_template_cache()
+    results = []
+
+    if purge_stale_only:
+        if cache_type in ("all", "schemas", "concepts"):
+            purged = schema_cache.purge_stale()
+            results.append(
+                f"Purged {purged['tables_purged']} stale tables, "
+                f"{purged['concepts_purged']} stale concepts"
+            )
+        return "; ".join(results) if results else "No stale entries found"
+
+    if cache_type == "all":
+        schema_cache.clear_all()
+        template_cache.clear_all()
+        return "Cleared all caches (schemas, concepts, templates)"
+    elif cache_type == "schemas":
+        schema_cache._tables = {}
+        schema_cache.save()
+        return "Cleared table schema cache"
+    elif cache_type == "concepts":
+        schema_cache._concepts = {}
+        schema_cache.save()
+        return "Cleared concept cache"
+    elif cache_type == "templates":
+        template_cache.clear_all()
+        return "Cleared query template cache"
+    else:
+        return f"Unknown cache_type: {cache_type}. Use: all, schemas, concepts, templates"
+
+
+@mcp.tool()
+async def lookup_concept(concept: str) -> dict[str, Any]:
+    """Look up a business concept in the cache.
+
+    Use this to quickly find which table contains data for a concept
+    like "customers", "orders", "task_runs", etc.
+
+    Args:
+        concept: Business concept to look up (e.g., "customers", "deployments")
+
+    Returns:
+        Cached table mapping if found, or suggestions
+    """
+    schema_cache = get_schema_cache()
+    result = schema_cache.get_concept(concept)
+
+    if result:
+        return {
+            "found": True,
+            "concept": concept,
+            "table": result.get("table"),
+            "key_column": result.get("key_column"),
+            "date_column": result.get("date_column"),
+            "learned_at": result.get("learned_at"),
+        }
+
+    # Suggest similar concepts
+    all_concepts = list(schema_cache.concepts.keys())
+    similar = [c for c in all_concepts if concept.lower() in c or c in concept.lower()]
+
+    return {
+        "found": False,
+        "concept": concept,
+        "similar_concepts": similar[:5],
+        "hint": "Use learn_concept to teach this mapping after a successful query",
+    }
+
+
+@mcp.tool()
+async def learn_concept(
+    concept: str,
+    table: str,
+    key_column: str | None = None,
+    date_column: str | None = None,
+) -> str:
+    """Teach the cache a new concept → table mapping.
+
+    After successfully querying data, use this to remember which table
+    contains data for a business concept. Future queries can skip discovery.
+
+    Args:
+        concept: Business concept name (e.g., "customers", "task_runs")
+        table: Full table name (DATABASE.SCHEMA.TABLE)
+        key_column: Primary key or main identifier column
+        date_column: Main timestamp column for filtering
+
+    Returns:
+        Confirmation message
+    """
+    schema_cache = get_schema_cache()
+
+    # Validate table name format
+    parts = table.split(".")
+    if len(parts) != 3:
+        return f"Error: table must be fully qualified (DATABASE.SCHEMA.TABLE), got: {table}"
+
+    schema_cache.set_concept(concept, table, key_column, date_column)
+
+    return f"Learned: '{concept}' → {table}"
+
+
+@mcp.tool()
+async def get_cached_table(table: str) -> dict[str, Any]:
+    """Get cached schema information for a table.
+
+    Returns column names, types, and descriptions if the table
+    has been queried before and cached.
+
+    Args:
+        table: Full table name (DATABASE.SCHEMA.TABLE)
+
+    Returns:
+        Cached table info or not-found message
+    """
+    schema_cache = get_schema_cache()
+    cached = schema_cache.get_table(table)
+
+    if cached:
+        return {
+            "found": True,
+            "table": cached.full_name,
+            "columns": cached.columns,
+            "row_count": cached.row_count,
+            "comment": cached.comment,
+            "cached_at": cached.cached_at,
+            "is_stale": cached.is_stale(),
+        }
+
+    return {
+        "found": False,
+        "table": table,
+        "hint": "Use get_tables_info to fetch and cache this table's schema",
+    }
+
+
 def main() -> None:
-    """Entry point for the Jupyter kernel MCP server."""
+    """Entry point for the data warehouse MCP server."""
     mcp.run()
 
 
