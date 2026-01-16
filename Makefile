@@ -1,4 +1,4 @@
-.PHONY: help install install-dev install-all sync lint format check test run build clean
+.PHONY: help install reinstall install-dev install-all sync lint format check test run build clean
 
 # Directory containing the Python project
 WAREHOUSE_DIR := packages/data-warehouse
@@ -27,6 +27,9 @@ help:  ## Show this help message
 # Installation targets
 install:  ## [quick] Install core dependencies and local MCP server
 	cd $(WAREHOUSE_DIR) && uv sync
+	uv tool install --force $(WAREHOUSE_DIR)
+
+reinstall:  ## [quick] Reinstall MCP server (after code changes)
 	uv tool install --force $(WAREHOUSE_DIR)
 
 install-dev:  ## [dev] Install with dev dependencies
