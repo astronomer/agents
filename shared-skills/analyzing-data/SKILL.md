@@ -1,21 +1,68 @@
 ---
 name: analyzing-data
-description: Queries data warehouse and answers questions about data. Use when the user asks ANY question requiring database/warehouse queries - including "who uses X", "how many Y", "show me Z", "find customers", "what is the count", data lookups, metrics, trends, or SQL. CRITICAL - when filtering on categorical columns (operators, features, types), always explore what values exist first to find related variants. Always invoke this skill before calling warehouse MCP tools directly.
+description: Queries data warehouse and answers business questions about data. Handles questions requiring database/warehouse queries including "who uses X", "how many Y", "show me Z", "find customers", "what is the count", data lookups, metrics, trends, or SQL analysis.
 ---
 
 # Data Analysis
 
 Answer business questions and perform analysis using SQL queries against the data warehouse.
 
-## Quick Start (Read This First!)
+## ⚠️ MANDATORY FIRST STEP - DO THIS BEFORE ANYTHING ELSE
 
-**For most queries, follow this 3-step flow:**
+**STOP. Before calling ANY other tool, you MUST call `lookup_pattern` first:**
 
-1. **Check CLAUDE.md Quick Reference** → Find the table for your concept
-2. **Run `lookup_concept`** → Verify cache has the mapping
-3. **Execute `run_sql`** → Query the table directly
+```
+lookup_pattern("<user's question here>")
+```
 
-**Skip discovery tools** (`list_schemas`, `list_tables`, `get_tables_info`) unless the concept isn't in Quick Reference.
+This is NON-NEGOTIABLE. Do not call `lookup_concept`, `list_schemas`, `list_tables`, or `run_sql` until you have checked for patterns.
+
+**Why?** Patterns contain proven strategies that save 5-10 tool calls and avoid timeouts. Skipping this wastes time and may lead to failed queries.
+
+---
+
+## Quick Start Flow (After Pattern Check)
+
+1. ✅ **`lookup_pattern`** → ALREADY DONE (mandatory first step above)
+2. **If pattern found** → Follow its strategy, skip to `run_sql`
+3. **If no pattern** → Check `lookup_concept` for table mapping
+4. **If no concept** → Then use discovery tools (`list_schemas`, etc.)
+
+---
+
+## What To Do With Pattern Results
+
+**If `lookup_pattern` returns `found: true`:**
+
+1. **Read the strategy** - follow it step by step
+2. **Use tables_used** - these are the right tables, skip discovery
+3. **Avoid the gotchas** - these are known failure modes
+4. **Adapt example_query** - replace the placeholder with user's value
+5. **Go directly to `run_sql`** - skip all discovery tools
+
+**If `lookup_pattern` returns `found: false`:**
+
+Proceed with normal discovery flow (lookup_concept → list_schemas → etc.)
+
+---
+
+## Example: Pattern-Accelerated Query
+
+```
+User: "Who uses S3Operator?"
+
+Step 1: lookup_pattern("who uses S3Operator")
+        → Found! Pattern "operator_usage"
+
+Step 2: Read strategy:
+        - Use TASK_RUNS table (not DEPLOYMENT_OPERATOR_LOG)
+        - ILIKE '%S3%' for variants
+        - Add 90-day date filter
+
+Step 3: Adapt example_query, replacing HITL with S3
+
+Step 4: run_sql(...) → Done in 2 tool calls instead of 8!
+```
 
 ---
 
@@ -285,74 +332,7 @@ Provide the final SQL query so it can be rerun or modified.
 
 ## Common Analysis Patterns
 
-### Trend Over Time
-```sql
-SELECT
-    DATE_TRUNC('week', event_date) as week,
-    COUNT(*) as events,
-    COUNT(DISTINCT user_id) as unique_users
-FROM events
-WHERE event_date >= DATEADD(month, -3, CURRENT_DATE)
-GROUP BY 1
-ORDER BY 1
-```
-
-### Comparison (Period over Period)
-```sql
-SELECT
-    CASE
-        WHEN date_col >= DATEADD(day, -7, CURRENT_DATE) THEN 'This Week'
-        ELSE 'Last Week'
-    END as period,
-    SUM(amount) as total,
-    COUNT(DISTINCT customer_id) as customers
-FROM orders
-WHERE date_col >= DATEADD(day, -14, CURRENT_DATE)
-GROUP BY 1
-```
-
-### Top N Analysis
-```sql
-SELECT
-    customer_name,
-    SUM(revenue) as total_revenue,
-    COUNT(*) as order_count
-FROM orders
-JOIN customers USING (customer_id)
-WHERE order_date >= '2024-01-01'
-GROUP BY customer_name
-ORDER BY total_revenue DESC
-LIMIT 10
-```
-
-### Distribution / Histogram
-```sql
-SELECT
-    FLOOR(amount / 100) * 100 as bucket,
-    COUNT(*) as frequency
-FROM orders
-GROUP BY 1
-ORDER BY 1
-```
-
-### Cohort Analysis
-```sql
-WITH first_purchase AS (
-    SELECT
-        customer_id,
-        DATE_TRUNC('month', MIN(order_date)) as cohort_month
-    FROM orders
-    GROUP BY customer_id
-)
-SELECT
-    fp.cohort_month,
-    DATE_TRUNC('month', o.order_date) as activity_month,
-    COUNT(DISTINCT o.customer_id) as active_customers
-FROM orders o
-JOIN first_purchase fp USING (customer_id)
-GROUP BY 1, 2
-ORDER BY 1, 2
-```
+For SQL templates (trends, comparisons, Top N, distributions, cohorts), see [reference/common-patterns.md](reference/common-patterns.md).
 
 ## Anti-Patterns to Avoid
 
@@ -373,11 +353,9 @@ ORDER BY 1, 2
 
 ## REQUIRED After Successful Query: Update Cache
 
-**⚠️ MANDATORY: After EVERY successful query, call `learn_concept` to cache the mapping.**
+**⚠️ MANDATORY: After EVERY successful query, do TWO things:**
 
-This ensures future queries skip discovery entirely.
-
-### After query succeeds, call:
+### 1. Cache the Concept (always)
 
 ```
 learn_concept(
@@ -387,6 +365,36 @@ learn_concept(
     date_column="<timestamp column for filtering>"
 )
 ```
+
+### 2. Offer to Save Pattern (if non-trivial query)
+
+**For queries that required discovery, multiple steps, or had gotchas:**
+
+Ask the user: "Save this query pattern for future similar questions?"
+
+If user confirms, call:
+
+```
+learn_pattern(
+    pattern_name="<descriptive_name>",
+    question_types=["<type 1>", "<type 2>"],  # How users might ask this
+    strategy=["Step 1...", "Step 2..."],       # What worked
+    tables_used=["TABLE1", "TABLE2"],          # Tables involved
+    gotchas=["Gotcha 1...", "Gotcha 2..."],   # What to avoid
+    example_query="<working SQL>"              # Optional
+)
+```
+
+**When to offer pattern saving:**
+- Query required 3+ steps or tool calls
+- You discovered something non-obvious (e.g., use TASK_RUNS not DEPLOYMENT_OPERATOR_LOG)
+- Initial approach failed/timed out and you found a better way
+- Query involved a large table with specific filtering strategies
+
+**When NOT to save a pattern:**
+- Simple single-table query
+- Question is very specific/one-off
+- Just used an existing pattern
 
 ### Examples:
 
@@ -408,25 +416,37 @@ learn_concept("deployments", "HQ.MODEL_ASTRO.DEPLOYMENTS",
 
 | Tool | When to Use |
 |------|-------------|
-| `lookup_concept("X")` | Before discovery - check if we already know the table |
-| `learn_concept(...)` | After successful query - save the mapping |
+| `lookup_pattern("question")` | **FIRST** - check for proven strategy for this question type |
+| `learn_pattern(...)` | After non-trivial query - save strategy (with user confirmation) |
+| `lookup_concept("X")` | Check if we know which table has concept X |
+| `learn_concept(...)` | After successful query - save concept → table mapping |
 | `get_cached_table("DB.SCHEMA.TABLE")` | Get cached column info for a table |
+| `list_patterns()` | See all saved patterns |
+| `record_pattern_outcome(name, success)` | Track if pattern helped or failed |
 | `cache_status()` | Debug - see what's cached |
 | `clear_cache()` | Reset if cache is stale |
 
-### Flow with Cache:
+### Flow with Patterns + Cache:
 
 ```
-1. User asks: "Who uses FeatureX?"
-2. Check CLAUDE.md Quick Reference → Not listed
-3. lookup_concept("featurex") → Not found
-4. Discovery: search codebase or INFORMATION_SCHEMA → Find table
-5. run_sql(...) → Success!
-6. learn_concept("featurex", "HQ.MODEL_ASTRO.TASK_RUNS", ...)  ← DO THIS
+1. User asks: "Who uses S3Operator?"
+2. lookup_pattern("who uses S3Operator") → Found! "operator_usage" pattern
+3. Follow pattern strategy:
+   - Use TASK_RUNS (not DEPLOYMENT_OPERATOR_LOG)
+   - ILIKE '%S3%' for variants
+   - Add 90-day date filter
+4. run_sql(...) → Success!
+5. record_pattern_outcome("operator_usage", success=True)
 
-Next time user asks about FeatureX:
-1. lookup_concept("featurex") → Found! HQ.MODEL_ASTRO.TASK_RUNS
-2. run_sql(...) → Skip all discovery
+Without pattern (first time):
+1. User asks: "Who uses FeatureX?"
+2. lookup_pattern(...) → Not found
+3. lookup_concept("featurex") → Not found
+4. Discovery: search tables → Find TASK_RUNS
+5. run_sql(...) → Times out! Try with date filter → Success!
+6. learn_concept("featurex", "HQ.MODEL_ASTRO.TASK_RUNS", ...)
+7. Ask user: "Save this pattern for future 'who uses X' questions?"
+8. If yes → learn_pattern("operator_usage", ...)
 ```
 
 ## Next Steps
