@@ -17,6 +17,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 from .cache import (
+    get_pattern_cache,
     get_schema_cache,
     get_template_cache,
 )
@@ -781,6 +782,170 @@ async def get_cached_table(table: str) -> dict[str, Any]:
         "table": table,
         "hint": "Use get_tables_info to fetch and cache this table's schema",
     }
+
+
+@mcp.tool()
+async def lookup_pattern(question: str) -> dict[str, Any]:
+    """CALL THIS FIRST before any data query. Finds proven strategies for question types.
+
+    Returns cached patterns with step-by-step strategies, tables to use, and gotchas
+    to avoid. If a pattern matches, follow its strategy instead of running discovery.
+
+    Example: "who uses HITLOperator" → returns operator_usage pattern with proven
+    approach that avoids timeouts and finds all operator variants.
+
+    Args:
+        question: The user's question (e.g., "who uses S3Operator", "customer count")
+
+    Returns:
+        Matching patterns with strategies, or hint to proceed with normal discovery
+    """
+    pattern_cache = get_pattern_cache()
+    matches = pattern_cache.lookup_by_question(question)
+
+    if matches:
+        return {
+            "found": True,
+            "question": question,
+            "patterns": [
+                {
+                    "name": p.pattern_name,
+                    "question_types": p.question_types,
+                    "strategy": p.strategy,
+                    "tables_used": p.tables_used,
+                    "gotchas": p.gotchas,
+                    "example_query": p.example_query,
+                    "success_count": p.success_count,
+                }
+                for p in matches
+            ],
+        }
+
+    return {
+        "found": False,
+        "question": question,
+        "hint": "No matching patterns. Use learn_pattern after a successful query.",
+    }
+
+
+@mcp.tool()
+async def learn_pattern(
+    pattern_name: str,
+    question_types: list[str],
+    strategy: list[str],
+    tables_used: list[str],
+    gotchas: list[str],
+    example_query: str | None = None,
+    ttl_days: int = 90,
+) -> str:
+    """Save a query pattern for future use.
+
+    After successfully answering a question, use this to remember the approach.
+    Future similar questions can use this pattern to skip discovery.
+
+    Args:
+        pattern_name: Unique name (e.g., "operator_usage", "customer_metrics")
+        question_types: Types of questions this pattern answers
+                       (e.g., ["who uses X", "which customers use X"])
+        strategy: Step-by-step approach that worked (list of steps)
+        tables_used: Tables involved (e.g., ["HQ.MODEL_ASTRO.TASK_RUNS"])
+        gotchas: What to avoid / what failed (e.g., ["GROUP BY times out"])
+        example_query: Optional working SQL example
+        ttl_days: Days before pattern expires (default 90)
+
+    Returns:
+        Confirmation message
+    """
+    pattern_cache = get_pattern_cache()
+
+    # Check if pattern already exists
+    existing = pattern_cache.get_pattern(pattern_name)
+    if existing:
+        # Update success count and overwrite
+        success_count = existing.success_count + 1
+        pattern_cache.delete_pattern(pattern_name)
+    else:
+        success_count = 1
+
+    pattern = pattern_cache.store_pattern(
+        pattern_name=pattern_name,
+        question_types=question_types,
+        strategy=strategy,
+        tables_used=tables_used,
+        gotchas=gotchas,
+        example_query=example_query,
+        ttl_days=ttl_days,
+    )
+    pattern.success_count = success_count
+    pattern_cache.save()
+
+    return f"Learned pattern: '{pattern_name}' for questions like {question_types}"
+
+
+@mcp.tool()
+async def record_pattern_outcome(pattern_name: str, success: bool) -> str:
+    """Record whether a pattern helped or failed.
+
+    Call this after using a pattern to track its effectiveness.
+    Patterns with more failures than successes may be auto-purged.
+
+    Args:
+        pattern_name: Name of the pattern used
+        success: True if pattern helped, False if it led to wrong approach
+
+    Returns:
+        Updated pattern stats
+    """
+    pattern_cache = get_pattern_cache()
+    pattern = pattern_cache.get_pattern(pattern_name)
+
+    if not pattern:
+        return f"Pattern '{pattern_name}' not found"
+
+    if success:
+        pattern_cache.record_success(pattern_name)
+        new_count = pattern.success_count + 1
+        return f"Pattern '{pattern_name}': {new_count} successes, {pattern.failure_count} failures"
+    else:
+        pattern_cache.record_failure(pattern_name)
+        new_count = pattern.failure_count + 1
+        return f"Pattern '{pattern_name}': {pattern.success_count} successes, {new_count} failures"
+
+
+@mcp.tool()
+async def list_patterns() -> dict[str, Any]:
+    """List all saved query patterns.
+
+    Returns:
+        All patterns with summary info
+    """
+    pattern_cache = get_pattern_cache()
+    patterns = pattern_cache.list_patterns()
+
+    return {
+        "count": len(patterns),
+        "patterns": patterns,
+    }
+
+
+@mcp.tool()
+async def delete_pattern(pattern_name: str) -> str:
+    """Delete a saved pattern.
+
+    Use this when a pattern is outdated or no longer useful.
+
+    Args:
+        pattern_name: Name of the pattern to delete
+
+    Returns:
+        Confirmation or error message
+    """
+    pattern_cache = get_pattern_cache()
+
+    if pattern_cache.delete_pattern(pattern_name):
+        return f"Deleted pattern: '{pattern_name}'"
+    else:
+        return f"Pattern '{pattern_name}' not found"
 
 
 def main() -> None:
