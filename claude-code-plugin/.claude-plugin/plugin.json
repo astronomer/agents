@@ -6,7 +6,7 @@
     "name": "Astronomer",
     "email": "support@astronomer.io"
   },
-  "homepage": "https://github.com/astronomer/data-ai-plugins",
-  "repository": "https://github.com/astronomer/data-ai-plugins",
+  "homepage": "https://github.com/astronomer/agents",
+  "repository": "https://github.com/astronomer/agents",
   "keywords": ["data-engineering", "airflow", "snowflake", "bigquery", "jupyter", "astronomer"]
 }
