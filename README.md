@@ -175,33 +175,6 @@ Once installed, skills are invoked automatically based on what you ask. You can 
 
 See [CLAUDE.md](./CLAUDE.md) for plugin development guidelines.
 
-### Repo Structure
-
-```
-agents/
-├── packages/
-│   └── data-warehouse/          # Data warehouse MCP server
-├── shared-skills/               # Skills (shared by Claude Code & OpenCode)
-│   ├── init-warehouse/          # Schema discovery initialization
-│   ├── analyzing-data/          # SQL-based data analysis
-│   ├── dag-authoring/           # DAG creation workflows
-│   ├── dag-testing/             # DAG testing and debugging
-│   ├── debug-dag/               # Failed DAG diagnosis
-│   ├── discover-data/           # Data exploration
-│   ├── check-freshness/         # Data currency checks
-│   ├── profile-table/           # Table profiling
-│   ├── upstream-lineage/        # Source tracing
-│   ├── downstream-lineage/      # Impact analysis
-│   ├── astro-project-setup/     # Project initialization
-│   ├── astro-local-env/         # Local environment management
-│   └── airflow-2-to-3-migration/# Airflow upgrade guide
-├── claude-code-plugin/          # Claude Code plugin config
-├── opencode/                    # OpenCode config
-├── scripts/                     # Testing and development tools
-├── tests/                       # Test fixtures and expected flows
-└── docs/                        # Additional documentation
-```
-
 ### Adding Skills
 
 Create a new skill in `shared-skills/<name>/SKILL.md` with YAML frontmatter:
