@@ -44,10 +44,12 @@ Analysis Progress:
 - [ ] Step 1: pattern lookup (check for cached strategy)
 - [ ] Step 2: concept lookup (check for known tables)
 - [ ] Step 3: Search codebase for table definitions (Grep)
-- [ ] Step 4: Execute query via kernel
-- [ ] Step 5: learn_concept (ALWAYS before presenting results)
-- [ ] Step 6: learn_pattern (if discovery took 3+ steps)
-- [ ] Step 7: Present findings to user
+- [ ] Step 4: Read SQL file to get table/column names
+- [ ] Step 5: Execute query via kernel (run_sql)
+- [ ] Step 6: learn_concept (ALWAYS before presenting results)
+- [ ] Step 7: learn_pattern (ALWAYS if discovery required)
+- [ ] Step 8: record_pattern_outcome (if you used a pattern in Step 1)
+- [ ] Step 9: Present findings to user
 ```
 
 ---
@@ -57,10 +59,12 @@ Analysis Progress:
 ### Kernel Management
 
 ```bash
-uv run scripts/cli.py start      # Start kernel with Snowflake
-uv run scripts/cli.py exec "..." # Execute Python code
-uv run scripts/cli.py status     # Check kernel status
-uv run scripts/cli.py stop       # Stop kernel
+uv run scripts/cli.py start           # Start kernel with Snowflake
+uv run scripts/cli.py exec "..."      # Execute Python code
+uv run scripts/cli.py status          # Check kernel status
+uv run scripts/cli.py restart         # Restart kernel
+uv run scripts/cli.py stop            # Stop kernel
+uv run scripts/cli.py install plotly  # Install additional packages
 ```
 
 ### Concept Cache (concept -> table mappings)
@@ -74,6 +78,9 @@ uv run scripts/cli.py concept learn customers HQ.MART_CUST.CURRENT_ASTRO_CUSTS -
 
 # List all concepts
 uv run scripts/cli.py concept list
+
+# Import concepts from warehouse.md
+uv run scripts/cli.py concept import -p /path/to/warehouse.md
 ```
 
 ### Pattern Cache (query strategies)
@@ -97,6 +104,38 @@ uv run scripts/cli.py pattern record operator_usage --success
 
 # List all patterns
 uv run scripts/cli.py pattern list
+
+# Delete a pattern
+uv run scripts/cli.py pattern delete operator_usage
+```
+
+### Table Schema Cache
+
+```bash
+# Look up cached table schema
+uv run scripts/cli.py table lookup HQ.MART_CUST.CURRENT_ASTRO_CUSTS
+
+# Cache a table schema
+uv run scripts/cli.py table cache DB.SCHEMA.TABLE -c '[{"name":"id","type":"INT"}]'
+
+# List all cached tables
+uv run scripts/cli.py table list
+
+# Delete from cache
+uv run scripts/cli.py table delete DB.SCHEMA.TABLE
+```
+
+### Cache Management
+
+```bash
+# View cache statistics
+uv run scripts/cli.py cache status
+
+# Clear all caches
+uv run scripts/cli.py cache clear
+
+# Clear only stale entries (older than 90 days)
+uv run scripts/cli.py cache clear --stale-only
 ```
 
 ---
@@ -127,6 +166,7 @@ Once kernel starts, these are available:
 | Function | Description |
 |----------|-------------|
 | `run_sql(query, limit=100)` | Execute SQL, return Polars DataFrame |
+| `run_sql_pandas(query, limit=100)` | Execute SQL, return Pandas DataFrame |
 | `pl` | Polars library (imported) |
 | `pd` | Pandas library (imported) |
 
