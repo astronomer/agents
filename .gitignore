@@ -55,6 +55,9 @@ Thumbs.db
 # Generated schema files (project-specific)
 .astro/
 
+# Claude local settings
+.claude/
+
 # Skill testing runtime (Ralph Loop)
 .ralph/
 .ralph-history/
