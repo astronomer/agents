@@ -3,6 +3,10 @@
     "airflow": {
       "command": "uvx",
       "args": ["astro-airflow-mcp@0.2.2", "--transport", "stdio", "--airflow-project-dir", "${PWD}"]
+    },
+    "warehouse": {
+      "command": "uvx",
+      "args": ["data-warehouse"]
     }
   }
 }

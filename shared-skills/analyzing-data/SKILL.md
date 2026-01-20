@@ -1,186 +1,70 @@
 ---
 name: analyzing-data
 description: Queries data warehouse and answers business questions about data. Handles questions requiring database/warehouse queries including "who uses X", "how many Y", "show me Z", "find customers", "what is the count", data lookups, metrics, trends, or SQL analysis.
-hooks:
-  PreToolUse:
-    - matcher: "Bash"
-      hooks:
-        - type: command
-          command: "uv run scripts/cli.py ensure"
-          once: true
-  Stop:
-    - hooks:
-        - type: command
-          command: "uv run scripts/cli.py stop"
 ---
 
 # Data Analysis
 
-Answer business questions by querying the data warehouse. The kernel starts automatically on first use.
+Answer business questions by finding the right table, then querying it.
 
-## Prerequisites
+## ⚠️ MANDATORY FIRST STEP - DO THIS BEFORE ANYTHING ELSE
 
-**uv must be installed:**
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
+**STOP. Before calling ANY other tool, you MUST call `lookup_pattern` first:**
+
+```
+lookup_pattern("<user's question here>")
 ```
 
-## MANDATORY FIRST STEP
+This is NON-NEGOTIABLE. Do not call `lookup_concept`, `list_schemas`, `list_tables`, or `run_sql` until you have checked for patterns.
 
-**Before any other action, check for cached patterns:**
-
-```bash
-uv run scripts/cli.py pattern lookup "<user's question>"
-```
-
-This is NON-NEGOTIABLE. Patterns contain proven strategies that save time and avoid failed queries.
+**Why?** Patterns contain proven strategies that save 5-10 tool calls and avoid timeouts. Skipping this wastes time and may lead to failed queries.
 
 ---
 
 ## Workflow
 
+Copy this checklist and check off items as you complete them:
+
 ```
 Analysis Progress:
-- [ ] Step 1: pattern lookup (check for cached strategy)
-- [ ] Step 2: concept lookup (check for known tables)
-- [ ] Step 3: table lookup (check for cached schema) - BEFORE writing queries
-- [ ] Step 4: Search codebase for table definitions (Grep) if cache miss
-- [ ] Step 5: Read SQL file to get table/column names
-- [ ] Step 6: Execute query via kernel (run_sql)
-- [ ] Step 7: learn_concept (ALWAYS before presenting results)
-- [ ] Step 8: learn_pattern (ALWAYS if discovery required)
-- [ ] Step 9: record_pattern_outcome (if you used a pattern in Step 1)
-- [ ] Step 10: Present findings to user
+- [ ] Step 1: lookup_pattern (check for cached strategy)
+- [ ] Step 2: Grep codebase for table definitions
+- [ ] Step 3: Read SQL file to get table/column names
+- [ ] Step 4: run_sql query
+- [ ] Step 5: learn_concept (ALWAYS - before presenting results)
+- [ ] Step 6: learn_pattern (ALWAYS if discovery required - before presenting results)
+- [ ] Step 7: record_pattern_outcome (if you used a pattern in Step 1)
+- [ ] Step 8: Present results to user
 ```
 
-**IMPORTANT:** Never assume column names. Always verify via `table lookup` or `SELECT * LIMIT 1` before writing queries.
+## ⚠️ MANDATORY: Complete Steps 5-7 BEFORE Presenting Results
 
----
+**DO NOT write any summary or results to the user until you have:**
+1. ✅ Called `learn_concept(...)` - ALWAYS, no exceptions
+2. ✅ Called `learn_pattern(...)` - ALWAYS if query required discovery (3+ tool calls)
+3. ✅ Called `record_pattern_outcome(...)` - If you used a pattern from Step 1
 
-## CLI Commands
+**This is a HARD GATE.** Present results only after caching is complete.
 
-### Kernel Management
+### Step 1: Check cached patterns
 
-```bash
-uv run scripts/cli.py start           # Start kernel with Snowflake
-uv run scripts/cli.py exec "..."      # Execute Python code
-uv run scripts/cli.py status          # Check kernel status
-uv run scripts/cli.py restart         # Restart kernel
-uv run scripts/cli.py stop            # Stop kernel
-uv run scripts/cli.py install plotly  # Install additional packages
+```
+lookup_pattern("<user's question>")
 ```
 
-### Concept Cache (concept -> table mappings)
+If `found: true` → follow returned strategy, skip to Step 4.
 
-```bash
-# Look up a concept
-uv run scripts/cli.py concept lookup customers
+### Step 2: Search codebase for table definitions
 
-# Learn a new concept
-uv run scripts/cli.py concept learn customers HQ.MART_CUST.CURRENT_ASTRO_CUSTS -k ACCT_ID
-
-# List all concepts
-uv run scripts/cli.py concept list
-
-# Import concepts from warehouse.md
-uv run scripts/cli.py concept import -p /path/to/warehouse.md
-```
-
-### Pattern Cache (query strategies)
-
-```bash
-# Look up patterns for a question
-uv run scripts/cli.py pattern lookup "who uses operator X"
-
-# Learn a new pattern
-uv run scripts/cli.py pattern learn operator_usage \
-    -q "who uses X operator" \
-    -q "which customers use X" \
-    -s "1. Query TASK_RUNS for operator_class" \
-    -s "2. Join with ORGS on org_id" \
-    -t "HQ.MODEL_ASTRO.TASK_RUNS" \
-    -t "HQ.MODEL_ASTRO.ORGANIZATIONS" \
-    -g "TASK_RUNS is huge - always filter by date"
-
-# Record pattern outcome
-uv run scripts/cli.py pattern record operator_usage --success
-
-# List all patterns
-uv run scripts/cli.py pattern list
-
-# Delete a pattern
-uv run scripts/cli.py pattern delete operator_usage
-```
-
-### Table Schema Cache
-
-```bash
-# Look up cached table schema
-uv run scripts/cli.py table lookup HQ.MART_CUST.CURRENT_ASTRO_CUSTS
-
-# Cache a table schema
-uv run scripts/cli.py table cache DB.SCHEMA.TABLE -c '[{"name":"id","type":"INT"}]'
-
-# List all cached tables
-uv run scripts/cli.py table list
-
-# Delete from cache
-uv run scripts/cli.py table delete DB.SCHEMA.TABLE
-```
-
-### Cache Management
-
-```bash
-# View cache statistics
-uv run scripts/cli.py cache status
-
-# Clear all caches
-uv run scripts/cli.py cache clear
-
-# Clear only stale entries (older than 90 days)
-uv run scripts/cli.py cache clear --stale-only
-```
-
----
-
-## Quick Start Example
-
-```bash
-# 1. Check for existing patterns
-uv run scripts/cli.py pattern lookup "how many customers"
-
-# 2. Check for known concepts
-uv run scripts/cli.py concept lookup customers
-
-# 3. Execute query
-uv run scripts/cli.py exec "df = run_sql('SELECT COUNT(*) FROM HQ.MART_CUST.CURRENT_ASTRO_CUSTS')"
-uv run scripts/cli.py exec "print(df)"
-
-# 4. Cache what we learned
-uv run scripts/cli.py concept learn customers HQ.MART_CUST.CURRENT_ASTRO_CUSTS -k ACCT_ID
-```
-
----
-
-## Available Functions in Kernel
-
-Once kernel starts, these are available:
-
-| Function | Description |
-|----------|-------------|
-| `run_sql(query, limit=100)` | Execute SQL, return Polars DataFrame |
-| `run_sql_pandas(query, limit=100)` | Execute SQL, return Pandas DataFrame |
-| `pl` | Polars library (imported) |
-| `pd` | Pandas library (imported) |
-
----
-
-## Table Discovery via Codebase
-
-If concept/pattern cache miss, search the codebase:
+**Run this Grep before using ANY warehouse MCP tools.**
 
 ```
 Grep pattern="<concept>" glob="**/*.sql"
+```
+
+Example for ARR question:
+```
+Grep pattern="ARR" glob="dags/declarative/**/*.sql"
 ```
 
 | Repo Type | Where to Look |
@@ -188,33 +72,147 @@ Grep pattern="<concept>" glob="**/*.sql"
 | **Gusty** | `dags/declarative/04_metric/`, `06_reporting/`, `05_mart/` |
 | **dbt** | `models/marts/`, `models/staging/` |
 
----
+### Step 3: Read the SQL file
 
-## Known Tables Quick Reference
+When Grep finds matches, read the SQL file to get:
+- Exact table name from the `schema:` frontmatter
+- Available columns from the SELECT
+- Any important filters or joins
 
-| Concept | Table | Key Column | Date Column |
-|---------|-------|------------|-------------|
-| customers | HQ.MART_CUST.CURRENT_ASTRO_CUSTS | ACCT_ID | - |
-| organizations | HQ.MODEL_ASTRO.ORGANIZATIONS | ORG_ID | CREATED_TS |
-| deployments | HQ.MODEL_ASTRO.DEPLOYMENTS | DEPLOYMENT_ID | CREATED_TS |
-| task_runs | HQ.MODEL_ASTRO.TASK_RUNS | - | START_TS |
-| dag_runs | HQ.MODEL_ASTRO.DAG_RUNS | - | START_TS |
-| users | HQ.MODEL_ASTRO.USERS | USER_ID | - |
-| accounts | HQ.MODEL_CRM.SF_ACCOUNTS | ACCT_ID | - |
+### Step 4: Query the warehouse
 
-**Large tables (always filter by date):** TASK_RUNS (6B rows), DAG_RUNS (500M rows)
+```
+run_sql("<query>")
+```
 
----
-
-## Query Tips
-
+**Query tips:**
 - Use LIMIT during exploration
-- Filter early with WHERE clauses
-- Prefer pre-aggregated tables (`METRICS_*`, `MART_*`, `AGG_*`)
-- For 100M+ row tables: no JOINs or GROUP BY on first query
+- Filter early with WHERE
+- Prefer pre-aggregated tables (`METRICS_*`, `MART_*`, `AGG_*`) over raw fact tables
+- For 100M+ row tables: no JOINs or GROUP BY on first query (see [reference/discovery-warehouse.md](reference/discovery-warehouse.md))
+
+### Step 5: Cache the concept (ALWAYS)
+
+**⚠️ MANDATORY after EVERY successful query - do this BEFORE presenting results:**
+
+```
+learn_concept(concept="<topic>", table="DB.SCHEMA.TABLE", key_column="id", date_column="created_at")
+```
+
+### Step 6: Save pattern (MANDATORY if discovery required)
+
+**⚠️ MANDATORY if ANY of these are true:**
+- Query required 3+ tool calls
+- You discovered something non-obvious (e.g., specific filters needed)
+- Initial approach failed/timed out and you found a better way
+- Query involved a large table with specific filtering strategies
+
+**Do NOT ask the user. Just save it.**
+
+```
+learn_pattern(
+    pattern_name="<name>",
+    question_types=["who uses X", "how many X"],
+    strategy=["Step 1...", "Step 2..."],
+    tables_used=["DB.SCHEMA.TABLE"],
+    gotchas=["What to avoid"],
+    example_query="<working SQL>"
+)
+```
+
+### Step 7: Record pattern outcome (if you used a pattern)
+
+**If Step 1 returned a pattern and you used it:**
+
+```
+record_pattern_outcome("pattern_name", success=True)   # or False if it didn't help
+```
+
+This tracks pattern effectiveness - patterns with poor success rates get flagged.
+
+### Step 8: Present results
+
+**Only after completing Steps 5-7**, present results to the user:
+
+| Section | Content |
+|---------|---------|
+| **Summary** | One paragraph answer |
+| **Key Metrics** | Table with values |
+| **Query** | SQL for reuse |
+
+---
+
+## Using cached patterns
+
+When `lookup_pattern` returns `found: true`:
+1. Follow the `strategy` steps
+2. Use `tables_used` directly (skip discovery)
+3. Avoid the `gotchas`
+4. Adapt `example_query` for user's specific question
+5. **Call `record_pattern_outcome(name, success=True/False)` after** ← Don't forget!
+
+---
+
+## Complete Flow Examples
+
+### With Pattern (fast path)
+
+```
+1. User asks: "Who uses S3Operator?"
+2. lookup_pattern("who uses S3Operator") → Found! "operator_usage" pattern
+3. Follow pattern strategy:
+   - Use TASK_RUNS (not DEPLOYMENT_OPERATOR_LOG)
+   - ILIKE '%S3%' for variants
+   - Add 90-day date filter
+4. run_sql(...) → Success!
+5. record_pattern_outcome("operator_usage", success=True)  ← REQUIRED
+```
+
+### Without Pattern (first time discovery)
+
+```
+1. User asks: "Who uses FeatureX?"
+2. lookup_pattern(...) → Not found
+3. lookup_concept("featurex") → Not found
+4. Discovery: Grep codebase → Read SQL file → Find TASK_RUNS
+5. run_sql(...) → Times out! Try with date filter → Success!
+6. learn_concept("featurex", "HQ.MODEL_ASTRO.TASK_RUNS", ...)  ← REQUIRED
+7. learn_pattern("operator_usage", ...) ← REQUIRED (discovery took 3+ calls)
+8. Present results to user
+```
+
+---
+
+## Cache Tools Reference
+
+| Tool | When to Use |
+|------|-------------|
+| `lookup_pattern("question")` | **FIRST** - check for proven strategy |
+| `record_pattern_outcome(name, success)` | **AFTER using pattern** - track effectiveness |
+| `learn_pattern(...)` | After non-trivial query - save strategy |
+| `lookup_concept("X")` | Check if we know which table has concept X |
+| `learn_concept(...)` | **AFTER successful query** - save concept → table |
+| `get_cached_table("DB.SCHEMA.TABLE")` | Get cached column info for a table |
+| `list_patterns()` | See all saved patterns |
+| `cache_status()` | Debug - see what's cached |
+| `clear_cache()` | Reset if cache is stale |
+
+---
+
+## Fallback: Warehouse discovery
+
+Only if Step 2 Grep returned no results:
+
+```
+lookup_concept("<concept>")
+list_schemas()
+list_tables(database, schema)
+get_tables_info(database, schema, [tables])
+```
 
 ---
 
 ## Reference
 
-- [reference/discovery-warehouse.md](reference/discovery-warehouse.md) - Large table handling, warehouse discovery
+- [reference/discovery-warehouse.md](reference/discovery-warehouse.md) - Large table handling
+- [reference/common-patterns.md](reference/common-patterns.md) - SQL templates
