@@ -41,6 +41,7 @@ class TestConceptCache:
 
         # Look it up
         found = cache.lookup_concept("customers")
+        assert found is not None
         assert found["table"] == "HQ.MART.CUSTOMERS"
 
     def test_concept_case_insensitive(self, mock_cache_dir):

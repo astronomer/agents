@@ -31,3 +31,16 @@ jobs:
       - name: Run analyzing-data skill tests
         working-directory: shared-skills/analyzing-data/scripts
         run: uv run --with pytest pytest tests/ -v
+
+  typecheck:
+    name: Type checking
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Run ty type checker
+        working-directory: shared-skills/analyzing-data/scripts
+        run: uvx ty check

@@ -43,7 +43,10 @@ def lookup_concept(concept: str) -> dict | None:
 
 
 def learn_concept(
-    concept: str, table: str, key_column: str = None, date_column: str = None
+    concept: str,
+    table: str,
+    key_column: str | None = None,
+    date_column: str | None = None,
 ):
     """Store a concept -> table mapping for future use."""
     concepts = _load_json("concepts.json")
@@ -85,7 +88,7 @@ def learn_pattern(
     strategy: list[str],
     tables_used: list[str],
     gotchas: list[str],
-    example_query: str = None,
+    example_query: str | None = None,
 ):
     """Store a query pattern/strategy for a type of question."""
     patterns = _load_json("patterns.json")
