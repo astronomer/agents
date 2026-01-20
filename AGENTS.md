@@ -60,20 +60,6 @@ description: When to use this skill (Claude uses this to decide when to invoke i
 
 ## MCP Servers
 
-### Installing Local MCP Servers
-
-Local packages (like `data-warehouse`) must be installed as uv tools before the plugin can use them:
-
-```bash
-# Install all local MCP servers
-make install
-
-# Or install manually
-uv tool install --force packages/data-warehouse
-```
-
-This makes the package available via `uvx data-warehouse` system-wide. Re-run with `--force` after making changes to the package.
-
 ### Claude Code
 
 Configure in `claude-code-plugin/.mcp.json`:
