@@ -1,14 +1,14 @@
 ---
-name: astro-project-setup
-description: Initialize and configure Astro/Airflow projects. Use when the user wants to create a new project, set up dependencies, configure connections/variables, or understand project structure. For running the local environment, see astro-local-env.
+name: setting-up-astro-project
+description: Initialize and configure Astro/Airflow projects. Use when the user wants to create a new project, set up dependencies, configure connections/variables, or understand project structure. For running the local environment, see managing-astro-local-env.
 ---
 
 # Astro Project Setup
 
 This skill helps you initialize and configure Airflow projects using the Astro CLI.
 
-> **To run the local environment**, see the **astro-local-env** skill.
-> **To write DAGs**, see the **dag-authoring** skill.
+> **To run the local environment**, see the **managing-astro-local-env** skill.
+> **To write DAGs**, see the **authoring-dags** skill.
 
 ---
 
@@ -114,6 +114,6 @@ astro dev parse
 
 ## Related Skills
 
-- **astro-local-env**: Start, stop, and troubleshoot the local environment
-- **dag-authoring**: Write and validate DAGs (uses MCP tools)
-- **dag-testing**: Test DAGs (uses MCP tools)
+- **managing-astro-local-env**: Start, stop, and troubleshoot the local environment
+- **authoring-dags**: Write and validate DAGs (uses MCP tools)
+- **testing-dags**: Test DAGs (uses MCP tools)

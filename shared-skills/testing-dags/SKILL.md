@@ -1,5 +1,5 @@
 ---
-name: dag-testing
+name: testing-dags
 description: Test Airflow DAGs by immediately calling trigger_dag_and_wait. Use when the user says "test my DAG", "run the DAG", "test locally", or wants to debug a failed run. First action is ALWAYS trigger_dag_and_wait — no pre-flight checks.
 ---
 
@@ -383,5 +383,5 @@ Task logs typically show:
 
 ## Related Skills
 
-- **dag-authoring**: For creating new DAGs (includes validation before testing)
-- **diagnose**: For general Airflow troubleshooting
+- **authoring-dags**: For creating new DAGs (includes validation before testing)
+- **debugging-dags**: For general Airflow troubleshooting

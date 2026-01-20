@@ -1,14 +1,14 @@
 ---
-name: astro-local-env
-description: Manage local Airflow environment with Astro CLI. Use when the user wants to start, stop, or restart Airflow, view logs, troubleshoot containers, or fix environment issues. For project setup, see astro-project-setup.
+name: managing-astro-local-env
+description: Manage local Airflow environment with Astro CLI. Use when the user wants to start, stop, or restart Airflow, view logs, troubleshoot containers, or fix environment issues. For project setup, see setting-up-astro-project.
 ---
 
 # Astro Local Environment
 
 This skill helps you manage your local Airflow environment using the Astro CLI.
 
-> **To set up a new project**, see the **astro-project-setup** skill.
-> **When Airflow is running**, use MCP tools from **dag-authoring** and **dag-testing** skills.
+> **To set up a new project**, see the **setting-up-astro-project** skill.
+> **When Airflow is running**, use MCP tools from **authoring-dags** and **testing-dags** skills.
 
 ---
 
@@ -120,6 +120,6 @@ astro dev upgrade-test
 
 ## Related Skills
 
-- **astro-project-setup**: Initialize projects and configure dependencies
-- **dag-authoring**: Write DAGs (uses MCP tools, requires running Airflow)
-- **dag-testing**: Test DAGs (uses MCP tools, requires running Airflow)
+- **setting-up-astro-project**: Initialize projects and configure dependencies
+- **authoring-dags**: Write DAGs (uses MCP tools, requires running Airflow)
+- **testing-dags**: Test DAGs (uses MCP tools, requires running Airflow)

@@ -1,5 +1,5 @@
 ---
-name: downstream-lineage
+name: tracing-downstream-lineage
 description: Trace downstream data lineage and impact analysis. Use when the user asks what depends on this data, what breaks if something changes, downstream dependencies, or needs to assess change risk before modifying a table or DAG.
 ---
 
@@ -147,6 +147,6 @@ Before making changes:
 4. [ ] Schedule change during low-impact window
 
 ### Related Skills
-- Trace where data comes from: sources skill
-- Check downstream freshness: freshness skill
-- Debug any broken DAGs: diagnose skill
+- Trace where data comes from: **tracing-upstream-lineage** skill
+- Check downstream freshness: **checking-freshness** skill
+- Debug any broken DAGs: **debugging-dags** skill

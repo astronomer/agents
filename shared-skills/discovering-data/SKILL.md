@@ -1,5 +1,5 @@
 ---
-name: discover-data
+name: discovering-data
 description: Discover and explore data for a concept or domain. Use when the user asks what data exists for a topic (e.g., "ARR", "customers", "orders"), wants to find relevant tables, or needs to understand what data is available before analysis.
 ---
 
@@ -265,6 +265,6 @@ LIMIT 10;
 ### Next Steps
 
 Suggest logical follow-ups:
-- "To deep-dive on a specific table, use the profile skill"
-- "To check data freshness, use the freshness skill"
-- "To understand where this data comes from, use the sources skill"
+- "To deep-dive on a specific table, use the **profiling-tables** skill"
+- "To check data freshness, use the **checking-freshness** skill"
+- "To understand where this data comes from, use the **tracing-upstream-lineage** skill"

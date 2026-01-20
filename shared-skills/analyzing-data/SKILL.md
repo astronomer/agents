@@ -43,14 +43,17 @@ This is NON-NEGOTIABLE. Patterns contain proven strategies that save time and av
 Analysis Progress:
 - [ ] Step 1: pattern lookup (check for cached strategy)
 - [ ] Step 2: concept lookup (check for known tables)
-- [ ] Step 3: Search codebase for table definitions (Grep)
-- [ ] Step 4: Read SQL file to get table/column names
-- [ ] Step 5: Execute query via kernel (run_sql)
-- [ ] Step 6: learn_concept (ALWAYS before presenting results)
-- [ ] Step 7: learn_pattern (ALWAYS if discovery required)
-- [ ] Step 8: record_pattern_outcome (if you used a pattern in Step 1)
-- [ ] Step 9: Present findings to user
+- [ ] Step 3: table lookup (check for cached schema) - BEFORE writing queries
+- [ ] Step 4: Search codebase for table definitions (Grep) if cache miss
+- [ ] Step 5: Read SQL file to get table/column names
+- [ ] Step 6: Execute query via kernel (run_sql)
+- [ ] Step 7: learn_concept (ALWAYS before presenting results)
+- [ ] Step 8: learn_pattern (ALWAYS if discovery required)
+- [ ] Step 9: record_pattern_outcome (if you used a pattern in Step 1)
+- [ ] Step 10: Present findings to user
 ```
+
+**IMPORTANT:** Never assume column names. Always verify via `table lookup` or `SELECT * LIMIT 1` before writing queries.
 
 ---
 

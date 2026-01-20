@@ -1,6 +1,11 @@
 ---
-name: init-warehouse
+name: initializing-warehouse
 description: Initialize warehouse schema discovery. Generates .astro/warehouse.md with all table metadata for instant lookups. Run once per project, refresh when schema changes. Use when user says "/data:init" or asks to set up data discovery.
+hooks:
+  Stop:
+    - hooks:
+        - type: command
+          command: "echo 'Cache populated. Use analyzing-data skill for queries.'"
 ---
 
 # Initialize Warehouse Schema

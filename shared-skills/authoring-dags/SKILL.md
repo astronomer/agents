@@ -1,13 +1,18 @@
 ---
-name: dag-authoring
-description: Workflow and best practices for writing Apache Airflow DAGs. Use when the user wants to create a new DAG, write pipeline code, or asks about DAG patterns and conventions. For testing and debugging DAGs, see the dag-testing skill.
+name: authoring-dags
+description: Workflow and best practices for writing Apache Airflow DAGs. Use when the user wants to create a new DAG, write pipeline code, or asks about DAG patterns and conventions. For testing and debugging DAGs, see the testing-dags skill.
+hooks:
+  Stop:
+    - hooks:
+        - type: command
+          command: "echo 'Remember to test your DAG with the testing-dags skill'"
 ---
 
 # DAG Authoring Skill
 
 This skill guides you through creating and validating Airflow DAGs using best practices and MCP tools.
 
-> **For testing and debugging DAGs**, see the **dag-testing** skill which covers the full test → debug → fix → retest workflow.
+> **For testing and debugging DAGs**, see the **testing-dags** skill which covers the full test → debug → fix → retest workflow.
 
 ---
 
@@ -174,9 +179,9 @@ Returns in one call: metadata, tasks, dependencies, source code.
 
 ## Phase 5: Test
 
-> **📘 See the dag-testing skill for comprehensive testing guidance.**
+> **📘 See the testing-dags skill for comprehensive testing guidance.**
 
-Once validation passes, test the DAG using the workflow in the **dag-testing** skill:
+Once validation passes, test the DAG using the workflow in the **testing-dags** skill:
 
 1. **Get user consent** — Always ask before triggering
 2. **Trigger and wait** — Use `trigger_dag_and_wait(dag_id, timeout=300)`
@@ -190,7 +195,7 @@ Once validation passes, test the DAG using the workflow in the **dag-testing** s
 trigger_dag_and_wait(dag_id="your_dag_id", timeout=300)
 ```
 
-For the full test → debug → fix → retest loop, see **dag-testing**.
+For the full test → debug → fix → retest loop, see **testing-dags**.
 
 ---
 
@@ -200,7 +205,7 @@ If issues found:
 1. Fix the code
 2. Check for import errors with `list_import_errors` MCP tool
 3. Re-validate using MCP tools (Phase 4)
-4. Re-test using the **dag-testing** skill workflow (Phase 5)
+4. Re-test using the **testing-dags** skill workflow (Phase 5)
 
 **Never use CLI commands to check status or logs. Always use MCP tools.**
 
@@ -219,218 +224,29 @@ If issues found:
 | Validate | `list_dag_warnings` | Configuration warnings |
 | Validate | `explore_dag` | Full DAG inspection |
 
-> **Testing tools** — See the **dag-testing** skill for `trigger_dag_and_wait`, `diagnose_dag_run`, `get_task_logs`, etc.
+> **Testing tools** — See the **testing-dags** skill for `trigger_dag_and_wait`, `diagnose_dag_run`, `get_task_logs`, etc.
 
 ---
 
-## Best Practices
+## Best Practices & Anti-Patterns
 
-### Use TaskFlow API
+For detailed code examples and patterns, see **[reference/best-practices.md](reference/best-practices.md)**.
 
-```python
-from airflow.decorators import dag, task
-from datetime import datetime
-
-@dag(
-    dag_id='my_pipeline',
-    start_date=datetime(2025, 1, 1),
-    schedule='@daily',
-    catchup=False,
-    default_args={'owner': 'data-team', 'retries': 2},
-    tags=['etl', 'production'],
-)
-def my_pipeline():
-    @task
-    def extract():
-        return {"data": [1, 2, 3]}
-
-    @task
-    def transform(data: dict):
-        return [x * 2 for x in data["data"]]
-
-    @task
-    def load(transformed: list):
-        print(f"Loaded {len(transformed)} records")
-
-    load(transform(extract()))
-
-my_pipeline()
-```
-
-### Never Hard-Code Credentials
-
-```python
-# WRONG
-conn_string = "postgresql://user:password@host:5432/db"
-
-# CORRECT - Use connections
-from airflow.hooks.base import BaseHook
-conn = BaseHook.get_connection("my_postgres_conn")
-
-# CORRECT - Use variables
-from airflow.models import Variable
-api_key = Variable.get("my_api_key")
-
-# CORRECT - Templating
-sql = "SELECT * FROM {{ var.value.table_name }}"
-```
-
-### Use Provider Operators
-
-```python
-from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
-from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
-from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
-```
-
-### Ensure Idempotency
-
-```python
-@task
-def load_data(data_interval_start, data_interval_end):
-    # Delete before insert
-    delete_existing(data_interval_start, data_interval_end)
-    insert_new(data_interval_start, data_interval_end)
-```
-
-### Use Data Intervals
-
-```python
-@task
-def process(data_interval_start, data_interval_end):
-    print(f"Processing {data_interval_start} to {data_interval_end}")
-
-# In SQL
-sql = """
-    SELECT * FROM events
-    WHERE event_time >= '{{ data_interval_start }}'
-      AND event_time < '{{ data_interval_end }}'
-"""
-```
-
-### Organize with Task Groups
-
-```python
-from airflow.decorators import task_group
-
-@task_group
-def extract_sources():
-    @task
-    def from_postgres(): ...
-
-    @task
-    def from_api(): ...
-
-    return from_postgres(), from_api()
-```
-
-### Use Setup/Teardown
-
-```python
-from airflow.decorators import setup, teardown
-
-@setup
-def create_temp_table(): ...
-
-@teardown
-def drop_temp_table(): ...
-
-@task
-def process(): ...
-
-create = create_temp_table()
-process_task = process()
-cleanup = drop_temp_table()
-
-create >> process_task >> cleanup
-cleanup.as_teardown(setups=[create])
-```
-
-### Include Data Quality Checks
-
-```python
-from airflow.providers.common.sql.operators.sql import (
-    SQLColumnCheckOperator,
-    SQLTableCheckOperator,
-)
-
-SQLColumnCheckOperator(
-    task_id="check_columns",
-    table="my_table",
-    column_mapping={
-        "id": {"null_check": {"equal_to": 0}},
-    },
-)
-
-SQLTableCheckOperator(
-    task_id="check_table",
-    table="my_table",
-    checks={"row_count": {"check_statement": "COUNT(*) > 0"}},
-)
-```
-
----
-
-## Anti-Patterns
-
-### DON'T: Access Metadata DB Directly
-
-```python
-# WRONG - Fails in Airflow 3
-from airflow.settings import Session
-session.query(DagModel).all()
-```
-
-### DON'T: Use Deprecated Imports
-
-```python
-# WRONG
-from airflow.operators.dummy_operator import DummyOperator
-
-# CORRECT
-from airflow.providers.standard.operators.empty import EmptyOperator
-```
-
-### DON'T: Use SubDAGs
-
-```python
-# WRONG
-from airflow.operators.subdag import SubDagOperator
-
-# CORRECT
-from airflow.decorators import task_group
-```
-
-### DON'T: Use Deprecated Context Keys
-
-```python
-# WRONG
-execution_date = context["execution_date"]
-
-# CORRECT
-logical_date = context["dag_run"].logical_date
-data_start = context["data_interval_start"]
-```
-
-### DON'T: Hard-Code File Paths
-
-```python
-# WRONG
-open("include/data.csv")
-
-# CORRECT - Files in dags/
-import os
-dag_dir = os.path.dirname(__file__)
-open(os.path.join(dag_dir, "data.csv"))
-
-# CORRECT - Files in include/
-open(f"{os.getenv('AIRFLOW_HOME')}/include/data.csv")
-```
+Key topics covered:
+- TaskFlow API usage
+- Credentials management (connections, variables)
+- Provider operators
+- Idempotency patterns
+- Data intervals
+- Task groups
+- Setup/Teardown patterns
+- Data quality checks
+- Anti-patterns to avoid
 
 ---
 
 ## Related Skills
 
-- **dag-testing**: For testing DAGs, debugging failures, and the test → fix → retest loop
-- **diagnose**: For general Airflow troubleshooting
-- **airflow-migration**: For migrating DAGs to newer Airflow versions
+- **testing-dags**: For testing DAGs, debugging failures, and the test → fix → retest loop
+- **debugging-dags**: For troubleshooting failed DAGs
+- **migrating-airflow-2-to-3**: For migrating DAGs to Airflow 3

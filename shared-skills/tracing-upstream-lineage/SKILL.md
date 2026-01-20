@@ -1,5 +1,5 @@
 ---
-name: upstream-lineage
+name: tracing-upstream-lineage
 description: Trace upstream data lineage. Use when the user asks where data comes from, what feeds a table, upstream dependencies, data sources, or needs to understand data origins.
 ---
 
@@ -76,7 +76,7 @@ TARGET: analytics.orders_daily
 ### Step 5: Check Source Health
 
 For each upstream source:
-- **Tables**: Check freshness with the freshness skill
+- **Tables**: Check freshness with the **checking-freshness** skill
 - **DAGs**: Check recent run status with `get_dag_stats`
 - **External systems**: Note connection info from DAG code
 
@@ -122,6 +122,6 @@ Describe how data flows and transforms:
 - Complex transformation chains that could break?
 
 ### Related Skills
-- Check source freshness: freshness skill
-- Debug source DAG: diagnose skill
-- Trace downstream impacts: impacts skill
+- Check source freshness: **checking-freshness** skill
+- Debug source DAG: **debugging-dags** skill
+- Trace downstream impacts: **tracing-downstream-lineage** skill

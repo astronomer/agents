@@ -1,5 +1,5 @@
 ---
-name: check-freshness
+name: checking-freshness
 description: Quick data freshness check. Use when the user asks if data is up to date, when a table was last updated, if data is stale, or needs to verify data currency before using it.
 ---
 
@@ -68,7 +68,7 @@ Check Airflow for the source pipeline:
    - Did the last run fail? Use `get_dag_stats`
    - Is a run currently in progress?
 
-3. **Diagnose if needed**: If the DAG failed, use the diagnose skill to investigate.
+3. **Diagnose if needed**: If the DAG failed, use the **debugging-dags** skill to investigate.
 
 ## Output Format
 
@@ -88,7 +88,7 @@ Last Update: 2024-01-14 03:00:00 UTC
 Age: 37 hours
 Status: Very Stale
 Source DAG: daily_etl_pipeline (FAILED)
-Action: Investigate with diagnose skill
+Action: Investigate with **debugging-dags** skill
 ```
 
 ## Quick Checks
