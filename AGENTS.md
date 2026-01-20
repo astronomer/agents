@@ -56,7 +56,7 @@ description: When to use this skill (Claude uses this to decide when to invoke i
 
 - Skills are auto-discovered from the `skills/` directory
 - Claude invokes skills automatically based on the description matching user requests
-- Users can also invoke directly with `/plugin-name:skill-name` (e.g., `/data:dag-authoring`)
+- Users can also invoke directly with `/plugin-name:skill-name` (e.g., `/data:authoring-dags`)
 
 ## MCP Servers
 

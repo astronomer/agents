@@ -44,19 +44,19 @@ The `data` plugin bundles everything in this repo into a single installable pack
 
 | Skill | Command | Description |
 |-------|---------|-------------|
-| [init-warehouse](./shared-skills/init-warehouse/) | `/data:init-warehouse` | Initialize schema discovery - generates `.astro/warehouse.md` for instant lookups |
+| [initializing-warehouse](./shared-skills/initializing-warehouse/) | `/data:initializing-warehouse` | Initialize schema discovery - generates `.astro/warehouse.md` for instant lookups |
 | [analyzing-data](./shared-skills/analyzing-data/) | `/data:analyzing-data` | SQL-based analysis to answer business questions using cache and schema reference |
-| [dag-authoring](./shared-skills/dag-authoring/) | `/data:dag-authoring` | Create and validate Airflow DAGs with best practices |
-| [dag-testing](./shared-skills/dag-testing/) | `/data:dag-testing` | Test and debug Airflow DAGs locally |
-| [debug-dag](./shared-skills/debug-dag/) | `/data:debug-dag` | Debug failed DAG runs and find root causes |
-| [discover-data](./shared-skills/discover-data/) | `/data:discover-data` | Discover what data exists for a concept or domain |
-| [check-freshness](./shared-skills/check-freshness/) | `/data:check-freshness` | Check how current your data is |
-| [profile-table](./shared-skills/profile-table/) | `/data:profile-table` | Comprehensive table profiling and quality assessment |
-| [upstream-lineage](./shared-skills/upstream-lineage/) | `/data:upstream-lineage` | Trace upstream lineage - where does this data come from? |
-| [downstream-lineage](./shared-skills/downstream-lineage/) | `/data:downstream-lineage` | Analyze downstream dependencies - what breaks if I change this? |
-| [astro-project-setup](./shared-skills/astro-project-setup/) | `/data:astro-project-setup` | Initialize and configure new Astro/Airflow projects |
-| [astro-local-env](./shared-skills/astro-local-env/) | `/data:astro-local-env` | Manage local Airflow environment (start, stop, logs, troubleshoot) |
-| [airflow-2-to-3-migration](./shared-skills/airflow-2-to-3-migration/) | `/data:airflow-2-to-3-migration` | Migrate DAGs from Airflow 2.x to 3.x |
+| [authoring-dags](./shared-skills/authoring-dags/) | `/data:authoring-dags` | Create and validate Airflow DAGs with best practices |
+| [testing-dags](./shared-skills/testing-dags/) | `/data:testing-dags` | Test and debug Airflow DAGs locally |
+| [debugging-dags](./shared-skills/debugging-dags/) | `/data:debugging-dags` | Debug failed DAG runs and find root causes |
+| [discovering-data](./shared-skills/discovering-data/) | `/data:discovering-data` | Discover what data exists for a concept or domain |
+| [checking-freshness](./shared-skills/checking-freshness/) | `/data:checking-freshness` | Check how current your data is |
+| [profiling-tables](./shared-skills/profiling-tables/) | `/data:profiling-tables` | Comprehensive table profiling and quality assessment |
+| [tracing-upstream-lineage](./shared-skills/tracing-upstream-lineage/) | `/data:tracing-upstream-lineage` | Trace upstream lineage - where does this data come from? |
+| [tracing-downstream-lineage](./shared-skills/tracing-downstream-lineage/) | `/data:tracing-downstream-lineage` | Analyze downstream dependencies - what breaks if I change this? |
+| [setting-up-astro-project](./shared-skills/setting-up-astro-project/) | `/data:setting-up-astro-project` | Initialize and configure new Astro/Airflow projects |
+| [managing-astro-local-env](./shared-skills/managing-astro-local-env/) | `/data:managing-astro-local-env` | Manage local Airflow environment (start, stop, logs, troubleshoot) |
+| [migrating-airflow-2-to-3](./shared-skills/migrating-airflow-2-to-3/) | `/data:migrating-airflow-2-to-3` | Migrate DAGs from Airflow 2.x to 3.x |
 
 ---
 
@@ -144,18 +144,18 @@ The Airflow MCP auto-discovers your project when you run Claude Code from an Air
 Once installed, skills are invoked automatically based on what you ask. You can also invoke them directly:
 
 ```
-/data:init-warehouse     # Initialize schema discovery (run once per project)
-/data:analyzing-data     # Analyze data with SQL
-/data:dag-authoring      # Start guided DAG creation
-/data:discover-data      # Discover available data
-/data:debug-dag          # Debug a failed DAG run
+/data:initializing-warehouse   # Initialize schema discovery (run once per project)
+/data:analyzing-data           # Analyze data with SQL
+/data:authoring-dags           # Start guided DAG creation
+/data:discovering-data         # Discover available data
+/data:debugging-dags           # Debug a failed DAG run
 ```
 
 ### Getting Started
 
 1. **Initialize your warehouse** (recommended first step):
    ```
-   /data:init-warehouse
+   /data:initializing-warehouse
    ```
    This generates `.astro/warehouse.md` with schema metadata and offers to add a Quick Reference to your CLAUDE.md for fastest query performance.
 
