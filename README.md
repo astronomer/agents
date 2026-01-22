@@ -116,7 +116,9 @@ my_warehouse:
   type: snowflake
   account: ${SNOWFLAKE_ACCOUNT}
   user: ${SNOWFLAKE_USER}
+  auth_type: private_key
   private_key_path: ~/.ssh/snowflake_key.p8
+  private_key_passphrase: ${SNOWFLAKE_PRIVATE_KEY_PASSPHRASE}
   warehouse: COMPUTE_WH
   role: ANALYST
   databases:
@@ -127,8 +129,9 @@ my_warehouse:
 Store credentials in `~/.astro/ai/config/.env`:
 
 ```bash
-SNOWFLAKE_ACCOUNT=xyz12345.us-east-1
+SNOWFLAKE_ACCOUNT=xyz12345
 SNOWFLAKE_USER=myuser
+SNOWFLAKE_PRIVATE_KEY_PASSPHRASE=your-passphrase-here  # Only required if using an encrypted private key
 ```
 
 **Supported warehouses:** Snowflake, BigQuery, Databricks, Redshift.
