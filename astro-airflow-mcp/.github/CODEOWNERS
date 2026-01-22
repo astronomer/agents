@@ -1,0 +1,5 @@
+# Code owners for astro-airflow-mcp
+# These owners will be automatically requested for review when PRs are opened
+
+# Global owners - own everything in the repository
+* @astronomer/astro-airflow-mcp-admins

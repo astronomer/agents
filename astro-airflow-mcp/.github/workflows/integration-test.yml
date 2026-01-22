@@ -1,0 +1,78 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  integration-test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - airflow-version: "2.11.0"
+            profile: "airflow2"
+            port: "8080"
+            health-endpoint: "/health"
+          - airflow-version: "3.1.0"
+            profile: "airflow3"
+            port: "8081"
+            health-endpoint: "/api/v2/monitor/health"
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+      with:
+        enable-cache: true
+
+    - name: Install dependencies
+      run: make install-dev-ci
+
+    - name: Start Airflow ${{ matrix.airflow-version }}
+      run: docker compose -f docker-compose.test.yml --profile ${{ matrix.profile }} up -d
+
+    - name: Wait for Airflow to be ready
+      run: |
+        echo "Waiting for Airflow ${{ matrix.airflow-version }}..."
+        for i in $(seq 1 24); do  # 24 * 5s = 2 min max
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:${{ matrix.port }}${{ matrix.health-endpoint }} 2>/dev/null || echo "000")
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "Airflow is ready!"
+            exit 0
+          fi
+          echo "Waiting... ($i/24) - HTTP: $HTTP_CODE"
+          sleep 5
+        done
+        echo "Timeout waiting for Airflow"
+        exit 1
+
+    - name: Run integration tests
+      env:
+        AIRFLOW_URL: http://localhost:${{ matrix.port }}
+        AIRFLOW_USERNAME: admin
+        AIRFLOW_PASSWORD: admin
+      run: uv run pytest tests/integration/ -v --tb=short -x
+
+    - name: Show container logs on failure
+      if: failure()
+      run: |
+        echo "=== Container Status ==="
+        docker compose -f docker-compose.test.yml ps -a
+        echo ""
+        echo "=== Airflow Container Logs ==="
+        docker logs astro-airflow-mcp-${{ matrix.profile }}-1 2>&1 | tail -100
+
+    - name: Cleanup
+      if: always()
+      run: docker compose -f docker-compose.test.yml --profile ${{ matrix.profile }} down
