@@ -1,11 +1,19 @@
-name: Integration Tests
+name: "astro-airflow-mcp: Integration Tests"
 
 on:
   push:
     branches: [main]
+    paths:
+      - 'astro-airflow-mcp/**'
   pull_request:
     branches: [main]
+    paths:
+      - 'astro-airflow-mcp/**'
   workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: astro-airflow-mcp
 
 jobs:
   integration-test:
@@ -45,7 +53,7 @@ jobs:
     - name: Wait for Airflow to be ready
       run: |
         echo "Waiting for Airflow ${{ matrix.airflow-version }}..."
-        for i in $(seq 1 24); do  # 24 * 5s = 2 min max
+        for i in $(seq 1 24); do
           HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:${{ matrix.port }}${{ matrix.health-endpoint }} 2>/dev/null || echo "000")
           if [ "$HTTP_CODE" = "200" ]; then
             echo "Airflow is ready!"
