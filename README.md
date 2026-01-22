@@ -1,64 +1,70 @@
 # agents
 
-AI agent tooling for data engineering workflows. Built by [Astronomer](https://www.astronomer.io/).
+AI agent tooling for data engineering workflows. Extends [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Cursor](https://cursor.com), and [OpenCode](https://opencode.ai) with specialized capabilities for working with Airflow and data warehouses.
 
-This repo contains MCP servers, skills, and plugins that extend AI coding assistants (Claude Code, OpenCode) with specialized data engineering capabilities.
-
----
+Built by [Astronomer](https://www.astronomer.io/).
 
 ## Table of Contents
 
 - [Features](#features)
-  - [MCP Servers](#mcp-servers)
-  - [Skills](#skills)
 - [Installation](#installation)
-  - [Prerequisites](#prerequisites)
-  - [Claude Code](#claude-code)
-  - [OpenCode](#opencode)
 - [Configuration](#configuration)
-  - [Warehouse Connections](#warehouse-connections)
-  - [Airflow](#airflow)
 - [Usage](#usage)
-  - [Getting Started](#getting-started)
-  - [Example Prompts](#example-prompts)
 - [Development](#development)
-  - [Repo Structure](#repo-structure)
-  - [Adding Skills](#adding-skills)
-  - [Testing Skills](#testing-skills)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
 - [License](#license)
-
----
 
 ## Features
 
-The `data` plugin bundles everything in this repo into a single installable package for Claude Code or OpenCode.
+The `data` plugin bundles MCP servers and skills into a single installable package.
 
 ### MCP Servers
 
 | Server | Description |
 |--------|-------------|
-| **Airflow** | Full Airflow REST API integration via [astro-airflow-mcp](https://github.com/astronomer/astro-airflow-mcp): DAG management, triggering, task logs, system health |
+| **[Airflow](https://github.com/astronomer/astro-airflow-mcp)** | Full Airflow REST API integration via [astro-airflow-mcp](https://github.com/astronomer/astro-airflow-mcp): DAG management, triggering, task logs, system health |
 | [**Data Warehouse**](./packages/data-warehouse/) | SQL queries against configured warehouses (Snowflake, BigQuery, etc.), schema discovery, persistent Python kernel for analysis |
 
 ### Skills
 
-| Skill | Command | Description |
-|-------|---------|-------------|
-| [initializing-warehouse](./shared-skills/initializing-warehouse/) | `/data:initializing-warehouse` | Initialize schema discovery - generates `.astro/warehouse.md` for instant lookups |
-| [analyzing-data](./shared-skills/analyzing-data/) | `/data:analyzing-data` | SQL-based analysis to answer business questions using cache and schema reference |
-| [authoring-dags](./shared-skills/authoring-dags/) | `/data:authoring-dags` | Create and validate Airflow DAGs with best practices |
-| [testing-dags](./shared-skills/testing-dags/) | `/data:testing-dags` | Test and debug Airflow DAGs locally |
-| [debugging-dags](./shared-skills/debugging-dags/) | `/data:debugging-dags` | Debug failed DAG runs and find root causes |
-| [discovering-data](./shared-skills/discovering-data/) | `/data:discovering-data` | Discover what data exists for a concept or domain |
-| [checking-freshness](./shared-skills/checking-freshness/) | `/data:checking-freshness` | Check how current your data is |
-| [profiling-tables](./shared-skills/profiling-tables/) | `/data:profiling-tables` | Comprehensive table profiling and quality assessment |
-| [tracing-upstream-lineage](./shared-skills/tracing-upstream-lineage/) | `/data:tracing-upstream-lineage` | Trace upstream lineage - where does this data come from? |
-| [tracing-downstream-lineage](./shared-skills/tracing-downstream-lineage/) | `/data:tracing-downstream-lineage` | Analyze downstream dependencies - what breaks if I change this? |
-| [setting-up-astro-project](./shared-skills/setting-up-astro-project/) | `/data:setting-up-astro-project` | Initialize and configure new Astro/Airflow projects |
-| [managing-astro-local-env](./shared-skills/managing-astro-local-env/) | `/data:managing-astro-local-env` | Manage local Airflow environment (start, stop, logs, troubleshoot) |
-| [migrating-airflow-2-to-3](./shared-skills/migrating-airflow-2-to-3/) | `/data:migrating-airflow-2-to-3` | Migrate DAGs from Airflow 2.x to 3.x |
+#### Setup & Configuration
 
----
+| Skill | Description |
+|-------|-------------|
+| [initializing-warehouse](./shared-skills/initializing-warehouse/) | Initialize schema discovery - generates `.astro/warehouse.md` for instant lookups |
+| [managing-astro-local-env](./shared-skills/managing-astro-local-env/) | Manage local Airflow environment (start, stop, logs, troubleshoot) |
+| [setting-up-astro-project](./shared-skills/setting-up-astro-project/) | Initialize and configure new Astro/Airflow projects |
+
+#### Data Discovery & Analysis
+
+| Skill | Description |
+|-------|-------------|
+| [analyzing-data](./shared-skills/analyzing-data/) | SQL-based analysis to answer business questions |
+| [checking-freshness](./shared-skills/checking-freshness/) | Check how current your data is |
+| [discovering-data](./shared-skills/discovering-data/) | Discover what data exists for a concept or domain |
+| [profiling-tables](./shared-skills/profiling-tables/) | Comprehensive table profiling and quality assessment |
+
+#### Data Lineage
+
+| Skill | Description |
+|-------|-------------|
+| [tracing-downstream-lineage](./shared-skills/tracing-downstream-lineage/) | Analyze what breaks if you change something |
+| [tracing-upstream-lineage](./shared-skills/tracing-upstream-lineage/) | Trace where data comes from |
+
+#### DAG Development
+
+| Skill | Description |
+|-------|-------------|
+| [authoring-dags](./shared-skills/authoring-dags/) | Create and validate Airflow DAGs with best practices |
+| [debugging-dags](./shared-skills/debugging-dags/) | Debug failed DAG runs and find root causes |
+| [testing-dags](./shared-skills/testing-dags/) | Test and debug Airflow DAGs locally |
+
+#### Migration
+
+| Skill | Description |
+|-------|-------------|
+| [migrating-airflow-2-to-3](./shared-skills/migrating-airflow-2-to-3/) | Migrate DAGs from Airflow 2.x to 3.x |
 
 ## Installation
 
@@ -66,7 +72,7 @@ The `data` plugin bundles everything in this repo into a single installable pack
 
 ### Prerequisites
 
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI (v1.0.33+) or [OpenCode](https://opencode.ai)
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI (v1.0.33+), [OpenCode](https://opencode.ai), or [Cursor](https://cursor.com)
 - [uv](https://docs.astral.sh/uv/) package manager
 - [Astro CLI](https://www.astronomer.io/docs/astro/cli/install-cli) (for Airflow features)
 
@@ -103,7 +109,22 @@ cd opencode
 opencode
 ```
 
----
+### Cursor
+
+Cursor uses the same MCP configuration format as Claude Code. After following the Claude Code installation above, copy the MCP config to Cursor's location:
+
+```bash
+# Copy MCP config to Cursor (after Claude Code plugin install)
+cp claude-code-plugin/.mcp.json .cursor/mcp.json
+```
+
+Alternatively, create a symlink to keep them in sync:
+```bash
+mkdir -p .cursor
+ln -s ../claude-code-plugin/.mcp.json .cursor/mcp.json
+```
+
+> **Note:** Skills are not yet supported in Cursor, but MCP servers (Airflow, Data Warehouse) will work. [Cursor Docs](https://cursor.com/docs/context/skills)
 
 ## Configuration
 
@@ -140,19 +161,9 @@ SNOWFLAKE_PRIVATE_KEY_PASSPHRASE=your-passphrase-here  # Only required if using 
 
 The Airflow MCP auto-discovers your project when you run Claude Code from an Airflow project directory (contains `airflow.cfg` or `dags/` folder).
 
----
-
 ## Usage
 
-Once installed, skills are invoked automatically based on what you ask. You can also invoke them directly:
-
-```
-/data:initializing-warehouse   # Initialize schema discovery (run once per project)
-/data:analyzing-data           # Analyze data with SQL
-/data:authoring-dags           # Start guided DAG creation
-/data:discovering-data         # Discover available data
-/data:debugging-dags           # Debug a failed DAG run
-```
+Skills are invoked automatically based on what you ask. You can also invoke them directly with `/data:<skill-name>`.
 
 ### Getting Started
 
@@ -160,19 +171,13 @@ Once installed, skills are invoked automatically based on what you ask. You can 
    ```
    /data:initializing-warehouse
    ```
-   This generates `.astro/warehouse.md` with schema metadata and offers to add a Quick Reference to your CLAUDE.md for fastest query performance.
+   This generates `.astro/warehouse.md` with schema metadata for faster queries.
 
 2. **Ask questions naturally**:
    - "What tables contain customer data?"
-   - "Who uses HITLOperator the most?"
-   - "Show me ARR trends by product"
-
-3. **Work with Airflow**:
+   - "Show me revenue trends by product"
    - "Create a DAG that loads data from S3 to Snowflake daily"
    - "Why did my etl_pipeline DAG fail yesterday?"
-   - "Test my DAG locally"
-
----
 
 ## Development
 
@@ -215,8 +220,6 @@ See [`docs/skill-testing.md`](./docs/skill-testing.md) for the full framework do
 - Ralph Loop for automated iteration
 - A/B testing configurations
 
----
-
 ## Troubleshooting
 
 ### Common Issues
@@ -238,19 +241,9 @@ cd opencode && opencode mcp list
 cd opencode && opencode debug skill
 ```
 
----
-
 ## Contributing
 
-We welcome contributions! Please see [CLAUDE.md](./CLAUDE.md) for development guidelines.
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run `make install` to test locally
-5. Submit a pull request
-
----
+Contributions welcome! See [CLAUDE.md](./CLAUDE.md) for development guidelines.
 
 ## License
 
