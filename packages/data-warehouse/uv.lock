@@ -185,6 +185,7 @@ name = "data-warehouse"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "cryptography" },
     { name = "ipykernel" },
     { name = "jupyter-client" },
     { name = "mcp" },
@@ -201,6 +202,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cryptography", specifier = ">=41.0.0" },
     { name = "ipykernel", specifier = ">=6.0.0" },
     { name = "jupyter-client", specifier = ">=8.0.0" },
     { name = "mcp", specifier = ">=1.0.0" },

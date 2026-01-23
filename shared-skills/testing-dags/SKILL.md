@@ -1,6 +1,6 @@
 ---
 name: testing-dags
-description: Test Airflow DAGs by immediately calling trigger_dag_and_wait. Use when the user says "test my DAG", "run the DAG", "test locally", or wants to debug a failed run. First action is ALWAYS trigger_dag_and_wait — no pre-flight checks.
+description: Complex DAG testing workflows with debugging and fixing cycles. Use for multi-step testing requests like "test this dag and fix it if it fails", "test and debug", "run the pipeline and troubleshoot issues". For simple test requests ("test dag", "run dag"), the airflow entrypoint skill handles it directly. This skill is for iterative test-debug-fix cycles.
 ---
 
 # DAG Testing Skill
