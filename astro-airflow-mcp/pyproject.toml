@@ -31,7 +31,7 @@ build-backend = "hatchling.build"
 [tool.hatch.version]
 source = "vcs"
 fallback-version = "0.0.0+dev"
-raw-options = { root = "..", tag_regex = "^astro-airflow-mcp-(?P<version>.*)$" }
+raw-options = { root = "..", tag_regex = "^astro-airflow-mcp-(?P<version>.*)$", git_describe_command = ["git", "describe", "--tags", "--match", "astro-airflow-mcp-*"] }
 
 [tool.hatchling.build.targets.wheel]
 packages = ["src/astro_airflow_mcp"]

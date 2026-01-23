@@ -1,6 +1,6 @@
 [project]
 name = "astro-dwh-mcp"
-version = "0.1.0"
+dynamic = ["version"]
 description = "MCP server for data warehouse operations (SQL, schema exploration)"
 requires-python = ">=3.11"
 dependencies = [
@@ -23,8 +23,13 @@ dev = [
 astro-dwh-mcp = "src.server:main"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+fallback-version = "0.0.0+dev"
+raw-options = { root = "..", tag_regex = "^astro-dwh-mcp-(?P<version>.*)$", git_describe_command = ["git", "describe", "--tags", "--match", "astro-dwh-mcp-*"] }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
