@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "airflow": {
-      "command": "uvx",
-      "args": ["astro-airflow-mcp@0.2.3", "--transport", "stdio", "--airflow-project-dir", "${PWD}"]
-    }
-  }
-}

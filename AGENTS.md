@@ -6,9 +6,7 @@
 project-root/
 ├── .claude-plugin/
 │   └── marketplace.json        # Marketplace + plugin definition (strict: false)
-├── .mcp.json                   # MCP server configuration
-├── hooks/                      # Plugin hooks
-│   ├── hooks.json
+├── hooks/                      # Hook scripts
 │   └── *.sh
 └── skills/                     # Skills (auto-discovered)
     └── skill-name/
@@ -50,26 +48,20 @@ description: When to use this skill (Claude uses this to decide when to invoke i
 - Claude invokes skills automatically based on the description matching user requests
 - Users can also invoke directly with `/plugin-name:skill-name` (e.g., `/data:authoring-dags`)
 
-## MCP Servers
+## Configuration
 
-Configure in `.mcp.json` at the repo root:
+Everything is defined inline in `.claude-plugin/marketplace.json` following the [advanced plugin entries](https://code.claude.com/docs/en/plugin-marketplaces#advanced-plugin-entries) pattern:
 
-```json
-{
-  "mcpServers": {
-    "server-name": {
-      "command": "uvx",
-      "args": ["package-name", "--transport", "stdio"]
-    }
-  }
-}
-```
+- **hooks**: Inlined in marketplace.json, scripts in `hooks/`
+- **mcpServers**: Inlined in marketplace.json
+- **skills**: Auto-discovered from `skills/` directory
+
+Use `${CLAUDE_PLUGIN_ROOT}` to reference files within the plugin (required because plugins are copied to a cache location when installed).
 
 ## Key Files
 
-- `.claude-plugin/marketplace.json` - Marketplace catalog with inline plugin definition (references hooks and mcpServers)
-- `.mcp.json` - MCP server configuration (referenced via `"mcpServers": "./.mcp.json"`)
-- `hooks/hooks.json` - Plugin hooks (referenced via `"hooks": "./hooks/hooks.json"`)
+- `.claude-plugin/marketplace.json` - Marketplace catalog with inline plugin definition (hooks, mcpServers)
+- `hooks/*.sh` - Hook scripts (referenced via `${CLAUDE_PLUGIN_ROOT}/hooks/...`)
 - `skills/*/SKILL.md` - Individual skills (auto-discovered)
 
 ## Config Location
