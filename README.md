@@ -1,6 +1,6 @@
 # agents
 
-AI agent tooling for data engineering workflows. Extends [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and [Cursor](https://cursor.com) with specialized capabilities for working with Airflow and data warehouses.
+AI agent tooling for data engineering workflows. Extends code agents and IDEs like [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and [Cursor](https://cursor.com) with specialized capabilities for working with Airflow and data warehouses.
 
 Built by [Astronomer](https://www.astronomer.io/).
 
