@@ -1,0 +1,15 @@
+{
+  "name": "astronomer",
+  "owner": {
+    "name": "Astronomer",
+    "email": "support@astronomer.io"
+  },
+  "plugins": [
+    {
+      "name": "data",
+      "source": "./claude-code-plugin",
+      "description": "Data engineering plugin - warehouse exploration, pipeline authoring, Airflow integration",
+      "version": "0.1.0"
+    }
+  ]
+}

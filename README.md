@@ -68,32 +68,113 @@ The `data` plugin bundles MCP servers and skills into a single installable packa
 
 ## Installation
 
-> **Note:** These instructions require cloning the repo locally. We're working on simpler installation via a published package.
+### Compatibility
 
-### Prerequisites
-
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI (v1.0.33+), [OpenCode](https://opencode.ai), or [Cursor](https://cursor.com)
-- [uv](https://docs.astral.sh/uv/) package manager
-- [Astro CLI](https://www.astronomer.io/docs/astro/cli/install-cli) (for Airflow features)
+| Client | MCP Servers | Skills |
+|--------|-------------|--------|
+| Claude Code | Yes | Yes (13 skills) |
+| Cursor | Yes | Yes (via Claude Code) |
+| OpenCode | Yes | Yes |
+| VS Code (Cline) | Yes | No |
+| Claude Desktop | Yes | No |
 
 ### Claude Code
 
 ```bash
-# Clone the repo
-git clone https://github.com/astronomer/agents.git
-cd agents
-
-# Install local MCP servers
-make install
-
 # Add the marketplace and install the plugin
-claude plugin marketplace add ./claude-code-plugin
+claude plugin marketplace add astronomer/agents
 claude plugin install data@astronomer
 ```
 
-Or test without installing:
-```bash
-claude --plugin-dir ./claude-code-plugin
+The plugin includes MCP servers that run via `uvx` from PyPI - no local installation required.
+
+### Cursor
+
+Cursor supports both MCP servers and skills.
+
+**MCP Servers** - Click to install:
+
+<a href="https://cursor.com/en-US/install-mcp?name=astro-airflow-mcp&config=eyJjb21tYW5kIjoidXZ4IiwiYXJncyI6WyJhc3Ryby1haXJmbG93LW1jcCIsIi0tdHJhbnNwb3J0Iiwic3RkaW8iXX0"><img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Add Airflow MCP to Cursor" height="32"></a>
+<a href="https://cursor.com/en-US/install-mcp?name=astro-dwh-mcp&config=eyJjb21tYW5kIjoidXZ4IiwiYXJncyI6WyJhc3Ryby1kd2gtbWNwIl19"><img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Add Warehouse MCP to Cursor" height="32"></a>
+
+**Skills** - Cursor auto-discovers skills from Claude Code plugins:
+
+1. Install the Claude Code plugin (see above)
+2. Open Cursor Settings > **Features** > **Claude Code**
+3. Enable **"Include third-party skills"**
+
+<details>
+<summary>Manual MCP configuration</summary>
+
+Add to `~/.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "airflow": {
+      "command": "uvx",
+      "args": ["astro-airflow-mcp", "--transport", "stdio"]
+    },
+    "warehouse": {
+      "command": "uvx",
+      "args": ["astro-dwh-mcp"]
+    }
+  }
+}
+```
+
+</details>
+
+### VS Code / Cline
+
+VS Code with Cline supports MCP servers (not skills).
+
+<a href="https://insiders.vscode.dev/redirect?url=vscode://ms-vscode.vscode-mcp/install?%7B%22name%22%3A%22astro-airflow-mcp%22%2C%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22astro-airflow-mcp%22%2C%22--transport%22%2C%22stdio%22%5D%7D"><img src="https://img.shields.io/badge/VS_Code-Install_Airflow_MCP-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white" alt="Install in VS Code" height="32"></a>
+<a href="https://insiders.vscode.dev/redirect?url=vscode://ms-vscode.vscode-mcp/install?%7B%22name%22%3A%22astro-dwh-mcp%22%2C%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22astro-dwh-mcp%22%5D%7D"><img src="https://img.shields.io/badge/VS_Code-Install_Warehouse_MCP-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white" alt="Install in VS Code" height="32"></a>
+
+<details>
+<summary>Manual configuration</summary>
+
+Add to `.vscode/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "airflow": {
+      "command": "uvx",
+      "args": ["astro-airflow-mcp", "--transport", "stdio"]
+    },
+    "warehouse": {
+      "command": "uvx",
+      "args": ["astro-dwh-mcp"]
+    }
+  }
+}
+```
+
+</details>
+
+### Claude Desktop
+
+Claude Desktop supports MCP servers (not skills).
+
+Add to your config file:
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "airflow": {
+      "command": "uvx",
+      "args": ["astro-airflow-mcp", "--transport", "stdio"]
+    },
+    "warehouse": {
+      "command": "uvx",
+      "args": ["astro-dwh-mcp"]
+    }
+  }
+}
 ```
 
 ### OpenCode
@@ -109,22 +190,23 @@ cd opencode
 opencode
 ```
 
-### Cursor
+### Generic MCP Clients
 
-Cursor uses the same MCP configuration format as Claude Code. After following the Claude Code installation above, copy the MCP config to Cursor's location:
+For any MCP-compatible client:
 
 ```bash
-# Copy MCP config to Cursor (after Claude Code plugin install)
-cp claude-code-plugin/.mcp.json .cursor/mcp.json
-```
+# Airflow MCP
+uvx astro-airflow-mcp --transport stdio
 
-Alternatively, create a symlink to keep them in sync:
-```bash
-mkdir -p .cursor
-ln -s ../claude-code-plugin/.mcp.json .cursor/mcp.json
-```
+# With remote Airflow
+AIRFLOW_API_URL=https://your-airflow.example.com \
+AIRFLOW_USERNAME=admin \
+AIRFLOW_PASSWORD=admin \
+uvx astro-airflow-mcp --transport stdio
 
-> **Note:** Skills are not yet supported in Cursor, but MCP servers (Airflow, Data Warehouse) will work. [Cursor Docs](https://cursor.com/docs/context/skills)
+# Data Warehouse MCP (requires ~/.astro/ai/config/warehouse.yml)
+uvx astro-dwh-mcp
+```
 
 ## Configuration
 
@@ -161,6 +243,15 @@ SNOWFLAKE_PRIVATE_KEY_PASSPHRASE=your-passphrase-here  # Only required if using 
 
 The Airflow MCP auto-discovers your project when you run Claude Code from an Airflow project directory (contains `airflow.cfg` or `dags/` folder).
 
+For remote instances, set environment variables:
+
+| Variable | Description |
+|----------|-------------|
+| `AIRFLOW_API_URL` | Airflow webserver URL |
+| `AIRFLOW_USERNAME` | Username |
+| `AIRFLOW_PASSWORD` | Password |
+| `AIRFLOW_AUTH_TOKEN` | Bearer token (alternative to username/password) |
+
 ## Usage
 
 Skills are invoked automatically based on what you ask. You can also invoke them directly with `/data:<skill-name>`.
@@ -182,6 +273,24 @@ Skills are invoked automatically based on what you ask. You can also invoke them
 ## Development
 
 See [CLAUDE.md](./CLAUDE.md) for plugin development guidelines.
+
+### Local Development Setup
+
+```bash
+# Clone the repo
+git clone https://github.com/astronomer/agents.git
+cd agents
+
+# Install local MCP servers as uv tools
+make install
+
+# Test with local plugin
+claude --plugin-dir ./claude-code-plugin
+
+# Or install from local marketplace
+claude plugin marketplace add ./claude-code-plugin
+claude plugin install data@astronomer
+```
 
 ### Adding Skills
 
@@ -251,4 +360,4 @@ Apache 2.0
 
 ---
 
-Made with ❤️ by Astronomer
+Made with :heart: by Astronomer
