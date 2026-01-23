@@ -1,6 +1,6 @@
 # agents
 
-AI agent tooling for data engineering workflows. Extends [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Cursor](https://cursor.com), and [OpenCode](https://opencode.ai) with specialized capabilities for working with Airflow and data warehouses.
+AI agent tooling for data engineering workflows. Extends [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Cursor](https://cursor.com), [OpenCode](https://opencode.ai), and other code agents with specialized capabilities via MCPs and skills for working with Airflow and data warehouses.
 
 Built by [Astronomer](https://www.astronomer.io/).
 
@@ -27,18 +27,11 @@ The `data` plugin bundles an MCP server and skills into a single installable pac
 
 ### Skills
 
-#### Setup & Configuration
-
-| Skill | Description |
-|-------|-------------|
-| [initializing-warehouse](./shared-skills/initializing-warehouse/) | Initialize schema discovery - generates `.astro/warehouse.md` for instant lookups |
-| [managing-astro-local-env](./shared-skills/managing-astro-local-env/) | Manage local Airflow environment (start, stop, logs, troubleshoot) |
-| [setting-up-astro-project](./shared-skills/setting-up-astro-project/) | Initialize and configure new Astro/Airflow projects |
-
 #### Data Discovery & Analysis
 
 | Skill | Description |
 |-------|-------------|
+| [initializing-warehouse](./shared-skills/initializing-warehouse/) | Initialize schema discovery - generates `.astro/warehouse.md` for instant lookups |
 | [analyzing-data](./shared-skills/analyzing-data/) | SQL-based analysis to answer business questions (uses background Jupyter kernel) |
 | [checking-freshness](./shared-skills/checking-freshness/) | Check how current your data is |
 | [discovering-data](./shared-skills/discovering-data/) | Discover what data exists for a concept or domain |
@@ -55,6 +48,8 @@ The `data` plugin bundles an MCP server and skills into a single installable pac
 
 | Skill | Description |
 |-------|-------------|
+| [setting-up-astro-project](./shared-skills/setting-up-astro-project/) | Initialize and configure new Astro/Airflow projects |
+| [managing-astro-local-env](./shared-skills/managing-astro-local-env/) | Manage local Airflow environment (start, stop, logs, troubleshoot) |
 | [authoring-dags](./shared-skills/authoring-dags/) | Create and validate Airflow DAGs with best practices |
 | [debugging-dags](./shared-skills/debugging-dags/) | Debug failed DAG runs and find root causes |
 | [testing-dags](./shared-skills/testing-dags/) | Test and debug Airflow DAGs locally |
@@ -218,7 +213,7 @@ SNOWFLAKE_USER=myuser
 SNOWFLAKE_PRIVATE_KEY_PASSPHRASE=your-passphrase-here  # Only required if using an encrypted private key
 ```
 
-**Supported warehouses:** Snowflake, BigQuery, Databricks, Redshift.
+**Supported warehouses:** Snowflake, planning on adding support for BigQuery, Databricks, Redshift.
 
 ### Airflow
 
