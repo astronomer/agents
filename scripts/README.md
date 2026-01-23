@@ -147,4 +147,4 @@ Scripts use `uv run` for Python dependencies. Ensure you have:
 
 - `docs/skill-testing.md` - Full framework documentation
 - `tests/README.md` - Test data and fixtures
-- `packages/data-warehouse/src/mocks.py` - Mock response implementation
+- `astro-dwh-mcp/src/mocks.py` - Mock response implementation

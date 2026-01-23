@@ -24,7 +24,7 @@ The `data` plugin bundles MCP servers and skills into a single installable packa
 | Server | Description |
 |--------|-------------|
 | **[Airflow](https://github.com/astronomer/agents/tree/main/astro-airflow-mcp)** | Full Airflow REST API integration via [astro-airflow-mcp](https://github.com/astronomer/agents/tree/main/astro-airflow-mcp): DAG management, triggering, task logs, system health |
-| [**Data Warehouse**](./packages/data-warehouse/) | SQL queries against configured warehouses (Snowflake, BigQuery, etc.), schema discovery, persistent Python kernel for analysis |
+| [**Data Warehouse**](./astro-dwh-mcp/) | SQL queries against configured warehouses (Snowflake, BigQuery, etc.), schema discovery, persistent Python kernel for analysis |
 
 ### Skills
 

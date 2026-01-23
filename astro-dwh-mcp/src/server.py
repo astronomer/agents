@@ -7,7 +7,7 @@ Usage:
     python -m src.server
 
 Or via the installed script:
-    data-warehouse
+    astro-dwh-mcp
 """
 
 import logging
@@ -203,7 +203,7 @@ def _write_sql_file(query: str, query_num: int, session_data_dir: Path) -> Path:
 
 
 # Create the FastMCP server
-mcp = FastMCP("data-warehouse")
+mcp = FastMCP("astro-dwh-mcp")
 
 
 @mcp.tool()
