@@ -215,6 +215,89 @@ class TestAirflowV2Adapter:
         assert result["assets"][0]["scheduled_dags"] == [{"dag_id": "consumer"}]
         assert "consuming_dags" not in result["assets"][0]
 
+    def test_list_asset_events_normalizes_field_names(self, mocker):
+        """Test V2 adapter normalizes dataset_events to asset_events."""
+        adapter = AirflowV2Adapter(
+            "http://localhost:8080",
+            "2.9.0",
+        )
+
+        mock_response = mocker.Mock()
+        mock_response.json.return_value = {
+            "dataset_events": [
+                {
+                    "dataset_uri": "s3://bucket/path",
+                    "source_dag_id": "producer_dag",
+                    "source_run_id": "run_123",
+                    "timestamp": "2024-01-01T00:00:00Z",
+                }
+            ],
+            "total_entries": 1,
+        }
+        mock_response.status_code = 200
+        mock_response.raise_for_status = mocker.Mock()
+
+        mock_client = mocker.Mock()
+        mock_client.get.return_value = mock_response
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+
+        mocker.patch("httpx.Client", return_value=mock_client)
+
+        result = adapter.list_asset_events(source_dag_id="producer_dag")
+
+        # Check normalization
+        assert "asset_events" in result
+        assert "dataset_events" not in result
+        assert "uri" in result["asset_events"][0]
+        assert "dataset_uri" not in result["asset_events"][0]
+        assert result["asset_events"][0]["source_dag_id"] == "producer_dag"
+
+        # Verify endpoint and params
+        call_args = mock_client.get.call_args
+        assert "/api/v1/datasets/events" in call_args[0][0]
+        assert call_args[1]["params"]["source_dag_id"] == "producer_dag"
+
+    def test_get_dag_run_upstream_asset_events_normalizes_field_names(self, mocker):
+        """Test V2 adapter normalizes dataset_events to asset_events for upstream events."""
+        adapter = AirflowV2Adapter(
+            "http://localhost:8080",
+            "2.9.0",
+        )
+
+        mock_response = mocker.Mock()
+        mock_response.json.return_value = {
+            "dataset_events": [
+                {
+                    "dataset_uri": "s3://bucket/input",
+                    "source_dag_id": "upstream_dag",
+                    "source_run_id": "upstream_run",
+                }
+            ],
+        }
+        mock_response.status_code = 200
+        mock_response.raise_for_status = mocker.Mock()
+
+        mock_client = mocker.Mock()
+        mock_client.get.return_value = mock_response
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+
+        mocker.patch("httpx.Client", return_value=mock_client)
+
+        result = adapter.get_dag_run_upstream_asset_events("consumer_dag", "run_123")
+
+        # Check normalization
+        assert "asset_events" in result
+        assert "dataset_events" not in result
+        assert "uri" in result["asset_events"][0]
+        assert "dataset_uri" not in result["asset_events"][0]
+        assert result["asset_events"][0]["source_dag_id"] == "upstream_dag"
+
+        # Verify endpoint
+        call_args = mock_client.get.call_args
+        assert "/api/v1/dags/consumer_dag/dagRuns/run_123/upstreamDatasetEvents" in call_args[0][0]
+
 
 class TestAirflowV3Adapter:
     """Tests for AirflowV3Adapter."""
@@ -277,6 +360,91 @@ class TestAirflowV3Adapter:
         call_kwargs = mock_client.get.call_args[1]
         assert call_kwargs["params"]["tags"] == ["production"]
         assert call_kwargs["params"]["only_active"] is True
+
+    def test_list_asset_events_normalizes_field_names(self, mocker):
+        """Test V3 adapter normalizes asset_uri to uri."""
+        adapter = AirflowV3Adapter(
+            "http://localhost:8080",
+            "3.0.0",
+        )
+
+        mock_response = mocker.Mock()
+        mock_response.json.return_value = {
+            "asset_events": [
+                {
+                    "asset_uri": "s3://bucket/path",
+                    "source_dag_id": "producer_dag",
+                    "source_run_id": "run_123",
+                    "timestamp": "2024-01-01T00:00:00Z",
+                }
+            ],
+            "total_entries": 1,
+        }
+        mock_response.status_code = 200
+        mock_response.raise_for_status = mocker.Mock()
+
+        mock_client = mocker.Mock()
+        mock_client.get.return_value = mock_response
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+
+        mocker.patch("httpx.Client", return_value=mock_client)
+
+        result = adapter.list_asset_events(
+            source_dag_id="producer_dag",
+            source_run_id="run_123",
+        )
+
+        # Check normalization
+        assert "asset_events" in result
+        assert "uri" in result["asset_events"][0]
+        assert "asset_uri" not in result["asset_events"][0]
+        assert result["asset_events"][0]["source_dag_id"] == "producer_dag"
+
+        # Verify endpoint and params
+        call_args = mock_client.get.call_args
+        assert "/api/v2/assets/events" in call_args[0][0]
+        assert call_args[1]["params"]["source_dag_id"] == "producer_dag"
+        assert call_args[1]["params"]["source_run_id"] == "run_123"
+
+    def test_get_dag_run_upstream_asset_events_normalizes_field_names(self, mocker):
+        """Test V3 adapter normalizes asset_uri to uri for upstream events."""
+        adapter = AirflowV3Adapter(
+            "http://localhost:8080",
+            "3.0.0",
+        )
+
+        mock_response = mocker.Mock()
+        mock_response.json.return_value = {
+            "asset_events": [
+                {
+                    "asset_uri": "s3://bucket/input",
+                    "source_dag_id": "upstream_dag",
+                    "source_run_id": "upstream_run",
+                }
+            ],
+        }
+        mock_response.status_code = 200
+        mock_response.raise_for_status = mocker.Mock()
+
+        mock_client = mocker.Mock()
+        mock_client.get.return_value = mock_response
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+
+        mocker.patch("httpx.Client", return_value=mock_client)
+
+        result = adapter.get_dag_run_upstream_asset_events("consumer_dag", "run_123")
+
+        # Check normalization
+        assert "asset_events" in result
+        assert "uri" in result["asset_events"][0]
+        assert "asset_uri" not in result["asset_events"][0]
+        assert result["asset_events"][0]["source_dag_id"] == "upstream_dag"
+
+        # Verify endpoint
+        call_args = mock_client.get.call_args
+        assert "/api/v2/dags/consumer_dag/dagRuns/run_123/upstreamAssetEvents" in call_args[0][0]
 
 
 class TestVersionDetection:

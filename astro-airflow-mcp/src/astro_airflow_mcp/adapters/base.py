@@ -321,6 +321,47 @@ class AirflowAdapter(ABC):
     def list_assets(self, limit: int = 100, offset: int = 0, **kwargs: Any) -> dict[str, Any]:
         """List assets/datasets."""
 
+    @abstractmethod
+    def list_asset_events(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        source_dag_id: str | None = None,
+        source_run_id: str | None = None,
+        source_task_id: str | None = None,
+    ) -> dict[str, Any]:
+        """List asset/dataset events with optional filters.
+
+        Args:
+            limit: Maximum number of events to return
+            offset: Offset for pagination
+            source_dag_id: Filter by DAG that produced the event
+            source_run_id: Filter by DAG run that produced the event
+            source_task_id: Filter by task that produced the event
+
+        Returns:
+            Dict with 'asset_events' list (normalized key for both Airflow 2/3)
+        """
+
+    @abstractmethod
+    def get_dag_run_upstream_asset_events(
+        self,
+        dag_id: str,
+        dag_run_id: str,
+    ) -> dict[str, Any]:
+        """Get asset events that triggered a specific DAG run.
+
+        This is used to verify causation - which asset events caused this
+        DAG run to be scheduled (data-aware scheduling).
+
+        Args:
+            dag_id: The DAG ID
+            dag_run_id: The DAG run ID
+
+        Returns:
+            Dict with 'asset_events' list showing which events triggered this run
+        """
+
     # Variable Operations
     @abstractmethod
     def list_variables(self, limit: int = 100, offset: int = 0) -> dict[str, Any]:
