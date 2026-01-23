@@ -226,7 +226,7 @@ SNOWFLAKE_USER=myuser
 SNOWFLAKE_PRIVATE_KEY_PASSPHRASE=your-passphrase-here  # Only required if using an encrypted private key
 ```
 
-**Supported warehouses:** Snowflake, BigQuery, Databricks, Redshift.
+**Supported warehouses:** Snowflake.
 
 ### Airflow
 
