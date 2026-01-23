@@ -8,6 +8,5 @@
   },
   "homepage": "https://github.com/astronomer/agents",
   "repository": "https://github.com/astronomer/agents",
-  "keywords": ["data-engineering", "airflow", "snowflake", "bigquery", "jupyter", "astronomer"],
-  "hooks": "./hooks/hooks.json"
+  "keywords": ["data-engineering", "airflow", "snowflake", "bigquery", "jupyter", "astronomer"]
 }
