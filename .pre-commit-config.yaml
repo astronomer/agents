@@ -5,18 +5,14 @@ repos:
       - id: ruff
         args: [--fix]
         types_or: [python, pyi]
-        exclude: ^astro-dwh-mcp/src/scripts/  # Go-style templates
       - id: ruff-format
         types_or: [python, pyi]
-        exclude: ^astro-dwh-mcp/src/scripts/  # Go-style templates
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
-        exclude: ^astro-dwh-mcp/src/scripts/  # Go-style templates
       - id: end-of-file-fixer
-        exclude: ^astro-dwh-mcp/src/scripts/  # Go-style templates
       - id: check-yaml
       - id: check-added-large-files
       - id: check-json
