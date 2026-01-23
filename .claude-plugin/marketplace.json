@@ -7,9 +7,17 @@
   "plugins": [
     {
       "name": "data",
-      "source": "./claude-code-plugin",
+      "source": "./",
+      "strict": false,
       "description": "Data engineering plugin - warehouse exploration, pipeline authoring, Airflow integration",
-      "version": "0.1.0"
+      "version": "0.1.0",
+      "author": {
+        "name": "Astronomer",
+        "email": "support@astronomer.io"
+      },
+      "homepage": "https://github.com/astronomer/agents",
+      "repository": "https://github.com/astronomer/agents",
+      "keywords": ["data-engineering", "airflow", "snowflake", "bigquery", "jupyter", "astronomer"]
     }
   ]
 }
