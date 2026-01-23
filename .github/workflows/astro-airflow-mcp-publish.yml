@@ -21,6 +21,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          fetch-depth: 0  # Full history for hatch-vcs to read version from tags
 
       - name: Set up Python
         uses: actions/setup-python@v5
