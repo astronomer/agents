@@ -67,10 +67,10 @@ Configure in `.mcp.json` at the repo root:
 
 ## Key Files
 
-- `.claude-plugin/marketplace.json` - Marketplace catalog with inline plugin definition
-- `.mcp.json` - MCP server configuration
-- `hooks/hooks.json` - Plugin hooks configuration
-- `skills/*/SKILL.md` - Individual skills
+- `.claude-plugin/marketplace.json` - Marketplace catalog with inline plugin definition (references hooks and mcpServers)
+- `.mcp.json` - MCP server configuration (referenced via `"mcpServers": "./.mcp.json"`)
+- `hooks/hooks.json` - Plugin hooks (referenced via `"hooks": "./hooks/hooks.json"`)
+- `skills/*/SKILL.md` - Individual skills (auto-discovered)
 
 ## Config Location
 
