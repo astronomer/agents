@@ -17,14 +17,13 @@ Built by [Astronomer](https://www.astronomer.io/).
 
 ## Features
 
-The `data` plugin bundles MCP servers and skills into a single installable package.
+The `data` plugin bundles an MCP server and skills into a single installable package.
 
-### MCP Servers
+### MCP Server
 
 | Server | Description |
 |--------|-------------|
 | **[Airflow](https://github.com/astronomer/agents/tree/main/astro-airflow-mcp)** | Full Airflow REST API integration via [astro-airflow-mcp](https://github.com/astronomer/agents/tree/main/astro-airflow-mcp): DAG management, triggering, task logs, system health |
-| [**Data Warehouse**](./astro-dwh-mcp/) | SQL queries against configured warehouses (Snowflake, BigQuery, etc.), schema discovery, persistent Python kernel for analysis |
 
 ### Skills
 
@@ -40,7 +39,7 @@ The `data` plugin bundles MCP servers and skills into a single installable packa
 
 | Skill | Description |
 |-------|-------------|
-| [analyzing-data](./shared-skills/analyzing-data/) | SQL-based analysis to answer business questions |
+| [analyzing-data](./shared-skills/analyzing-data/) | SQL-based analysis to answer business questions (uses background Jupyter kernel) |
 | [checking-freshness](./shared-skills/checking-freshness/) | Check how current your data is |
 | [discovering-data](./shared-skills/discovering-data/) | Discover what data exists for a concept or domain |
 | [profiling-tables](./shared-skills/profiling-tables/) | Comprehensive table profiling and quality assessment |
@@ -70,8 +69,8 @@ The `data` plugin bundles MCP servers and skills into a single installable packa
 
 ### Compatibility
 
-| Client | MCP Servers | Skills |
-|--------|-------------|--------|
+| Client | MCP Server | Skills |
+|--------|------------|--------|
 | Claude Code | Yes | Yes (13 skills) |
 | Cursor | Yes | Yes (via Claude Code) |
 | OpenCode | Yes | Yes |
@@ -86,16 +85,15 @@ claude plugin marketplace add astronomer/agents
 claude plugin install data@astronomer
 ```
 
-The plugin includes MCP servers that run via `uvx` from PyPI - no local installation required.
+The plugin includes the Airflow MCP server that runs via `uvx` from PyPI. Data warehouse queries are handled by the `analyzing-data` skill using a background Jupyter kernel.
 
 ### Cursor
 
 Cursor supports both MCP servers and skills.
 
-**MCP Servers** - Click to install:
+**MCP Server** - Click to install:
 
 <a href="https://cursor.com/en-US/install-mcp?name=astro-airflow-mcp&config=eyJjb21tYW5kIjoidXZ4IiwiYXJncyI6WyJhc3Ryby1haXJmbG93LW1jcCIsIi0tdHJhbnNwb3J0Iiwic3RkaW8iXX0"><img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Add Airflow MCP to Cursor" height="32"></a>
-<a href="https://cursor.com/en-US/install-mcp?name=astro-dwh-mcp&config=eyJjb21tYW5kIjoidXZ4IiwiYXJncyI6WyJhc3Ryby1kd2gtbWNwIl19"><img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Add Warehouse MCP to Cursor" height="32"></a>
 
 **Skills** - Cursor auto-discovers skills from Claude Code plugins:
 
@@ -114,10 +112,6 @@ Add to `~/.cursor/mcp.json`:
     "airflow": {
       "command": "uvx",
       "args": ["astro-airflow-mcp", "--transport", "stdio"]
-    },
-    "warehouse": {
-      "command": "uvx",
-      "args": ["astro-dwh-mcp"]
     }
   }
 }
@@ -130,7 +124,6 @@ Add to `~/.cursor/mcp.json`:
 VS Code with Cline supports MCP servers (not skills).
 
 <a href="https://insiders.vscode.dev/redirect?url=vscode://ms-vscode.vscode-mcp/install?%7B%22name%22%3A%22astro-airflow-mcp%22%2C%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22astro-airflow-mcp%22%2C%22--transport%22%2C%22stdio%22%5D%7D"><img src="https://img.shields.io/badge/VS_Code-Install_Airflow_MCP-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white" alt="Install in VS Code" height="32"></a>
-<a href="https://insiders.vscode.dev/redirect?url=vscode://ms-vscode.vscode-mcp/install?%7B%22name%22%3A%22astro-dwh-mcp%22%2C%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22astro-dwh-mcp%22%5D%7D"><img src="https://img.shields.io/badge/VS_Code-Install_Warehouse_MCP-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white" alt="Install in VS Code" height="32"></a>
 
 <details>
 <summary>Manual configuration</summary>
@@ -143,10 +136,6 @@ Add to `.vscode/mcp.json`:
     "airflow": {
       "command": "uvx",
       "args": ["astro-airflow-mcp", "--transport", "stdio"]
-    },
-    "warehouse": {
-      "command": "uvx",
-      "args": ["astro-dwh-mcp"]
     }
   }
 }
@@ -168,10 +157,6 @@ Add to your config file:
     "airflow": {
       "command": "uvx",
       "args": ["astro-airflow-mcp", "--transport", "stdio"]
-    },
-    "warehouse": {
-      "command": "uvx",
-      "args": ["astro-dwh-mcp"]
     }
   }
 }
@@ -180,10 +165,9 @@ Add to your config file:
 ### OpenCode
 
 ```bash
-# Clone and install
+# Clone the repo
 git clone https://github.com/astronomer/agents.git
 cd agents
-make install
 
 # Run from the opencode directory
 cd opencode
@@ -203,9 +187,6 @@ AIRFLOW_API_URL=https://your-airflow.example.com \
 AIRFLOW_USERNAME=admin \
 AIRFLOW_PASSWORD=admin \
 uvx astro-airflow-mcp --transport stdio
-
-# Data Warehouse MCP (requires ~/.astro/ai/config/warehouse.yml)
-uvx astro-dwh-mcp
 ```
 
 ## Configuration
@@ -281,9 +262,6 @@ See [CLAUDE.md](./CLAUDE.md) for plugin development guidelines.
 git clone https://github.com/astronomer/agents.git
 cd agents
 
-# Install local MCP servers as uv tools
-make install
-
 # Test with local plugin
 claude --plugin-dir ./claude-code-plugin
 
@@ -310,32 +288,12 @@ After adding skills, reinstall the plugin:
 claude plugin uninstall data@astronomer && claude plugin install data@astronomer
 ```
 
-### Testing Skills
-
-The repo includes a testing framework for iterating on skills without hitting real warehouses:
-
-```bash
-# Enable dry-run mode with mock responses
-export DRY_RUN_MODE=true
-export MOCK_RESPONSES_FILE=tests/mocks/hitl-mocks.yaml
-
-# Test a query
-claude --plugin-dir ./claude-code-plugin "Find HITL customers"
-```
-
-See [`docs/skill-testing.md`](./docs/skill-testing.md) for the full framework documentation including:
-- DRY_RUN mode for mock responses
-- Flow tracing and comparison
-- Ralph Loop for automated iteration
-- A/B testing configurations
-
 ## Troubleshooting
 
 ### Common Issues
 
 | Issue | Solution |
 |-------|----------|
-| MCP server not connecting | Run `make install` to ensure local packages are installed |
 | Skills not appearing | Reinstall plugin: `claude plugin uninstall data@astronomer && claude plugin install data@astronomer` |
 | Warehouse connection errors | Check credentials in `~/.astro/ai/config/.env` and connection config in `warehouse.yml` |
 | Airflow not detected | Ensure you're running from a directory with `airflow.cfg` or a `dags/` folder |
