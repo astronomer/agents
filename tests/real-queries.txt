@@ -1,4 +1,0 @@
-Which customers managed by account owner John Smith are still on Airflow 2.x
-how many tasks has Acme Corp run on their DEV deployment in January?
-how many hosted customers have the datadog metrics export configured?
-query our warehouse for a list of customers who have task runs that use the HITLOperator from deployment operator activity
