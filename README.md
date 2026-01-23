@@ -159,18 +159,11 @@ The `data` plugin bundles an MCP server and skills into a single installable pac
 
 ### Skills
 
-#### Setup & Configuration
-
-| Skill | Description |
-|-------|-------------|
-| [initializing-warehouse](./shared-skills/initializing-warehouse/) | Initialize schema discovery - generates `.astro/warehouse.md` for instant lookups |
-| [managing-astro-local-env](./shared-skills/managing-astro-local-env/) | Manage local Airflow environment (start, stop, logs, troubleshoot) |
-| [setting-up-astro-project](./shared-skills/setting-up-astro-project/) | Initialize and configure new Astro/Airflow projects |
-
 #### Data Discovery & Analysis
 
 | Skill | Description |
 |-------|-------------|
+| [initializing-warehouse](./shared-skills/initializing-warehouse/) | Initialize schema discovery - generates `.astro/warehouse.md` for instant lookups |
 | [analyzing-data](./shared-skills/analyzing-data/) | SQL-based analysis to answer business questions (uses background Jupyter kernel) |
 | [checking-freshness](./shared-skills/checking-freshness/) | Check how current your data is |
 | [discovering-data](./shared-skills/discovering-data/) | Discover what data exists for a concept or domain |
@@ -187,6 +180,8 @@ The `data` plugin bundles an MCP server and skills into a single installable pac
 
 | Skill | Description |
 |-------|-------------|
+| [managing-astro-local-env](./shared-skills/managing-astro-local-env/) | Manage local Airflow environment (start, stop, logs, troubleshoot) |
+| [setting-up-astro-project](./shared-skills/setting-up-astro-project/) | Initialize and configure new Astro/Airflow projects |
 | [authoring-dags](./shared-skills/authoring-dags/) | Create and validate Airflow DAGs with best practices |
 | [debugging-dags](./shared-skills/debugging-dags/) | Debug failed DAG runs and find root causes |
 | [testing-dags](./shared-skills/testing-dags/) | Test and debug Airflow DAGs locally |
