@@ -6,8 +6,8 @@ Built by [Astronomer](https://www.astronomer.io/).
 
 ## Table of Contents
 
-- [Features](#features)
 - [Installation](#installation)
+- [Features](#features)
 - [Configuration](#configuration)
 - [Usage](#usage)
 - [Development](#development)
@@ -15,57 +15,15 @@ Built by [Astronomer](https://www.astronomer.io/).
 - [Contributing](#contributing)
 - [License](#license)
 
-## Features
-
-The `data` plugin bundles an MCP server and skills into a single installable package.
-
-### MCP Server
-
-| Server | Description |
-|--------|-------------|
-| **[Airflow](https://github.com/astronomer/agents/tree/main/astro-airflow-mcp)** | Full Airflow REST API integration via [astro-airflow-mcp](https://github.com/astronomer/agents/tree/main/astro-airflow-mcp): DAG management, triggering, task logs, system health |
-
-### Skills
-
-#### Setup & Configuration
-
-| Skill | Description |
-|-------|-------------|
-| [initializing-warehouse](./shared-skills/initializing-warehouse/) | Initialize schema discovery - generates `.astro/warehouse.md` for instant lookups |
-| [managing-astro-local-env](./shared-skills/managing-astro-local-env/) | Manage local Airflow environment (start, stop, logs, troubleshoot) |
-| [setting-up-astro-project](./shared-skills/setting-up-astro-project/) | Initialize and configure new Astro/Airflow projects |
-
-#### Data Discovery & Analysis
-
-| Skill | Description |
-|-------|-------------|
-| [analyzing-data](./shared-skills/analyzing-data/) | SQL-based analysis to answer business questions (uses background Jupyter kernel) |
-| [checking-freshness](./shared-skills/checking-freshness/) | Check how current your data is |
-| [discovering-data](./shared-skills/discovering-data/) | Discover what data exists for a concept or domain |
-| [profiling-tables](./shared-skills/profiling-tables/) | Comprehensive table profiling and quality assessment |
-
-#### Data Lineage
-
-| Skill | Description |
-|-------|-------------|
-| [tracing-downstream-lineage](./shared-skills/tracing-downstream-lineage/) | Analyze what breaks if you change something |
-| [tracing-upstream-lineage](./shared-skills/tracing-upstream-lineage/) | Trace where data comes from |
-
-#### DAG Development
-
-| Skill | Description |
-|-------|-------------|
-| [authoring-dags](./shared-skills/authoring-dags/) | Create and validate Airflow DAGs with best practices |
-| [debugging-dags](./shared-skills/debugging-dags/) | Debug failed DAG runs and find root causes |
-| [testing-dags](./shared-skills/testing-dags/) | Test and debug Airflow DAGs locally |
-
-#### Migration
-
-| Skill | Description |
-|-------|-------------|
-| [migrating-airflow-2-to-3](./shared-skills/migrating-airflow-2-to-3/) | Migrate DAGs from Airflow 2.x to 3.x |
-
 ## Installation
+
+### Quick Start
+
+```bash
+npx skills add astronomer/agents
+```
+
+This installs Astronomer skills into your project via [skills.sh](https://skills.sh). Works with Claude Code, Cursor, and other AI coding tools.
 
 ### Compatibility
 
@@ -188,6 +146,56 @@ AIRFLOW_USERNAME=admin \
 AIRFLOW_PASSWORD=admin \
 uvx astro-airflow-mcp --transport stdio
 ```
+
+## Features
+
+The `data` plugin bundles an MCP server and skills into a single installable package.
+
+### MCP Server
+
+| Server | Description |
+|--------|-------------|
+| **[Airflow](https://github.com/astronomer/agents/tree/main/astro-airflow-mcp)** | Full Airflow REST API integration via [astro-airflow-mcp](https://github.com/astronomer/agents/tree/main/astro-airflow-mcp): DAG management, triggering, task logs, system health |
+
+### Skills
+
+#### Setup & Configuration
+
+| Skill | Description |
+|-------|-------------|
+| [initializing-warehouse](./shared-skills/initializing-warehouse/) | Initialize schema discovery - generates `.astro/warehouse.md` for instant lookups |
+| [managing-astro-local-env](./shared-skills/managing-astro-local-env/) | Manage local Airflow environment (start, stop, logs, troubleshoot) |
+| [setting-up-astro-project](./shared-skills/setting-up-astro-project/) | Initialize and configure new Astro/Airflow projects |
+
+#### Data Discovery & Analysis
+
+| Skill | Description |
+|-------|-------------|
+| [analyzing-data](./shared-skills/analyzing-data/) | SQL-based analysis to answer business questions (uses background Jupyter kernel) |
+| [checking-freshness](./shared-skills/checking-freshness/) | Check how current your data is |
+| [discovering-data](./shared-skills/discovering-data/) | Discover what data exists for a concept or domain |
+| [profiling-tables](./shared-skills/profiling-tables/) | Comprehensive table profiling and quality assessment |
+
+#### Data Lineage
+
+| Skill | Description |
+|-------|-------------|
+| [tracing-downstream-lineage](./shared-skills/tracing-downstream-lineage/) | Analyze what breaks if you change something |
+| [tracing-upstream-lineage](./shared-skills/tracing-upstream-lineage/) | Trace where data comes from |
+
+#### DAG Development
+
+| Skill | Description |
+|-------|-------------|
+| [authoring-dags](./shared-skills/authoring-dags/) | Create and validate Airflow DAGs with best practices |
+| [debugging-dags](./shared-skills/debugging-dags/) | Debug failed DAG runs and find root causes |
+| [testing-dags](./shared-skills/testing-dags/) | Test and debug Airflow DAGs locally |
+
+#### Migration
+
+| Skill | Description |
+|-------|-------------|
+| [migrating-airflow-2-to-3](./shared-skills/migrating-airflow-2-to-3/) | Migrate DAGs from Airflow 2.x to 3.x |
 
 ## Configuration
 
