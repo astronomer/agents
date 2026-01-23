@@ -1,0 +1,99 @@
+# Docker Compose for running integration tests against multiple Airflow versions
+#
+# Usage:
+#   # Start Airflow 2.x
+#   docker compose -f docker-compose.test.yml --profile airflow2 up -d
+#   ./scripts/run-integration-tests.sh http://localhost:8080
+#
+#   # Start Airflow 3.x
+#   docker compose -f docker-compose.test.yml --profile airflow3 up -d
+#   ./scripts/run-integration-tests.sh http://localhost:8081
+#
+#   # Start both (for comprehensive testing)
+#   docker compose -f docker-compose.test.yml --profile all up -d
+
+services:
+  # PostgreSQL for Airflow 2.x (LocalExecutor requires non-SQLite DB in 2.11+)
+  postgres2:
+    image: postgres:15
+    profiles: ["airflow2", "all"]
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      retries: 5
+
+  # Airflow 2.x (latest 2.x release)
+  airflow2:
+    image: apache/airflow:2.11.0-python3.11
+    profiles: ["airflow2", "all"]
+    depends_on:
+      postgres2:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres2/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "true"
+      AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+      _AIRFLOW_DB_MIGRATE: "true"
+      _AIRFLOW_WWW_USER_CREATE: "true"
+      _AIRFLOW_WWW_USER_USERNAME: admin
+      _AIRFLOW_WWW_USER_PASSWORD: admin
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./tests/integration/dags:/opt/airflow/dags/test_dags:ro
+    command: standalone
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  # PostgreSQL for Airflow 3.x
+  postgres3:
+    image: postgres:15
+    profiles: ["airflow3", "all"]
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      retries: 5
+
+  # Airflow 3.x (latest 3.x release)
+  airflow3:
+    image: apache/airflow:3.1.0-python3.12
+    profiles: ["airflow3", "all"]
+    depends_on:
+      postgres3:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres3/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "true"
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+      # Use passwords file to set fixed passwords (admin:admin)
+      # See: https://github.com/apache/airflow/blob/main/dev/breeze/src/airflow_breeze/files/simple_auth_manager_passwords.json
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: /opt/airflow/passwords.json
+      _AIRFLOW_DB_MIGRATE: "true"
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./tests/integration/passwords.json:/tmp/passwords.json:ro
+      - ./tests/integration/dags:/opt/airflow/dags/test_dags:ro
+    command: >
+      bash -c "cp /tmp/passwords.json /opt/airflow/passwords.json && airflow standalone"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v2/monitor/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
