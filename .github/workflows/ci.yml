@@ -29,7 +29,7 @@ jobs:
         uses: astral-sh/setup-uv@v5
 
       - name: Run analyzing-data skill tests
-        working-directory: shared-skills/analyzing-data/scripts
+        working-directory: skills/analyzing-data/scripts
         run: uv run --with pytest pytest tests/ -v
 
   typecheck:
@@ -42,5 +42,5 @@ jobs:
         uses: astral-sh/setup-uv@v5
 
       - name: Run ty type checker
-        working-directory: shared-skills/analyzing-data/scripts
+        working-directory: skills/analyzing-data/scripts
         run: uvx ty check
