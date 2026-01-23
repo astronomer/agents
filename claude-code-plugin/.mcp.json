@@ -6,7 +6,7 @@
     },
     "warehouse": {
       "command": "uvx",
-      "args": ["data-warehouse"]
+      "args": ["astro-dwh-mcp"]
     }
   }
 }

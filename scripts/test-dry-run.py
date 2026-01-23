@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test DRY_RUN mode in the data-warehouse MCP server."""
+"""Test DRY_RUN mode in the astro-dwh-mcp MCP server."""
 
 import os
 import sys
@@ -7,7 +7,7 @@ from pathlib import Path
 
 # Add the package to path - use installed version for proper dependencies
 INSTALLED_PATH = (
-    Path.home() / ".local/share/uv/tools/data-warehouse/lib/python3.12/site-packages"
+    Path.home() / ".local/share/uv/tools/astro-dwh-mcp/lib/python3.12/site-packages"
 )
 sys.path.insert(0, str(INSTALLED_PATH))
 

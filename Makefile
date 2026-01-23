@@ -1,7 +1,7 @@
 .PHONY: help install reinstall install-dev install-all sync lint format check test run build clean
 
 # Directory containing the Python project
-WAREHOUSE_DIR := packages/data-warehouse
+DWH_DIR := astro-dwh-mcp
 
 # Default target
 help:  ## Show this help message
@@ -26,48 +26,48 @@ help:  ## Show this help message
 
 # Installation targets
 install:  ## [quick] Install core dependencies and local MCP server
-	cd $(WAREHOUSE_DIR) && uv sync
-	uv tool install --force $(WAREHOUSE_DIR)
+	cd $(DWH_DIR) && uv sync
+	uv tool install --force ./$(DWH_DIR)
 
 reinstall:  ## [quick] Reinstall MCP server (after code changes)
-	uv tool install --force $(WAREHOUSE_DIR)
+	uv tool install --force ./$(DWH_DIR)
 
 install-dev:  ## [dev] Install with dev dependencies
-	cd $(WAREHOUSE_DIR) && uv sync --extra dev
+	cd $(DWH_DIR) && uv sync --extra dev
 
 install-all:  ## [dev] Install with all optional dependencies
-	cd $(WAREHOUSE_DIR) && uv sync --all-extras
+	cd $(DWH_DIR) && uv sync --all-extras
 
 sync:  ## [dev] Sync dependencies from lockfile
-	cd $(WAREHOUSE_DIR) && uv sync --frozen
+	cd $(DWH_DIR) && uv sync --frozen
 
 # Development targets
 lint:  ## [test] Run ruff linter
-	cd $(WAREHOUSE_DIR) && uv run ruff check src/
+	cd $(DWH_DIR) && uv run ruff check src/
 
 format:  ## [dev] Format code with ruff
-	cd $(WAREHOUSE_DIR) && uv run ruff format src/
-	cd $(WAREHOUSE_DIR) && uv run ruff check --fix src/
+	cd $(DWH_DIR) && uv run ruff format src/
+	cd $(DWH_DIR) && uv run ruff check --fix src/
 
 check:  ## [test] Run linter and format check
-	cd $(WAREHOUSE_DIR) && uv run ruff check src/
-	cd $(WAREHOUSE_DIR) && uv run ruff format --check src/
+	cd $(DWH_DIR) && uv run ruff check src/
+	cd $(DWH_DIR) && uv run ruff format --check src/
 
 test:  ## [test] Run tests with pytest
-	cd $(WAREHOUSE_DIR) && uv run pytest
+	cd $(DWH_DIR) && uv run pytest
 
 # Run target
 run:  ## [quick] Run the data warehouse MCP server
-	cd $(WAREHOUSE_DIR) && uv run data-warehouse
+	cd $(DWH_DIR) && uv run astro-dwh-mcp
 
 # Build targets
 build:  ## [build] Build the package
-	cd $(WAREHOUSE_DIR) && uv build
+	cd $(DWH_DIR) && uv build
 
 clean:  ## [util] Remove build artifacts
-	rm -rf $(WAREHOUSE_DIR)/dist/
-	rm -rf $(WAREHOUSE_DIR)/build/
-	rm -rf $(WAREHOUSE_DIR)/.pytest_cache/
-	rm -rf $(WAREHOUSE_DIR)/.ruff_cache/
-	find $(WAREHOUSE_DIR) -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-	find $(WAREHOUSE_DIR) -type f -name "*.pyc" -delete 2>/dev/null || true
+	rm -rf $(DWH_DIR)/dist/
+	rm -rf $(DWH_DIR)/build/
+	rm -rf $(DWH_DIR)/.pytest_cache/
+	rm -rf $(DWH_DIR)/.ruff_cache/
+	find $(DWH_DIR) -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	find $(DWH_DIR) -type f -name "*.pyc" -delete 2>/dev/null || true

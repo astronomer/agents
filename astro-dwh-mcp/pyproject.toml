@@ -1,5 +1,5 @@
 [project]
-name = "data-warehouse"
+name = "astro-dwh-mcp"
 version = "0.1.0"
 description = "MCP server for data warehouse operations (SQL, schema exploration)"
 requires-python = ">=3.11"
@@ -20,7 +20,7 @@ dev = [
 ]
 
 [project.scripts]
-data-warehouse = "src.server:main"
+astro-dwh-mcp = "src.server:main"
 
 [build-system]
 requires = ["hatchling"]

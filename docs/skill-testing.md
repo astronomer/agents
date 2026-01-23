@@ -30,7 +30,7 @@ python scripts/compare-flows.py \
 
 ## Components
 
-### DRY_RUN Mode (`packages/data-warehouse/src/mocks.py`)
+### DRY_RUN Mode (`astro-dwh-mcp/src/mocks.py`)
 
 When `DRY_RUN_MODE=true`, the MCP server returns mock responses instead of executing real queries:
 
@@ -124,7 +124,7 @@ Flow Comparison Results:
 
 ```
 agents/
-├── packages/data-warehouse/src/
+├── astro-dwh-mcp/src/
 │   ├── server.py          # MCP server with DRY_RUN support
 │   └── mocks.py           # Mock response system
 ├── tests/

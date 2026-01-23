@@ -1,4 +1,4 @@
-"""Configuration utilities for the data-warehouse package."""
+"""Configuration utilities for the astro-dwh-mcp package."""
 
 import logging
 from pathlib import Path

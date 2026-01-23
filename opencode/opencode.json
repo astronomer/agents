@@ -7,7 +7,7 @@
     },
     "warehouse": {
       "type": "local",
-      "command": ["uvx", "data-warehouse"]
+      "command": ["uvx", "astro-dwh-mcp"]
     }
   }
 }
