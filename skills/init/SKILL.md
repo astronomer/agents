@@ -1,16 +1,24 @@
 ---
-name: initializing-warehouse
+name: init
 description: Initialize warehouse schema discovery. Generates .astro/warehouse.md with all table metadata for instant lookups. Run once per project, refresh when schema changes. Use when user says "/data:init" or asks to set up data discovery.
 hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: "uv run ${CLAUDE_PLUGIN_ROOT}/skills/analyzing-data/scripts/cli.py ensure"
+          once: true
   Stop:
     - hooks:
         - type: command
-          command: "echo 'Cache populated. Use analyzing-data skill for queries.'"
+          command: "uv run ${CLAUDE_PLUGIN_ROOT}/skills/analyzing-data/scripts/cli.py stop"
 ---
 
 # Initialize Warehouse Schema
 
 Generate a comprehensive, user-editable schema reference file for the data warehouse.
+
+**Scripts:** `$CLAUDE_PLUGIN_ROOT/skills/analyzing-data/scripts/`
 
 ## What This Does
 
@@ -24,12 +32,11 @@ Generate a comprehensive, user-editable schema reference file for the data wareh
 
 ### Step 1: Read Warehouse Configuration
 
-```python
-# Read ~/.astro/ai/config/warehouse.yml to get configured databases
-# Example config has: databases: [HQ, ANALYTICS, RAW]
+```bash
+cat ~/.astro/ai/config/warehouse.yml
 ```
 
-Use `list_schemas()` with no database argument to see all configured databases.
+Get the list of databases to discover (e.g., `databases: [HQ, ANALYTICS, RAW]`).
 
 ### Step 2: Search Codebase for Context (Parallel)
 
@@ -66,20 +73,31 @@ For each database in configured_databases:
     Task(
         subagent_type="general-purpose",
         prompt="""
-        Discover all metadata for database {DATABASE}:
+        Discover all metadata for database {DATABASE}.
 
-        1. Call list_schemas(database="{DATABASE}")
-        2. For each schema returned, call list_tables(database="{DATABASE}", schema=X)
-        3. For tables with interesting names or high row counts,
-           call get_tables_info(database="{DATABASE}", schema=X, tables=[...])
+        Use the CLI to run SQL queries:
+        # Scripts are relative to ../analyzing-data/
+        uv run scripts/cli.py exec "df = run_sql('...')"
+        uv run scripts/cli.py exec "print(df)"
+
+        1. Query schemas:
+           SELECT SCHEMA_NAME FROM {DATABASE}.INFORMATION_SCHEMA.SCHEMATA
+
+        2. Query tables with row counts:
+           SELECT TABLE_SCHEMA, TABLE_NAME, ROW_COUNT, COMMENT
+           FROM {DATABASE}.INFORMATION_SCHEMA.TABLES
+           ORDER BY TABLE_SCHEMA, TABLE_NAME
+
+        3. For important schemas (MODEL_*, METRICS_*, MART_*), query columns:
+           SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE, COMMENT
+           FROM {DATABASE}.INFORMATION_SCHEMA.COLUMNS
+           WHERE TABLE_SCHEMA = 'X'
 
         Return a structured summary:
         - Database name
         - List of schemas with table counts
-        - For each table: name, row_count, columns (if fetched)
+        - For each table: name, row_count, key columns
         - Flag any tables with >100M rows as "large"
-
-        Focus on MODEL_*, METRICS_*, MART_* schemas first as these are most useful.
         """
     )
 ```
@@ -88,16 +106,18 @@ For each database in configured_databases:
 
 ### Step 4: Discover Categorical Value Families
 
-For key categorical columns (like OPERATOR, STATUS, TYPE, FEATURE), discover value families to help with filtering:
+For key categorical columns (like OPERATOR, STATUS, TYPE, FEATURE), discover value families:
 
-```sql
--- Find distinct values and group into families
+```bash
+uv run cli.py exec "df = run_sql('''
 SELECT DISTINCT column_name, COUNT(*) as occurrences
 FROM table
 WHERE column_name IS NOT NULL
 GROUP BY column_name
 ORDER BY occurrences DESC
 LIMIT 50
+''')"
+uv run cli.py exec "print(df)"
 ```
 
 Group related values into families by common prefix/suffix (e.g., `Export*` for ExportCSV, ExportJSON, ExportParquet).
@@ -182,44 +202,17 @@ Query downstream first: `reporting` > `mart_*` > `metric_*` > `model_*` > `IN_*`
 | `/data:init` | Generate .astro/warehouse.md |
 | `/data:init --refresh` | Regenerate, preserving user edits |
 | `/data:init --database HQ` | Only discover specific database |
-| `/data:init --warehouse prod` | Use specific warehouse from config |
 | `/data:init --global` | Write to ~/.astro/ai/config/ instead |
-| `/data:init --no-code` | Skip codebase search |
-
-## Multi-Warehouse Support
-
-When `warehouse.yml` has multiple warehouses:
-
-```yaml
-prod:
-  type: snowflake
-  databases: [HQ, ANALYTICS]
-
-staging:
-  type: snowflake
-  databases: [HQ_STAGING]
-```
-
-Default behavior: discover the first/default warehouse.
-Use `--warehouse NAME` to specify which one.
-
-For separate files per warehouse: `--warehouse prod --output warehouse-prod.md`
 
 ### Step 7: Pre-populate Cache
 
-After generating warehouse.md, automatically populate the runtime cache with all Quick Reference entries:
+After generating warehouse.md, populate the concept cache:
 
+```bash
+# Scripts are relative to ../analyzing-data/
+uv run cli.py concept import -p .astro/warehouse.md
+uv run cli.py concept learn customers HQ.MART_CUST.CURRENT_ASTRO_CUSTS -k ACCT_ID
 ```
-For each row in Quick Reference table:
-    learn_concept(
-        concept=row.concept,
-        table=row.table,
-        key_column=row.key_column,
-        date_column=row.date_column
-    )
-```
-
-This enables instant `lookup_concept()` results without reading warehouse.md.
 
 ### Step 8: Offer CLAUDE.md Integration (Ask User)
 
@@ -254,6 +247,7 @@ When querying the warehouse, use these table mappings:
 
 > Auto-generated by `/data:init`. Run `/data:init --refresh` to update.
 ```
+**If yes:** Append the Quick Reference section to `.claude/CLAUDE.md` or `CLAUDE.md`.
 
 ## After Generation
 
@@ -263,18 +257,14 @@ Tell the user:
 Generated .astro/warehouse.md
 
 Summary:
-  - {N} databases
-  - {N} schemas
-  - {N} tables
-  - {N} columns
+  - {N} databases, {N} schemas, {N} tables
   - {N} tables enriched with code descriptions
   - {N} concepts cached for instant lookup
 
-You can now:
+Next steps:
   1. Edit .astro/warehouse.md to add business context
-  2. Fill in the Quick Reference table with concept mappings
-  3. Commit it to your repo for team sharing
-  4. Run /data:init --refresh when schema changes
+  2. Commit to version control
+  3. Run /data:init --refresh when schema changes
 ```
 
 ## Refresh Behavior
@@ -311,25 +301,18 @@ Watch for these indicators:
 
 If you suspect cache issues:
 
+```bash
+# Scripts are relative to ../analyzing-data/
+uv run scripts/cli.py cache status
+uv run scripts/cli.py cache clear --stale-only
+uv run scripts/cli.py cache clear
 ```
-# Check cache status
-cache_status()
-
-# Clear stale entries (older than 7 days)
-clear_cache(cache_type="all", purge_stale_only=True)
-
-# Full reset
-clear_cache(cache_type="all")
-```
-
-Then run `/data:init --refresh` to repopulate.
 
 ## Codebase Patterns Recognized
 
 | Pattern | Source | What We Extract |
 |---------|--------|-----------------|
 | `**/models/**/*.yml` | dbt | table/column descriptions, tests |
-| `**/schema.yml` | dbt | table relationships |
 | `**/dags/**/*.sql` | gusty | YAML frontmatter (description, primary_key) |
 | `AGENTS.md`, `CLAUDE.md` | docs | data layer hierarchy, conventions |
 | `**/docs/**/*.md` | docs | business context |

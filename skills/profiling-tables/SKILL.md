@@ -9,12 +9,16 @@ Generate a comprehensive profile of a table that a new team member could use to 
 
 ## Step 1: Basic Metadata
 
-Use `get_tables_info` to get:
-- Column names and data types
-- Column descriptions/comments (if available)
-- Primary keys and constraints
+Query column metadata:
 
-If the table name isn't fully qualified, use `list_schemas` and `list_tables` to locate it first.
+```sql
+SELECT COLUMN_NAME, DATA_TYPE, COMMENT
+FROM <database>.INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = '<schema>' AND TABLE_NAME = '<table>'
+ORDER BY ORDINAL_POSITION
+```
+
+If the table name isn't fully qualified, search INFORMATION_SCHEMA.TABLES to locate it first.
 
 ## Step 2: Size and Shape
 

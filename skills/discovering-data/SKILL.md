@@ -40,7 +40,7 @@ Metadata tables may have gaps or lag. The actual execution data (in tables with 
 
 ### Use Row Counts as a Signal
 
-When `list_tables` returns row counts:
+When querying INFORMATION_SCHEMA.TABLES returns row counts:
 - **Millions+ rows** → likely execution/fact data (actual events, transactions, runs)
 - **Thousands of rows** → likely metadata/config (what's configured, not what happened)
 
@@ -143,10 +143,14 @@ Group discovered tables by their role in the data architecture:
 
 ### Step 3: Get Schema Details
 
-For the most relevant tables (typically 2-5), use `get_tables_info` to retrieve:
-- Column names and types
-- Column descriptions
-- Key fields
+For the most relevant tables (typically 2-5), query column metadata:
+
+```sql
+SELECT COLUMN_NAME, DATA_TYPE, COMMENT
+FROM <database>.INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = '<schema>' AND TABLE_NAME = '<table>'
+ORDER BY ORDINAL_POSITION
+```
 
 Focus on tables that appear to be:
 - The "main" or canonical source

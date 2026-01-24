@@ -19,7 +19,7 @@ Look for columns that indicate when data was loaded or updated:
 - `load_date`, `etl_timestamp`, `ingestion_time`
 - `date`, `event_date`, `transaction_date` (business dates)
 
-Use `get_tables_info` if you need to see column names.
+Query INFORMATION_SCHEMA.COLUMNS if you need to see column names.
 
 ### 2. Query Last Update Time
 

@@ -106,7 +106,14 @@ LIMIT 30
 
 ### Step 3: Get Schema Details
 
-For the most relevant tables (typically 2-5), use `get_tables_info` to retrieve column names, types, and descriptions.
+For the most relevant tables (typically 2-5), query column metadata:
+
+```sql
+SELECT COLUMN_NAME, DATA_TYPE, COMMENT
+FROM <database>.INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = '<schema>' AND TABLE_NAME = '<table>'
+ORDER BY ORDINAL_POSITION
+```
 
 ### Step 4: Check Data Freshness
 

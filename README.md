@@ -150,7 +150,7 @@ The `data` plugin bundles an MCP server and skills into a single installable pac
 
 | Skill | Description |
 |-------|-------------|
-| [initializing-warehouse](./skills/initializing-warehouse/) | Initialize schema discovery - generates `.astro/warehouse.md` for instant lookups |
+| [init](./skills/init/) | Initialize schema discovery - generates `.astro/warehouse.md` for instant lookups |
 | [analyzing-data](./skills/analyzing-data/) | SQL-based analysis to answer business questions (uses background Jupyter kernel) |
 | [checking-freshness](./skills/checking-freshness/) | Check how current your data is |
 | [discovering-data](./skills/discovering-data/) | Discover what data exists for a concept or domain |
@@ -231,7 +231,7 @@ Skills are invoked automatically based on what you ask. You can also invoke them
 
 1. **Initialize your warehouse** (recommended first step):
    ```
-   /data:initializing-warehouse
+   /data:init
    ```
    This generates `.astro/warehouse.md` with schema metadata for faster queries.
 
