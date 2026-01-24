@@ -24,7 +24,7 @@
             "hooks": [
               {
                 "type": "command",
-                "command": "${CLAUDE_PLUGIN_ROOT}/hooks/airflow-skill-suggester.sh"
+                "command": "${CLAUDE_PLUGIN_ROOT}/skills/airflow/hooks/airflow-skill-suggester.sh"
               }
             ]
           }
