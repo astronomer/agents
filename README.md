@@ -76,6 +76,39 @@ Add to `~/.cursor/mcp.json`:
 
 </details>
 
+<details>
+<summary>Enable hooks (skill suggestions, session management)</summary>
+
+Cursor does not auto-load Claude Code plugin hooks installed via plugins, so recommend using `npx skills add astronomer/agents` with project scope.
+
+Create `.cursor/hooks.json` in your project:
+
+```json
+{
+  "version": 1,
+  "hooks": {
+    "beforeSubmitPrompt": [
+      {
+        "command": "$CURSOR_PROJECT_DIR/.cursor/skills/airflow/hooks/airflow-skill-suggester.sh",
+        "timeout": 5
+      }
+    ],
+    "stop": [
+      {
+        "command": "uv run $CURSOR_PROJECT_DIR/.cursor/skills/analyzing-data/scripts/cli.py stop",
+        "timeout": 10
+      }
+    ]
+  }
+}
+```
+
+**What these hooks do:**
+- `beforeSubmitPrompt`: Suggests data skills when you mention Airflow keywords
+- `stop`: Cleans up kernel when session ends
+
+</details>
+
 ### VS Code / Cline
 
 VS Code with Cline supports MCP servers (not skills).

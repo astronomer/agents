@@ -6,11 +6,11 @@
 project-root/
 ├── .claude-plugin/
 │   └── marketplace.json        # Marketplace + plugin definition (strict: false)
-├── hooks/                      # Hook scripts
-│   └── *.sh
 └── skills/                     # Skills (auto-discovered)
     └── skill-name/
-        └── SKILL.md            # Skill with YAML frontmatter
+        ├── SKILL.md            # Skill with YAML frontmatter
+        └── hooks/              # Hook scripts (co-located with skill)
+            └── *.sh
 ```
 
 ## Installing the Plugin
@@ -52,7 +52,7 @@ description: When to use this skill (Claude uses this to decide when to invoke i
 
 Everything is defined inline in `.claude-plugin/marketplace.json` following the [advanced plugin entries](https://code.claude.com/docs/en/plugin-marketplaces#advanced-plugin-entries) pattern:
 
-- **hooks**: Inlined in marketplace.json, scripts in `hooks/`
+- **hooks**: Inlined in marketplace.json, scripts co-located in `skills/<name>/hooks/`
 - **mcpServers**: Inlined in marketplace.json
 - **skills**: Auto-discovered from `skills/` directory
 
@@ -61,8 +61,8 @@ Use `${CLAUDE_PLUGIN_ROOT}` to reference files within the plugin (required becau
 ## Key Files
 
 - `.claude-plugin/marketplace.json` - Marketplace catalog with inline plugin definition (hooks, mcpServers)
-- `hooks/*.sh` - Hook scripts (referenced via `${CLAUDE_PLUGIN_ROOT}/hooks/...`)
 - `skills/*/SKILL.md` - Individual skills (auto-discovered)
+- `skills/*/hooks/*.sh` - Hook scripts (co-located with skills, referenced via `${CLAUDE_PLUGIN_ROOT}/skills/<name>/hooks/...`)
 
 ## Config Location
 
