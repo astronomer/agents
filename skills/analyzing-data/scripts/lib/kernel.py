@@ -173,7 +173,7 @@ class KernelManager:
 
         if self.connection_file.exists():
             self.connection_file.unlink()
-        print("Kernel stopped")
+        print('{"message": "Kernel stopped"}')
 
     def execute(self, code: str, timeout: float = 30.0) -> ExecutionResult:
         if not self.connection_file.exists():
