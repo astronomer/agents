@@ -153,7 +153,6 @@ The `data` plugin bundles an MCP server and skills into a single installable pac
 | [init](./skills/init/) | Initialize schema discovery - generates `.astro/warehouse.md` for instant lookups |
 | [analyzing-data](./skills/analyzing-data/) | SQL-based analysis to answer business questions (uses background Jupyter kernel) |
 | [checking-freshness](./skills/checking-freshness/) | Check how current your data is |
-| [discovering-data](./skills/discovering-data/) | Discover what data exists for a concept or domain |
 | [profiling-tables](./skills/profiling-tables/) | Comprehensive table profiling and quality assessment |
 
 #### Data Lineage
@@ -167,17 +166,47 @@ The `data` plugin bundles an MCP server and skills into a single installable pac
 
 | Skill | Description |
 |-------|-------------|
-| [managing-astro-local-env](./skills/managing-astro-local-env/) | Manage local Airflow environment (start, stop, logs, troubleshoot) |
+| [airflow](./skills/airflow/) | Main entrypoint - routes to specialized Airflow skills |
 | [setting-up-astro-project](./skills/setting-up-astro-project/) | Initialize and configure new Astro/Airflow projects |
+| [managing-astro-local-env](./skills/managing-astro-local-env/) | Manage local Airflow environment (start, stop, logs, troubleshoot) |
 | [authoring-dags](./skills/authoring-dags/) | Create and validate Airflow DAGs with best practices |
-| [debugging-dags](./skills/debugging-dags/) | Debug failed DAG runs and find root causes |
 | [testing-dags](./skills/testing-dags/) | Test and debug Airflow DAGs locally |
+| [debugging-dags](./skills/debugging-dags/) | Deep failure diagnosis and root cause analysis |
 
 #### Migration
 
 | Skill | Description |
 |-------|-------------|
 | [migrating-airflow-2-to-3](./skills/migrating-airflow-2-to-3/) | Migrate DAGs from Airflow 2.x to 3.x |
+
+### User Journeys
+
+#### Data Analysis Flow
+
+```
+/data:init → /data:analyzing-data → /data:profiling-tables
+                    ↓
+            /data:checking-freshness
+```
+
+1. **Initialize** (`/data:init`) - One-time setup to generate `warehouse.md` with schema metadata
+2. **Analyze** (`/data:analyzing-data`) - Answer business questions with SQL
+3. **Profile** (`/data:profiling-tables`) - Deep dive into specific tables for statistics and quality
+4. **Check freshness** (`/data:checking-freshness`) - Verify data is up to date before using
+
+#### DAG Development Flow
+
+```
+/data:setting-up-astro-project → /data:authoring-dags → /data:testing-dags
+           ↓                                                    ↓
+/data:managing-astro-local-env                      /data:debugging-dags
+```
+
+1. **Setup** (`/data:setting-up-astro-project`) - Initialize project structure and dependencies
+2. **Environment** (`/data:managing-astro-local-env`) - Start/stop local Airflow for development
+3. **Author** (`/data:authoring-dags`) - Write DAG code following best practices
+4. **Test** (`/data:testing-dags`) - Run DAGs and fix issues iteratively
+5. **Debug** (`/data:debugging-dags`) - Deep investigation for complex failures
 
 ## Configuration
 
