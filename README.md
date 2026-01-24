@@ -106,58 +106,9 @@ Create `.cursor/hooks.json` in your project:
 
 </details>
 
-### VS Code
+### Other MCP Clients
 
-**Skills** (GitHub Copilot):
-
-```bash
-npx skills add astronomer/agents
-```
-
-**MCP Server** - Click to install:
-
-<a href="https://insiders.vscode.dev/redirect?url=vscode://ms-vscode.vscode-mcp/install?%7B%22name%22%3A%22astro-airflow-mcp%22%2C%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22astro-airflow-mcp%22%2C%22--transport%22%2C%22stdio%22%5D%7D"><img src="https://img.shields.io/badge/VS_Code-Install_Airflow_MCP-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white" alt="Install in VS Code" height="32"></a>
-
-<details>
-<summary>Manual MCP configuration</summary>
-
-Add to `.vscode/mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "airflow": {
-      "command": "uvx",
-      "args": ["astro-airflow-mcp", "--transport", "stdio"]
-    }
-  }
-}
-```
-
-</details>
-
-### Claude Desktop
-
-Claude Desktop supports MCP servers (not skills).
-
-Add to your config file:
-- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-
-```json
-{
-  "mcpServers": {
-    "airflow": {
-      "command": "uvx",
-      "args": ["astro-airflow-mcp", "--transport", "stdio"]
-    }
-  }
-}
-```
-
-### Generic MCP Clients
-
-For any MCP-compatible client:
+For any MCP-compatible client (Claude Desktop, VS Code, etc.):
 
 ```bash
 # Airflow MCP
