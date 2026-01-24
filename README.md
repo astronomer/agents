@@ -6,14 +6,33 @@ Built by [Astronomer](https://www.astronomer.io/).
 
 ## Table of Contents
 
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
 - [Installation](#installation)
+  - [Quick Start](#quick-start)
+  - [Compatibility](#compatibility)
+  - [Claude Code](#claude-code)
+  - [Cursor](#cursor)
+  - [Other MCP Clients](#other-mcp-clients)
 - [Features](#features)
+  - [MCP Server](#mcp-server)
+  - [Skills](#skills)
+  - [User Journeys](#user-journeys)
 - [Configuration](#configuration)
+  - [Warehouse Connections](#warehouse-connections)
+  - [Airflow](#airflow)
 - [Usage](#usage)
+  - [Getting Started](#getting-started)
 - [Development](#development)
+  - [Local Development Setup](#local-development-setup)
+  - [Adding Skills](#adding-skills)
 - [Troubleshooting](#troubleshooting)
+  - [Common Issues](#common-issues)
 - [Contributing](#contributing)
 - [License](#license)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ## Installation
 

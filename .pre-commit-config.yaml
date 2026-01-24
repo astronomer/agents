@@ -16,3 +16,11 @@ repos:
       - id: check-yaml
       - id: check-added-large-files
       - id: check-json
+
+  - repo: https://github.com/thlorenz/doctoc
+    rev: v2.2.0
+    hooks:
+      - id: doctoc
+        args:
+          - "--maxlevel"
+          - "3"
