@@ -27,12 +27,9 @@ This installs Astronomer skills into your project via [skills.sh](https://skills
 
 ### Compatibility
 
-| Client | MCP Server | Skills |
-|--------|------------|--------|
-| Claude Code | Yes | Yes (13 skills) |
-| Cursor | Yes | Yes (via Claude Code) |
-| VS Code (Cline) | Yes | No |
-| Claude Desktop | Yes | No |
+**Skills:** Works with [25+ AI coding agents](https://github.com/vercel-labs/add-skill?tab=readme-ov-file#available-agents) including Claude Code, Cursor, VS Code (GitHub Copilot), Windsurf, Cline, and more.
+
+**MCP Server:** Works with any [MCP-compatible client](https://modelcontextprotocol.io/clients) including Claude Desktop, VS Code, and others.
 
 ### Claude Code
 
@@ -52,11 +49,13 @@ Cursor supports both MCP servers and skills.
 
 <a href="https://cursor.com/en-US/install-mcp?name=astro-airflow-mcp&config=eyJjb21tYW5kIjoidXZ4IiwiYXJncyI6WyJhc3Ryby1haXJmbG93LW1jcCIsIi0tdHJhbnNwb3J0Iiwic3RkaW8iXX0"><img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Add Airflow MCP to Cursor" height="32"></a>
 
-**Skills** - Cursor auto-discovers skills from Claude Code plugins:
+**Skills** - Install to your project:
 
-1. Install the Claude Code plugin (see above)
-2. Open Cursor Settings > **Features** > **Claude Code**
-3. Enable **"Include third-party skills"**
+```bash
+npx skills add astronomer/agents
+```
+
+This installs skills to `.cursor/skills/` in your project.
 
 <details>
 <summary>Manual MCP configuration</summary>
@@ -78,8 +77,6 @@ Add to `~/.cursor/mcp.json`:
 
 <details>
 <summary>Enable hooks (skill suggestions, session management)</summary>
-
-Cursor does not auto-load Claude Code plugin hooks installed via plugins, so recommend using `npx skills add astronomer/agents` with project scope.
 
 Create `.cursor/hooks.json` in your project:
 
@@ -109,14 +106,20 @@ Create `.cursor/hooks.json` in your project:
 
 </details>
 
-### VS Code / Cline
+### VS Code
 
-VS Code with Cline supports MCP servers (not skills).
+**Skills** (GitHub Copilot):
+
+```bash
+npx skills add astronomer/agents
+```
+
+**MCP Server** - Click to install:
 
 <a href="https://insiders.vscode.dev/redirect?url=vscode://ms-vscode.vscode-mcp/install?%7B%22name%22%3A%22astro-airflow-mcp%22%2C%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22astro-airflow-mcp%22%2C%22--transport%22%2C%22stdio%22%5D%7D"><img src="https://img.shields.io/badge/VS_Code-Install_Airflow_MCP-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white" alt="Install in VS Code" height="32"></a>
 
 <details>
-<summary>Manual configuration</summary>
+<summary>Manual MCP configuration</summary>
 
 Add to `.vscode/mcp.json`:
 
