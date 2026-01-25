@@ -9,6 +9,7 @@ import pytest
 from astro_airflow_mcp.server import (
     TOKEN_REFRESH_BUFFER_SECONDS,
     AirflowTokenManager,
+    _clear_task_instances_impl,
     _config,
     _get_auth_token,
     _get_dag_details_impl,
@@ -181,6 +182,56 @@ class TestImplFunctions:
 
         assert result_data["event_count"] == 0
         assert result_data["triggered_by_events"] == []
+
+    def test_clear_task_instances_impl_success(self, mocker):
+        """Test _clear_task_instances_impl with successful response."""
+        mock_response = {
+            "task_instances": [
+                {
+                    "dag_id": "example_dag",
+                    "dag_run_id": "manual__2024-01-01",
+                    "task_id": "my_task",
+                    "state": "cleared",
+                },
+            ],
+        }
+        mock_adapter = mocker.Mock()
+        mock_adapter.clear_task_instances.return_value = mock_response
+        mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
+
+        result = _clear_task_instances_impl(
+            dag_id="example_dag",
+            dag_run_id="manual__2024-01-01",
+            task_ids=["my_task"],
+            dry_run=False,
+        )
+        result_data = json.loads(result)
+
+        assert len(result_data["task_instances"]) == 1
+        assert result_data["task_instances"][0]["task_id"] == "my_task"
+        assert result_data["task_instances"][0]["state"] == "cleared"
+        mock_adapter.clear_task_instances.assert_called_once_with(
+            dag_id="example_dag",
+            dag_run_id="manual__2024-01-01",
+            task_ids=["my_task"],
+            dry_run=False,
+            only_failed=False,
+            include_downstream=False,
+        )
+
+    def test_clear_task_instances_impl_error(self, mocker):
+        """Test _clear_task_instances_impl with adapter error."""
+        mock_adapter = mocker.Mock()
+        mock_adapter.clear_task_instances.side_effect = Exception("DAG not found")
+        mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
+
+        result = _clear_task_instances_impl(
+            dag_id="nonexistent_dag",
+            dag_run_id="run_123",
+            task_ids=["task1"],
+        )
+
+        assert "DAG not found" in result
 
 
 class TestConfiguration:

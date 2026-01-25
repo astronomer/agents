@@ -387,3 +387,49 @@ class AirflowV3Adapter(AirflowAdapter):
             return self._handle_not_found(
                 "task logs", alternative="Check if the task instance exists and has been executed"
             )
+
+    def clear_task_instances(
+        self,
+        dag_id: str,
+        dag_run_id: str,
+        task_ids: list[str],
+        dry_run: bool = True,
+        only_failed: bool = False,
+        include_downstream: bool = False,
+        include_upstream: bool = False,
+        reset_dag_runs: bool = True,
+    ) -> dict[str, Any]:
+        """Clear task instances to allow re-execution.
+
+        Args:
+            dag_id: The ID of the DAG
+            dag_run_id: The ID of the DAG run
+            task_ids: List of task IDs to clear
+            dry_run: If True, return what would be cleared without clearing
+            only_failed: Only clear failed task instances
+            include_downstream: Also clear downstream tasks
+            include_upstream: Also clear upstream tasks
+            reset_dag_runs: Reset the DAG run state to 'queued'
+
+        Returns:
+            Dict with list of cleared task instances
+
+        Available in Airflow 3.0+.
+        """
+        json_body: dict[str, Any] = {
+            "dag_run_id": dag_run_id,
+            "task_ids": task_ids,
+            "dry_run": dry_run,
+            "only_failed": only_failed,
+            "include_downstream": include_downstream,
+            "include_upstream": include_upstream,
+            "reset_dag_runs": reset_dag_runs,
+        }
+
+        try:
+            return self._post(f"dags/{dag_id}/clearTaskInstances", json_data=json_body)
+        except NotFoundError:
+            return self._handle_not_found(
+                "clearTaskInstances",
+                alternative="Use the Airflow UI to clear task instances",
+            )
