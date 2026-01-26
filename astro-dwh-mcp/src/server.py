@@ -11,8 +11,9 @@ Or via the installed script:
 """
 
 import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, AsyncIterator
 
 from mcp.server.fastmcp import FastMCP
 
@@ -202,8 +203,26 @@ def _write_sql_file(query: str, query_num: int, session_data_dir: Path) -> Path:
     return sql_file
 
 
-# Create the FastMCP server
-mcp = FastMCP("astro-dwh-mcp")
+@asynccontextmanager
+async def server_lifespan(app: FastMCP) -> AsyncIterator[None]:
+    """Manage server lifecycle, including kernel cleanup on shutdown."""
+    # Startup: nothing special needed
+    logger.info("MCP server starting up")
+    yield
+    # Shutdown: clean up the kernel
+    logger.info("MCP server shutting down")
+    global _kernel_manager
+    if _kernel_manager is not None:
+        logger.info("Stopping kernel...")
+        try:
+            await _kernel_manager.stop()
+            logger.info("Kernel stopped successfully during shutdown")
+        except Exception as e:
+            logger.warning("Error stopping kernel during shutdown: %s", e)
+
+
+# Create the FastMCP server with lifespan for cleanup
+mcp = FastMCP("astro-dwh-mcp", lifespan=server_lifespan)
 
 
 @mcp.tool()
