@@ -31,9 +31,7 @@ class TestExploreDag:
         mock_adapter.list_tasks.return_value = mock_tasks
         mock_adapter.get_dag_source.return_value = mock_source
 
-        mocker.patch(
-            "astro_airflow_mcp.tools.diagnostic._get_adapter", return_value=mock_adapter
-        )
+        mocker.patch("astro_airflow_mcp.tools.diagnostic._get_adapter", return_value=mock_adapter)
 
         explore_dag_fn = get_tool_fn(diagnostic_module, "explore_dag")
         result = explore_dag_fn("example_dag")
@@ -54,9 +52,7 @@ class TestExploreDag:
         mock_adapter.list_tasks.side_effect = Exception("Tasks endpoint failed")
         mock_adapter.get_dag_source.side_effect = Exception("Source endpoint failed")
 
-        mocker.patch(
-            "astro_airflow_mcp.tools.diagnostic._get_adapter", return_value=mock_adapter
-        )
+        mocker.patch("astro_airflow_mcp.tools.diagnostic._get_adapter", return_value=mock_adapter)
 
         explore_dag_fn = get_tool_fn(diagnostic_module, "explore_dag")
         result = explore_dag_fn("example_dag")
@@ -90,9 +86,7 @@ class TestDiagnoseDagRun:
         mock_adapter.get_dag_run.return_value = mock_run
         mock_adapter.get_task_instances.return_value = mock_task_instances
 
-        mocker.patch(
-            "astro_airflow_mcp.tools.diagnostic._get_adapter", return_value=mock_adapter
-        )
+        mocker.patch("astro_airflow_mcp.tools.diagnostic._get_adapter", return_value=mock_adapter)
 
         diagnose_fn = get_tool_fn(diagnostic_module, "diagnose_dag_run")
         result = diagnose_fn("example_dag", "manual__2024-01-01")
@@ -115,9 +109,7 @@ class TestDiagnoseDagRun:
         mock_adapter = MagicMock()
         mock_adapter.get_dag_run.side_effect = Exception("Run not found")
 
-        mocker.patch(
-            "astro_airflow_mcp.tools.diagnostic._get_adapter", return_value=mock_adapter
-        )
+        mocker.patch("astro_airflow_mcp.tools.diagnostic._get_adapter", return_value=mock_adapter)
 
         diagnose_fn = get_tool_fn(diagnostic_module, "diagnose_dag_run")
         result = diagnose_fn("example_dag", "nonexistent")
@@ -143,9 +135,7 @@ class TestGetSystemHealth:
         mock_adapter.list_dag_warnings.return_value = mock_warnings
         mock_adapter.get_dag_stats.return_value = mock_stats
 
-        mocker.patch(
-            "astro_airflow_mcp.tools.diagnostic._get_adapter", return_value=mock_adapter
-        )
+        mocker.patch("astro_airflow_mcp.tools.diagnostic._get_adapter", return_value=mock_adapter)
 
         health_fn = get_tool_fn(diagnostic_module, "get_system_health")
         result = health_fn()
@@ -172,9 +162,7 @@ class TestGetSystemHealth:
         mock_adapter.list_dag_warnings.return_value = mock_warnings
         mock_adapter.get_dag_stats.return_value = mock_stats
 
-        mocker.patch(
-            "astro_airflow_mcp.tools.diagnostic._get_adapter", return_value=mock_adapter
-        )
+        mocker.patch("astro_airflow_mcp.tools.diagnostic._get_adapter", return_value=mock_adapter)
 
         health_fn = get_tool_fn(diagnostic_module, "get_system_health")
         result = health_fn()
@@ -200,9 +188,7 @@ class TestGetSystemHealth:
         mock_adapter.list_dag_warnings.return_value = mock_warnings
         mock_adapter.get_dag_stats.return_value = mock_stats
 
-        mocker.patch(
-            "astro_airflow_mcp.tools.diagnostic._get_adapter", return_value=mock_adapter
-        )
+        mocker.patch("astro_airflow_mcp.tools.diagnostic._get_adapter", return_value=mock_adapter)
 
         health_fn = get_tool_fn(diagnostic_module, "get_system_health")
         result = health_fn()
@@ -224,9 +210,7 @@ class TestGetSystemHealth:
         mock_adapter.list_dag_warnings.return_value = mock_warnings
         mock_adapter.get_dag_stats.side_effect = Exception("Endpoint not found")
 
-        mocker.patch(
-            "astro_airflow_mcp.tools.diagnostic._get_adapter", return_value=mock_adapter
-        )
+        mocker.patch("astro_airflow_mcp.tools.diagnostic._get_adapter", return_value=mock_adapter)
 
         health_fn = get_tool_fn(diagnostic_module, "get_system_health")
         result = health_fn()
