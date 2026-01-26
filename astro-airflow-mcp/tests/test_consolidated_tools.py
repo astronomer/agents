@@ -3,6 +3,8 @@
 import json
 from unittest.mock import MagicMock
 
+import astro_airflow_mcp.tools.diagnostic as diagnostic_module
+
 
 # Helper to get the underlying function from a decorated MCP tool
 def get_tool_fn(module, tool_name):
@@ -19,8 +21,6 @@ class TestExploreDag:
 
     def test_explore_dag_success(self, mocker):
         """Test explore_dag returns combined data."""
-        import astro_airflow_mcp.server as server_module
-
         mock_dag = {"dag_id": "example_dag", "is_paused": False}
         mock_tasks = {"tasks": [{"task_id": "task1"}, {"task_id": "task2"}]}
         mock_source = {"content": "print('hello')"}
@@ -31,9 +31,9 @@ class TestExploreDag:
         mock_adapter.list_tasks.return_value = mock_tasks
         mock_adapter.get_dag_source.return_value = mock_source
 
-        mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
+        mocker.patch("astro_airflow_mcp.tools.diagnostic._get_adapter", return_value=mock_adapter)
 
-        explore_dag_fn = get_tool_fn(server_module, "explore_dag")
+        explore_dag_fn = get_tool_fn(diagnostic_module, "explore_dag")
         result = explore_dag_fn("example_dag")
         data = json.loads(result)
 
@@ -44,8 +44,6 @@ class TestExploreDag:
 
     def test_explore_dag_partial_failure(self, mocker):
         """Test explore_dag handles partial API failures."""
-        import astro_airflow_mcp.server as server_module
-
         mock_dag = {"dag_id": "example_dag"}
 
         # Create mock adapter with partial failures
@@ -54,9 +52,9 @@ class TestExploreDag:
         mock_adapter.list_tasks.side_effect = Exception("Tasks endpoint failed")
         mock_adapter.get_dag_source.side_effect = Exception("Source endpoint failed")
 
-        mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
+        mocker.patch("astro_airflow_mcp.tools.diagnostic._get_adapter", return_value=mock_adapter)
 
-        explore_dag_fn = get_tool_fn(server_module, "explore_dag")
+        explore_dag_fn = get_tool_fn(diagnostic_module, "explore_dag")
         result = explore_dag_fn("example_dag")
         data = json.loads(result)
 
@@ -71,8 +69,6 @@ class TestDiagnoseDagRun:
 
     def test_diagnose_dag_run_success(self, mocker):
         """Test diagnose_dag_run returns run and task info."""
-        import astro_airflow_mcp.server as server_module
-
         mock_run = {
             "dag_run_id": "manual__2024-01-01",
             "state": "failed",
@@ -90,9 +86,9 @@ class TestDiagnoseDagRun:
         mock_adapter.get_dag_run.return_value = mock_run
         mock_adapter.get_task_instances.return_value = mock_task_instances
 
-        mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
+        mocker.patch("astro_airflow_mcp.tools.diagnostic._get_adapter", return_value=mock_adapter)
 
-        diagnose_fn = get_tool_fn(server_module, "diagnose_dag_run")
+        diagnose_fn = get_tool_fn(diagnostic_module, "diagnose_dag_run")
         result = diagnose_fn("example_dag", "manual__2024-01-01")
         data = json.loads(result)
 
@@ -109,15 +105,13 @@ class TestDiagnoseDagRun:
 
     def test_diagnose_dag_run_not_found(self, mocker):
         """Test diagnose_dag_run handles missing run."""
-        import astro_airflow_mcp.server as server_module
-
         # Create mock adapter that raises exception
         mock_adapter = MagicMock()
         mock_adapter.get_dag_run.side_effect = Exception("Run not found")
 
-        mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
+        mocker.patch("astro_airflow_mcp.tools.diagnostic._get_adapter", return_value=mock_adapter)
 
-        diagnose_fn = get_tool_fn(server_module, "diagnose_dag_run")
+        diagnose_fn = get_tool_fn(diagnostic_module, "diagnose_dag_run")
         result = diagnose_fn("example_dag", "nonexistent")
         data = json.loads(result)
 
@@ -129,8 +123,6 @@ class TestGetSystemHealth:
 
     def test_get_system_health_healthy(self, mocker):
         """Test get_system_health when system is healthy."""
-        import astro_airflow_mcp.server as server_module
-
         mock_version = {"version": "3.0.0"}
         mock_import_errors = {"import_errors": []}
         mock_warnings = {"dag_warnings": []}
@@ -143,9 +135,9 @@ class TestGetSystemHealth:
         mock_adapter.list_dag_warnings.return_value = mock_warnings
         mock_adapter.get_dag_stats.return_value = mock_stats
 
-        mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
+        mocker.patch("astro_airflow_mcp.tools.diagnostic._get_adapter", return_value=mock_adapter)
 
-        health_fn = get_tool_fn(server_module, "get_system_health")
+        health_fn = get_tool_fn(diagnostic_module, "get_system_health")
         result = health_fn()
         data = json.loads(result)
 
@@ -156,8 +148,6 @@ class TestGetSystemHealth:
 
     def test_get_system_health_with_import_errors(self, mocker):
         """Test get_system_health detects import errors."""
-        import astro_airflow_mcp.server as server_module
-
         mock_version = {"version": "3.0.0"}
         mock_import_errors = {
             "import_errors": [{"filename": "/dags/broken.py", "stack_trace": "SyntaxError"}]
@@ -172,9 +162,9 @@ class TestGetSystemHealth:
         mock_adapter.list_dag_warnings.return_value = mock_warnings
         mock_adapter.get_dag_stats.return_value = mock_stats
 
-        mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
+        mocker.patch("astro_airflow_mcp.tools.diagnostic._get_adapter", return_value=mock_adapter)
 
-        health_fn = get_tool_fn(server_module, "get_system_health")
+        health_fn = get_tool_fn(diagnostic_module, "get_system_health")
         result = health_fn()
         data = json.loads(result)
 
@@ -184,8 +174,6 @@ class TestGetSystemHealth:
 
     def test_get_system_health_with_warnings(self, mocker):
         """Test get_system_health detects warnings."""
-        import astro_airflow_mcp.server as server_module
-
         mock_version = {"version": "3.0.0"}
         mock_import_errors = {"import_errors": []}
         mock_warnings = {
@@ -200,9 +188,9 @@ class TestGetSystemHealth:
         mock_adapter.list_dag_warnings.return_value = mock_warnings
         mock_adapter.get_dag_stats.return_value = mock_stats
 
-        mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
+        mocker.patch("astro_airflow_mcp.tools.diagnostic._get_adapter", return_value=mock_adapter)
 
-        health_fn = get_tool_fn(server_module, "get_system_health")
+        health_fn = get_tool_fn(diagnostic_module, "get_system_health")
         result = health_fn()
         data = json.loads(result)
 
@@ -211,8 +199,6 @@ class TestGetSystemHealth:
 
     def test_get_system_health_dag_stats_unavailable(self, mocker):
         """Test get_system_health handles missing dagStats (Airflow 2.x)."""
-        import astro_airflow_mcp.server as server_module
-
         mock_version = {"version": "2.9.0"}
         mock_import_errors = {"import_errors": []}
         mock_warnings = {"dag_warnings": []}
@@ -224,9 +210,9 @@ class TestGetSystemHealth:
         mock_adapter.list_dag_warnings.return_value = mock_warnings
         mock_adapter.get_dag_stats.side_effect = Exception("Endpoint not found")
 
-        mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
+        mocker.patch("astro_airflow_mcp.tools.diagnostic._get_adapter", return_value=mock_adapter)
 
-        health_fn = get_tool_fn(server_module, "get_system_health")
+        health_fn = get_tool_fn(diagnostic_module, "get_system_health")
         result = health_fn()
         data = json.loads(result)
 

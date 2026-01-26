@@ -9,14 +9,20 @@ import pytest
 from astro_airflow_mcp.server import (
     TOKEN_REFRESH_BUFFER_SECONDS,
     AirflowTokenManager,
-    _clear_task_instances_impl,
     _config,
     _get_auth_token,
-    _get_dag_details_impl,
+    configure,
+)
+from astro_airflow_mcp.tools.asset import (
     _get_upstream_asset_events_impl,
     _list_asset_events_impl,
+)
+from astro_airflow_mcp.tools.dag import (
+    _get_dag_details_impl,
     _list_dags_impl,
-    configure,
+)
+from astro_airflow_mcp.tools.task import (
+    _clear_task_instances_impl,
 )
 
 
@@ -44,7 +50,7 @@ class TestImplFunctions:
         }
         mock_adapter = mocker.Mock()
         mock_adapter.get_dag.return_value = mock_dag_data
-        mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
+        mocker.patch("astro_airflow_mcp.tools.dag._get_adapter", return_value=mock_adapter)
 
         result = _get_dag_details_impl("example_dag")
         result_data = json.loads(result)
@@ -57,7 +63,7 @@ class TestImplFunctions:
         """Test _get_dag_details_impl with adapter error."""
         mock_adapter = mocker.Mock()
         mock_adapter.get_dag.side_effect = Exception("DAG not found")
-        mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
+        mocker.patch("astro_airflow_mcp.tools.dag._get_adapter", return_value=mock_adapter)
 
         result = _get_dag_details_impl("nonexistent_dag")
 
@@ -74,7 +80,7 @@ class TestImplFunctions:
         }
         mock_adapter = mocker.Mock()
         mock_adapter.list_dags.return_value = mock_response
-        mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
+        mocker.patch("astro_airflow_mcp.tools.dag._get_adapter", return_value=mock_adapter)
 
         result = _list_dags_impl(limit=10, offset=0)
         result_data = json.loads(result)
@@ -89,7 +95,7 @@ class TestImplFunctions:
         mock_response = {"dags": [], "total_entries": 0}
         mock_adapter = mocker.Mock()
         mock_adapter.list_dags.return_value = mock_response
-        mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
+        mocker.patch("astro_airflow_mcp.tools.dag._get_adapter", return_value=mock_adapter)
 
         result = _list_dags_impl()
         result_data = json.loads(result)
@@ -113,7 +119,7 @@ class TestImplFunctions:
         }
         mock_adapter = mocker.Mock()
         mock_adapter.list_asset_events.return_value = mock_response
-        mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
+        mocker.patch("astro_airflow_mcp.tools.asset._get_adapter", return_value=mock_adapter)
 
         result = _list_asset_events_impl(source_dag_id="producer_dag")
         result_data = json.loads(result)
@@ -134,7 +140,7 @@ class TestImplFunctions:
         mock_response = {"asset_events": [], "total_entries": 0}
         mock_adapter = mocker.Mock()
         mock_adapter.list_asset_events.return_value = mock_response
-        mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
+        mocker.patch("astro_airflow_mcp.tools.asset._get_adapter", return_value=mock_adapter)
 
         result = _list_asset_events_impl()
         result_data = json.loads(result)
@@ -157,7 +163,7 @@ class TestImplFunctions:
         }
         mock_adapter = mocker.Mock()
         mock_adapter.get_dag_run_upstream_asset_events.return_value = mock_response
-        mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
+        mocker.patch("astro_airflow_mcp.tools.asset._get_adapter", return_value=mock_adapter)
 
         result = _get_upstream_asset_events_impl("consumer_dag", "run_123")
         result_data = json.loads(result)
@@ -175,7 +181,7 @@ class TestImplFunctions:
         mock_response = {"asset_events": []}
         mock_adapter = mocker.Mock()
         mock_adapter.get_dag_run_upstream_asset_events.return_value = mock_response
-        mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
+        mocker.patch("astro_airflow_mcp.tools.asset._get_adapter", return_value=mock_adapter)
 
         result = _get_upstream_asset_events_impl("dag", "run")
         result_data = json.loads(result)
@@ -197,7 +203,7 @@ class TestImplFunctions:
         }
         mock_adapter = mocker.Mock()
         mock_adapter.clear_task_instances.return_value = mock_response
-        mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
+        mocker.patch("astro_airflow_mcp.tools.task._get_adapter", return_value=mock_adapter)
 
         result = _clear_task_instances_impl(
             dag_id="example_dag",
@@ -223,7 +229,7 @@ class TestImplFunctions:
         """Test _clear_task_instances_impl with adapter error."""
         mock_adapter = mocker.Mock()
         mock_adapter.clear_task_instances.side_effect = Exception("DAG not found")
-        mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
+        mocker.patch("astro_airflow_mcp.tools.task._get_adapter", return_value=mock_adapter)
 
         result = _clear_task_instances_impl(
             dag_id="nonexistent_dag",

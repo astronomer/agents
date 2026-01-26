@@ -25,7 +25,16 @@ MCP server for Apache Airflow with adapter pattern for version compatibility:
 
 ```
 src/astro_airflow_mcp/
-├── server.py          # MCP tools, resources, prompts (FastMCP)
+├── server.py          # Core infrastructure: config, auth, adapter management (FastMCP)
+├── tools/             # MCP tool implementations (grouped by domain)
+│   ├── dag.py         # DAG management (get, list, source, stats, pause, unpause)
+│   ├── task.py        # Task management (get, list, instance, logs, clear)
+│   ├── dag_run.py     # DAG run management (list, get, trigger, trigger_and_wait)
+│   ├── asset.py       # Asset/dataset tools (list, events, upstream events)
+│   ├── admin.py       # Admin tools (connections, variables, pools, plugins, providers, config, version)
+│   └── diagnostic.py  # Diagnostic tools (warnings, errors, explore, diagnose, health)
+├── resources.py       # MCP resources (read-only endpoints)
+├── prompts.py         # MCP prompts (guided workflows)
 ├── adapters/
 │   ├── base.py        # Abstract adapter interface
 │   ├── airflow_v2.py  # Airflow 2.x API (/api/v1)
@@ -118,10 +127,10 @@ except NotFoundError:
 - Integration tests: `tests/integration/` (require running Airflow)
 
 ```python
-# Good - mock adapter
+# Good - mock adapter (patch in the tool module that imports it)
 mock_adapter = mocker.Mock()
 mock_adapter.list_dags.return_value = {"dags": [...]}
-mocker.patch("astro_airflow_mcp.server._get_adapter", return_value=mock_adapter)
+mocker.patch("astro_airflow_mcp.tools.dag._get_adapter", return_value=mock_adapter)
 
 # Bad - mock HTTP library
 mocker.patch("httpx.Client")
