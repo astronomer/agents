@@ -15,6 +15,7 @@
     - [Core Tools](#core-tools)
     - [MCP Resources](#mcp-resources)
     - [MCP Prompts](#mcp-prompts)
+  - [Airflow CLI Tool](#airflow-cli-tool)
   - [Advanced Usage](#advanced-usage)
     - [Running as Standalone Server](#running-as-standalone-server)
     - [Airflow Plugin Mode](#airflow-plugin-mode)
@@ -235,6 +236,77 @@ claude mcp add airflow -e AIRFLOW_API_URL=https://your-airflow.example.com -e AI
 | `troubleshoot_failed_dag` | Guided workflow for diagnosing DAG failures |
 | `daily_health_check` | Morning health check routine |
 | `onboard_new_dag` | Guide for understanding a new DAG |
+
+## Airflow CLI Tool
+
+This package also includes `airflow-cli`, a command-line tool for interacting with Airflow instances directly from your terminal.
+
+### Installation
+
+```bash
+# Install with uv
+uv tool install astro-airflow-mcp
+
+# Or use uvx to run without installing
+uvx --from astro-airflow-mcp airflow-cli --help
+```
+
+### Quick Reference
+
+```bash
+# System health check
+airflow-cli health
+
+# DAG operations
+airflow-cli dags list
+airflow-cli dags get <dag_id>
+airflow-cli dags explore <dag_id>      # Full investigation (metadata + tasks + source)
+airflow-cli dags source <dag_id>
+airflow-cli dags pause <dag_id>
+airflow-cli dags unpause <dag_id>
+airflow-cli dags errors                 # Import errors
+airflow-cli dags warnings
+
+# Run operations
+airflow-cli runs list --dag-id <dag_id>
+airflow-cli runs get <dag_id> <run_id>
+airflow-cli runs trigger <dag_id>
+airflow-cli runs trigger-wait <dag_id>  # Trigger and wait for completion
+airflow-cli runs diagnose <dag_id> <run_id>
+
+# Task operations
+airflow-cli tasks list <dag_id>
+airflow-cli tasks get <dag_id> <task_id>
+airflow-cli tasks logs <dag_id> <run_id> <task_id>
+
+# Config operations
+airflow-cli config version
+airflow-cli config connections
+airflow-cli config variables
+airflow-cli config pools
+```
+
+### Configuration
+
+```bash
+# Environment variables
+export AIRFLOW_API_URL=http://localhost:8080
+export AIRFLOW_USERNAME=admin
+export AIRFLOW_PASSWORD=admin
+
+# Or use CLI flags
+airflow-cli --airflow-url http://localhost:8080 --username admin --password admin dags list
+```
+
+All commands output JSON, making them easy to use with tools like `jq`:
+
+```bash
+# Find failed runs
+airflow-cli runs list | jq '.dag_runs[] | select(.state == "failed")'
+
+# Get DAG IDs only
+airflow-cli dags list | jq '.dags[].dag_id'
+```
 
 ## Advanced Usage
 

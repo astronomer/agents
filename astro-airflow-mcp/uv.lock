@@ -287,7 +287,7 @@ wheels = [
 
 [[package]]
 name = "astro-airflow-mcp"
-version = "0.0.0+dev"
+version = "0.2.4.dev28+g70bd814"
 source = { editable = "." }
 dependencies = [
     { name = "fastmcp" },
@@ -295,6 +295,7 @@ dependencies = [
     { name = "packaging" },
     { name = "pydantic" },
     { name = "pyyaml" },
+    { name = "typer" },
 ]
 
 [package.optional-dependencies]
@@ -324,6 +325,7 @@ requires-dist = [
     { name = "packaging", specifier = ">=21.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
     { name = "pyyaml", specifier = ">=6.0" },
+    { name = "typer", specifier = ">=0.12.0" },
 ]
 
 [package.metadata.dependency-groups]

@@ -1,6 +1,6 @@
 # Makefile for airflow-mcp development
 
-.PHONY: help install install-dev install-dev-ci install-hooks run docker-build docker-run build test test-integration test-integration-v2 test-integration-v3 lint format type-check security check clean prek
+.PHONY: help install install-dev install-dev-ci install-hooks run cli cli-health cli-help docker-build docker-run build test test-integration test-integration-v2 test-integration-v3 lint format type-check security check clean prek
 
 help:  ## Show this help message
 	@echo "Available commands:"
@@ -26,6 +26,15 @@ install-hooks:  ## Install prek hooks
 
 run:  ## Run the MCP server in HTTP mode (default is stdio, but HTTP can be useful for local testing)
 	uv run python -m astro_airflow_mcp --transport http
+
+cli:  ## Run the airflow-cli tool (pass args with ARGS=, e.g., make cli ARGS="dags list")
+	uv run airflow-cli $(ARGS)
+
+cli-health:  ## Run airflow-cli health check
+	uv run airflow-cli health
+
+cli-help:  ## Show airflow-cli help
+	uv run airflow-cli --help
 
 docker-build:  ## Build Docker image
 	docker build -t astro-airflow-mcp .
