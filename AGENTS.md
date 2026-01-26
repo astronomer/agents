@@ -1,3 +1,17 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
+
+- [Claude Code Plugin Development](#claude-code-plugin-development)
+  - [Plugin Structure](#plugin-structure)
+  - [Installing the Plugin](#installing-the-plugin)
+  - [Skills](#skills)
+  - [Configuration](#configuration)
+  - [Key Files](#key-files)
+  - [Config Location](#config-location)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # Claude Code Plugin Development
 
 ## Plugin Structure

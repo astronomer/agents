@@ -1,3 +1,33 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
+
+- [Airflow MCP Server](#airflow-mcp-server)
+  - [Quickstart](#quickstart)
+    - [IDEs](#ides)
+    - [CLI Tools](#cli-tools)
+    - [Desktop Apps](#desktop-apps)
+    - [Other MCP Clients](#other-mcp-clients)
+    - [Configuration](#configuration)
+  - [Features](#features)
+  - [Available Tools](#available-tools)
+    - [Consolidated Tools (Agent-Optimized)](#consolidated-tools-agent-optimized)
+    - [Core Tools](#core-tools)
+    - [MCP Resources](#mcp-resources)
+    - [MCP Prompts](#mcp-prompts)
+  - [Advanced Usage](#advanced-usage)
+    - [Running as Standalone Server](#running-as-standalone-server)
+    - [Airflow Plugin Mode](#airflow-plugin-mode)
+    - [CLI Options](#cli-options)
+  - [Architecture](#architecture)
+    - [Core Components](#core-components)
+    - [Version Handling Strategy](#version-handling-strategy)
+    - [Deployment Modes](#deployment-modes)
+  - [Development](#development)
+  - [Contributing](#contributing)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # Airflow MCP Server
 
 [![CI](https://github.com/astronomer/astro-airflow-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/astronomer/astro-airflow-mcp/actions/workflows/ci.yml)

@@ -1,3 +1,16 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
+
+- [Common Analysis Patterns](#common-analysis-patterns)
+  - [Trend Over Time](#trend-over-time)
+  - [Comparison (Period over Period)](#comparison-period-over-period)
+  - [Top N Analysis](#top-n-analysis)
+  - [Distribution / Histogram](#distribution--histogram)
+  - [Cohort Analysis](#cohort-analysis)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # Common Analysis Patterns
 
 SQL templates for frequent analysis types.

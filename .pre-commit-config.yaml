@@ -24,3 +24,5 @@ repos:
         args:
           - "--maxlevel"
           - "3"
+        # Exclude files with YAML frontmatter (doctoc doesn't handle it well)
+        exclude: "(SKILL\\.md|/commands/.*\\.md)$"
