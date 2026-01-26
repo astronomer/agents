@@ -1,7 +1,6 @@
 """Asset/dataset tools - list assets, list events, get upstream events."""
 
 import json
-from typing import Any
 
 from astro_airflow_mcp.server import (
     DEFAULT_LIMIT,
