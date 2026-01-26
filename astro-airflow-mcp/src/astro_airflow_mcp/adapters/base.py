@@ -419,3 +419,32 @@ class AirflowAdapter(ABC):
     @abstractmethod
     def get_config(self) -> dict[str, Any]:
         """Get Airflow configuration."""
+
+    # Task Instance Operations
+    @abstractmethod
+    def clear_task_instances(
+        self,
+        dag_id: str,
+        dag_run_id: str,
+        task_ids: list[str],
+        dry_run: bool = True,
+        only_failed: bool = False,
+        include_downstream: bool = False,
+        include_upstream: bool = False,
+        reset_dag_runs: bool = True,
+    ) -> dict[str, Any]:
+        """Clear task instances to allow re-execution.
+
+        Args:
+            dag_id: The ID of the DAG
+            dag_run_id: The ID of the DAG run
+            task_ids: List of task IDs to clear
+            dry_run: If True, return what would be cleared without clearing
+            only_failed: Only clear failed task instances
+            include_downstream: Also clear downstream tasks
+            include_upstream: Also clear upstream tasks
+            reset_dag_runs: Reset the DAG run state to 'queued'
+
+        Returns:
+            Dict with list of cleared task instances
+        """

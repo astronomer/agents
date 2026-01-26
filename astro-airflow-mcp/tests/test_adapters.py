@@ -806,3 +806,180 @@ class TestPauseDag:
         assert result["is_paused"] is False
         call_args = mock_client.patch.call_args
         assert "/api/v2/dags/example_dag" in call_args[0][0]
+
+
+class TestClearTaskInstances:
+    """Tests for clear_task_instances method."""
+
+    def test_clear_task_instances_v2(self, mocker):
+        """Test V2 adapter clear_task_instances calls correct endpoint."""
+        adapter = AirflowV2Adapter(
+            "http://localhost:8080",
+            "2.9.0",
+        )
+
+        mock_response = mocker.Mock()
+        mock_response.json.return_value = {
+            "task_instances": [
+                {
+                    "dag_id": "example_dag",
+                    "dag_run_id": "manual__2024-01-01",
+                    "task_id": "my_task",
+                    "state": "cleared",
+                }
+            ]
+        }
+        mock_response.status_code = 200
+        mock_response.raise_for_status = mocker.Mock()
+
+        mock_client = mocker.Mock()
+        mock_client.post.return_value = mock_response
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+
+        mocker.patch("httpx.Client", return_value=mock_client)
+
+        result = adapter.clear_task_instances(
+            dag_id="example_dag",
+            dag_run_id="manual__2024-01-01",
+            task_ids=["my_task"],
+            dry_run=False,
+        )
+
+        assert "task_instances" in result
+        assert result["task_instances"][0]["task_id"] == "my_task"
+        call_args = mock_client.post.call_args
+        assert "/api/v1/dags/example_dag/clearTaskInstances" in call_args[0][0]
+        assert call_args[1]["json"]["task_ids"] == ["my_task"]
+        assert call_args[1]["json"]["dag_run_id"] == "manual__2024-01-01"
+        assert call_args[1]["json"]["dry_run"] is False
+
+    def test_clear_task_instances_v2_dry_run(self, mocker):
+        """Test V2 adapter clear_task_instances dry_run mode."""
+        adapter = AirflowV2Adapter(
+            "http://localhost:8080",
+            "2.9.0",
+        )
+
+        mock_response = mocker.Mock()
+        mock_response.json.return_value = {
+            "task_instances": [
+                {"task_id": "task1", "state": "failed"},
+                {"task_id": "task2", "state": "success"},
+            ]
+        }
+        mock_response.status_code = 200
+        mock_response.raise_for_status = mocker.Mock()
+
+        mock_client = mocker.Mock()
+        mock_client.post.return_value = mock_response
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+
+        mocker.patch("httpx.Client", return_value=mock_client)
+
+        result = adapter.clear_task_instances(
+            dag_id="example_dag",
+            dag_run_id="run_123",
+            task_ids=["task1", "task2"],
+            dry_run=True,
+            only_failed=True,
+        )
+
+        assert len(result["task_instances"]) == 2
+        call_args = mock_client.post.call_args
+        assert call_args[1]["json"]["dry_run"] is True
+        assert call_args[1]["json"]["only_failed"] is True
+
+    def test_clear_task_instances_v2_handles_404(self, mocker):
+        """Test V2 adapter handles 404 for clear_task_instances gracefully."""
+        adapter = AirflowV2Adapter(
+            "http://localhost:8080",
+            "2.0.0",  # Old version without clearTaskInstances
+        )
+
+        mock_response = mocker.Mock()
+        mock_response.status_code = 404
+
+        mock_client = mocker.Mock()
+        mock_client.post.return_value = mock_response
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+
+        mocker.patch("httpx.Client", return_value=mock_client)
+
+        result = adapter.clear_task_instances(
+            dag_id="example_dag",
+            dag_run_id="run_123",
+            task_ids=["task1"],
+        )
+
+        assert result["available"] is False
+        assert "alternative" in result
+        assert "2.1" in result["alternative"]
+
+    def test_clear_task_instances_v3(self, mocker):
+        """Test V3 adapter clear_task_instances calls correct endpoint."""
+        adapter = AirflowV3Adapter(
+            "http://localhost:8080",
+            "3.0.0",
+        )
+
+        mock_response = mocker.Mock()
+        mock_response.json.return_value = {
+            "task_instances": [
+                {
+                    "dag_id": "example_dag",
+                    "dag_run_id": "manual__2024-01-01",
+                    "task_id": "extract",
+                    "state": "cleared",
+                }
+            ]
+        }
+        mock_response.status_code = 200
+        mock_response.raise_for_status = mocker.Mock()
+
+        mock_client = mocker.Mock()
+        mock_client.post.return_value = mock_response
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+
+        mocker.patch("httpx.Client", return_value=mock_client)
+
+        result = adapter.clear_task_instances(
+            dag_id="example_dag",
+            dag_run_id="manual__2024-01-01",
+            task_ids=["extract"],
+            include_downstream=True,
+        )
+
+        assert "task_instances" in result
+        call_args = mock_client.post.call_args
+        assert "/api/v2/dags/example_dag/clearTaskInstances" in call_args[0][0]
+        assert call_args[1]["json"]["include_downstream"] is True
+
+    def test_clear_task_instances_v3_handles_404(self, mocker):
+        """Test V3 adapter handles 404 for clear_task_instances gracefully."""
+        adapter = AirflowV3Adapter(
+            "http://localhost:8080",
+            "3.0.0",
+        )
+
+        mock_response = mocker.Mock()
+        mock_response.status_code = 404
+
+        mock_client = mocker.Mock()
+        mock_client.post.return_value = mock_response
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+
+        mocker.patch("httpx.Client", return_value=mock_client)
+
+        result = adapter.clear_task_instances(
+            dag_id="nonexistent_dag",
+            dag_run_id="run_123",
+            task_ids=["task1"],
+        )
+
+        assert result["available"] is False
+        assert "alternative" in result

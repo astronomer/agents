@@ -739,6 +739,49 @@ def _get_task_logs_impl(
         return str(e)
 
 
+def _clear_task_instances_impl(
+    dag_id: str,
+    dag_run_id: str,
+    task_ids: list[str],
+    dry_run: bool = True,
+    only_failed: bool = False,
+    include_downstream: bool = False,
+) -> str:
+    """Internal implementation for clearing task instances.
+
+    Note: The adapter also supports ``include_upstream`` and ``reset_dag_runs``
+    parameters, but they are intentionally omitted from the tool surface.
+    ``include_upstream`` is rarely desired for retries (and risks re-processing
+    already-succeeded tasks), and ``reset_dag_runs=True`` is the correct default
+    for virtually all retry scenarios.  The adapter sends sensible defaults for
+    both.
+
+    Args:
+        dag_id: The ID of the DAG
+        dag_run_id: The ID of the DAG run
+        task_ids: List of task IDs to clear
+        dry_run: If True, return what would be cleared without clearing
+        only_failed: Only clear failed task instances
+        include_downstream: Also clear downstream tasks
+
+    Returns:
+        JSON string with the cleared task instances
+    """
+    try:
+        adapter = _get_adapter()
+        data = adapter.clear_task_instances(
+            dag_id=dag_id,
+            dag_run_id=dag_run_id,
+            task_ids=task_ids,
+            dry_run=dry_run,
+            only_failed=only_failed,
+            include_downstream=include_downstream,
+        )
+        return json.dumps(data, indent=2)
+    except Exception as e:
+        return str(e)
+
+
 @mcp.tool()
 def get_task(dag_id: str, task_id: str) -> str:
     """Get detailed information about a specific task definition in a DAG.
@@ -887,6 +930,58 @@ def get_task_logs(
         task_id=task_id,
         try_number=try_number,
         map_index=map_index,
+    )
+
+
+@mcp.tool()
+def clear_task_instances(
+    dag_id: str,
+    dag_run_id: str,
+    task_ids: list[str],
+    dry_run: bool = True,
+    only_failed: bool = False,
+    include_downstream: bool = False,
+) -> str:
+    """Clear task instances to retry their execution.
+
+    Use this tool when the user asks about:
+    - "Retry task X" or "Clear task Y and run again"
+    - "Rerun the failed tasks" or "Reset task Z"
+    - "Clear and retry from task A onwards"
+    - "Re-execute task B" or "Run task C again"
+    - "Fix the failed task and retry"
+
+    This clears the state of task instances, allowing them to be re-executed.
+    By default, it runs in dry_run mode to show what would be cleared.
+    Set dry_run=False to actually clear the tasks.
+
+    Returns information about cleared task instances including:
+    - task_id: The ID of the cleared task
+    - dag_id: The DAG containing the task
+    - dag_run_id: The DAG run containing the task
+    - state: The previous state of the task (before clearing)
+
+    Args:
+        dag_id: The ID of the DAG (e.g., "example_dag")
+        dag_run_id: The ID of the DAG run (e.g., "manual__2024-01-01T00:00:00+00:00")
+        task_ids: List of task IDs to clear (e.g., ["extract_data", "transform_data"])
+        dry_run: If True (default), only show what would be cleared without actually
+                 clearing. Set to False to actually clear the tasks.
+        only_failed: If True, only clear task instances that are in a failed state.
+                     Useful for retrying just the failures.
+        include_downstream: If True, also clear all downstream tasks that depend
+                           on the specified tasks. Useful for "retry from here onwards".
+
+    Returns:
+        JSON with list of task instances that were (or would be) cleared
+    """
+    return _clear_task_instances_impl(
+        dag_id=dag_id,
+        dag_run_id=dag_run_id,
+        task_ids=task_ids,
+        dry_run=dry_run,
+        only_failed=only_failed,
+        include_downstream=include_downstream,
     )
 
 

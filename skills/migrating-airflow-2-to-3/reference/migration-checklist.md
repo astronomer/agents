@@ -1,3 +1,21 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
+
+- [Migration Checklist](#migration-checklist)
+  - [1. Direct metadata DB access](#1-direct-metadata-db-access)
+  - [2. Legacy imports](#2-legacy-imports)
+  - [3. Removed DAG arguments](#3-removed-dag-arguments)
+  - [4. Deprecated context keys](#4-deprecated-context-keys)
+  - [5. XCom pickling](#5-xcom-pickling)
+  - [6. Datasets to Assets](#6-datasets-to-assets)
+  - [7. Removed operators](#7-removed-operators)
+  - [8. Email changes](#8-email-changes)
+  - [9. REST API v1](#9-rest-api-v1)
+  - [10. File paths](#10-file-paths)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # Migration Checklist
 
 After running Ruff's AIR rules, use this manual search checklist to find remaining issues.

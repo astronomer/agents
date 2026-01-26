@@ -1,3 +1,20 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
+
+- [Agent Guidelines for astro-airflow-mcp](#agent-guidelines-for-astro-airflow-mcp)
+  - [Architecture](#architecture)
+  - [Code Conventions](#code-conventions)
+    - [HTTP Client](#http-client)
+    - [Adapter Pattern](#adapter-pattern)
+    - [MCP Tools](#mcp-tools)
+    - [Error Handling](#error-handling)
+  - [Airflow Version Differences](#airflow-version-differences)
+  - [Testing](#testing)
+  - [Files to Know](#files-to-know)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # Agent Guidelines for astro-airflow-mcp
 
 Guidelines for AI coding assistants contributing to this repository.

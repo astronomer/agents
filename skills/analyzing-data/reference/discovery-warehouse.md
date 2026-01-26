@@ -1,3 +1,21 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
+
+- [Warehouse Discovery](#warehouse-discovery)
+  - [Value Discovery (Explore Before Filtering)](#value-discovery-explore-before-filtering)
+  - [Fast Table Validation](#fast-table-validation)
+    - [Use Row Counts as a Signal](#use-row-counts-as-a-signal)
+  - [Handling Large Tables (100M+ rows)](#handling-large-tables-100m-rows)
+    - [Pattern: Find examples first, aggregate later](#pattern-find-examples-first-aggregate-later)
+  - [Table Exploration Process](#table-exploration-process)
+    - [Step 1: Search for Relevant Tables](#step-1-search-for-relevant-tables)
+    - [Step 2: Categorize by Data Layer](#step-2-categorize-by-data-layer)
+    - [Step 3: Get Schema Details](#step-3-get-schema-details)
+    - [Step 4: Check Data Freshness](#step-4-check-data-freshness)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # Warehouse Discovery
 
 Patterns for discovering and querying data in the warehouse.
