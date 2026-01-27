@@ -8,6 +8,7 @@ The _conn, pl, pd, and sqlglot variables are defined in the kernel before this r
 
 # --- SQL Safety Functions (injected into kernel) ---
 
+
 def _check_sql_safety(query: str) -> tuple[bool, list[str]]:
     """Check if SQL query contains dangerous operations."""
     from sqlglot import exp
@@ -60,7 +61,9 @@ def _is_select_only(query: str) -> bool:
                     if not isinstance(main_query, exp.Select):
                         return False
                     for cte in statement.expressions:
-                        if hasattr(cte, "this") and not isinstance(cte.this, exp.Select):
+                        if hasattr(cte, "this") and not isinstance(
+                            cte.this, exp.Select
+                        ):
                             return False
                 else:
                     return False
@@ -97,6 +100,7 @@ def _inject_limit(query: str, limit: int) -> str:
 
 
 # --- Main SQL Execution Functions ---
+
 
 def run_sql(query: str, limit: int = 100):
     """Execute SQL and return Polars DataFrame.

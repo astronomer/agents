@@ -1,6 +1,5 @@
 """Tests for SQL safety module."""
 
-import pytest
 import sys
 from pathlib import Path
 
@@ -46,9 +45,7 @@ class TestCheckSqlSafety:
 
     def test_select_with_truncate_in_comment_is_safe(self):
         """Ensure TRUNCATE in comments doesn't trigger false positive."""
-        is_safe, ops = check_sql_safety(
-            "SELECT * FROM users -- TRUNCATE TABLE users"
-        )
+        is_safe, ops = check_sql_safety("SELECT * FROM users -- TRUNCATE TABLE users")
         assert is_safe is True
         assert ops == []
 
@@ -88,9 +85,7 @@ class TestCheckSqlSafety:
         assert "TRUNCATE" in ops
 
     def test_create_as_select_is_blocked(self):
-        is_safe, ops = check_sql_safety(
-            "CREATE TABLE new_table AS SELECT * FROM users"
-        )
+        is_safe, ops = check_sql_safety("CREATE TABLE new_table AS SELECT * FROM users")
         assert is_safe is False
         assert "CREATE" in ops
 
@@ -102,9 +97,10 @@ class TestIsSelectOnly:
         assert is_select_only("SELECT * FROM users") is True
 
     def test_select_with_cte(self):
-        assert is_select_only(
-            "WITH cte AS (SELECT * FROM users) SELECT * FROM cte"
-        ) is True
+        assert (
+            is_select_only("WITH cte AS (SELECT * FROM users) SELECT * FROM cte")
+            is True
+        )
 
     def test_insert_is_not_select(self):
         assert is_select_only("INSERT INTO users VALUES (1)") is False
@@ -151,9 +147,10 @@ class TestHasLimit:
         assert has_limit(query) is True
 
     def test_cte_with_limit(self):
-        assert has_limit(
-            "WITH cte AS (SELECT * FROM users) SELECT * FROM cte LIMIT 5"
-        ) is True
+        assert (
+            has_limit("WITH cte AS (SELECT * FROM users) SELECT * FROM cte LIMIT 5")
+            is True
+        )
 
 
 class TestInjectLimit:

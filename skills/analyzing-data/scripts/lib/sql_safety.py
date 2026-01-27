@@ -83,7 +83,9 @@ def is_select_only(query: str) -> bool:
                         return False
                     # Check CTE expressions are also SELECT only
                     for cte in statement.expressions:
-                        if hasattr(cte, "this") and not isinstance(cte.this, exp.Select):
+                        if hasattr(cte, "this") and not isinstance(
+                            cte.this, exp.Select
+                        ):
                             return False
                 else:
                     return False

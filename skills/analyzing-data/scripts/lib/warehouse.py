@@ -186,9 +186,7 @@ class SnowflakeConfig:
             lines.append(f'print(f"   Role: {self.role}")')
         if self.databases:
             lines.append(f'print(f"   Database: {self.databases[0]}")')
-        lines.append(
-            'print("\\nAvailable functions:")'
-        )
+        lines.append('print("\\nAvailable functions:")')
         lines.append(
             'print("  run_sql(query, limit=100) -> Polars (safe, auto-LIMIT)")'
         )
