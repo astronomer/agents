@@ -8,6 +8,7 @@
 #     "pyyaml>=6.0",
 #     "python-dotenv>=1.0.0",
 #     "cryptography>=41.0.0",
+#     "sqlglot>=26.0.0",
 # ]
 # ///
 """CLI for the analyzing-data skill.

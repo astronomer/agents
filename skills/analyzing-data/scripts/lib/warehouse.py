@@ -102,7 +102,7 @@ class SnowflakeConfig:
                 raise ValueError(f"warehouse '{name}': private_key required")
 
     def get_required_packages(self) -> list[str]:
-        pkgs = ["snowflake-connector-python[pandas]"]
+        pkgs = ["snowflake-connector-python[pandas]", "sqlglot"]
         if self.auth_type == "private_key":
             pkgs.append("cryptography")
         return pkgs
@@ -187,7 +187,19 @@ class SnowflakeConfig:
         if self.databases:
             lines.append(f'print(f"   Database: {self.databases[0]}")')
         lines.append(
-            'print("\\nAvailable: run_sql(query) -> polars, run_sql_pandas(query) -> pandas")'
+            'print("\\nAvailable functions:")'
+        )
+        lines.append(
+            'print("  run_sql(query, limit=100) -> Polars (safe, auto-LIMIT)")'
+        )
+        lines.append(
+            'print("  run_sql_pandas(query, limit=100) -> Pandas (safe, auto-LIMIT)")'
+        )
+        lines.append(
+            'print("  run_sql_unsafe(query) -> Polars (bypasses safety for DDL/DML)")'
+        )
+        lines.append(
+            'print("  run_sql_pandas_unsafe(query) -> Pandas (bypasses safety for DDL/DML)")'
         )
         return "\n".join(lines)
 
@@ -200,7 +212,8 @@ class SnowflakeConfig:
             """import snowflake.connector
 import polars as pl
 import pandas as pd
-import os"""
+import os
+import sqlglot"""
         )
 
         # 2. Private key loader (if needed)
