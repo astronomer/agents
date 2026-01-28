@@ -6,19 +6,19 @@ hooks:
     - matcher: "Bash"
       hooks:
         - type: command
-          command: "uv run ${CLAUDE_PLUGIN_ROOT}/skills/analyzing-data/scripts/cli.py ensure"
+          command: "uv run ${CLAUDE_PLUGIN_ROOT}/../analyzing-data/scripts/cli.py ensure"
           once: true
   Stop:
     - hooks:
         - type: command
-          command: "uv run ${CLAUDE_PLUGIN_ROOT}/skills/analyzing-data/scripts/cli.py stop"
+          command: "uv run ${CLAUDE_PLUGIN_ROOT}/../analyzing-data/scripts/cli.py stop"
 ---
 
 # Initialize Warehouse Schema
 
 Generate a comprehensive, user-editable schema reference file for the data warehouse.
 
-**Scripts:** `$CLAUDE_PLUGIN_ROOT/skills/analyzing-data/scripts/`
+**Scripts:** `$CLAUDE_PLUGIN_ROOT/../analyzing-data/scripts/`
 
 ## What This Does
 

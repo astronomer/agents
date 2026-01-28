@@ -72,11 +72,15 @@ Everything is defined inline in `.claude-plugin/marketplace.json` following the 
 
 Use `${CLAUDE_PLUGIN_ROOT}` to reference files within the plugin (required because plugins are copied to a cache location when installed).
 
+**Important:** `${CLAUDE_PLUGIN_ROOT}` resolves differently depending on context:
+- In `marketplace.json`: resolves to the **plugin root** (e.g., use `${CLAUDE_PLUGIN_ROOT}/skills/foo/hooks/bar.sh`)
+- In `SKILL.md` frontmatter: resolves to the **skill's directory** (e.g., use `${CLAUDE_PLUGIN_ROOT}/scripts/bar.py` for a script in the same skill)
+
 ## Key Files
 
 - `.claude-plugin/marketplace.json` - Marketplace catalog with inline plugin definition (hooks, mcpServers)
 - `skills/*/SKILL.md` - Individual skills (auto-discovered)
-- `skills/*/hooks/*.sh` - Hook scripts (co-located with skills, referenced via `${CLAUDE_PLUGIN_ROOT}/skills/<name>/hooks/...`)
+- `skills/*/hooks/*.sh` - Hook scripts (co-located with skills, referenced via `${CLAUDE_PLUGIN_ROOT}/hooks/...` from SKILL.md or `${CLAUDE_PLUGIN_ROOT}/skills/<name>/hooks/...` from marketplace.json)
 
 ## Config Location
 
