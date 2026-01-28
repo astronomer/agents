@@ -22,7 +22,7 @@ repos:
 
   # Python code formatting with ruff
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.7
+    rev: v0.14.14
     hooks:
       # Run the linter
       - id: ruff-check
@@ -32,7 +32,7 @@ repos:
 
   # Type checking with mypy
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.19.0
+    rev: v1.19.1
     hooks:
       - id: mypy
         additional_dependencies:
@@ -43,7 +43,7 @@ repos:
 
   # Security checks
   - repo: https://github.com/PyCQA/bandit
-    rev: 1.9.2
+    rev: 1.9.3
     hooks:
       - id: bandit
         args: ['-c', 'pyproject.toml']
