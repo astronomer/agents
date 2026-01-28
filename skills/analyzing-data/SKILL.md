@@ -6,12 +6,12 @@ hooks:
     - matcher: "Bash"
       hooks:
         - type: command
-          command: "uv run ${CLAUDE_PLUGIN_ROOT}/skills/analyzing-data/scripts/cli.py ensure"
+          command: "uv run ./scripts/cli.py ensure"
           once: true
   Stop:
     - hooks:
         - type: command
-          command: "uv run ${CLAUDE_PLUGIN_ROOT}/skills/analyzing-data/scripts/cli.py stop"
+          command: "uv run ./scripts/cli.py stop"
 ---
 
 # Data Analysis
