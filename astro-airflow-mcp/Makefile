@@ -9,8 +9,14 @@ help:  ## Show this help message
 install:  ## Install the package
 	uv pip install -e .
 
+uninstall:  ## Uninstall the package
+	uv pip uninstall astro-airflow-mcp
+
 install-tool:  ## Install as a system-wide CLI tool
 	uv tool install -e .
+
+uninstall-tool:  ## Uninstall the system-wide CLI tool
+	uv tool uninstall astro-airflow-mcp
 
 install-dev:  ## Install the package with dev dependencies (local)
 	uv sync --all-extras
