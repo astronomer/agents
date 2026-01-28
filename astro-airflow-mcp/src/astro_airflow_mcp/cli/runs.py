@@ -9,7 +9,7 @@ import typer
 from astro_airflow_mcp.cli.context import get_adapter
 from astro_airflow_mcp.cli.output import output_error, output_json, wrap_list_response
 
-app = typer.Typer(help="DAG run management commands")
+app = typer.Typer(help="DAG run management commands", no_args_is_help=True)
 
 # Terminal states for DAG runs (polling stops when reached)
 TERMINAL_DAG_RUN_STATES = {"success", "failed", "upstream_failed"}

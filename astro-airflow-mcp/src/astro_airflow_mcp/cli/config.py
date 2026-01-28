@@ -7,7 +7,7 @@ import typer
 from astro_airflow_mcp.cli.context import get_adapter
 from astro_airflow_mcp.cli.output import output_error, output_json, wrap_list_response
 
-app = typer.Typer(help="Configuration and system commands")
+app = typer.Typer(help="Configuration and system commands", no_args_is_help=True)
 
 
 @app.command("show")
