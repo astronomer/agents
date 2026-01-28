@@ -167,10 +167,32 @@ Once kernel starts, these are available:
 
 | Function | Description |
 |----------|-------------|
-| `run_sql(query, limit=100)` | Execute SQL, return Polars DataFrame |
-| `run_sql_pandas(query, limit=100)` | Execute SQL, return Pandas DataFrame |
+| `run_sql(query, limit=100)` | Execute SQL, return Polars DataFrame (safe) |
+| `run_sql_pandas(query, limit=100)` | Execute SQL, return Pandas DataFrame (safe) |
+| `run_sql_unsafe(query, limit=0)` | Execute DDL/DML without safety checks |
+| `run_sql_pandas_unsafe(query, limit=0)` | Execute DDL/DML without safety checks |
 | `pl` | Polars library (imported) |
 | `pd` | Pandas library (imported) |
+
+### SQL Safety Features
+
+The `run_sql()` and `run_sql_pandas()` functions include automatic safety features:
+
+1. **DDL/DML Blocking**: Automatically blocks dangerous operations:
+   - `CREATE`, `DROP`, `ALTER`, `TRUNCATE`
+   - `INSERT`, `UPDATE`, `DELETE`
+
+2. **Automatic LIMIT Injection**: SELECT queries without LIMIT get `LIMIT 100` injected at the SQL level (not post-fetch), improving performance on large tables.
+
+**For intentional DDL/DML** (e.g., creating sandbox tables), use the `_unsafe` variants:
+
+```python
+# Create a temp table
+run_sql_unsafe("CREATE TEMP TABLE my_analysis AS SELECT * FROM source LIMIT 1000")
+
+# Insert results
+run_sql_unsafe("INSERT INTO SANDBOX.MY_SCHEMA.RESULTS SELECT * FROM analysis")
+```
 
 ---
 

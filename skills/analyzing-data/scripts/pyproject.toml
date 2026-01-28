@@ -1,0 +1,22 @@
+[project]
+name = "analyzing-data-scripts"
+version = "0.1.0"
+description = "Scripts for the analyzing-data skill"
+requires-python = ">=3.11"
+dependencies = [
+    "click>=8.0.0",
+    "jupyter-client>=8.0.0",
+    "ipykernel>=6.0.0",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0.0",
+    "cryptography>=41.0.0",
+    "sqlglot>=26.0.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
