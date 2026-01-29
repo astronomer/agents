@@ -8,6 +8,7 @@ import typer
 # to avoid circular imports, so we import them here and register below
 from astro_airflow_mcp.cli import config as config_module
 from astro_airflow_mcp.cli import dags as dags_module
+from astro_airflow_mcp.cli import instance_cmd
 from astro_airflow_mcp.cli import runs as runs_module
 from astro_airflow_mcp.cli import tasks as tasks_module
 from astro_airflow_mcp.cli.context import configure_context, get_adapter
@@ -64,6 +65,14 @@ def main(
             help="Bearer token for Airflow authentication (takes precedence)",
         ),
     ] = None,
+    instance: Annotated[
+        str | None,
+        typer.Option(
+            "--instance",
+            "-i",
+            help="Use a specific instance from config file",
+        ),
+    ] = None,
     _version: Annotated[
         bool | None,
         typer.Option(
@@ -82,12 +91,16 @@ def main(
     - AIRFLOW_USERNAME / --username
     - AIRFLOW_PASSWORD / --password
     - AIRFLOW_AUTH_TOKEN / --token
+
+    Or use a named instance from ~/.astro/ai/config/airflow-config.yaml:
+    - --instance <name>
     """
     configure_context(
         airflow_url=airflow_url,
         username=username,
         password=password,
         auth_token=auth_token,
+        instance_name=instance,
     )
 
 
@@ -157,6 +170,7 @@ app.add_typer(dags_module.app, name="dags", help="DAG management commands")
 app.add_typer(runs_module.app, name="runs", help="DAG run management commands")
 app.add_typer(tasks_module.app, name="tasks", help="Task management commands")
 app.add_typer(config_module.app, name="config", help="Configuration and system commands")
+app.add_typer(instance_cmd.app, name="instance", help="Instance management commands")
 
 
 def cli_main() -> None:
