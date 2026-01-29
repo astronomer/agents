@@ -290,7 +290,7 @@ def load_concepts_from_warehouse_md(path: Path | None = None) -> int:
     if path is None:
         locations = [
             Path(".astro/warehouse.md"),
-            Path.home() / ".astro" / "ai" / "config" / "warehouse.md",
+            Path.home() / ".astro" / "agents" / "warehouse.md",
             Path("warehouse.md"),
         ]
         for loc in locations:

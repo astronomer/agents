@@ -71,7 +71,7 @@ def warehouse_list():
             marker = " (default)" if name == default_name else ""
             click.echo(f"{name}: {conn.connector_type()}{marker}")
     except FileNotFoundError:
-        click.echo("No warehouse config found at ~/.astro/ai/config/warehouse.yml")
+        click.echo("No warehouse config found at ~/.astro/agents/warehouse.yml")
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
 
@@ -98,7 +98,7 @@ def start(warehouse: str | None):
     except FileNotFoundError as e:
         click.echo(f"Error: {e}", err=True)
         click.echo(
-            "Create ~/.astro/ai/config/warehouse.yml with your Snowflake credentials",
+            "Create ~/.astro/agents/warehouse.yml with your Snowflake credentials",
             err=True,
         )
         sys.exit(1)
