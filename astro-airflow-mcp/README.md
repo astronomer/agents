@@ -16,6 +16,7 @@
     - [MCP Resources](#mcp-resources)
     - [MCP Prompts](#mcp-prompts)
   - [Airflow CLI Tool](#airflow-cli-tool)
+    - [Instance Management](#instance-management)
   - [Advanced Usage](#advanced-usage)
     - [Running as Standalone Server](#running-as-standalone-server)
     - [Airflow Plugin Mode](#airflow-plugin-mode)
@@ -286,7 +287,48 @@ airflow-cli config variables
 airflow-cli config pools
 ```
 
+### Instance Management
+
+Manage multiple Airflow instances with persistent configuration:
+
+```bash
+# Add instances (auth is optional for open instances)
+airflow-cli instance add local --url http://localhost:8080
+airflow-cli instance add staging --url https://staging.example.com --username admin --password secret
+airflow-cli instance add prod --url https://prod.example.com --token '${AIRFLOW_PROD_TOKEN}'
+
+# List and switch instances
+airflow-cli instance list      # Shows all instances in a table
+airflow-cli instance use prod  # Switch to prod instance
+airflow-cli instance current   # Show current instance
+airflow-cli instance delete old-instance
+
+# Override instance for a single command
+airflow-cli --instance staging dags list
+```
+
+Config file location: `~/.airflow-cli/config.yaml` (override with `--config` or `AIRFLOW_CLI_CONFIG` env var)
+
+```yaml
+instances:
+- name: local
+  url: http://localhost:8080
+  auth: null
+- name: staging
+  url: https://staging.example.com
+  auth:
+    username: admin
+    password: secret
+- name: prod
+  url: https://prod.example.com
+  auth:
+    token: ${AIRFLOW_PROD_TOKEN}  # Environment variable interpolation
+current-instance: local
+```
+
 ### Configuration
+
+You can also configure connections via environment variables or CLI flags:
 
 ```bash
 # Environment variables
@@ -298,7 +340,7 @@ export AIRFLOW_PASSWORD=admin
 airflow-cli --airflow-url http://localhost:8080 --username admin --password admin dags list
 ```
 
-All commands output JSON, making them easy to use with tools like `jq`:
+All commands output JSON (except `instance` commands which use human-readable tables), making them easy to use with tools like `jq`:
 
 ```bash
 # Find failed runs
