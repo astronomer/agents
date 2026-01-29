@@ -539,6 +539,11 @@ class TestSQLAlchemyPackageDetection:
             ("postgresql://u:p@h/d", "psycopg[binary]"),
             ("duckdb:///data.db", "duckdb"),
             ("redshift+redshift_connector://u:p@h:5439/d", "redshift_connector"),
+            ("snowflake://u:p@h/d", "snowflake-sqlalchemy"),
+            ("trino://u:p@h/d", "trino"),
+            ("clickhouse://u:p@h/d", "clickhouse-driver"),
+            ("cockroachdb://u:p@h/d", "sqlalchemy-cockroachdb"),
+            ("awsathena://u:p@h/d", "pyathena"),
         ],
         ids=[
             "mssql",
@@ -549,6 +554,11 @@ class TestSQLAlchemyPackageDetection:
             "postgresql",
             "duckdb",
             "redshift",
+            "snowflake",
+            "trino",
+            "clickhouse",
+            "cockroachdb",
+            "awsathena",
         ],
     )
     def test_driver_package_detected(self, url, expected_driver):
@@ -560,6 +570,70 @@ class TestSQLAlchemyPackageDetection:
     def test_unknown_dialect_only_sqlalchemy(self):
         conn = SQLAlchemyConnector(url="unknown://u:p@h/d", databases=["d"])
         assert conn.get_required_packages() == ["sqlalchemy"]
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "notaurl",
+            "postgresql:",
+            "",
+            "://missing-dialect",
+        ],
+        ids=["no_scheme", "no_slashes", "empty", "empty_dialect"],
+    )
+    def test_malformed_url_returns_only_sqlalchemy(self, url):
+        """Malformed URLs should gracefully fall back to just sqlalchemy."""
+        conn = SQLAlchemyConnector(url=url, databases=["d"])
+        assert conn.get_required_packages() == ["sqlalchemy"]
+
+    def test_pool_size_in_prelude(self):
+        """pool_size parameter should be passed to create_engine."""
+        conn = SQLAlchemyConnector(url="sqlite:///t.db", databases=["t"], pool_size=10)
+        prelude = conn.to_python_prelude()
+        assert "pool_size=10" in prelude
+
+    def test_echo_in_prelude(self):
+        """echo parameter should be passed to create_engine."""
+        conn = SQLAlchemyConnector(url="sqlite:///t.db", databases=["t"], echo=True)
+        prelude = conn.to_python_prelude()
+        assert "echo=True" in prelude
+
+    def test_atexit_cleanup_in_prelude(self):
+        """Connection cleanup should be registered with atexit."""
+        conn = SQLAlchemyConnector(url="sqlite:///t.db", databases=["t"])
+        prelude = conn.to_python_prelude()
+        assert "atexit.register" in prelude
+        assert "_conn.close()" in prelude
+        assert "_engine.dispose()" in prelude
+
+    @pytest.mark.parametrize(
+        "url,expected_display",
+        [
+            ("sqlite:///t.db", "SQLite"),
+            ("postgresql://u:p@h/d", "PostgreSQL"),
+            ("mysql://u:p@h/d", "MySQL"),
+            ("redshift://u:p@h/d", "Redshift"),
+            ("snowflake://u:p@h/d", "Snowflake"),
+            ("trino://u:p@h/d", "Trino"),
+            ("clickhouse://u:p@h/d", "ClickHouse"),
+            ("unknown://u:p@h/d", "Database"),
+        ],
+        ids=[
+            "sqlite",
+            "postgresql",
+            "mysql",
+            "redshift",
+            "snowflake",
+            "trino",
+            "clickhouse",
+            "unknown",
+        ],
+    )
+    def test_display_name_in_prelude(self, url, expected_display):
+        """Status message should show correct database name."""
+        conn = SQLAlchemyConnector(url=url, databases=["d"])
+        prelude = conn.to_python_prelude()
+        assert f"{expected_display} connection established" in prelude
 
 
 class TestConnectorDefaults:
