@@ -538,6 +538,7 @@ class TestSQLAlchemyPackageDetection:
             ("postgres://u:p@h/d", "psycopg[binary]"),
             ("postgresql://u:p@h/d", "psycopg[binary]"),
             ("duckdb:///data.db", "duckdb"),
+            ("redshift+redshift_connector://u:p@h:5439/d", "redshift_connector"),
         ],
         ids=[
             "mssql",
@@ -547,6 +548,7 @@ class TestSQLAlchemyPackageDetection:
             "postgres",
             "postgresql",
             "duckdb",
+            "redshift",
         ],
     )
     def test_driver_package_detected(self, url, expected_driver):

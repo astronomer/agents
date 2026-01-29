@@ -250,7 +250,7 @@ SNOWFLAKE_PRIVATE_KEY_PASSPHRASE=your-passphrase-here  # Only required if using 
 | `snowflake` | Built-in | Snowflake Data Cloud |
 | `postgres` | Built-in | PostgreSQL |
 | `bigquery` | Built-in | Google BigQuery |
-| `sqlalchemy` | Any SQLAlchemy driver | MySQL, DuckDB, SQLite, and [others](https://docs.sqlalchemy.org/en/20/dialects/) |
+| `sqlalchemy` | Any SQLAlchemy driver | Redshift, MySQL, DuckDB, SQLite, and [others](https://docs.sqlalchemy.org/en/20/dialects/) |
 
 <details>
 <summary>Example configurations</summary>
@@ -276,6 +276,12 @@ my_duckdb:
   type: sqlalchemy
   url: duckdb:///path/to/analytics.duckdb
   databases: [main]
+
+# Redshift (via SQLAlchemy)
+my_redshift:
+  type: sqlalchemy
+  url: redshift+redshift_connector://${REDSHIFT_USER}:${REDSHIFT_PASSWORD}@${REDSHIFT_HOST}:5439/${REDSHIFT_DATABASE}
+  databases: [my_database]
 ```
 
 </details>
