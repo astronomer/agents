@@ -12,13 +12,10 @@ class TestConfigPaths:
         """Test kernel venv dir returns new path when no legacy exists."""
         import lib.config as config_module
 
-        # Reset warning flag for clean test
         config_module._legacy_warning_shown = False
 
         with patch.object(Path, "exists", return_value=False):
-            from lib.config import get_kernel_venv_dir
-
-            result = get_kernel_venv_dir()
+            result = config_module.get_kernel_venv_dir()
             assert isinstance(result, Path)
             assert result.parts[-3:] == (".astro", "agents", "kernel_venv")
 
@@ -29,9 +26,7 @@ class TestConfigPaths:
         config_module._legacy_warning_shown = False
 
         with patch.object(Path, "exists", return_value=False):
-            from lib.config import get_kernel_connection_file
-
-            result = get_kernel_connection_file()
+            result = config_module.get_kernel_connection_file()
             assert isinstance(result, Path)
             assert result.name == "kernel.json"
             assert result.parts[-3:-1] == (".astro", "agents")
@@ -43,9 +38,7 @@ class TestConfigPaths:
         config_module._legacy_warning_shown = False
 
         with patch.object(Path, "exists", return_value=False):
-            from lib.config import get_config_dir
-
-            result = get_config_dir()
+            result = config_module.get_config_dir()
             assert isinstance(result, Path)
             assert result.parts[-2:] == (".astro", "agents")
 
