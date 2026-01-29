@@ -243,7 +243,42 @@ SNOWFLAKE_USER=myuser
 SNOWFLAKE_PRIVATE_KEY_PASSPHRASE=your-passphrase-here  # Only required if using an encrypted private key
 ```
 
-**Supported warehouses:** Snowflake.
+**Supported databases:**
+
+| Type | Package | Description |
+|------|---------|-------------|
+| `snowflake` | Built-in | Snowflake Data Cloud |
+| `postgres` | Built-in | PostgreSQL |
+| `bigquery` | Built-in | Google BigQuery |
+| `sqlalchemy` | Any SQLAlchemy driver | MySQL, DuckDB, SQLite, and [others](https://docs.sqlalchemy.org/en/20/dialects/) |
+
+<details>
+<summary>Example configurations</summary>
+
+```yaml
+# PostgreSQL
+my_postgres:
+  type: postgres
+  host: localhost
+  port: 5432
+  user: analyst
+  password: ${POSTGRES_PASSWORD}
+  database: analytics
+
+# BigQuery
+my_bigquery:
+  type: bigquery
+  project: my-gcp-project
+  credentials_path: ~/.config/gcloud/service_account.json
+
+# SQLAlchemy (any supported database)
+my_duckdb:
+  type: sqlalchemy
+  url: duckdb:///path/to/analytics.duckdb
+  databases: [main]
+```
+
+</details>
 
 ### Airflow
 
