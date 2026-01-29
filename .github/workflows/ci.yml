@@ -30,7 +30,7 @@ jobs:
 
       - name: Run analyzing-data skill tests
         working-directory: skills/analyzing-data/scripts
-        run: uv run --with pytest pytest tests/ -v
+        run: uv run --extra test pytest tests/ -v
 
   typecheck:
     name: Type checking
