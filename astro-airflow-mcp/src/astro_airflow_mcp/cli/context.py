@@ -59,7 +59,7 @@ class TokenManager:
         token_url = f"{self.airflow_url}/auth/token"
 
         try:
-            with httpx.Client(timeout=30.0) as client:
+            with httpx.Client(timeout=10.0) as client:
                 if self.username and self.password:
                     response = client.post(
                         token_url,
