@@ -20,6 +20,11 @@
 
 Patterns for discovering and querying data in the warehouse.
 
+> **Note:** Examples use Snowflake syntax. Key differences for other databases:
+> - `ILIKE` → BigQuery: `LOWER(col) LIKE LOWER('%term%')`
+> - `DATEADD(day, -30, x)` → PostgreSQL: `x - INTERVAL '30 days'`
+> - `INFORMATION_SCHEMA` structure varies by database
+
 ## Value Discovery (Explore Before Filtering)
 
 ⚠️ **CRITICAL: When filtering on categorical columns (operators, features, types, statuses), ALWAYS explore what values exist BEFORE writing your main query.**
