@@ -99,7 +99,9 @@ my_postgres:
   database: testdb
 """)
         config = WarehouseConfig.load(config_file)
-        assert config.connectors["my_postgres"].password == "secretpassword"
+        connector = config.connectors["my_postgres"]
+        assert isinstance(connector, PostgresConnector)
+        assert connector.password == "secretpassword"
 
 
 class TestWarehouseConfigGetDefault:
@@ -125,6 +127,7 @@ second_connector:
         config = WarehouseConfig.load(config_file)
         name, connector = config.get_default()
         assert name == "first_connector"
+        assert isinstance(connector, PostgresConnector)
         assert connector.host == "first.example.com"
 
     def test_get_default_empty_raises(self):

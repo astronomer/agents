@@ -8,7 +8,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest", "sqlalchemy", "polars", "pandas"]
+test = ["pytest", "sqlalchemy", "polars", "pandas", "pyyaml"]
 test-integration = [
     "pytest",
     "sqlalchemy",
