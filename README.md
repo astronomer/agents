@@ -250,7 +250,39 @@ SNOWFLAKE_PRIVATE_KEY_PASSPHRASE=your-passphrase-here  # Only required if using 
 | `snowflake` | Built-in | Snowflake Data Cloud |
 | `postgres` | Built-in | PostgreSQL |
 | `bigquery` | Built-in | Google BigQuery |
-| `sqlalchemy` | Any SQLAlchemy driver | Redshift, MySQL, DuckDB, SQLite, and [others](https://docs.sqlalchemy.org/en/20/dialects/) |
+| `sqlalchemy` | Any SQLAlchemy driver | Auto-detects packages for 25+ databases (see below) |
+
+<details>
+<summary>Auto-detected SQLAlchemy databases</summary>
+
+The connector automatically installs the correct driver packages for:
+
+| Database | Dialect URL |
+|----------|-------------|
+| PostgreSQL | `postgresql://` or `postgres://` |
+| MySQL | `mysql://` or `mysql+pymysql://` |
+| MariaDB | `mariadb://` |
+| SQLite | `sqlite:///` |
+| SQL Server | `mssql+pyodbc://` |
+| Oracle | `oracle://` |
+| Redshift | `redshift://` |
+| Snowflake | `snowflake://` |
+| BigQuery | `bigquery://` |
+| DuckDB | `duckdb:///` |
+| Trino | `trino://` |
+| ClickHouse | `clickhouse://` |
+| CockroachDB | `cockroachdb://` |
+| Databricks | `databricks://` |
+| Amazon Athena | `awsathena://` |
+| Cloud Spanner | `spanner://` |
+| Teradata | `teradata://` |
+| Vertica | `vertica://` |
+| SAP HANA | `hana://` |
+| IBM Db2 | `db2://` |
+
+For unlisted databases, install the driver manually and use standard SQLAlchemy URLs.
+
+</details>
 
 <details>
 <summary>Example configurations</summary>
