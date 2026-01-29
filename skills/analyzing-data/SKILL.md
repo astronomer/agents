@@ -27,6 +27,46 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 Scripts are located relative to this skill file.
 
+## Warehouse Configuration
+
+Configure connections in `~/.astro/ai/config/warehouse.yml`. The first entry is the default.
+
+**Supported databases:**
+
+```yaml
+# Snowflake
+my_snowflake:
+  type: snowflake
+  account: myaccount.us-east-1
+  user: analyst
+  password: ${SNOWFLAKE_PASSWORD}
+  warehouse: COMPUTE_WH
+  database: ANALYTICS
+
+# PostgreSQL
+my_postgres:
+  type: postgres
+  host: localhost
+  port: 5432
+  user: analyst
+  password: ${POSTGRES_PASSWORD}
+  database: analytics
+
+# BigQuery
+my_bigquery:
+  type: bigquery
+  project: my-gcp-project
+  credentials_path: ~/.config/gcloud/service_account.json
+
+# Any SQLAlchemy-compatible database (MySQL, DuckDB, etc.)
+my_duckdb:
+  type: sqlalchemy
+  url: duckdb:///path/to/analytics.duckdb
+  databases: [main]
+```
+
+Environment variables (`${VAR}`) are expanded at runtime.
+
 ## MANDATORY FIRST STEP
 
 **Before any other action, check for cached patterns:**
@@ -61,7 +101,8 @@ Analysis Progress:
 ### Kernel Management
 
 ```bash
-uv run scripts/cli.py start           # Start kernel with Snowflake
+uv run scripts/cli.py start           # Start kernel with default warehouse
+uv run scripts/cli.py start -w my_pg  # Start with specific warehouse
 uv run scripts/cli.py exec "..."      # Execute Python code
 uv run scripts/cli.py status          # Check kernel status
 uv run scripts/cli.py restart         # Restart kernel
@@ -211,6 +252,12 @@ Grep pattern="<concept>" glob="**/*.sql"
 - Filter early with WHERE clauses
 - Prefer pre-aggregated tables (`METRICS_*`, `MART_*`, `AGG_*`)
 - For 100M+ row tables: no JOINs or GROUP BY on first query
+
+**SQL Dialect Differences:**
+| Operation | Snowflake | PostgreSQL | BigQuery |
+|-----------|-----------|------------|----------|
+| Date subtract | `DATEADD(day, -7, x)` | `x - INTERVAL '7 days'` | `DATE_SUB(x, INTERVAL 7 DAY)` |
+| Case-insensitive | `ILIKE` | `ILIKE` | `LOWER(x) LIKE LOWER(y)` |
 
 ---
 

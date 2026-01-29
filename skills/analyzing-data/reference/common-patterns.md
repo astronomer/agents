@@ -15,6 +15,10 @@
 
 SQL templates for frequent analysis types.
 
+> **Note:** Examples use Snowflake syntax. For other databases:
+> - `DATEADD(day, -7, x)` → PostgreSQL: `x - INTERVAL '7 days'` → BigQuery: `DATE_SUB(x, INTERVAL 7 DAY)`
+> - `DATE_TRUNC('week', x)` → BigQuery: `DATE_TRUNC(x, WEEK)`
+
 ## Trend Over Time
 ```sql
 SELECT
