@@ -3,94 +3,13 @@
 from __future__ import annotations
 
 import os
-import time
 from typing import TYPE_CHECKING
 
-import httpx
-
 from astro_airflow_mcp.adapters import AirflowAdapter, create_adapter
+from astro_airflow_mcp.auth import TokenManager
 
 if TYPE_CHECKING:
     from astro_airflow_mcp.config import ResolvedConfig
-
-
-class TokenManager:
-    """Manages JWT token lifecycle for Airflow API authentication."""
-
-    def __init__(
-        self,
-        airflow_url: str,
-        username: str | None = None,
-        password: str | None = None,
-    ):
-        self.airflow_url = airflow_url
-        self.username = username
-        self.password = password
-        self._token: str | None = None
-        self._token_fetched_at: float | None = None
-        self._token_lifetime_seconds: float = 1800
-        self._token_endpoint_available: bool | None = None
-
-    def get_token(self) -> str | None:
-        """Get current token, fetching/refreshing if needed."""
-        if self._token_endpoint_available is False:
-            return None
-        if self._should_refresh():
-            self._fetch_token()
-        return self._token
-
-    def get_basic_auth(self) -> tuple[str, str] | None:
-        """Get basic auth credentials for Airflow 2.x fallback."""
-        if self.username and self.password:
-            return (self.username, self.password)
-        return None
-
-    def _should_refresh(self) -> bool:
-        """Check if token needs refresh."""
-        if self._token is None:
-            return True
-        if self._token_fetched_at is None:
-            return True
-        elapsed = time.time() - self._token_fetched_at
-        return elapsed >= (self._token_lifetime_seconds - 300)
-
-    def _fetch_token(self) -> None:
-        """Fetch new token from /auth/token endpoint."""
-        token_url = f"{self.airflow_url}/auth/token"
-
-        try:
-            with httpx.Client(timeout=10.0) as client:
-                if self.username and self.password:
-                    response = client.post(
-                        token_url,
-                        json={"username": self.username, "password": self.password},
-                        headers={"Content-Type": "application/json"},
-                    )
-                else:
-                    response = client.get(token_url)
-
-            if response.status_code == 404:
-                self._token_endpoint_available = False
-                self._token = None
-                if not self.username and not self.password:
-                    self.username = "admin"  # nosec B105
-                    self.password = "admin"  # nosec B105
-                return
-
-            response.raise_for_status()
-            data = response.json()
-
-            if "access_token" in data:
-                self._token = data["access_token"]
-                self._token_fetched_at = time.time()
-                self._token_endpoint_available = True
-                if "expires_in" in data:
-                    self._token_lifetime_seconds = float(data["expires_in"])
-            else:
-                self._token = None
-
-        except httpx.RequestError:
-            self._token = None
 
 
 class CLIContext:
