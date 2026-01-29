@@ -52,6 +52,30 @@ def main():
     pass
 
 
+@main.group()
+def warehouse():
+    """Manage warehouse connections."""
+
+
+@warehouse.command("list")
+def warehouse_list():
+    """List available warehouse connections."""
+    try:
+        config = WarehouseConfig.load()
+        if not config.connectors:
+            click.echo("No warehouses configured")
+            return
+
+        default_name, _ = config.get_default()
+        for name, conn in config.connectors.items():
+            marker = " (default)" if name == default_name else ""
+            click.echo(f"{name}: {conn.connector_type()}{marker}")
+    except FileNotFoundError:
+        click.echo("No warehouse config found at ~/.astro/ai/config/warehouse.yml")
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+
+
 @main.command()
 @click.option("--warehouse", "-w", help="Warehouse name from config")
 def start(warehouse: str | None):

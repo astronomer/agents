@@ -61,6 +61,7 @@ Analysis Progress:
 ### Kernel Management
 
 ```bash
+uv run scripts/cli.py warehouse list  # List available warehouses
 uv run scripts/cli.py start           # Start kernel with default warehouse
 uv run scripts/cli.py start -w my_pg  # Start with specific warehouse
 uv run scripts/cli.py exec "..."      # Execute Python code
