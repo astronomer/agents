@@ -41,7 +41,7 @@ def list_instances() -> None:
             elif inst.auth.token:
                 auth = "token"
             else:
-                auth = f"basic ({inst.auth.username})"
+                auth = "basic"
             table.add_row(marker, inst.name, inst.url, auth)
 
         console.print(table)
@@ -71,7 +71,7 @@ def current_instance() -> None:
             elif instance.auth.token:
                 console.print("Auth: token")
             else:
-                console.print(f"Auth: basic ({instance.auth.username})")
+                console.print("Auth: basic")
     except ConfigError as e:
         output_error(str(e))
 
@@ -132,7 +132,7 @@ def add_instance(
         if has_token:
             auth_type = "token"
         elif has_basic:
-            auth_type = f"basic ({username})"
+            auth_type = "basic"
         else:
             auth_type = "none"
         console.print(f"{action} instance [bold]{name}[/bold]")
