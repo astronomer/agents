@@ -571,6 +571,29 @@ class TestSQLAlchemyPackageDetection:
         conn = SQLAlchemyConnector(url="unknown://u:p@h/d", databases=["d"])
         assert conn.get_required_packages() == ["sqlalchemy"]
 
+    def test_extra_packages_added(self):
+        """Users can specify extra_packages for unlisted databases."""
+        conn = SQLAlchemyConnector(
+            url="customdb://u:p@h/d",
+            databases=["d"],
+            extra_packages=["custom-driver", "custom-utils"],
+        )
+        pkgs = conn.get_required_packages()
+        assert "sqlalchemy" in pkgs
+        assert "custom-driver" in pkgs
+        assert "custom-utils" in pkgs
+
+    def test_extra_packages_from_dict(self):
+        """extra_packages should be parsed from config dict."""
+        conn = SQLAlchemyConnector.from_dict(
+            {
+                "url": "customdb://u:p@h/d",
+                "databases": ["d"],
+                "extra_packages": ["my-driver"],
+            }
+        )
+        assert "my-driver" in conn.get_required_packages()
+
     @pytest.mark.parametrize(
         "url",
         [

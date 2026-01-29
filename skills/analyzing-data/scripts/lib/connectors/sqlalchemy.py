@@ -104,6 +104,7 @@ class SQLAlchemyConnector(DatabaseConnector):
     pool_size: int = 5
     echo: bool = False
     url_env_var: str | None = None
+    extra_packages: list[str] = field(default_factory=list)  # For unlisted databases
 
     @classmethod
     def connector_type(cls) -> str:
@@ -121,6 +122,7 @@ class SQLAlchemyConnector(DatabaseConnector):
             pool_size=data.get("pool_size", 5),
             echo=data.get("echo", False),
             url_env_var=url_env,
+            extra_packages=data.get("extra_packages", []),
         )
 
     def validate(self, name: str) -> None:
@@ -136,6 +138,7 @@ class SQLAlchemyConnector(DatabaseConnector):
         dialect = _extract_dialect(self.url)
         if dialect and dialect in DIALECTS:
             packages.extend(DIALECTS[dialect].packages)
+        packages.extend(self.extra_packages)
         return packages
 
     def get_env_vars_for_kernel(self) -> dict[str, str]:

@@ -280,7 +280,15 @@ The connector automatically installs the correct driver packages for:
 | SAP HANA | `hana://` |
 | IBM Db2 | `db2://` |
 
-For unlisted databases, install the driver manually and use standard SQLAlchemy URLs.
+For unlisted databases, use `extra_packages` to specify the driver:
+
+```yaml
+my_custom_db:
+  type: sqlalchemy
+  url: customdb://user:pass@host/database
+  databases: [mydb]
+  extra_packages: ["custom-db-driver"]
+```
 
 </details>
 
