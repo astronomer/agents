@@ -296,38 +296,368 @@ class TestEnvVarSubstitution:
         assert env_vars.get("TEST_PW") == "secret"
 
 
-class TestPreludeCompilation:
-    """Test that generated prelude code compiles without syntax errors."""
+class TestUnresolvedEnvVarValidation:
+    """Validation must catch unresolved ${VAR} patterns to fail fast."""
 
-    def test_snowflake_prelude_compiles(self):
+    @pytest.mark.parametrize(
+        "connector_cls,kwargs,error_match",
+        [
+            (
+                SnowflakeConnector,
+                {"account": "${X}", "user": "u", "password": "p", "databases": []},
+                "account required",
+            ),
+            (
+                SnowflakeConnector,
+                {"account": "a", "user": "${X}", "password": "p", "databases": []},
+                "user required",
+            ),
+            (
+                SnowflakeConnector,
+                {"account": "a", "user": "u", "password": "${X}", "databases": []},
+                "password required",
+            ),
+            (
+                PostgresConnector,
+                {"host": "${X}", "user": "u", "database": "d", "databases": []},
+                "host required",
+            ),
+            (
+                PostgresConnector,
+                {"host": "h", "user": "${X}", "database": "d", "databases": []},
+                "user required",
+            ),
+            (
+                PostgresConnector,
+                {"host": "h", "user": "u", "database": "${X}", "databases": []},
+                "database required",
+            ),
+            (
+                BigQueryConnector,
+                {"project": "${X}", "databases": []},
+                "project required",
+            ),
+            (SQLAlchemyConnector, {"url": "${X}", "databases": ["d"]}, "url required"),
+        ],
+        ids=[
+            "snowflake_account",
+            "snowflake_user",
+            "snowflake_password",
+            "postgres_host",
+            "postgres_user",
+            "postgres_database",
+            "bigquery_project",
+            "sqlalchemy_url",
+        ],
+    )
+    def test_unresolved_env_var_fails_validation(
+        self, connector_cls, kwargs, error_match
+    ):
+        conn = connector_cls(**kwargs)
+        with pytest.raises(ValueError, match=error_match):
+            conn.validate("test")
+
+
+class TestGetEnvVarsForKernel:
+    """Tests for get_env_vars_for_kernel() across all connectors."""
+
+    def test_snowflake_password_env_var(self, monkeypatch):
+        monkeypatch.setenv("SF_PASS", "secret")
+        conn = SnowflakeConnector.from_dict(
+            {
+                "account": "a",
+                "user": "u",
+                "password": "${SF_PASS}",
+            }
+        )
+        env_vars = conn.get_env_vars_for_kernel()
+        assert env_vars == {"SF_PASS": "secret"}
+
+    def test_snowflake_private_key_env_var(self, monkeypatch):
+        monkeypatch.setenv("SF_KEY", "my-private-key")
+        conn = SnowflakeConnector.from_dict(
+            {
+                "account": "a",
+                "user": "u",
+                "auth_type": "private_key",
+                "private_key": "${SF_KEY}",
+            }
+        )
+        env_vars = conn.get_env_vars_for_kernel()
+        assert env_vars == {"SF_KEY": "my-private-key"}
+
+    def test_snowflake_all_env_vars(self, monkeypatch):
+        monkeypatch.setenv("SF_KEY", "key")
+        monkeypatch.setenv("SF_PASS", "passphrase")
+        conn = SnowflakeConnector.from_dict(
+            {
+                "account": "a",
+                "user": "u",
+                "auth_type": "private_key",
+                "private_key": "${SF_KEY}",
+                "private_key_passphrase": "${SF_PASS}",
+            }
+        )
+        env_vars = conn.get_env_vars_for_kernel()
+        assert "SF_KEY" in env_vars
+        assert "SF_PASS" in env_vars
+
+    def test_snowflake_no_env_vars_when_literal(self):
         conn = SnowflakeConnector(
-            account="test", user="u", password="p", warehouse="WH", databases=["DB"]
+            account="a", user="u", password="literal-pass", databases=[]
         )
-        prelude = conn.to_python_prelude()
-        compile(prelude, "<string>", "exec")
+        env_vars = conn.get_env_vars_for_kernel()
+        assert env_vars == {}
 
-    def test_postgres_prelude_compiles(self):
+    def test_postgres_password_env_var(self, monkeypatch):
+        monkeypatch.setenv("PG_PASS", "secret")
+        conn = PostgresConnector.from_dict(
+            {
+                "host": "h",
+                "user": "u",
+                "password": "${PG_PASS}",
+                "database": "d",
+            }
+        )
+        env_vars = conn.get_env_vars_for_kernel()
+        assert env_vars == {"PG_PASS": "secret"}
+
+    def test_postgres_no_env_vars_when_literal(self):
         conn = PostgresConnector(
-            host="localhost", port=5432, user="u", database="db", databases=["db"]
+            host="h", user="u", password="literal", database="d", databases=[]
         )
-        prelude = conn.to_python_prelude()
-        compile(prelude, "<string>", "exec")
+        env_vars = conn.get_env_vars_for_kernel()
+        assert env_vars == {}
 
-    def test_bigquery_prelude_compiles(self):
-        conn = BigQueryConnector(project="my-project", databases=["my-project"])
-        prelude = conn.to_python_prelude()
-        compile(prelude, "<string>", "exec")
-
-    def test_bigquery_prelude_with_location_compiles(self):
+    def test_bigquery_credentials_path_env_var(self):
         conn = BigQueryConnector(
-            project="my-project", location="US", databases=["my-project"]
+            project="p", credentials_path="/path/to/creds.json", databases=[]
+        )
+        env_vars = conn.get_env_vars_for_kernel()
+        assert env_vars == {"GOOGLE_APPLICATION_CREDENTIALS": "/path/to/creds.json"}
+
+    def test_bigquery_no_env_vars_without_creds(self):
+        conn = BigQueryConnector(project="p", databases=[])
+        env_vars = conn.get_env_vars_for_kernel()
+        assert env_vars == {}
+
+    def test_sqlalchemy_url_env_var(self, monkeypatch):
+        monkeypatch.setenv("DB_URL", "postgresql://u:p@h/d")
+        conn = SQLAlchemyConnector.from_dict(
+            {
+                "url": "${DB_URL}",
+                "databases": ["d"],
+            }
+        )
+        env_vars = conn.get_env_vars_for_kernel()
+        assert env_vars == {"DB_URL": "postgresql://u:p@h/d"}
+
+
+class TestSnowflakePrivateKeyPrelude:
+    """Tests for Snowflake private key authentication prelude variations."""
+
+    def test_private_key_from_file_compiles(self):
+        conn = SnowflakeConnector(
+            account="a",
+            user="u",
+            auth_type="private_key",
+            private_key_path="/path/to/key.pem",
+            databases=[],
         )
         prelude = conn.to_python_prelude()
         compile(prelude, "<string>", "exec")
+        assert "_load_private_key" in prelude
+        assert "/path/to/key.pem" in prelude
 
-    def test_sqlalchemy_prelude_compiles(self):
-        conn = SQLAlchemyConnector(url="sqlite:///test.db", databases=["test"])
+    def test_private_key_from_file_with_passphrase_compiles(self):
+        conn = SnowflakeConnector(
+            account="a",
+            user="u",
+            auth_type="private_key",
+            private_key_path="/path/to/key.pem",
+            private_key_passphrase="mypassphrase",
+            databases=[],
+        )
         prelude = conn.to_python_prelude()
+        compile(prelude, "<string>", "exec")
+        assert "mypassphrase" in prelude
+
+    def test_private_key_from_content_compiles(self):
+        conn = SnowflakeConnector(
+            account="a",
+            user="u",
+            auth_type="private_key",
+            private_key="-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----",
+            databases=[],
+        )
+        prelude = conn.to_python_prelude()
+        compile(prelude, "<string>", "exec")
+        assert "_load_private_key" in prelude
+
+    def test_private_key_from_env_var_compiles(self, monkeypatch):
+        monkeypatch.setenv("SF_PRIVATE_KEY", "key-content")
+        conn = SnowflakeConnector.from_dict(
+            {
+                "account": "a",
+                "user": "u",
+                "auth_type": "private_key",
+                "private_key": "${SF_PRIVATE_KEY}",
+            }
+        )
+        prelude = conn.to_python_prelude()
+        compile(prelude, "<string>", "exec")
+        assert "os.environ.get" in prelude
+        assert "SF_PRIVATE_KEY" in prelude
+
+    def test_private_key_passphrase_from_env_var_compiles(self, monkeypatch):
+        monkeypatch.setenv("SF_PASSPHRASE", "secret")
+        conn = SnowflakeConnector.from_dict(
+            {
+                "account": "a",
+                "user": "u",
+                "auth_type": "private_key",
+                "private_key_path": "/path/to/key.pem",
+                "private_key_passphrase": "${SF_PASSPHRASE}",
+            }
+        )
+        prelude = conn.to_python_prelude()
+        compile(prelude, "<string>", "exec")
+        assert "SF_PASSPHRASE" in prelude
+
+
+class TestSQLAlchemyPackageDetection:
+    """SQLAlchemy connector must detect correct driver packages from URL."""
+
+    @pytest.mark.parametrize(
+        "url,expected_driver",
+        [
+            ("mssql+pyodbc://u:p@h/d", "pyodbc"),
+            ("oracle+oracledb://u:p@h/d", "oracledb"),
+            ("mysql+mysqlconnector://u:p@h/d", "mysql-connector-python"),
+            ("mysql+pymysql://u:p@h/d", "pymysql"),
+            ("postgres://u:p@h/d", "psycopg[binary]"),
+            ("postgresql://u:p@h/d", "psycopg[binary]"),
+            ("duckdb:///data.db", "duckdb"),
+        ],
+        ids=[
+            "mssql",
+            "oracle",
+            "mysql_connector",
+            "mysql_pymysql",
+            "postgres",
+            "postgresql",
+            "duckdb",
+        ],
+    )
+    def test_driver_package_detected(self, url, expected_driver):
+        conn = SQLAlchemyConnector(url=url, databases=["d"])
+        pkgs = conn.get_required_packages()
+        assert "sqlalchemy" in pkgs
+        assert expected_driver in pkgs
+
+    def test_unknown_dialect_only_sqlalchemy(self):
+        conn = SQLAlchemyConnector(url="unknown://u:p@h/d", databases=["d"])
+        assert conn.get_required_packages() == ["sqlalchemy"]
+
+
+class TestConnectorDefaults:
+    """Connectors must have sensible defaults for optional fields."""
+
+    def test_postgres_default_port(self):
+        conn = PostgresConnector.from_dict({"host": "h", "user": "u", "database": "d"})
+        assert conn.port == 5432
+
+    def test_postgres_custom_port(self):
+        conn = PostgresConnector.from_dict(
+            {"host": "h", "port": 5433, "user": "u", "database": "d"}
+        )
+        assert conn.port == 5433
+
+    @pytest.mark.parametrize(
+        "connector_cls,config,expected_databases",
+        [
+            (
+                PostgresConnector,
+                {"host": "h", "user": "u", "database": "mydb"},
+                ["mydb"],
+            ),
+            (
+                PostgresConnector,
+                {"host": "h", "user": "u", "database": "mydb", "databases": ["a", "b"]},
+                ["a", "b"],
+            ),
+            (BigQueryConnector, {"project": "my-project"}, ["my-project"]),
+            (
+                BigQueryConnector,
+                {"project": "p", "databases": ["d1", "d2"]},
+                ["d1", "d2"],
+            ),
+        ],
+        ids=[
+            "postgres_default",
+            "postgres_override",
+            "bigquery_default",
+            "bigquery_override",
+        ],
+    )
+    def test_databases_list_defaults(self, connector_cls, config, expected_databases):
+        conn = connector_cls.from_dict(config)
+        assert conn.databases == expected_databases
+
+    def test_bigquery_empty_location_by_default(self):
+        conn = BigQueryConnector.from_dict({"project": "p"})
+        assert conn.location == ""
+
+
+class TestPreludeCompilation:
+    """Generated prelude code must be valid Python syntax."""
+
+    @pytest.mark.parametrize(
+        "connector",
+        [
+            SnowflakeConnector(
+                account="a", user="u", password="p", warehouse="WH", databases=["DB"]
+            ),
+            SnowflakeConnector(
+                account="a",
+                user="u",
+                auth_type="private_key",
+                private_key_path="/k.pem",
+                databases=[],
+            ),
+            PostgresConnector(
+                host="h", port=5432, user="u", database="db", databases=["db"]
+            ),
+            PostgresConnector(
+                host="h",
+                user="u",
+                password="p",
+                database="db",
+                sslmode="require",
+                databases=[],
+            ),
+            BigQueryConnector(project="p", databases=["p"]),
+            BigQueryConnector(project="p", location="US", databases=["p"]),
+            BigQueryConnector(
+                project="p", credentials_path="/creds.json", databases=["p"]
+            ),
+            SQLAlchemyConnector(url="sqlite:///test.db", databases=["test"]),
+            SQLAlchemyConnector(url="postgresql://u:p@h/d", databases=["d"]),
+        ],
+        ids=[
+            "snowflake_password",
+            "snowflake_private_key",
+            "postgres_basic",
+            "postgres_ssl",
+            "bigquery_basic",
+            "bigquery_location",
+            "bigquery_credentials",
+            "sqlalchemy_sqlite",
+            "sqlalchemy_postgres",
+        ],
+    )
+    def test_prelude_compiles(self, connector):
+        prelude = connector.to_python_prelude()
         compile(prelude, "<string>", "exec")
 
 
