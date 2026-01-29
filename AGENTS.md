@@ -82,4 +82,4 @@ Use `${CLAUDE_PLUGIN_ROOT}` to reference files within the plugin (required becau
 
 ## Config Location
 
-This plugin uses `~/.astro/ai/config/` for user configuration (warehouse credentials, etc.).
+This plugin uses `~/.astro/agents/` for user configuration (warehouse credentials, etc.).

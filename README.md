@@ -218,7 +218,7 @@ The `data` plugin bundles an MCP server and skills into a single installable pac
 
 ### Warehouse Connections
 
-Configure data warehouse connections at `~/.astro/ai/config/warehouse.yml`:
+Configure data warehouse connections at `~/.astro/agents/warehouse.yml`:
 
 ```yaml
 my_warehouse:
@@ -235,7 +235,7 @@ my_warehouse:
     - RAW
 ```
 
-Store credentials in `~/.astro/ai/config/.env`:
+Store credentials in `~/.astro/agents/.env`:
 
 ```bash
 SNOWFLAKE_ACCOUNT=xyz12345
@@ -355,7 +355,7 @@ claude plugin uninstall data@astronomer && claude plugin install data@astronomer
 | Issue | Solution |
 |-------|----------|
 | Skills not appearing | Reinstall plugin: `claude plugin uninstall data@astronomer && claude plugin install data@astronomer` |
-| Warehouse connection errors | Check credentials in `~/.astro/ai/config/.env` and connection config in `warehouse.yml` |
+| Warehouse connection errors | Check credentials in `~/.astro/agents/.env` and connection config in `warehouse.yml` |
 | Airflow not detected | Ensure you're running from a directory with `airflow.cfg` or a `dags/` folder |
 
 ## Contributing
