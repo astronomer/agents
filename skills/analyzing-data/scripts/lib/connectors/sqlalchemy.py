@@ -59,6 +59,8 @@ class SQLAlchemyConnector(DatabaseConnector):
             packages.append("pyodbc")
         elif "oracle" in url_lower:
             packages.append("oracledb")
+        elif "redshift" in url_lower:
+            packages.append("redshift_connector")
         return packages
 
     def get_env_vars_for_kernel(self) -> dict[str, str]:
@@ -87,6 +89,8 @@ class SQLAlchemyConnector(DatabaseConnector):
             db_type = "SQL Server"
         elif "oracle" in url_lower:
             db_type = "Oracle"
+        elif "redshift" in url_lower:
+            db_type = "Redshift"
         else:
             db_type = "Database"
 
