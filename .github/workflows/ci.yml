@@ -19,8 +19,8 @@ jobs:
       - name: Run prek
         run: uvx prek run --all-files
 
-  test:
-    name: Run tests
+  unit-test:
+    name: Unit tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,9 +28,43 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v5
 
-      - name: Run analyzing-data skill tests
+      - name: Run unit tests
         working-directory: skills/analyzing-data/scripts
-        run: uv run --extra test pytest tests/ -v
+        run: uv run --extra test pytest tests/ --ignore=tests/integration -v
+
+  integration-test:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    needs: unit-test
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Run integration tests
+        working-directory: skills/analyzing-data/scripts
+        env:
+          TEST_POSTGRES_HOST: localhost
+          TEST_POSTGRES_PORT: 5432
+          TEST_POSTGRES_USER: test
+          TEST_POSTGRES_PASSWORD: test
+          TEST_POSTGRES_DB: testdb
+        run: uv run --extra test-integration pytest tests/integration/ -v
 
   typecheck:
     name: Type checking

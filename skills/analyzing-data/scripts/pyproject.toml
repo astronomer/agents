@@ -9,3 +9,12 @@ classifiers = [
 
 [project.optional-dependencies]
 test = ["pytest", "sqlalchemy", "polars", "pandas"]
+test-integration = [
+    "pytest",
+    "sqlalchemy",
+    "polars",
+    "pandas",
+    "psycopg[binary]",
+    "duckdb",
+    "duckdb-engine",
+]
