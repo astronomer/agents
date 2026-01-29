@@ -1,4 +1,4 @@
-"""Tests for airflow-cli config module."""
+"""Tests for af CLI config module."""
 
 import os
 from unittest.mock import patch

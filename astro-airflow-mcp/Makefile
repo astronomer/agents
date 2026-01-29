@@ -33,14 +33,14 @@ install-hooks:  ## Install prek hooks
 run:  ## Run the MCP server in HTTP mode (default is stdio, but HTTP can be useful for local testing)
 	uv run python -m astro_airflow_mcp --transport http
 
-cli:  ## Run the airflow-cli tool (pass args with ARGS=, e.g., make cli ARGS="dags list")
-	uv run airflow-cli $(ARGS)
+cli:  ## Run the af CLI tool (pass args with ARGS=, e.g., make cli ARGS="dags list")
+	uv run af $(ARGS)
 
-cli-health:  ## Run airflow-cli health check
-	uv run airflow-cli health
+cli-health:  ## Run af CLI health check
+	uv run af health
 
-cli-help:  ## Show airflow-cli help
-	uv run airflow-cli --help
+cli-help:  ## Show af CLI help
+	uv run af --help
 
 docker-build:  ## Build Docker image
 	docker build -t astro-airflow-mcp .

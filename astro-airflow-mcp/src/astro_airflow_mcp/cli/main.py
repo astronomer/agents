@@ -16,7 +16,7 @@ from astro_airflow_mcp.cli.context import configure_context, get_adapter
 from astro_airflow_mcp.cli.output import output_json
 
 app = typer.Typer(
-    name="airflow-cli",
+    name="af",
     help="CLI tool for interacting with Apache Airflow.",
     no_args_is_help=True,
 )
@@ -27,7 +27,7 @@ def version_callback(value: bool) -> None:
     if value:
         from astro_airflow_mcp import __version__
 
-        print(f"airflow-cli version {__version__}")
+        print(f"af version {__version__}")
         raise typer.Exit()
 
 
@@ -79,8 +79,8 @@ def main(
         typer.Option(
             "--config",
             "-c",
-            envvar="AIRFLOW_CLI_CONFIG",
-            help="Path to config file (default: ~/.airflow-cli/config.yaml)",
+            envvar="AF_CONFIG",
+            help="Path to config file (default: ~/.af/config.yaml)",
         ),
     ] = None,
     _version: Annotated[
@@ -102,12 +102,12 @@ def main(
     - AIRFLOW_PASSWORD / --password
     - AIRFLOW_AUTH_TOKEN / --token
 
-    Or use a named instance from ~/.airflow-cli/config.yaml:
+    Or use a named instance from ~/.af/config.yaml:
     - --instance <name>
     """
     # Set config path env var so all ConfigManager instances use it
     if config:
-        os.environ["AIRFLOW_CLI_CONFIG"] = config
+        os.environ["AF_CONFIG"] = config
 
     configure_context(
         airflow_url=airflow_url,

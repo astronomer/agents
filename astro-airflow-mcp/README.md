@@ -15,7 +15,7 @@
     - [Core Tools](#core-tools)
     - [MCP Resources](#mcp-resources)
     - [MCP Prompts](#mcp-prompts)
-  - [Airflow CLI Tool](#airflow-cli-tool)
+  - [Airflow CLI Tool](#af-tool)
     - [Instance Management](#instance-management)
   - [Advanced Usage](#advanced-usage)
     - [Running as Standalone Server](#running-as-standalone-server)
@@ -240,7 +240,7 @@ claude mcp add airflow -e AIRFLOW_API_URL=https://your-airflow.example.com -e AI
 
 ## Airflow CLI Tool
 
-This package also includes `airflow-cli`, a command-line tool for interacting with Airflow instances directly from your terminal.
+This package also includes `af`, a command-line tool for interacting with Airflow instances directly from your terminal.
 
 ### Installation
 
@@ -249,42 +249,42 @@ This package also includes `airflow-cli`, a command-line tool for interacting wi
 uv tool install astro-airflow-mcp
 
 # Or use uvx to run without installing
-uvx --from astro-airflow-mcp airflow-cli --help
+uvx --from astro-airflow-mcp af --help
 ```
 
 ### Quick Reference
 
 ```bash
 # System health check
-airflow-cli health
+af health
 
 # DAG operations
-airflow-cli dags list
-airflow-cli dags get <dag_id>
-airflow-cli dags explore <dag_id>      # Full investigation (metadata + tasks + source)
-airflow-cli dags source <dag_id>
-airflow-cli dags pause <dag_id>
-airflow-cli dags unpause <dag_id>
-airflow-cli dags errors                 # Import errors
-airflow-cli dags warnings
+af dags list
+af dags get <dag_id>
+af dags explore <dag_id>      # Full investigation (metadata + tasks + source)
+af dags source <dag_id>
+af dags pause <dag_id>
+af dags unpause <dag_id>
+af dags errors                 # Import errors
+af dags warnings
 
 # Run operations
-airflow-cli runs list --dag-id <dag_id>
-airflow-cli runs get <dag_id> <run_id>
-airflow-cli runs trigger <dag_id>
-airflow-cli runs trigger-wait <dag_id>  # Trigger and wait for completion
-airflow-cli runs diagnose <dag_id> <run_id>
+af runs list --dag-id <dag_id>
+af runs get <dag_id> <run_id>
+af runs trigger <dag_id>
+af runs trigger-wait <dag_id>  # Trigger and wait for completion
+af runs diagnose <dag_id> <run_id>
 
 # Task operations
-airflow-cli tasks list <dag_id>
-airflow-cli tasks get <dag_id> <task_id>
-airflow-cli tasks logs <dag_id> <run_id> <task_id>
+af tasks list <dag_id>
+af tasks get <dag_id> <task_id>
+af tasks logs <dag_id> <run_id> <task_id>
 
 # Config operations
-airflow-cli config version
-airflow-cli config connections
-airflow-cli config variables
-airflow-cli config pools
+af config version
+af config connections
+af config variables
+af config pools
 ```
 
 ### Instance Management
@@ -293,21 +293,21 @@ Manage multiple Airflow instances with persistent configuration:
 
 ```bash
 # Add instances (auth is optional for open instances)
-airflow-cli instance add local --url http://localhost:8080
-airflow-cli instance add staging --url https://staging.example.com --username admin --password secret
-airflow-cli instance add prod --url https://prod.example.com --token '${AIRFLOW_PROD_TOKEN}'
+af instance add local --url http://localhost:8080
+af instance add staging --url https://staging.example.com --username admin --password secret
+af instance add prod --url https://prod.example.com --token '${AIRFLOW_PROD_TOKEN}'
 
 # List and switch instances
-airflow-cli instance list      # Shows all instances in a table
-airflow-cli instance use prod  # Switch to prod instance
-airflow-cli instance current   # Show current instance
-airflow-cli instance delete old-instance
+af instance list      # Shows all instances in a table
+af instance use prod  # Switch to prod instance
+af instance current   # Show current instance
+af instance delete old-instance
 
 # Override instance for a single command
-airflow-cli --instance staging dags list
+af --instance staging dags list
 ```
 
-Config file location: `~/.airflow-cli/config.yaml` (override with `--config` or `AIRFLOW_CLI_CONFIG` env var)
+Config file location: `~/.af/config.yaml` (override with `--config` or `AF_CONFIG` env var)
 
 ```yaml
 instances:
@@ -337,17 +337,17 @@ export AIRFLOW_USERNAME=admin
 export AIRFLOW_PASSWORD=admin
 
 # Or use CLI flags
-airflow-cli --airflow-url http://localhost:8080 --username admin --password admin dags list
+af --airflow-url http://localhost:8080 --username admin --password admin dags list
 ```
 
 All commands output JSON (except `instance` commands which use human-readable tables), making them easy to use with tools like `jq`:
 
 ```bash
 # Find failed runs
-airflow-cli runs list | jq '.dag_runs[] | select(.state == "failed")'
+af runs list | jq '.dag_runs[] | select(.state == "failed")'
 
 # Get DAG IDs only
-airflow-cli dags list | jq '.dags[].dag_id'
+af dags list | jq '.dags[].dag_id'
 ```
 
 ## Advanced Usage

@@ -1,4 +1,4 @@
-"""Pydantic models for airflow-cli configuration."""
+"""Pydantic models for af CLI configuration."""
 
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ class Instance(BaseModel):
 
 
 class AirflowCliConfig(BaseModel):
-    """Root configuration model for airflow-cli."""
+    """Root configuration model for af CLI."""
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 

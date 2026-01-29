@@ -1,4 +1,4 @@
-"""Instance management CLI commands for airflow-cli."""
+"""Instance management CLI commands for af CLI."""
 
 from typing import Annotated
 
@@ -23,7 +23,7 @@ def list_instances() -> None:
         if not config.instances:
             console.print("No instances configured.", style="dim")
             console.print(
-                "\nAdd one with: airflow-cli instance add <name> --url <url> --username <user> --password <pass>",
+                "\nAdd one with: af instance add <name> --url <url> --username <user> --password <pass>",
                 style="dim",
             )
             return
@@ -58,7 +58,7 @@ def current_instance() -> None:
 
         if current is None:
             console.print("No current instance set.", style="dim")
-            console.print("\nSet one with: airflow-cli instance use <name>", style="dim")
+            console.print("\nSet one with: af instance use <name>", style="dim")
             return
 
         config = manager.load()

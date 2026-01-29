@@ -1,4 +1,4 @@
-"""Configuration loading and management for airflow-cli."""
+"""Configuration loading and management for af CLI."""
 
 from __future__ import annotations
 
@@ -34,19 +34,19 @@ class ResolvedConfig:
 
 
 class ConfigManager:
-    """Manages airflow-cli configuration file."""
+    """Manages af CLI configuration file."""
 
-    DEFAULT_CONFIG_DIR = Path.home() / ".airflow-cli"
+    DEFAULT_CONFIG_DIR = Path.home() / ".af"
     DEFAULT_CONFIG_FILE = "config.yaml"
-    CONFIG_ENV_VAR = "AIRFLOW_CLI_CONFIG"
+    CONFIG_ENV_VAR = "AF_CONFIG"
 
     def __init__(self, config_path: Path | None = None):
         """Initialize the config manager.
 
         Args:
             config_path: Optional custom path to config file.
-                         Falls back to AIRFLOW_CLI_CONFIG env var,
-                         then ~/.astro/airflow-cli.yaml
+                         Falls back to AF_CONFIG env var,
+                         then ~/.af/config.yaml
         """
         if config_path:
             self.config_path = config_path

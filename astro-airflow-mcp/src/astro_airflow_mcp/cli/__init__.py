@@ -1,4 +1,4 @@
-"""CLI package for airflow-cli tool."""
+"""CLI package for af tool."""
 
 from astro_airflow_mcp.cli.main import app
 
