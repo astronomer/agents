@@ -1,5 +1,6 @@
 """Main CLI application with Typer."""
 
+import os
 from typing import Annotated, Any
 
 import typer
@@ -73,6 +74,15 @@ def main(
             help="Use a specific instance from config file",
         ),
     ] = None,
+    config: Annotated[
+        str | None,
+        typer.Option(
+            "--config",
+            "-c",
+            envvar="AIRFLOW_CLI_CONFIG",
+            help="Path to config file (default: ~/.airflow-cli/config.yaml)",
+        ),
+    ] = None,
     _version: Annotated[
         bool | None,
         typer.Option(
@@ -92,9 +102,13 @@ def main(
     - AIRFLOW_PASSWORD / --password
     - AIRFLOW_AUTH_TOKEN / --token
 
-    Or use a named instance from ~/.astro/ai/config/airflow-config.yaml:
+    Or use a named instance from ~/.airflow-cli/config.yaml:
     - --instance <name>
     """
+    # Set config path env var so all ConfigManager instances use it
+    if config:
+        os.environ["AIRFLOW_CLI_CONFIG"] = config
+
     configure_context(
         airflow_url=airflow_url,
         username=username,

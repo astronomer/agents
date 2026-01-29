@@ -61,9 +61,7 @@ class AirflowCliConfig(BaseModel):
         if self.current_instance is not None:
             instance_names = {i.name for i in self.instances}
             if self.current_instance not in instance_names:
-                raise ValueError(
-                    f"current-instance '{self.current_instance}' does not exist"
-                )
+                raise ValueError(f"current-instance '{self.current_instance}' does not exist")
         return self
 
     def add_instance(
@@ -78,7 +76,11 @@ class AirflowCliConfig(BaseModel):
         # Only create Auth if credentials provided
         has_basic = username is not None and password is not None
         has_token = token is not None
-        auth = Auth(username=username, password=password, token=token) if has_basic or has_token else None
+        auth = (
+            Auth(username=username, password=password, token=token)
+            if has_basic or has_token
+            else None
+        )
 
         existing = self.get_instance(name)
         if existing:

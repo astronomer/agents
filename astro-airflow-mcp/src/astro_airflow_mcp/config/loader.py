@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -35,17 +36,22 @@ class ResolvedConfig:
 class ConfigManager:
     """Manages airflow-cli configuration file."""
 
-    DEFAULT_CONFIG_DIR = Path.home() / ".astro"
-    DEFAULT_CONFIG_FILE = "airflow-cli.yaml"
+    DEFAULT_CONFIG_DIR = Path.home() / ".airflow-cli"
+    DEFAULT_CONFIG_FILE = "config.yaml"
+    CONFIG_ENV_VAR = "AIRFLOW_CLI_CONFIG"
 
     def __init__(self, config_path: Path | None = None):
         """Initialize the config manager.
 
         Args:
-            config_path: Optional custom path to config file
+            config_path: Optional custom path to config file.
+                         Falls back to AIRFLOW_CLI_CONFIG env var,
+                         then ~/.astro/airflow-cli.yaml
         """
         if config_path:
             self.config_path = config_path
+        elif os.environ.get(self.CONFIG_ENV_VAR):
+            self.config_path = Path(os.environ[self.CONFIG_ENV_VAR])
         else:
             self.config_path = self.DEFAULT_CONFIG_DIR / self.DEFAULT_CONFIG_FILE
         self.lock_path = self.config_path.with_suffix(".lock")

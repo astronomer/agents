@@ -22,7 +22,10 @@ def list_instances() -> None:
 
         if not config.instances:
             console.print("No instances configured.", style="dim")
-            console.print("\nAdd one with: airflow-cli instance add <name> --url <url> --username <user> --password <pass>", style="dim")
+            console.print(
+                "\nAdd one with: airflow-cli instance add <name> --url <url> --username <user> --password <pass>",
+                style="dim",
+            )
             return
 
         table = Table(show_header=True, header_style="bold", box=None, pad_edge=False)

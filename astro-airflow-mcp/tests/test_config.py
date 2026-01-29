@@ -327,10 +327,14 @@ class TestConfigManager:
     def test_load_invalid_config(self, tmp_path):
         """Test loading invalid config raises ConfigError."""
         config_path = tmp_path / "config.yaml"
-        config_path.write_text(yaml.dump({
-            "instances": [],
-            "current-instance": "nonexistent",
-        }))
+        config_path.write_text(
+            yaml.dump(
+                {
+                    "instances": [],
+                    "current-instance": "nonexistent",
+                }
+            )
+        )
 
         manager = ConfigManager(config_path=config_path)
         with pytest.raises(ConfigError, match="Invalid config"):
