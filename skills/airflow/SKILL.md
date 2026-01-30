@@ -12,10 +12,11 @@ Use `af` commands to query, manage, and troubleshoot Airflow workflows.
 Run all `af` commands using uvx (no installation required):
 
 ```bash
-uvx --from astro-airflow-mcp af <command>
+# UPDATE VERSION HERE WHEN RELEASING
+uvx --from astro-airflow-mcp==0.3.0 af <command>
 ```
 
-Throughout this document, `af` is shorthand for `uvx --from astro-airflow-mcp af`.
+Throughout this document, `af` is shorthand for the command above.
 
 ## Instance Configuration
 
