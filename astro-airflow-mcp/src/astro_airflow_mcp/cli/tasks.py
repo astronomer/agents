@@ -13,6 +13,7 @@ def parse_task_ids(value: str) -> list[str]:
     """Parse comma-separated task IDs into a list."""
     return [t.strip() for t in value.split(",") if t.strip()]
 
+
 app = typer.Typer(help="Task management commands", no_args_is_help=True)
 
 
