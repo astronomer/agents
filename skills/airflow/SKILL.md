@@ -22,6 +22,10 @@ Throughout this document, `af` is shorthand for `uvx --from astro-airflow-mcp@la
 Manage multiple Airflow instances with persistent configuration:
 
 ```bash
+# Add a new instance
+af instance add prod --url https://airflow.example.com --token "$API_TOKEN"
+af instance add staging --url https://staging.example.com --username admin --password admin
+
 # List and switch instances
 af instance list      # Shows all instances in a table
 af instance use prod  # Switch to prod instance
@@ -32,17 +36,28 @@ af instance delete old-instance
 af --instance staging dags list
 ```
 
-Config file: `~/.af/config.yaml` (override with `--config` or `AIRFLOW_CLI_CONFIG`)
+Config file: `~/.af/config.yaml` (override with `--config` or `AF_CONFIG` env var)
 
-Or use environment variables:
+Tokens in config can reference environment variables using `${VAR}` syntax:
+```yaml
+instances:
+- name: prod
+  url: https://airflow.example.com
+  auth:
+    token: ${AIRFLOW_API_TOKEN}
+```
+
+Or use environment variables directly (no config file needed):
 
 ```bash
 export AIRFLOW_API_URL=http://localhost:8080
+export AIRFLOW_AUTH_TOKEN=your-token-here
+# Or username/password:
 export AIRFLOW_USERNAME=admin
 export AIRFLOW_PASSWORD=admin
 ```
 
-Or CLI flags: `af --airflow-url http://localhost:8080 --username admin --password admin <command>`
+Or CLI flags: `af --airflow-url http://localhost:8080 --token "$TOKEN" <command>`
 
 ## Quick Reference
 
