@@ -156,7 +156,6 @@ class AstroCli:
         headers: list[tuple[str, int]] = []
         col_pattern = re.compile(r"(\S+(?:\s\S+)*)")
 
-        pos = 0
         for match in col_pattern.finditer(header_line):
             header_name = match.group(1).strip().lower().replace(" ", "_")
             headers.append((header_name, match.start()))
