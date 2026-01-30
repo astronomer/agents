@@ -7,6 +7,16 @@ description: Manages Apache Airflow operations including listing, testing, runni
 
 Use `af` commands to query, manage, and troubleshoot Airflow workflows.
 
+## Running the CLI
+
+Run all `af` commands using uvx (no installation required):
+
+```bash
+uvx --from astro-airflow-mcp af <command>
+```
+
+Throughout this document, `af` is shorthand for `uvx --from astro-airflow-mcp af`.
+
 ## Instance Configuration
 
 Manage multiple Airflow instances with persistent configuration:
