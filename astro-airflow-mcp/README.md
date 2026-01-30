@@ -249,7 +249,7 @@ This package also includes `af`, a command-line tool for interacting with Airflo
 uv tool install astro-airflow-mcp
 
 # Or use uvx to run without installing
-uvx --from astro-airflow-mcp af --help
+uvx --from astro-airflow-mcp@latest af --help
 ```
 
 ### Quick Reference
