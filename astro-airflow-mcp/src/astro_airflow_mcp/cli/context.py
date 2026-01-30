@@ -6,10 +6,10 @@ import os
 from typing import TYPE_CHECKING
 
 from astro_airflow_mcp.adapter_manager import AdapterManager
-from astro_airflow_mcp.adapters import AirflowAdapter
 from astro_airflow_mcp.constants import DEFAULT_AIRFLOW_URL
 
 if TYPE_CHECKING:
+    from astro_airflow_mcp.adapters import AirflowAdapter
     from astro_airflow_mcp.config import ResolvedConfig
 
 

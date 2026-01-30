@@ -7,7 +7,7 @@ from typing import Any
 # Re-export wrap_list_response from shared utils for backwards compatibility
 from astro_airflow_mcp.utils import wrap_list_response
 
-__all__ = ["output_json", "output_error", "wrap_list_response"]
+__all__ = ["output_error", "output_json", "wrap_list_response"]
 
 
 def output_json(data: Any, indent: int = 2) -> None:

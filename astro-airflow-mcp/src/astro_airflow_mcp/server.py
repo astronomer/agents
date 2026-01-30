@@ -14,7 +14,6 @@ from fastmcp.server.middleware.logging import LoggingMiddleware
 
 from astro_airflow_mcp.adapter_manager import AdapterManager
 from astro_airflow_mcp.adapters import AirflowAdapter
-from astro_airflow_mcp.constants import DEFAULT_LIMIT, DEFAULT_OFFSET
 from astro_airflow_mcp.logging import get_logger
 from astro_airflow_mcp.utils import wrap_list_response
 
