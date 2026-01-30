@@ -43,6 +43,7 @@ def list_instances() -> None:
         table = Table(show_header=True, header_style="bold", box=None, pad_edge=False)
         table.add_column("", width=1)  # Current marker
         table.add_column("NAME")
+        table.add_column("SOURCE")
         table.add_column("URL")
         table.add_column("AUTH")
 
@@ -54,7 +55,7 @@ def list_instances() -> None:
                 auth = "token"
             else:
                 auth = "basic"
-            table.add_row(marker, inst.name, inst.url, auth)
+            table.add_row(marker, inst.name, inst.source or "-", inst.url, auth)
 
         console.print(table)
     except ConfigError as e:
@@ -138,7 +139,7 @@ def add_instance(
     try:
         manager = ConfigManager()
         is_update = manager.load().get_instance(name) is not None
-        manager.add_instance(name, url, username=username, password=password, token=token)
+        manager.add_instance(name, url, username=username, password=password, token=token, source="manual")
 
         action = "Updated" if is_update else "Added"
         if has_token:
@@ -411,7 +412,7 @@ def discover_instances(
 
         # Add instance to config
         try:
-            manager.add_instance(inst.name, inst.url, token=token)
+            manager.add_instance(inst.name, inst.url, token=token, source=inst.source)
             auth_info = "token" if token else "none"
             console.print(f"  [green]Added[/green] {inst.name} (auth: {auth_info})")
             added_count += 1

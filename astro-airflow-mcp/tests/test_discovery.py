@@ -588,3 +588,58 @@ class TestLocalDiscoveryBackend:
         result = backend._parse_health_response(mock_response, "/health")
 
         assert result is None
+
+    def test_get_astro_project_port_webserver(self, tmp_path):
+        """Test _get_astro_project_port reads webserver.port (Airflow 2)."""
+        astro_dir = tmp_path / ".astro"
+        astro_dir.mkdir()
+        config_file = astro_dir / "config.yaml"
+        config_file.write_text("webserver:\n  port: 8081\n")
+
+        backend = LocalDiscoveryBackend()
+        port = backend._get_astro_project_port(tmp_path)
+
+        assert port == 8081
+
+    def test_get_astro_project_port_api_server(self, tmp_path):
+        """Test _get_astro_project_port reads api-server.port (Airflow 3)."""
+        astro_dir = tmp_path / ".astro"
+        astro_dir.mkdir()
+        config_file = astro_dir / "config.yaml"
+        config_file.write_text("api-server:\n  port: 8082\n")
+
+        backend = LocalDiscoveryBackend()
+        port = backend._get_astro_project_port(tmp_path)
+
+        assert port == 8082
+
+    def test_get_astro_project_port_prefers_api_server(self, tmp_path):
+        """Test _get_astro_project_port prefers api-server over webserver."""
+        astro_dir = tmp_path / ".astro"
+        astro_dir.mkdir()
+        config_file = astro_dir / "config.yaml"
+        config_file.write_text("api-server:\n  port: 8082\nwebserver:\n  port: 8081\n")
+
+        backend = LocalDiscoveryBackend()
+        port = backend._get_astro_project_port(tmp_path)
+
+        assert port == 8082
+
+    def test_get_astro_project_port_no_config(self, tmp_path):
+        """Test _get_astro_project_port returns None when no config."""
+        backend = LocalDiscoveryBackend()
+        port = backend._get_astro_project_port(tmp_path)
+
+        assert port is None
+
+    def test_get_astro_project_port_no_port_in_config(self, tmp_path):
+        """Test _get_astro_project_port returns None when no port in config."""
+        astro_dir = tmp_path / ".astro"
+        astro_dir.mkdir()
+        config_file = astro_dir / "config.yaml"
+        config_file.write_text("project:\n  name: test\n")
+
+        backend = LocalDiscoveryBackend()
+        port = backend._get_astro_project_port(tmp_path)
+
+        assert port is None

@@ -5,9 +5,11 @@ from __future__ import annotations
 import asyncio
 import socket
 import time
+from pathlib import Path
 from typing import Any
 
 import httpx
+import yaml
 
 from astro_airflow_mcp.discovery.base import DiscoveredInstance, DiscoveryError
 
@@ -47,6 +49,45 @@ class LocalDiscoveryBackend:
         """Local discovery is always available."""
         return True
 
+    def _get_astro_project_port(self, project_dir: Path | None = None) -> int | None:
+        """Check for .astro/config.yaml and extract the configured port.
+
+        Looks for:
+        - webserver.port (Airflow 2.x via Astro CLI)
+        - api-server.port (Airflow 3.x via Astro CLI)
+
+        Args:
+            project_dir: Directory to check (default: current working directory)
+
+        Returns:
+            Port number if found, None otherwise
+        """
+        if project_dir is None:
+            project_dir = Path.cwd()
+
+        config_path = project_dir / ".astro" / "config.yaml"
+        if not config_path.exists():
+            return None
+
+        try:
+            with open(config_path) as f:
+                config = yaml.safe_load(f)
+
+            if not config:
+                return None
+
+            # Check for Airflow 3.x api-server.port
+            if "api-server" in config and "port" in config["api-server"]:
+                return int(config["api-server"]["port"])
+
+            # Check for Airflow 2.x webserver.port
+            if "webserver" in config and "port" in config["webserver"]:
+                return int(config["webserver"]["port"])
+
+            return None
+        except (OSError, yaml.YAMLError, ValueError, TypeError):
+            return None
+
     def discover(
         self,
         ports: list[int] | None = None,
@@ -56,8 +97,11 @@ class LocalDiscoveryBackend:
     ) -> list[DiscoveredInstance]:
         """Discover local Airflow instances by scanning ports.
 
+        First checks for .astro/config.yaml in the current directory to find
+        the configured port. Falls back to scanning common ports if not found.
+
         Args:
-            ports: Ports to scan (default: 8080, 8081, 8082, 8793)
+            ports: Ports to scan (default: check .astro/config.yaml, then common ports)
             hosts: Hosts to scan (default: localhost, 127.0.0.1)
             timeout: Connection timeout in seconds
             **kwargs: Additional options (ignored)
@@ -65,7 +109,17 @@ class LocalDiscoveryBackend:
         Returns:
             List of discovered instances
         """
-        scan_ports = ports if ports else self.DEFAULT_PORTS
+        # Build port list: check .astro/config.yaml first, then fallback to defaults
+        if ports:
+            scan_ports = ports
+        else:
+            astro_port = self._get_astro_project_port()
+            if astro_port:
+                # Prioritize Astro project port, then check other common ports
+                scan_ports = [astro_port] + [p for p in self.DEFAULT_PORTS if p != astro_port]
+            else:
+                scan_ports = self.DEFAULT_PORTS
+
         scan_hosts = hosts if hosts else self.DEFAULT_HOSTS
 
         instances: list[DiscoveredInstance] = []
