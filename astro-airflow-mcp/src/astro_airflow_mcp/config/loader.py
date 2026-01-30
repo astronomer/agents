@@ -170,7 +170,9 @@ class ConfigManager:
     ) -> None:
         """Add or update an instance."""
         config = self.load()
-        config.add_instance(name, url, username=username, password=password, token=token, source=source)
+        config.add_instance(
+            name, url, username=username, password=password, token=token, source=source
+        )
         self.save(config)
 
     def delete_instance(self, name: str) -> None:

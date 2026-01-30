@@ -38,7 +38,9 @@ class Instance(BaseModel):
     name: str = Field(..., description="Unique name for this instance")
     url: str = Field(..., description="Base URL of the Airflow webserver")
     auth: Auth | None = Field(default=None, description="Authentication configuration (optional)")
-    source: str | None = Field(default=None, description="Discovery source (e.g., astro, local, manual)")
+    source: str | None = Field(
+        default=None, description="Discovery source (e.g., astro, local, manual)"
+    )
 
 
 class AirflowCliConfig(BaseModel):

@@ -139,7 +139,9 @@ def add_instance(
     try:
         manager = ConfigManager()
         is_update = manager.load().get_instance(name) is not None
-        manager.add_instance(name, url, username=username, password=password, token=token, source="manual")
+        manager.add_instance(
+            name, url, username=username, password=password, token=token, source="manual"
+        )
 
         action = "Updated" if is_update else "Added"
         if has_token:
