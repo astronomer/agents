@@ -460,20 +460,6 @@ class TestInstanceNameGeneration:
         )
         assert _generate_instance_name(dep) == "my-workspace-my-deployment"
 
-    def test_name_generation_with_prefix(self):
-        """Test name generation with prefix."""
-        from astro_airflow_mcp.discovery.astro import _generate_instance_name
-
-        dep = AstroDeployment(
-            id="dep-1",
-            name="deployment",
-            workspace_id="ws-1",
-            workspace_name="prod",
-            airflow_api_url="https://example.com/api/v2",
-            status="HEALTHY",
-        )
-        assert _generate_instance_name(dep, prefix="astro-") == "astro-prod-deployment"
-
     def test_name_generation_normalizes_special_chars(self):
         """Test that special characters are normalized."""
         from astro_airflow_mcp.discovery.astro import _generate_instance_name

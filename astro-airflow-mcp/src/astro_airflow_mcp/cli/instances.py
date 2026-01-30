@@ -220,10 +220,6 @@ def discover_instances(
         bool,
         typer.Option("--overwrite", "-o", help="Overwrite existing instances without prompting"),
     ] = False,
-    prefix: Annotated[
-        str | None,
-        typer.Option("--prefix", "-p", help="Prefix for instance names (e.g., 'astro-')"),
-    ] = None,
     backend: Annotated[
         list[str] | None,
         typer.Option("--backend", "-b", help="Specific backend(s) to use (default: all)"),
@@ -255,7 +251,6 @@ def discover_instances(
         af instance discover --port 9090        # Add custom port to scan
         af instance discover --wide             # Deep scan all ports 1024-65535
         af instance discover --dry-run          # Preview without changes
-        af instance discover --prefix dev-      # Add prefix to names
     """
     # Get the registry and available backends
     registry = get_default_registry()
@@ -300,7 +295,6 @@ def discover_instances(
     # Prepare options for discovery
     discovery_options = {
         "all_workspaces": all_workspaces,
-        "prefix": prefix,
         "create_tokens": False,  # Don't create tokens during discovery phase
     }
 

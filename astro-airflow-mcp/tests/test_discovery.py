@@ -297,23 +297,6 @@ class TestAstroDiscoveryBackend:
         assert len(instances) == 0
         mock_cli.inspect_deployment.assert_not_called()
 
-    def test_discover_with_prefix(self, mock_cli):
-        """Test discover applies prefix to names."""
-        mock_cli.list_deployments.return_value = [{"name": "dep1", "deployment_id": "id1"}]
-        mock_cli.inspect_deployment.return_value = AstroDeployment(
-            id="id1",
-            name="dep1",
-            workspace_id="ws1",
-            workspace_name="prod",
-            airflow_api_url="https://example.com",
-            status="HEALTHY",
-        )
-
-        backend = AstroDiscoveryBackend(cli=mock_cli)
-        instances = backend.discover(prefix="astro-", create_tokens=False)
-
-        assert instances[0].name == "astro-prod-dep1"
-
 
 class TestGenerateInstanceName:
     """Tests for _generate_instance_name helper."""
@@ -329,18 +312,6 @@ class TestGenerateInstanceName:
             status="HEALTHY",
         )
         assert _generate_instance_name(dep) == "my-workspace-my-deployment"
-
-    def test_name_generation_with_prefix(self):
-        """Test name generation with prefix."""
-        dep = AstroDeployment(
-            id="dep-1",
-            name="deployment",
-            workspace_id="ws-1",
-            workspace_name="prod",
-            airflow_api_url="https://example.com",
-            status="HEALTHY",
-        )
-        assert _generate_instance_name(dep, prefix="astro-") == "astro-prod-deployment"
 
     def test_name_generation_normalizes_special_chars(self):
         """Test that special characters are normalized."""

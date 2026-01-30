@@ -22,15 +22,14 @@ class AstroNotAuthenticatedError(AstroDiscoveryError):
     """Raised when user is not authenticated with Astro CLI."""
 
 
-def _generate_instance_name(deployment: AstroDeployment, prefix: str | None = None) -> str:
+def _generate_instance_name(deployment: AstroDeployment) -> str:
     """Generate an instance name from deployment info.
 
-    Format: {prefix}{workspace}-{deployment-name}
+    Format: {workspace}-{deployment-name}
     Normalizes to lowercase with hyphens.
 
     Args:
         deployment: The Astro deployment
-        prefix: Optional prefix to add to the name
 
     Returns:
         A normalized instance name
@@ -40,12 +39,7 @@ def _generate_instance_name(deployment: AstroDeployment, prefix: str | None = No
     name = re.sub(r"[^a-zA-Z0-9]+", "-", deployment.name.lower()).strip("-")
 
     # Handle empty workspace name
-    instance_name = name if not workspace else f"{workspace}-{name}"
-
-    if prefix:
-        instance_name = f"{prefix}{instance_name}"
-
-    return instance_name
+    return name if not workspace else f"{workspace}-{name}"
 
 
 class AstroDiscoveryBackend:
@@ -83,7 +77,6 @@ class AstroDiscoveryBackend:
     def discover(
         self,
         all_workspaces: bool = False,
-        prefix: str | None = None,
         create_tokens: bool = True,
         **kwargs: Any,
     ) -> list[DiscoveredInstance]:
@@ -91,7 +84,6 @@ class AstroDiscoveryBackend:
 
         Args:
             all_workspaces: If True, discover from all accessible workspaces
-            prefix: Optional prefix for instance names
             create_tokens: If True, create deployment tokens (default: True)
             **kwargs: Additional options (ignored)
 
@@ -128,7 +120,7 @@ class AstroDiscoveryBackend:
             except AstroCliError:
                 continue
 
-            instance_name = _generate_instance_name(deployment, prefix)
+            instance_name = _generate_instance_name(deployment)
 
             # Optionally create token
             token: str | None = None
