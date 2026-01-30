@@ -448,7 +448,7 @@ class TestInstanceNameGeneration:
 
     def test_basic_name_generation(self):
         """Test basic name generation."""
-        from astro_airflow_mcp.cli.instances import _generate_instance_name
+        from astro_airflow_mcp.discovery.astro import _generate_instance_name
 
         dep = AstroDeployment(
             id="dep-1",
@@ -462,7 +462,7 @@ class TestInstanceNameGeneration:
 
     def test_name_generation_with_prefix(self):
         """Test name generation with prefix."""
-        from astro_airflow_mcp.cli.instances import _generate_instance_name
+        from astro_airflow_mcp.discovery.astro import _generate_instance_name
 
         dep = AstroDeployment(
             id="dep-1",
@@ -476,7 +476,7 @@ class TestInstanceNameGeneration:
 
     def test_name_generation_normalizes_special_chars(self):
         """Test that special characters are normalized."""
-        from astro_airflow_mcp.cli.instances import _generate_instance_name
+        from astro_airflow_mcp.discovery.astro import _generate_instance_name
 
         dep = AstroDeployment(
             id="dep-1",
@@ -490,7 +490,7 @@ class TestInstanceNameGeneration:
 
     def test_name_generation_empty_workspace(self):
         """Test name generation when workspace name is empty."""
-        from astro_airflow_mcp.cli.instances import _generate_instance_name
+        from astro_airflow_mcp.discovery.astro import _generate_instance_name
 
         dep = AstroDeployment(
             id="dep-1",
@@ -504,7 +504,7 @@ class TestInstanceNameGeneration:
 
     def test_name_generation_strips_leading_trailing_hyphens(self):
         """Test that leading/trailing hyphens are stripped."""
-        from astro_airflow_mcp.cli.instances import _generate_instance_name
+        from astro_airflow_mcp.discovery.astro import _generate_instance_name
 
         dep = AstroDeployment(
             id="dep-1",
