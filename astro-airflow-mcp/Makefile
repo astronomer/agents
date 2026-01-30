@@ -1,6 +1,6 @@
 # Makefile for airflow-mcp development
 
-.PHONY: help install install-dev install-dev-ci install-hooks run docker-build docker-run build test test-integration test-integration-v2 test-integration-v3 lint format type-check security check clean prek
+.PHONY: help install install-dev install-dev-ci install-hooks run cli cli-health cli-help docker-build docker-run build test test-integration test-integration-v2 test-integration-v3 lint format type-check security check clean prek
 
 help:  ## Show this help message
 	@echo "Available commands:"
@@ -9,8 +9,14 @@ help:  ## Show this help message
 install:  ## Install the package
 	uv pip install -e .
 
+uninstall:  ## Uninstall the package
+	uv pip uninstall astro-airflow-mcp
+
 install-tool:  ## Install as a system-wide CLI tool
 	uv tool install -e .
+
+uninstall-tool:  ## Uninstall the system-wide CLI tool
+	uv tool uninstall astro-airflow-mcp
 
 install-dev:  ## Install the package with dev dependencies (local)
 	uv sync --all-extras
@@ -26,6 +32,15 @@ install-hooks:  ## Install prek hooks
 
 run:  ## Run the MCP server in HTTP mode (default is stdio, but HTTP can be useful for local testing)
 	uv run python -m astro_airflow_mcp --transport http
+
+cli:  ## Run the af CLI tool (pass args with ARGS=, e.g., make cli ARGS="dags list")
+	uv run af $(ARGS)
+
+cli-health:  ## Run af CLI health check
+	uv run af health
+
+cli-help:  ## Show af CLI help
+	uv run af --help
 
 docker-build:  ## Build Docker image
 	docker build -t astro-airflow-mcp .

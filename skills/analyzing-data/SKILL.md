@@ -6,12 +6,12 @@ hooks:
     - matcher: "Bash"
       hooks:
         - type: command
-          command: "uv run ${CLAUDE_PLUGIN_ROOT}/skills/analyzing-data/scripts/cli.py ensure"
+          command: "uv run ./scripts/cli.py ensure"
           once: true
   Stop:
     - hooks:
         - type: command
-          command: "uv run ${CLAUDE_PLUGIN_ROOT}/skills/analyzing-data/scripts/cli.py stop"
+          command: "uv run ./scripts/cli.py stop"
 ---
 
 # Data Analysis
@@ -61,7 +61,9 @@ Analysis Progress:
 ### Kernel Management
 
 ```bash
-uv run scripts/cli.py start           # Start kernel with Snowflake
+uv run scripts/cli.py warehouse list  # List available warehouses
+uv run scripts/cli.py start           # Start kernel with default warehouse
+uv run scripts/cli.py start -w my_pg  # Start with specific warehouse
 uv run scripts/cli.py exec "..."      # Execute Python code
 uv run scripts/cli.py status          # Check kernel status
 uv run scripts/cli.py restart         # Restart kernel
@@ -211,6 +213,12 @@ Grep pattern="<concept>" glob="**/*.sql"
 - Filter early with WHERE clauses
 - Prefer pre-aggregated tables (`METRICS_*`, `MART_*`, `AGG_*`)
 - For 100M+ row tables: no JOINs or GROUP BY on first query
+
+**SQL Dialect Differences:**
+| Operation | Snowflake | PostgreSQL | BigQuery |
+|-----------|-----------|------------|----------|
+| Date subtract | `DATEADD(day, -7, x)` | `x - INTERVAL '7 days'` | `DATE_SUB(x, INTERVAL 7 DAY)` |
+| Case-insensitive | `ILIKE` | `ILIKE` | `LOWER(x) LIKE LOWER(y)` |
 
 ---
 

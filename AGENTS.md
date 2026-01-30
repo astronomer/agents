@@ -72,12 +72,14 @@ Everything is defined inline in `.claude-plugin/marketplace.json` following the 
 
 Use `${CLAUDE_PLUGIN_ROOT}` to reference files within the plugin (required because plugins are copied to a cache location when installed).
 
+**Important:** Hooks in `SKILL.md` frontmatter can use **relative paths** from the skill's directory (e.g., `./scripts/bar.py`). Use `${CLAUDE_PLUGIN_ROOT}` in `marketplace.json` to reference the plugin root.
+
 ## Key Files
 
 - `.claude-plugin/marketplace.json` - Marketplace catalog with inline plugin definition (hooks, mcpServers)
 - `skills/*/SKILL.md` - Individual skills (auto-discovered)
-- `skills/*/hooks/*.sh` - Hook scripts (co-located with skills, referenced via `${CLAUDE_PLUGIN_ROOT}/skills/<name>/hooks/...`)
+- `skills/*/hooks/*.sh` - Hook scripts (co-located with skills, referenced via relative paths from SKILL.md or `${CLAUDE_PLUGIN_ROOT}/skills/<name>/hooks/...` from marketplace.json)
 
 ## Config Location
 
-This plugin uses `~/.astro/ai/config/` for user configuration (warehouse credentials, etc.).
+This plugin uses `~/.astro/agents/` for user configuration (warehouse credentials, etc.).

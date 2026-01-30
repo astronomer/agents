@@ -6,19 +6,19 @@ hooks:
     - matcher: "Bash"
       hooks:
         - type: command
-          command: "uv run ${CLAUDE_PLUGIN_ROOT}/skills/analyzing-data/scripts/cli.py ensure"
+          command: "uv run ../analyzing-data/scripts/cli.py ensure"
           once: true
   Stop:
     - hooks:
         - type: command
-          command: "uv run ${CLAUDE_PLUGIN_ROOT}/skills/analyzing-data/scripts/cli.py stop"
+          command: "uv run ../analyzing-data/scripts/cli.py stop"
 ---
 
 # Initialize Warehouse Schema
 
 Generate a comprehensive, user-editable schema reference file for the data warehouse.
 
-**Scripts:** `$CLAUDE_PLUGIN_ROOT/skills/analyzing-data/scripts/`
+**Scripts:** `../analyzing-data/scripts/`
 
 ## What This Does
 
@@ -33,7 +33,7 @@ Generate a comprehensive, user-editable schema reference file for the data wareh
 ### Step 1: Read Warehouse Configuration
 
 ```bash
-cat ~/.astro/ai/config/warehouse.yml
+cat ~/.astro/agents/warehouse.yml
 ```
 
 Get the list of databases to discover (e.g., `databases: [HQ, ANALYTICS, RAW]`).
@@ -136,7 +136,7 @@ Combine warehouse metadata + codebase context:
 
 Write the file to:
 - `.astro/warehouse.md` (default - project-specific, version-controllable)
-- `~/.astro/ai/config/warehouse.md` (if `--global` flag)
+- `~/.astro/agents/warehouse.md` (if `--global` flag)
 
 ## Output Format
 
@@ -202,7 +202,7 @@ Query downstream first: `reporting` > `mart_*` > `metric_*` > `model_*` > `IN_*`
 | `/data:init` | Generate .astro/warehouse.md |
 | `/data:init --refresh` | Regenerate, preserving user edits |
 | `/data:init --database HQ` | Only discover specific database |
-| `/data:init --global` | Write to ~/.astro/ai/config/ instead |
+| `/data:init --global` | Write to ~/.astro/agents/ instead |
 
 ### Step 7: Pre-populate Cache
 

@@ -189,10 +189,11 @@ The `data` plugin bundles an MCP server and skills into a single installable pac
 
 #### Data Analysis Flow
 
-```
-/data:init → /data:analyzing-data → /data:profiling-tables
-                    ↓
-            /data:checking-freshness
+```mermaid
+flowchart LR
+    init["/data:init"] --> analyzing["/data:analyzing-data"]
+    analyzing --> profiling["/data:profiling-tables"]
+    analyzing --> freshness["/data:checking-freshness"]
 ```
 
 1. **Initialize** (`/data:init`) - One-time setup to generate `warehouse.md` with schema metadata
@@ -202,10 +203,12 @@ The `data` plugin bundles an MCP server and skills into a single installable pac
 
 #### DAG Development Flow
 
-```
-/data:setting-up-astro-project → /data:authoring-dags → /data:testing-dags
-           ↓                                                    ↓
-/data:managing-astro-local-env                      /data:debugging-dags
+```mermaid
+flowchart LR
+    setup["/data:setting-up-astro-project"] --> authoring["/data:authoring-dags"]
+    setup --> env["/data:managing-astro-local-env"]
+    authoring --> testing["/data:testing-dags"]
+    testing --> debugging["/data:debugging-dags"]
 ```
 
 1. **Setup** (`/data:setting-up-astro-project`) - Initialize project structure and dependencies
@@ -218,7 +221,7 @@ The `data` plugin bundles an MCP server and skills into a single installable pac
 
 ### Warehouse Connections
 
-Configure data warehouse connections at `~/.astro/ai/config/warehouse.yml`:
+Configure data warehouse connections at `~/.astro/agents/warehouse.yml`:
 
 ```yaml
 my_warehouse:
@@ -235,7 +238,7 @@ my_warehouse:
     - RAW
 ```
 
-Store credentials in `~/.astro/ai/config/.env`:
+Store credentials in `~/.astro/agents/.env`:
 
 ```bash
 SNOWFLAKE_ACCOUNT=xyz12345
@@ -243,7 +246,80 @@ SNOWFLAKE_USER=myuser
 SNOWFLAKE_PRIVATE_KEY_PASSPHRASE=your-passphrase-here  # Only required if using an encrypted private key
 ```
 
-**Supported warehouses:** Snowflake.
+**Supported databases:**
+
+| Type | Package | Description |
+|------|---------|-------------|
+| `snowflake` | Built-in | Snowflake Data Cloud |
+| `postgres` | Built-in | PostgreSQL |
+| `bigquery` | Built-in | Google BigQuery |
+| `sqlalchemy` | Any SQLAlchemy driver | Auto-detects packages for 25+ databases (see below) |
+
+<details>
+<summary>Auto-detected SQLAlchemy databases</summary>
+
+The connector automatically installs the correct driver packages for:
+
+| Database | Dialect URL |
+|----------|-------------|
+| PostgreSQL | `postgresql://` or `postgres://` |
+| MySQL | `mysql://` or `mysql+pymysql://` |
+| MariaDB | `mariadb://` |
+| SQLite | `sqlite:///` |
+| SQL Server | `mssql+pyodbc://` |
+| Oracle | `oracle://` |
+| Redshift | `redshift://` |
+| Snowflake | `snowflake://` |
+| BigQuery | `bigquery://` |
+| DuckDB | `duckdb:///` |
+| Trino | `trino://` |
+| ClickHouse | `clickhouse://` |
+| CockroachDB | `cockroachdb://` |
+| Databricks | `databricks://` |
+| Amazon Athena | `awsathena://` |
+| Cloud Spanner | `spanner://` |
+| Teradata | `teradata://` |
+| Vertica | `vertica://` |
+| SAP HANA | `hana://` |
+| IBM Db2 | `db2://` |
+
+For unlisted databases, install the driver manually and use standard SQLAlchemy URLs.
+
+</details>
+
+<details>
+<summary>Example configurations</summary>
+
+```yaml
+# PostgreSQL
+my_postgres:
+  type: postgres
+  host: localhost
+  port: 5432
+  user: analyst
+  password: ${POSTGRES_PASSWORD}
+  database: analytics
+
+# BigQuery
+my_bigquery:
+  type: bigquery
+  project: my-gcp-project
+  credentials_path: ~/.config/gcloud/service_account.json
+
+# SQLAlchemy (any supported database)
+my_duckdb:
+  type: sqlalchemy
+  url: duckdb:///path/to/analytics.duckdb
+  databases: [main]
+
+# Redshift (via SQLAlchemy)
+my_redshift:
+  type: sqlalchemy
+  url: redshift+redshift_connector://${REDSHIFT_USER}:${REDSHIFT_PASSWORD}@${REDSHIFT_HOST}:5439/${REDSHIFT_DATABASE}
+  databases: [my_database]
+```
+
+</details>
 
 ### Airflow
 
@@ -320,7 +396,7 @@ claude plugin uninstall data@astronomer && claude plugin install data@astronomer
 | Issue | Solution |
 |-------|----------|
 | Skills not appearing | Reinstall plugin: `claude plugin uninstall data@astronomer && claude plugin install data@astronomer` |
-| Warehouse connection errors | Check credentials in `~/.astro/ai/config/.env` and connection config in `warehouse.yml` |
+| Warehouse connection errors | Check credentials in `~/.astro/agents/.env` and connection config in `warehouse.yml` |
 | Airflow not detected | Ensure you're running from a directory with `airflow.cfg` or a `dags/` folder |
 
 ## Contributing

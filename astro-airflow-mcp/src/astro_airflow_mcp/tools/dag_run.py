@@ -4,16 +4,13 @@ import json
 import time
 from typing import Any
 
+from astro_airflow_mcp.constants import DEFAULT_LIMIT, DEFAULT_OFFSET, TERMINAL_DAG_RUN_STATES
 from astro_airflow_mcp.server import (
-    DEFAULT_LIMIT,
-    DEFAULT_OFFSET,
     _get_adapter,
     _wrap_list_response,
     mcp,
 )
-
-# Terminal states for DAG runs (polling stops when reached)
-TERMINAL_DAG_RUN_STATES = {"success", "failed", "upstream_failed"}
+from astro_airflow_mcp.utils import extract_failed_tasks
 
 
 def _list_dag_runs_impl(
@@ -98,24 +95,8 @@ def _get_failed_task_instances(
     try:
         adapter = _get_adapter()
         data = adapter.get_task_instances(dag_id, dag_run_id)
-
-        failed_states = {"failed", "upstream_failed"}
-        failed_tasks = []
-
-        if "task_instances" in data:
-            for task in data["task_instances"]:
-                if task.get("state") in failed_states:
-                    failed_tasks.append(
-                        {
-                            "task_id": task.get("task_id"),
-                            "state": task.get("state"),
-                            "try_number": task.get("try_number"),
-                            "start_date": task.get("start_date"),
-                            "end_date": task.get("end_date"),
-                        }
-                    )
-
-        return failed_tasks
+        task_instances = data.get("task_instances", [])
+        return extract_failed_tasks(task_instances)
     except Exception:
         # If we can't fetch failed tasks, return empty list rather than failing
         return []
