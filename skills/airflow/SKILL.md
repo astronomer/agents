@@ -5,224 +5,194 @@ description: Manages Apache Airflow operations including listing, testing, runni
 
 # Airflow Operations
 
-**[AIRFLOW SKILL ACTIVE]** - Mention "Using Airflow MCP tools..." in responses.
+Use `af` commands to query, manage, and troubleshoot Airflow workflows.
 
-## Tool Usage Rules
+## Instance Configuration
 
-**Use Airflow MCP tools for all operations.** Never use:
-- `astro dev run` commands
-- `airflow` CLI commands
-- Bash to read logs or check directories
+Manage multiple Airflow instances with persistent configuration:
 
-MCP tools provide structured, reliable API access.
+```bash
+# List and switch instances
+af instance list      # Shows all instances in a table
+af instance use prod  # Switch to prod instance
+af instance current   # Show current instance
+af instance delete old-instance
 
----
-
-## Request Routing
-
-Determine what the user wants and route accordingly:
-
-### Simple Requests → Handle Directly with MCP Tools
-
-For straightforward operations, call MCP tools directly using the routing table below.
-
-### Complex Workflows → Delegate to Specialized Skills
-
-For multi-step procedures, delegate to specialized skills:
-- **Testing/Running DAGs**: `/data:testing-dags`
-- **Debugging Failures**: `/data:debugging-dags`
-- **Creating/Editing DAGs**: `/data:authoring-dags`
-
----
-
-## MCP Tool Routing Table
-
-Use this table to map user requests to the correct MCP tool:
-
-| User Intent | Trigger Words | MCP Tool to Call | Notes |
-|-------------|---------------|------------------|-------|
-| **List all DAGs** | list, show, what dags, get dags, all dags | `list_dags` | Returns all DAGs with metadata |
-| **Get DAG details** | show dag X, details for dag X, info about dag X | `get_dag_details(dag_id)` | Single DAG metadata |
-| **Explore DAG** | what does dag X do, how does dag X work, show me dag X | `explore_dag(dag_id)` | DAG + tasks + source |
-| **Get DAG source** | show code for dag X, source of dag X | `get_dag_source(dag_id)` | Python source code |
-| **Test/Run DAG** | test dag, run dag, trigger dag, execute dag | `trigger_dag_and_wait(dag_id)` | Or delegate to `/data:testing-dags` |
-| **Check DAG run status** | status of run X, how did run X go | `get_dag_run(dag_id, dag_run_id)` | Specific run details |
-| **Debug failure** | why did dag fail, what went wrong, debug dag | `diagnose_dag_run(dag_id, dag_run_id)` | Or delegate to `/data:debugging-dags` |
-| **Get task logs** | show logs for task X, task output, task errors | `get_task_logs(dag_id, dag_run_id, task_id)` | Task execution logs |
-| **List connections** | what connections, show connections | `list_connections` | External system connections |
-| **List variables** | what variables, show variables | `list_variables` | Airflow variables |
-| **Get variable** | value of variable X, what is variable X | `get_variable(variable_key)` | Single variable value |
-| **List pools** | what pools, show pools, pool capacity | `list_pools` | Resource pools |
-| **Get pool details** | pool X details, pool X status | `get_pool(pool_name)` | Single pool info |
-| **System health** | any errors, any problems, system status | `get_system_health` | Overall health check |
-| **DAG statistics** | success rate, failure count, run stats | `get_dag_stats` | Run statistics |
-| **Import errors** | parse errors, broken dags, import failures | `list_import_errors` | DAGs that failed to load |
-| **DAG warnings** | warnings, issues, deprecations | `list_dag_warnings` | Configuration warnings |
-| **List assets** | what datasets, data lineage, assets | `list_assets` | Data assets/datasets |
-| **Airflow version** | what version, airflow version | `get_airflow_version` | Version info |
-| **Airflow config** | configuration, settings, how configured | `get_airflow_config` | Full configuration |
-
----
-
-## Workflow Examples
-
-### Example 1: Simple List Request
-
-**User**: "list all dags"
-
-**Action**:
-```
-1. Identify intent: List all DAGs
-2. Look up routing table: "list dags" → list_dags
-3. Call list_dags MCP tool
-4. Present results to user
+# Override instance for a single command
+af --instance staging dags list
 ```
 
-**DO NOT**:
-- Use `astro dev run dags list`
-- Use bash to list files in dags folder
-- Try to read DAG files directly
+Config file: `~/.af/config.yaml` (override with `--config` or `AIRFLOW_CLI_CONFIG`)
 
----
+Or use environment variables:
 
-### Example 2: DAG Status Check
-
-**User**: "what's the status of my pipeline?"
-
-**Action**:
-```
-1. Identify intent: Check DAG/pipeline status
-2. If specific DAG mentioned: call get_dag_details(dag_id)
-3. If no specific DAG: call list_dags to show all with their states
-4. Present results
+```bash
+export AIRFLOW_API_URL=http://localhost:8080
+export AIRFLOW_USERNAME=admin
+export AIRFLOW_PASSWORD=admin
 ```
 
----
+Or CLI flags: `af --airflow-url http://localhost:8080 --username admin --password admin <command>`
 
-### Example 3: Testing (Simple)
+## Quick Reference
 
-**User**: "test dag_name"
+| Command | Description |
+|---------|-------------|
+| `af health` | System health check |
+| `af dags list` | List all DAGs |
+| `af dags get <dag_id>` | Get DAG details |
+| `af dags explore <dag_id>` | Full DAG investigation |
+| `af dags source <dag_id>` | Get DAG source code |
+| `af dags pause <dag_id>` | Pause DAG scheduling |
+| `af dags unpause <dag_id>` | Resume DAG scheduling |
+| `af dags errors` | List import errors |
+| `af dags warnings` | List DAG warnings |
+| `af dags stats` | DAG run statistics |
+| `af runs list` | List DAG runs |
+| `af runs get <dag_id> <run_id>` | Get run details |
+| `af runs trigger <dag_id>` | Trigger a DAG run |
+| `af runs trigger-wait <dag_id>` | Trigger and wait for completion |
+| `af runs diagnose <dag_id> <run_id>` | Diagnose failed run |
+| `af tasks list <dag_id>` | List tasks in DAG |
+| `af tasks get <dag_id> <task_id>` | Get task definition |
+| `af tasks instance <dag_id> <run_id> <task_id>` | Get task instance |
+| `af tasks logs <dag_id> <run_id> <task_id>` | Get task logs |
+| `af config version` | Airflow version |
+| `af config show` | Full configuration |
+| `af config connections` | List connections |
+| `af config variables` | List variables |
+| `af config variable <key>` | Get specific variable |
+| `af config pools` | List pools |
+| `af config pool <name>` | Get pool details |
+| `af config plugins` | List plugins |
+| `af config providers` | List providers |
+| `af config assets` | List assets/datasets |
 
-**Action**:
-```
-1. Identify intent: Test/run a DAG
-2. Simple test → call trigger_dag_and_wait(dag_id="dag_name") directly
-3. Report results
-```
+## User Intent Patterns
 
----
+### DAG Operations
+- "What DAGs exist?" / "List all DAGs" -> `af dags list`
+- "Tell me about DAG X" / "What is DAG Y?" -> `af dags explore <dag_id>`
+- "What's the schedule for DAG X?" -> `af dags get <dag_id>`
+- "Show me the code for DAG X" -> `af dags source <dag_id>`
+- "Stop DAG X" / "Pause this workflow" -> `af dags pause <dag_id>`
+- "Resume DAG X" -> `af dags unpause <dag_id>`
+- "Are there any DAG errors?" -> `af dags errors`
 
-### Example 4: Testing (Complex)
+### Run Operations
+- "What runs have executed?" -> `af runs list`
+- "Run DAG X" / "Trigger the pipeline" -> `af runs trigger <dag_id>`
+- "Run DAG X and wait" -> `af runs trigger-wait <dag_id>`
+- "Why did this run fail?" -> `af runs diagnose <dag_id> <run_id>`
 
-**User**: "test this dag and if it fails, debug and fix it"
+### Task Operations
+- "What tasks are in DAG X?" -> `af tasks list <dag_id>`
+- "Get task logs" / "Why did task fail?" -> `af tasks logs <dag_id> <run_id> <task_id>`
 
-**Action**:
-```
-1. Identify intent: Complex test → debug → fix workflow
-2. This is multi-step → delegate to specialized skill
-3. Invoke /data:testing-dags skill with user request
-4. Let specialized skill handle the full cycle
-```
+### System Operations
+- "What version of Airflow?" -> `af config version`
+- "What connections exist?" -> `af config connections`
+- "Are pools full?" -> `af config pools`
+- "Is Airflow healthy?" -> `af health`
 
----
+## Common Workflows
 
-### Example 5: Debugging
+### Investigate a Failed Run
 
-**User**: "my dag failed, why?"
+```bash
+# 1. List recent runs to find failure
+af runs list --dag-id my_dag
 
-**Action**:
-```
-1. Identify intent: Debug failure
-2. If dag_id and dag_run_id known: call diagnose_dag_run directly
-3. If not specific: call get_system_health to find recent failures
-4. Follow up with get_task_logs for error details
-5. For complex root cause analysis, delegate to /data:debugging-dags
-```
+# 2. Diagnose the specific run
+af runs diagnose my_dag manual__2024-01-15T10:00:00+00:00
 
----
-
-### Example 6: Connection Check
-
-**User**: "what connections are configured?"
-
-**Action**:
-```
-1. Identify intent: List connections
-2. Look up routing table: "connections" → list_connections
-3. Call list_connections MCP tool
-4. Present results (passwords will be hidden for security)
-```
-
----
-
-## Decision Tree: Direct vs Delegate
-
-### Handle Directly if:
-- ✅ Single MCP tool call needed
-- ✅ Request is straightforward (list, show, get)
-- ✅ No complex logic or multi-step procedures
-
-### Delegate to Specialized Skill if:
-- ✅ Multi-step workflow (test → wait → debug → fix)
-- ✅ Complex decision trees
-- ✅ Requires iterative refinement
-- ✅ User asks for comprehensive analysis
-
-**When in doubt**: Try handling directly first. If it becomes complex, acknowledge and delegate.
-
----
-
-## Common Mistakes
-
-**Don't use bash commands:**
-- `astro dev run`, `airflow` CLI → Use MCP tools instead
-- `docker ps` to check Airflow → MCP server already connected
-- `cat dags/*.py` → Use `get_dag_source(dag_id)` MCP tool
-- Piping MCP output to jq/grep → MCP returns structured JSON directly
-
----
-
-## Quick Reference Card
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  AIRFLOW OPERATIONS - QUICK REFERENCE                   │
-├─────────────────────────────────────────────────────────┤
-│                                                          │
-│  List DAGs            → list_dags                       │
-│  Run DAG              → trigger_dag_and_wait            │
-│  Check Status         → get_dag_details                 │
-│  Debug Failure        → diagnose_dag_run                │
-│  View Logs            → get_task_logs                   │
-│  Check Health         → get_system_health               │
-│  List Connections     → list_connections                │
-│  List Variables       → list_variables                  │
-│                                                          │
-│  Complex Test         → /data:testing-dags              │
-│  Complex Debug        → /data:debugging-dags            │
-│  Create/Edit DAG      → /data:authoring-dags            │
-│                                                          │
-├─────────────────────────────────────────────────────────┤
-│  ❌ NEVER USE: astro, airflow CLI, bash for Airflow    │
-│  ✅ ALWAYS USE: Airflow MCP tools                       │
-└─────────────────────────────────────────────────────────┘
+# 3. Get logs for failed task (from diagnose output)
+af tasks logs my_dag manual__2024-01-15T10:00:00+00:00 extract_data
 ```
 
----
+### Morning Health Check
+
+```bash
+# 1. Overall system health
+af health
+
+# 2. Check for broken DAGs
+af dags errors
+
+# 3. Check pool utilization
+af config pools
+```
+
+### Understand a DAG
+
+```bash
+# Get comprehensive overview (metadata + tasks + source)
+af dags explore my_dag
+```
+
+### Check Why DAG Isn't Running
+
+```bash
+# Check if paused
+af dags get my_dag
+
+# Check for import errors
+af dags errors
+
+# Check recent runs
+af runs list --dag-id my_dag
+```
+
+### Trigger and Monitor
+
+```bash
+# Option 1: Trigger and wait (blocking)
+af runs trigger-wait my_dag --timeout 1800
+
+# Option 2: Trigger and check later
+af runs trigger my_dag
+af runs get my_dag <run_id>
+```
+
+## Output Format
+
+All commands output JSON (except `instance` commands which use human-readable tables):
+
+```bash
+af dags list
+# {
+#   "total_dags": 5,
+#   "returned_count": 5,
+#   "dags": [...]
+# }
+```
+
+Use `jq` for filtering:
+
+```bash
+# Find failed runs
+af runs list | jq '.dag_runs[] | select(.state == "failed")'
+
+# Get DAG IDs only
+af dags list | jq '.dags[].dag_id'
+
+# Find paused DAGs
+af dags list | jq '[.dags[] | select(.is_paused == true)]'
+```
+
+## Task Logs Options
+
+```bash
+# Get logs for specific retry attempt
+af tasks logs my_dag run_id task_id --try 2
+
+# Get logs for mapped task index
+af tasks logs my_dag run_id task_id --map-index 5
+```
 
 ## Related Skills
 
-- **testing-dags**: Complex DAG testing workflows (trigger → wait → debug → fix cycle)
-- **debugging-dags**: Comprehensive failure diagnosis and root cause analysis
-- **authoring-dags**: Creating and editing DAG files with best practices
-- **managing-astro-local-env**: Starting/stopping local Airflow environment (astro dev start/stop)
-
----
-
-## Notes
-
-- This skill is the **primary entrypoint** for all Airflow operations
-- It establishes "Airflow context" where MCP tools are the default
-- For simple requests, handle directly
-- For complex workflows, delegate to specialized skills
-- **Never fall back to bash commands** - if MCP tools can't do it, ask the user for clarification
+- `testing-dags` - Test DAGs with debugging and fixing cycles
+- `debugging-dags` - Comprehensive DAG failure diagnosis and root cause analysis
+- `authoring-dags` - Creating and editing DAG files with best practices
+- `managing-astro-local-env` - Starting/stopping local Airflow environment

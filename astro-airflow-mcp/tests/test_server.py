@@ -6,11 +6,9 @@ import time
 import httpx
 import pytest
 
+from astro_airflow_mcp.auth import TOKEN_REFRESH_BUFFER_SECONDS, TokenManager
 from astro_airflow_mcp.server import (
-    TOKEN_REFRESH_BUFFER_SECONDS,
-    AirflowTokenManager,
-    _config,
-    _get_auth_token,
+    _manager,
     configure,
 )
 from astro_airflow_mcp.tools.asset import (
@@ -29,13 +27,14 @@ from astro_airflow_mcp.tools.task import (
 @pytest.fixture
 def reset_config():
     """Fixture that saves and restores global config after each test."""
-    original_url = _config.url
-    original_token = _config.auth_token
-    original_manager = _config.token_manager
+    original_url = _manager._airflow_url
+    original_token = _manager._auth_token
+    original_token_manager = _manager._token_manager
     yield
-    _config.url = original_url
-    _config.auth_token = original_token
-    _config.token_manager = original_manager
+    _manager._airflow_url = original_url
+    _manager._auth_token = original_token
+    _manager._token_manager = original_token_manager
+    _manager._adapter = None
 
 
 class TestImplFunctions:
@@ -246,18 +245,18 @@ class TestConfiguration:
     def test_configure_url(self, reset_config):
         """Test configure() updates global URL."""
         configure(url="https://test.airflow.com")
-        assert _config.url == "https://test.airflow.com"
+        assert _manager._airflow_url == "https://test.airflow.com"
 
     def test_configure_auth_token(self, reset_config):
         """Test configure() updates global auth token."""
         configure(auth_token="new_token_456")
-        assert _config.auth_token == "new_token_456"
+        assert _manager._auth_token == "new_token_456"
 
     def test_configure_both(self, reset_config):
         """Test configure() updates both URL and token."""
         configure(url="https://prod.airflow.com", auth_token="prod_token")
-        assert _config.url == "https://prod.airflow.com"
-        assert _config.auth_token == "prod_token"
+        assert _manager._airflow_url == "https://prod.airflow.com"
+        assert _manager._auth_token == "prod_token"
 
     def test_configure_with_username_password(self, reset_config):
         """Test configure() creates token manager with username/password."""
@@ -266,11 +265,11 @@ class TestConfiguration:
             username="testuser",
             password="testpass",
         )
-        assert _config.url == "https://test.airflow.com"
-        assert _config.auth_token is None  # Direct token should be None
-        assert _config.token_manager is not None
-        assert _config.token_manager.username == "testuser"
-        assert _config.token_manager.password == "testpass"
+        assert _manager._airflow_url == "https://test.airflow.com"
+        assert _manager._auth_token is None  # Direct token should be None
+        assert _manager._token_manager is not None
+        assert _manager._token_manager.username == "testuser"
+        assert _manager._token_manager.password == "testpass"
 
     def test_configure_auth_token_takes_precedence(self, reset_config):
         """Test that auth_token takes precedence over username/password."""
@@ -279,16 +278,16 @@ class TestConfiguration:
             username="testuser",
             password="testpass",
         )
-        assert _config.auth_token == "direct_token"
-        assert _config.token_manager is None  # Token manager not created
+        assert _manager._auth_token == "direct_token"
+        assert _manager._token_manager is None  # Token manager not created
 
 
-class TestAirflowTokenManager:
-    """Tests for the AirflowTokenManager class."""
+class TestTokenManager:
+    """Tests for the TokenManager class."""
 
     def test_init(self):
         """Test token manager initialization."""
-        manager = AirflowTokenManager(
+        manager = TokenManager(
             airflow_url="http://localhost:8080",
             username="admin",
             password="admin",
@@ -301,12 +300,12 @@ class TestAirflowTokenManager:
 
     def test_should_refresh_no_token(self):
         """Test _should_refresh returns True when no token exists."""
-        manager = AirflowTokenManager("http://localhost:8080")
+        manager = TokenManager("http://localhost:8080")
         assert manager._should_refresh() is True
 
     def test_should_refresh_with_valid_token(self):
         """Test _should_refresh returns False for valid token."""
-        manager = AirflowTokenManager("http://localhost:8080")
+        manager = TokenManager("http://localhost:8080")
         manager._token = "valid_token"
         manager._token_fetched_at = time.time()
         manager._token_lifetime_seconds = 3600  # 1 hour
@@ -314,7 +313,7 @@ class TestAirflowTokenManager:
 
     def test_should_refresh_expired_token(self):
         """Test _should_refresh returns True for expired token."""
-        manager = AirflowTokenManager("http://localhost:8080")
+        manager = TokenManager("http://localhost:8080")
         manager._token = "expired_token"
         # Set fetched_at to be past the lifetime minus buffer
         manager._token_lifetime_seconds = 1800
@@ -340,7 +339,7 @@ class TestAirflowTokenManager:
         mock_client.__exit__ = mocker.Mock(return_value=False)
         mocker.patch("httpx.Client", return_value=mock_client)
 
-        manager = AirflowTokenManager(
+        manager = TokenManager(
             airflow_url="http://localhost:8080",
             username="admin",
             password="secret",
@@ -372,7 +371,7 @@ class TestAirflowTokenManager:
         mock_client.__exit__ = mocker.Mock(return_value=False)
         mocker.patch("httpx.Client", return_value=mock_client)
 
-        manager = AirflowTokenManager(airflow_url="http://localhost:8080")
+        manager = TokenManager(airflow_url="http://localhost:8080")
         manager._fetch_token()
 
         assert manager._token == "admin_token"
@@ -386,7 +385,7 @@ class TestAirflowTokenManager:
         mock_client.__exit__ = mocker.Mock(return_value=False)
         mocker.patch("httpx.Client", return_value=mock_client)
 
-        manager = AirflowTokenManager(
+        manager = TokenManager(
             airflow_url="http://localhost:8080",
             username="admin",
             password="admin",
@@ -408,7 +407,7 @@ class TestAirflowTokenManager:
         mock_client.__exit__ = mocker.Mock(return_value=False)
         mocker.patch("httpx.Client", return_value=mock_client)
 
-        manager = AirflowTokenManager(
+        manager = TokenManager(
             airflow_url="http://localhost:8080",
             username="admin",
             password="admin",
@@ -421,7 +420,7 @@ class TestAirflowTokenManager:
         """Test get_token returns cached token when valid."""
         mock_client = mocker.patch("httpx.Client")
 
-        manager = AirflowTokenManager(
+        manager = TokenManager(
             airflow_url="http://localhost:8080",
             username="admin",
             password="admin",
@@ -437,7 +436,7 @@ class TestAirflowTokenManager:
 
     def test_invalidate(self):
         """Test token invalidation."""
-        manager = AirflowTokenManager("http://localhost:8080")
+        manager = TokenManager("http://localhost:8080")
         manager._token = "some_token"
         manager._token_fetched_at = time.time()
 
@@ -457,7 +456,7 @@ class TestAirflowTokenManager:
         mock_client.__exit__ = mocker.Mock(return_value=False)
         mocker.patch("httpx.Client", return_value=mock_client)
 
-        manager = AirflowTokenManager(airflow_url="http://localhost:8080")
+        manager = TokenManager(airflow_url="http://localhost:8080")
         manager._fetch_token()
 
         assert manager._token is None
@@ -477,7 +476,7 @@ class TestAirflowTokenManager:
         mock_client.__exit__ = mocker.Mock(return_value=False)
         mocker.patch("httpx.Client", return_value=mock_client)
 
-        manager = AirflowTokenManager(
+        manager = TokenManager(
             airflow_url="http://localhost:8080",
             username="custom_user",
             password="custom_pass",
@@ -494,7 +493,7 @@ class TestAirflowTokenManager:
         """Test that get_token doesn't retry when endpoint is marked unavailable."""
         mock_client = mocker.patch("httpx.Client")
 
-        manager = AirflowTokenManager(airflow_url="http://localhost:8080")
+        manager = TokenManager(airflow_url="http://localhost:8080")
         manager._token_endpoint_available = False
 
         token = manager.get_token()
@@ -504,7 +503,7 @@ class TestAirflowTokenManager:
 
     def test_get_basic_auth(self):
         """Test get_basic_auth returns credentials."""
-        manager = AirflowTokenManager(
+        manager = TokenManager(
             airflow_url="http://localhost:8080",
             username="admin",
             password="secret",
@@ -515,7 +514,7 @@ class TestAirflowTokenManager:
 
     def test_get_basic_auth_none_without_credentials(self):
         """Test get_basic_auth returns None without credentials."""
-        manager = AirflowTokenManager(airflow_url="http://localhost:8080")
+        manager = TokenManager(airflow_url="http://localhost:8080")
         auth = manager.get_basic_auth()
 
         assert auth is None
@@ -526,30 +525,30 @@ class TestGetAuthToken:
 
     def test_returns_direct_token(self, reset_config):
         """Test _get_auth_token returns direct auth_token when set."""
-        _config.auth_token = "direct_token"
-        _config.token_manager = None
+        _manager._auth_token = "direct_token"
+        _manager._token_manager = None
 
-        token = _get_auth_token()
+        token = _manager._get_auth_token()
         assert token == "direct_token"
 
     def test_returns_token_from_manager(self, mocker, reset_config):
         """Test _get_auth_token returns token from manager."""
-        _config.auth_token = None
+        _manager._auth_token = None
         mock_manager = mocker.Mock()
         mock_manager.get_token.return_value = "manager_token"
-        _config.token_manager = mock_manager
+        _manager._token_manager = mock_manager
 
-        token = _get_auth_token()
+        token = _manager._get_auth_token()
         assert token == "manager_token"
         mock_manager.get_token.assert_called_once()
 
     def test_direct_token_takes_precedence(self, mocker, reset_config):
         """Test direct auth_token takes precedence over token manager."""
-        _config.auth_token = "direct_token"
+        _manager._auth_token = "direct_token"
         mock_manager = mocker.Mock()
         mock_manager.get_token.return_value = "manager_token"
-        _config.token_manager = mock_manager
+        _manager._token_manager = mock_manager
 
-        token = _get_auth_token()
+        token = _manager._get_auth_token()
         assert token == "direct_token"
         mock_manager.get_token.assert_not_called()

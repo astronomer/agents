@@ -15,6 +15,8 @@
     - [Core Tools](#core-tools)
     - [MCP Resources](#mcp-resources)
     - [MCP Prompts](#mcp-prompts)
+  - [Airflow CLI Tool](#af-tool)
+    - [Instance Management](#instance-management)
   - [Advanced Usage](#advanced-usage)
     - [Running as Standalone Server](#running-as-standalone-server)
     - [Airflow Plugin Mode](#airflow-plugin-mode)
@@ -235,6 +237,118 @@ claude mcp add airflow -e AIRFLOW_API_URL=https://your-airflow.example.com -e AI
 | `troubleshoot_failed_dag` | Guided workflow for diagnosing DAG failures |
 | `daily_health_check` | Morning health check routine |
 | `onboard_new_dag` | Guide for understanding a new DAG |
+
+## Airflow CLI Tool
+
+This package also includes `af`, a command-line tool for interacting with Airflow instances directly from your terminal.
+
+### Installation
+
+```bash
+# Install with uv
+uv tool install astro-airflow-mcp
+
+# Or use uvx to run without installing
+uvx --from astro-airflow-mcp af --help
+```
+
+### Quick Reference
+
+```bash
+# System health check
+af health
+
+# DAG operations
+af dags list
+af dags get <dag_id>
+af dags explore <dag_id>      # Full investigation (metadata + tasks + source)
+af dags source <dag_id>
+af dags pause <dag_id>
+af dags unpause <dag_id>
+af dags errors                 # Import errors
+af dags warnings
+
+# Run operations
+af runs list --dag-id <dag_id>
+af runs get <dag_id> <run_id>
+af runs trigger <dag_id>
+af runs trigger-wait <dag_id>  # Trigger and wait for completion
+af runs diagnose <dag_id> <run_id>
+
+# Task operations
+af tasks list <dag_id>
+af tasks get <dag_id> <task_id>
+af tasks logs <dag_id> <run_id> <task_id>
+
+# Config operations
+af config version
+af config connections
+af config variables
+af config pools
+```
+
+### Instance Management
+
+Manage multiple Airflow instances with persistent configuration:
+
+```bash
+# Add instances (auth is optional for open instances)
+af instance add local --url http://localhost:8080
+af instance add staging --url https://staging.example.com --username admin --password secret
+af instance add prod --url https://prod.example.com --token '${AIRFLOW_PROD_TOKEN}'
+
+# List and switch instances
+af instance list      # Shows all instances in a table
+af instance use prod  # Switch to prod instance
+af instance current   # Show current instance
+af instance delete old-instance
+
+# Override instance for a single command
+af --instance staging dags list
+```
+
+Config file location: `~/.af/config.yaml` (override with `--config` or `AF_CONFIG` env var)
+
+```yaml
+instances:
+- name: local
+  url: http://localhost:8080
+  auth: null
+- name: staging
+  url: https://staging.example.com
+  auth:
+    username: admin
+    password: secret
+- name: prod
+  url: https://prod.example.com
+  auth:
+    token: ${AIRFLOW_PROD_TOKEN}  # Environment variable interpolation
+current-instance: local
+```
+
+### Configuration
+
+You can also configure connections via environment variables or CLI flags:
+
+```bash
+# Environment variables
+export AIRFLOW_API_URL=http://localhost:8080
+export AIRFLOW_USERNAME=admin
+export AIRFLOW_PASSWORD=admin
+
+# Or use CLI flags
+af --airflow-url http://localhost:8080 --username admin --password admin dags list
+```
+
+All commands output JSON (except `instance` commands which use human-readable tables), making them easy to use with tools like `jq`:
+
+```bash
+# Find failed runs
+af runs list | jq '.dag_runs[] | select(.state == "failed")'
+
+# Get DAG IDs only
+af dags list | jq '.dags[].dag_id'
+```
 
 ## Advanced Usage
 
