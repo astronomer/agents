@@ -42,17 +42,18 @@ class AstroDeployment:
         config = deployment.get("configuration", {})
         metadata = deployment.get("metadata", {})
 
-        # Get the API URL directly (add https:// if missing)
-        airflow_api_url = metadata.get("airflow_api_url", "")
-        if airflow_api_url and not airflow_api_url.startswith("http"):
-            airflow_api_url = f"https://{airflow_api_url}"
+        # Get the webserver URL (base URL without /api/v2 suffix)
+        # The adapter will add the appropriate API path
+        webserver_url = metadata.get("webserver_url", "")
+        if webserver_url and not webserver_url.startswith("http"):
+            webserver_url = f"https://{webserver_url}"
 
         return cls(
             id=metadata.get("deployment_id", ""),
             name=config.get("name", ""),
             workspace_id=metadata.get("workspace_id", ""),
             workspace_name=config.get("workspace_name", ""),
-            airflow_api_url=airflow_api_url,
+            airflow_api_url=webserver_url,
             status=metadata.get("status", "UNKNOWN"),
             airflow_version=metadata.get("airflow_version"),
             release_name=metadata.get("release_name"),

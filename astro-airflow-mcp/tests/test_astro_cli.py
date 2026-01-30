@@ -30,7 +30,7 @@ class TestAstroDeployment:
                     "deployment_id": "dep-123",
                     "workspace_id": "ws-456",
                     "status": "HEALTHY",
-                    "airflow_api_url": "xyz123.astronomer.run/abc456/api/v2",
+                    "webserver_url": "xyz123.astronomer.run/abc456",
                     "airflow_version": "3.1.6",
                     "release_name": "my-deployment-7890",
                 },
@@ -43,7 +43,7 @@ class TestAstroDeployment:
         assert deployment.workspace_id == "ws-456"
         assert deployment.workspace_name == "my-workspace"
         assert deployment.status == "HEALTHY"
-        assert deployment.airflow_api_url == "https://xyz123.astronomer.run/abc456/api/v2"
+        assert deployment.airflow_api_url == "https://xyz123.astronomer.run/abc456"
         assert deployment.airflow_version == "3.1.6"
         assert deployment.release_name == "my-deployment-7890"
 
@@ -54,12 +54,12 @@ class TestAstroDeployment:
                 "configuration": {"name": "test"},
                 "metadata": {
                     "deployment_id": "dep-123",
-                    "airflow_api_url": "https://already-https.com/api/v2",
+                    "webserver_url": "https://already-https.com",
                 },
             }
         }
         deployment = AstroDeployment.from_inspect_yaml(data)
-        assert deployment.airflow_api_url == "https://already-https.com/api/v2"
+        assert deployment.airflow_api_url == "https://already-https.com"
 
     def test_from_inspect_yaml_minimal(self):
         """Test with minimal data."""
@@ -318,7 +318,7 @@ class TestAstroCliDeployments:
         deployment_id: dep-123
         workspace_id: ws-456
         status: HEALTHY
-        airflow_api_url: example.astronomer.run/abc/api/v2
+        webserver_url: example.astronomer.run/abc
 """
         mock_result = MagicMock()
         mock_result.returncode = 0
@@ -330,7 +330,7 @@ class TestAstroCliDeployments:
             assert isinstance(deployment, AstroDeployment)
             assert deployment.id == "dep-123"
             assert deployment.name == "my-dep"
-            assert deployment.airflow_api_url == "https://example.astronomer.run/abc/api/v2"
+            assert deployment.airflow_api_url == "https://example.astronomer.run/abc"
 
     def test_inspect_deployment_with_workspace(self, mock_cli):
         """Test inspect_deployment passes workspace_id."""
