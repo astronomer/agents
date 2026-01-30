@@ -15,7 +15,6 @@ from astro_airflow_mcp.integrations.astro_cli import (
     AstroCli,
     AstroCliError,
     AstroCliNotAuthenticatedError,
-    AstroCliNotInstalledError,
     AstroDeployment,
 )
 
