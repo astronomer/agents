@@ -12,11 +12,6 @@ Use `af` commands to query, manage, and troubleshoot Airflow workflows.
 Manage multiple Airflow instances with persistent configuration:
 
 ```bash
-# Add instances (auth is optional for open instances)
-af instance add local --url http://localhost:8080
-af instance add staging --url https://staging.example.com --username admin --password secret
-af instance add prod --url https://prod.example.com --token '${AIRFLOW_PROD_TOKEN}'
-
 # List and switch instances
 af instance list      # Shows all instances in a table
 af instance use prod  # Switch to prod instance
