@@ -34,6 +34,10 @@
         "airflow": {
           "command": "uvx",
           "args": ["astro-airflow-mcp@0.2.3", "--transport", "stdio", "--airflow-project-dir", "${PWD}"]
+        },
+        "observe": {
+          "command": "uv",
+          "args": ["--directory", "/Users/milton.li/src/astro-ai/astro-agents/astro-observe-mcp", "run", "astro-observe-mcp"]
         }
       }
     }
