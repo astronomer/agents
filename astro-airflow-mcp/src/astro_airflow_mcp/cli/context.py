@@ -65,12 +65,9 @@ class CLIContext:
         3. Environment variables
         4. Defaults
         """
-        # Try to load from config file if instance specified or no CLI args
-        config_values: ResolvedConfig | None = None
-        if instance_name is not None or (
-            airflow_url is None and username is None and password is None and auth_token is None
-        ):
-            config_values = self._load_from_config(instance_name)
+        # Always try to load config to fill in missing values
+        # Config is used as fallback for any CLI args not provided
+        config_values = self._load_from_config(instance_name)
 
         # Determine final values with priority: CLI > config > env > default
         if airflow_url:
