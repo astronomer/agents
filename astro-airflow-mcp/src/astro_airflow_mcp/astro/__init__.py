@@ -1,6 +1,6 @@
-"""External tool integrations."""
+"""Astro CLI integration."""
 
-from astro_airflow_mcp.integrations.astro_cli import (
+from astro_airflow_mcp.astro.astro_cli import (
     AstroCli,
     AstroCliError,
     AstroCliNotAuthenticatedError,

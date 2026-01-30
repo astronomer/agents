@@ -11,7 +11,7 @@ from rich.table import Table
 
 from astro_airflow_mcp.cli.output import output_error
 from astro_airflow_mcp.config import ConfigError, ConfigManager
-from astro_airflow_mcp.integrations.astro_cli import (
+from astro_airflow_mcp.astro.astro_cli import (
     AstroCli,
     AstroCliError,
     AstroCliNotAuthenticatedError,
