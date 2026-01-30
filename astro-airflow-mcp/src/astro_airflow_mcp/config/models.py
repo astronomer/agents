@@ -38,6 +38,9 @@ class Instance(BaseModel):
     name: str = Field(..., description="Unique name for this instance")
     url: str = Field(..., description="Base URL of the Airflow webserver")
     auth: Auth | None = Field(default=None, description="Authentication configuration (optional)")
+    source: str | None = Field(
+        default=None, description="Discovery source (e.g., astro, local, manual)"
+    )
 
 
 class AirflowCliConfig(BaseModel):
@@ -71,6 +74,7 @@ class AirflowCliConfig(BaseModel):
         username: str | None = None,
         password: str | None = None,
         token: str | None = None,
+        source: str | None = None,
     ) -> None:
         """Add or update an instance."""
         # Only create Auth if credentials provided
@@ -86,9 +90,9 @@ class AirflowCliConfig(BaseModel):
         if existing:
             # Update existing instance
             idx = self.instances.index(existing)
-            self.instances[idx] = Instance(name=name, url=url, auth=auth)
+            self.instances[idx] = Instance(name=name, url=url, auth=auth, source=source)
         else:
-            self.instances.append(Instance(name=name, url=url, auth=auth))
+            self.instances.append(Instance(name=name, url=url, auth=auth, source=source))
 
     def delete_instance(self, name: str) -> None:
         """Delete an instance by name."""
