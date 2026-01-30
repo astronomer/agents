@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 import shutil
-import subprocess
+import subprocess  # nosec B404 - subprocess is needed for CLI wrapper
 from dataclasses import dataclass
 
 import yaml
@@ -76,7 +76,7 @@ class AstroCli:
         "astro login",
     ]
 
-    TOKEN_NAME = "af-cli-discover"
+    TOKEN_NAME = "af-cli-discover"  # nosec B105 - not a password, just a token name
 
     def __init__(self) -> None:
         """Initialize the Astro CLI wrapper."""
@@ -112,7 +112,7 @@ class AstroCli:
         """
         astro_path = self._get_astro_path()
 
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603 - astro CLI path is validated via shutil.which
             [astro_path, *args],
             capture_output=True,
             text=True,
@@ -251,9 +251,7 @@ class AstroCli:
         result = self._run_command(args, timeout=30)
 
         if result.returncode != 0:
-            raise AstroCliError(
-                f"Failed to inspect deployment '{deployment_id}': {result.stderr}"
-            )
+            raise AstroCliError(f"Failed to inspect deployment '{deployment_id}': {result.stderr}")
 
         try:
             data = yaml.safe_load(result.stdout)
