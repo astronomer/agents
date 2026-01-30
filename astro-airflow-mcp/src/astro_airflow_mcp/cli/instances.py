@@ -240,9 +240,7 @@ def discover_instances(
     try:
         deployments_data = cli.list_deployments(all_workspaces=all_workspaces)
     except AstroCliNotAuthenticatedError:
-        output_error(
-            "Not authenticated with Astro. Run 'astro login' first to authenticate."
-        )
+        output_error("Not authenticated with Astro. Run 'astro login' first to authenticate.")
         return
     except AstroCliError as e:
         output_error(f"Failed to list deployments: {e}")

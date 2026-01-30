@@ -131,8 +131,9 @@ class TestAstroCliAuthentication:
         mock_result.stdout = ""
         mock_result.stderr = error_message
 
-        with patch("subprocess.run", return_value=mock_result), pytest.raises(
-            AstroCliNotAuthenticatedError, match="Not authenticated"
+        with (
+            patch("subprocess.run", return_value=mock_result),
+            pytest.raises(AstroCliNotAuthenticatedError, match="Not authenticated"),
         ):
             mock_cli._run_command(["deployment", "list"])
 
@@ -284,8 +285,9 @@ class TestAstroCliDeployments:
         mock_result.stdout = ""
         mock_result.stderr = "some error"
 
-        with patch("subprocess.run", return_value=mock_result), pytest.raises(
-            AstroCliError, match="Failed to list"
+        with (
+            patch("subprocess.run", return_value=mock_result),
+            pytest.raises(AstroCliError, match="Failed to list"),
         ):
             mock_cli.list_deployments()
 
@@ -300,8 +302,9 @@ class TestAstroCliDeployments:
             "Run astro login and try again"
         )
 
-        with patch("subprocess.run", return_value=mock_result), pytest.raises(
-            AstroCliNotAuthenticatedError, match="Not authenticated"
+        with (
+            patch("subprocess.run", return_value=mock_result),
+            pytest.raises(AstroCliNotAuthenticatedError, match="Not authenticated"),
         ):
             mock_cli.list_deployments()
 
@@ -433,8 +436,9 @@ class TestAstroCliTokens:
         mock_result.stdout = ""
         mock_result.stderr = "Failed to create token"
 
-        with patch("subprocess.run", return_value=mock_result), pytest.raises(
-            AstroCliError, match="Failed to create"
+        with (
+            patch("subprocess.run", return_value=mock_result),
+            pytest.raises(AstroCliError, match="Failed to create"),
         ):
             mock_cli.create_deployment_token("dep-123", "my-token")
 
