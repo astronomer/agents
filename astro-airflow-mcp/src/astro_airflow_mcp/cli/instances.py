@@ -34,10 +34,7 @@ def _generate_instance_name(deployment: AstroDeployment, prefix: str | None = No
     name = re.sub(r"[^a-zA-Z0-9]+", "-", deployment.name.lower()).strip("-")
 
     # Handle empty workspace name
-    if not workspace:
-        instance_name = name
-    else:
-        instance_name = f"{workspace}-{name}"
+    instance_name = name if not workspace else f"{workspace}-{name}"
 
     if prefix:
         instance_name = f"{prefix}{instance_name}"
