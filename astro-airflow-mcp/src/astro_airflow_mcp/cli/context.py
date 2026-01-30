@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from typing import TYPE_CHECKING
 
 from astro_airflow_mcp.adapter_manager import AdapterManager
@@ -46,7 +47,13 @@ class CLIContext:
 
             manager = ConfigManager()
             return manager.resolve_instance(instance_name)
-        except (ConfigError, FileNotFoundError):
+        except FileNotFoundError:
+            # No config file - this is normal for first-time users
+            return None
+        except ConfigError as e:
+            # Config exists but has errors - warn the user
+            print(f"Warning: Failed to load config: {e}", file=sys.stderr)
+            print("Falling back to default settings (localhost:8080)", file=sys.stderr)
             return None
 
     def configure(
