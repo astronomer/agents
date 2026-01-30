@@ -382,7 +382,20 @@ class TestLocalDiscoveryBackend:
 
     def test_default_ports(self):
         """Test default ports are set."""
-        assert LocalDiscoveryBackend.DEFAULT_PORTS == [8080, 8081, 8082, 8083, 8084, 8085, 8086, 8087, 8088, 8089, 8090, 8793]
+        assert LocalDiscoveryBackend.DEFAULT_PORTS == [
+            8080,
+            8081,
+            8082,
+            8083,
+            8084,
+            8085,
+            8086,
+            8087,
+            8088,
+            8089,
+            8090,
+            8793,
+        ]
 
     def test_discover_with_no_open_ports(self):
         """Test discover returns empty when no ports open."""
