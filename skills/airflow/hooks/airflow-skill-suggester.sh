@@ -28,7 +28,8 @@ AIRFLOW_KEYWORDS=(
     "get dag"
     "dag status"
     "dag run"
-    "astro dev"
+    "astro dev",
+    "af"
 )
 
 # Check if prompt contains any Airflow keywords
