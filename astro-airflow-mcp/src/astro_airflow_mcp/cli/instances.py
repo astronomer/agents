@@ -193,10 +193,6 @@ def discover_instances(
         bool,
         typer.Option("--dry-run", "-n", help="Preview without making changes"),
     ] = False,
-    skip_existing: Annotated[
-        bool,
-        typer.Option("--skip-existing", "-s", help="Skip deployments that already exist in config"),
-    ] = False,
     overwrite: Annotated[
         bool,
         typer.Option("--overwrite", "-o", help="Overwrite existing instances without prompting"),
@@ -295,9 +291,7 @@ def discover_instances(
         instance_name = _generate_instance_name(dep, prefix)
 
         if instance_name in existing_names:
-            if skip_existing:
-                action = "skip (--skip-existing)"
-            elif overwrite:
+            if overwrite:
                 action = "overwrite"
             else:
                 action = "skip (exists)"
