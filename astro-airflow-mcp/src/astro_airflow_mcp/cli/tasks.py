@@ -7,6 +7,12 @@ import typer
 from astro_airflow_mcp.cli.context import get_adapter
 from astro_airflow_mcp.cli.output import output_error, output_json, wrap_list_response
 
+
+# Callback to parse comma-separated task IDs
+def parse_task_ids(value: str) -> list[str]:
+    """Parse comma-separated task IDs into a list."""
+    return [t.strip() for t in value.split(",") if t.strip()]
+
 app = typer.Typer(help="Task management commands", no_args_is_help=True)
 
 
@@ -99,5 +105,66 @@ def get_task_logs(
             full_content=True,
         )
         output_json(data)
+    except Exception as e:
+        output_error(str(e))
+
+
+@app.command("clear")
+def clear_task_instances(
+    dag_id: Annotated[str, typer.Argument(help="The DAG ID")],
+    dag_run_id: Annotated[str, typer.Argument(help="The DAG run ID")],
+    task_ids: Annotated[
+        str,
+        typer.Argument(help="Comma-separated list of task IDs to clear"),
+    ],
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run/--no-dry-run", "-d/-D", help="Preview what would be cleared"),
+    ] = True,
+    only_failed: Annotated[
+        bool,
+        typer.Option("--only-failed/--all", "-f/-a", help="Only clear failed task instances"),
+    ] = False,
+    include_downstream: Annotated[
+        bool,
+        typer.Option("--downstream/--no-downstream", help="Also clear downstream tasks"),
+    ] = False,
+) -> None:
+    """Clear task instances to allow re-running them.
+
+    By default, runs in dry-run mode showing what would be cleared.
+    Use --no-dry-run or -D to actually clear the tasks.
+
+    Examples:
+        af tasks clear my_dag run_123 task1,task2 --dry-run
+        af tasks clear my_dag run_123 task1 -D --only-failed
+        af tasks clear my_dag run_123 task1 -D --downstream
+    """
+    try:
+        adapter = get_adapter()
+        task_id_list = parse_task_ids(task_ids)
+
+        if not task_id_list:
+            output_error("No task IDs provided")
+            return
+
+        data = adapter.clear_task_instances(
+            dag_id=dag_id,
+            dag_run_id=dag_run_id,
+            task_ids=task_id_list,
+            dry_run=dry_run,
+            only_failed=only_failed,
+            include_downstream=include_downstream,
+        )
+
+        # Add context to the output
+        result = {
+            "dry_run": dry_run,
+            "dag_id": dag_id,
+            "dag_run_id": dag_run_id,
+            "requested_task_ids": task_id_list,
+            **data,
+        }
+        output_json(result)
     except Exception as e:
         output_error(str(e))
