@@ -7,7 +7,6 @@ import httpx
 import pytest
 
 from astro_airflow_mcp.auth import TOKEN_REFRESH_BUFFER_SECONDS, TokenManager
-from astro_airflow_mcp.constants import DEFAULT_AIRFLOW_URL
 from astro_airflow_mcp.server import (
     _manager,
     configure,

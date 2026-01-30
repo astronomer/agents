@@ -1,7 +1,5 @@
 """Tests for shared utility functions."""
 
-import pytest
-
 from astro_airflow_mcp.constants import (
     DEFAULT_AIRFLOW_URL,
     DEFAULT_LIMIT,
@@ -21,11 +19,11 @@ class TestConstants:
 
     def test_terminal_dag_run_states(self):
         """Test terminal DAG run states are defined correctly."""
-        assert TERMINAL_DAG_RUN_STATES == {"success", "failed", "upstream_failed"}
+        assert {"success", "failed", "upstream_failed"} == TERMINAL_DAG_RUN_STATES
 
     def test_failed_task_states(self):
         """Test failed task states are defined correctly."""
-        assert FAILED_TASK_STATES == {"failed", "upstream_failed"}
+        assert {"failed", "upstream_failed"} == FAILED_TASK_STATES
 
     def test_default_values(self):
         """Test default values are defined correctly."""

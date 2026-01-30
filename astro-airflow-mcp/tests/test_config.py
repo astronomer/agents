@@ -68,13 +68,16 @@ class TestInstance:
         assert instance.auth.username == "admin"
 
     def test_instance_with_token_auth(self):
-        """Test instance with token auth."""
+        """Test instance with token auth preserves interpolation syntax."""
         instance = Instance(
             name="staging",
             url="https://staging.example.com",
             auth=Auth(token="${STAGING_TOKEN}"),
         )
+        # Verify interpolation syntax is stored as-is, not resolved at creation time
+        # Interpolation should only happen at resolve_instance() time
         assert instance.auth.token == "${STAGING_TOKEN}"
+        assert "${" in instance.auth.token, "Interpolation syntax should be preserved"
 
     def test_instance_forbids_extra_fields(self):
         """Test that extra fields are rejected."""
