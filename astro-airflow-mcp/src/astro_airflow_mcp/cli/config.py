@@ -221,32 +221,3 @@ def list_providers() -> None:
             output_json({"message": "No providers found", "response": data})
     except Exception as e:
         output_error(str(e))
-
-
-@app.command("assets")
-def list_assets(
-    limit: Annotated[
-        int,
-        typer.Option("--limit", "-l", help="Maximum number of assets to return"),
-    ] = 100,
-    offset: Annotated[
-        int,
-        typer.Option("--offset", "-o", help="Offset for pagination"),
-    ] = 0,
-) -> None:
-    """List data assets/datasets tracked by Airflow.
-
-    Returns asset information including URI, producing tasks,
-    and consuming DAGs for data lineage.
-    """
-    try:
-        adapter = get_adapter()
-        data = adapter.list_assets(limit=limit, offset=offset)
-
-        if "assets" in data:
-            result = wrap_list_response(data["assets"], "assets", data)
-            output_json(result)
-        else:
-            output_json({"message": "No assets found", "response": data})
-    except Exception as e:
-        output_error(str(e))
