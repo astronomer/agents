@@ -1,0 +1,302 @@
+[
+  {
+    "model": "haiku",
+    "scenario": "simple_keyword_search",
+    "prompt": "Find all tables related to customers in our data warehouse",
+    "duration_ms": 4432,
+    "duration_api_ms": 5398,
+    "num_turns": 2,
+    "total_cost_usd": 0.0472963,
+    "input_tokens": 10,
+    "output_tokens": 173,
+    "cache_creation_tokens": 33912,
+    "cache_read_tokens": 33743,
+    "result_text": "I need your permission to search the data warehouse. I'm requesting access to the Astro Cloud Observability API to find customer-related tables.\n\nWould you like me to proceed with this search?",
+    "success": true,
+    "error": null,
+    "metadata": {
+      "session_id": "b700ddea-86f4-488d-a1fb-3b24b1459850",
+      "model_specific_usage": {
+        "inputTokens": 542,
+        "outputTokens": 198,
+        "cacheReadInputTokens": 33743,
+        "cacheCreationInputTokens": 33912,
+        "webSearchRequests": 0,
+        "costUSD": 0.0472963,
+        "contextWindow": 200000,
+        "maxOutputTokens": 64000
+      }
+    },
+    "timestamp": "2026-01-28T15:26:33.335959"
+  },
+  {
+    "model": "haiku",
+    "scenario": "filtered_snowflake_search",
+    "prompt": "Show me all Snowflake tables that contain 'revenue' in the name",
+    "duration_ms": 5870,
+    "duration_api_ms": 7163,
+    "num_turns": 3,
+    "total_cost_usd": 0.013905500000000001,
+    "input_tokens": 17,
+    "output_tokens": 269,
+    "cache_creation_tokens": 1496,
+    "cache_read_tokens": 100165,
+    "result_text": "I need you to grant permissions to access the Astro Cloud Observability API. Please approve access to the data observe tools so I can search for Snowflake tables with 'revenue' in the name.\n\nYou may see a permission prompt asking to allow access to these MCP tools. Once you approve, I'll be able to search your Astro Cloud catalog for all Snowflake tables containing 'revenue'.",
+    "success": true,
+    "error": null,
+    "metadata": {
+      "session_id": "b765a471-ff65-4eff-b478-a479dcac7028",
+      "model_specific_usage": {
+        "inputTokens": 549,
+        "outputTokens": 294,
+        "cacheReadInputTokens": 100165,
+        "cacheCreationInputTokens": 1496,
+        "webSearchRequests": 0,
+        "costUSD": 0.013905500000000001,
+        "contextWindow": 200000,
+        "maxOutputTokens": 64000
+      }
+    },
+    "timestamp": "2026-01-28T15:26:33.335986"
+  },
+  {
+    "model": "haiku",
+    "scenario": "cross_warehouse_search",
+    "prompt": "What tables do we have across Snowflake, Databricks, and BigQuery that store sales data?",
+    "duration_ms": 6191,
+    "duration_api_ms": 7216,
+    "num_turns": 3,
+    "total_cost_usd": 0.01394445,
+    "input_tokens": 17,
+    "output_tokens": 269,
+    "cache_creation_tokens": 1513,
+    "cache_read_tokens": 100192,
+    "result_text": "It looks like you haven't granted permissions for me to access the Astro Cloud Observability API yet. To search for your sales data tables across Snowflake, Databricks, and BigQuery, I need you to authorize access to these tools.\n\nOnce you grant permission, I'll be able to search your data catalog for all tables containing sales data across these platforms.",
+    "success": true,
+    "error": null,
+    "metadata": {
+      "session_id": "7690a6d2-40d6-4932-bffd-b9e9cfb908de",
+      "model_specific_usage": {
+        "inputTokens": 549,
+        "outputTokens": 297,
+        "cacheReadInputTokens": 100192,
+        "cacheCreationInputTokens": 1513,
+        "webSearchRequests": 0,
+        "costUSD": 0.01394445,
+        "contextWindow": 200000,
+        "maxOutputTokens": 64000
+      }
+    },
+    "timestamp": "2026-01-28T15:26:33.335990"
+  },
+  {
+    "model": "haiku",
+    "scenario": "lineage_discovery",
+    "prompt": "Find all the Airflow DAGs that write to customer tables",
+    "duration_ms": 9162,
+    "duration_api_ms": 10678,
+    "num_turns": 6,
+    "total_cost_usd": 0.022460050000000002,
+    "input_tokens": 17,
+    "output_tokens": 519,
+    "cache_creation_tokens": 4207,
+    "cache_read_tokens": 139273,
+    "result_text": "It looks like the MCP tools need permissions to connect to your Airflow and Astro Cloud Observability instance. To search for DAGs that write to customer tables, I need access to:\n\n1. **Airflow metadata** - to list all DAGs and their task definitions\n2. **Data lineage/catalog** - to identify which tables are customer-related and which DAGs produce them\n\nCould you grant permission for the Airflow MCP tools and the Astro Cloud Observability tools to connect? You should see permission prompts to au",
+    "success": true,
+    "error": null,
+    "metadata": {
+      "session_id": "c6045d2d-dc17-4cc0-92ee-4424e3597613",
+      "model_specific_usage": {
+        "inputTokens": 549,
+        "outputTokens": 545,
+        "cacheReadInputTokens": 139273,
+        "cacheCreationInputTokens": 4207,
+        "webSearchRequests": 0,
+        "costUSD": 0.022460050000000002,
+        "contextWindow": 200000,
+        "maxOutputTokens": 64000
+      }
+    },
+    "timestamp": "2026-01-28T15:26:33.335995"
+  },
+  {
+    "model": "haiku",
+    "scenario": "detailed_inspection",
+    "prompt": "Tell me about the customers table - who owns it, when was it last updated, and what deployment does it belong to?",
+    "duration_ms": 4303,
+    "duration_api_ms": 5726,
+    "num_turns": 2,
+    "total_cost_usd": 0.00994335,
+    "input_tokens": 10,
+    "output_tokens": 179,
+    "cache_creation_tokens": 1399,
+    "cache_read_tokens": 66276,
+    "result_text": "I need permission to access the Astro Cloud Observability tools. Please grant me access to search for data assets.\n\nOnce you do, I'll be able to find the customers table and get you details about its owner, last update time, and which deployment it belongs to.",
+    "success": true,
+    "error": null,
+    "metadata": {
+      "session_id": "7e4fec23-93c5-4d7f-8ac9-a6289cf736d5",
+      "model_specific_usage": {
+        "inputTokens": 542,
+        "outputTokens": 205,
+        "cacheReadInputTokens": 66276,
+        "cacheCreationInputTokens": 1399,
+        "webSearchRequests": 0,
+        "costUSD": 0.00994335,
+        "contextWindow": 200000,
+        "maxOutputTokens": 64000
+      }
+    },
+    "timestamp": "2026-01-28T15:26:33.335997"
+  },
+  {
+    "model": "sonnet",
+    "scenario": "simple_keyword_search",
+    "prompt": "Find all tables related to customers in our data warehouse",
+    "duration_ms": 10674,
+    "duration_api_ms": 9718,
+    "num_turns": 2,
+    "total_cost_usd": 0.14089740000000003,
+    "input_tokens": 10,
+    "output_tokens": 191,
+    "cache_creation_tokens": 33922,
+    "cache_read_tokens": 33743,
+    "result_text": "I need permission to access the Astro Cloud Observability API to search for customer-related tables. This will query your data catalog to find tables across Snowflake, Databricks, and BigQuery that are related to customers.",
+    "success": true,
+    "error": null,
+    "metadata": {
+      "session_id": "38032f22-04f7-4f14-a5d5-aeb45343faaf",
+      "model_specific_usage": {
+        "inputTokens": 532,
+        "outputTokens": 28,
+        "cacheReadInputTokens": 0,
+        "cacheCreationInputTokens": 0,
+        "webSearchRequests": 0,
+        "costUSD": 0.0006720000000000001,
+        "contextWindow": 200000,
+        "maxOutputTokens": 64000
+      }
+    },
+    "timestamp": "2026-01-28T15:26:33.336000"
+  },
+  {
+    "model": "sonnet",
+    "scenario": "filtered_snowflake_search",
+    "prompt": "Show me all Snowflake tables that contain 'revenue' in the name",
+    "duration_ms": 9478,
+    "duration_api_ms": 8720,
+    "num_turns": 2,
+    "total_cost_usd": 0.0279699,
+    "input_tokens": 10,
+    "output_tokens": 148,
+    "cache_creation_tokens": 1378,
+    "cache_read_tokens": 66268,
+    "result_text": "I need permission to access the Astro Cloud Observability API to search for Snowflake tables. The tool will search the catalog for tables with 'revenue' in their name.",
+    "success": true,
+    "error": null,
+    "metadata": {
+      "session_id": "48ec6331-8669-4a13-81ad-92f91c6c56cd",
+      "model_specific_usage": {
+        "inputTokens": 532,
+        "outputTokens": 28,
+        "cacheReadInputTokens": 0,
+        "cacheCreationInputTokens": 0,
+        "webSearchRequests": 0,
+        "costUSD": 0.0006720000000000001,
+        "contextWindow": 200000,
+        "maxOutputTokens": 64000
+      }
+    },
+    "timestamp": "2026-01-28T15:26:33.336001"
+  },
+  {
+    "model": "sonnet",
+    "scenario": "cross_warehouse_search",
+    "prompt": "What tables do we have across Snowflake, Databricks, and BigQuery that store sales data?",
+    "duration_ms": 14689,
+    "duration_api_ms": 13825,
+    "num_turns": 3,
+    "total_cost_usd": 0.04206359999999999,
+    "input_tokens": 17,
+    "output_tokens": 353,
+    "cache_creation_tokens": 1596,
+    "cache_read_tokens": 100202,
+    "result_text": "I need permission to access the Astro Cloud Observability API to search for sales tables. Once you grant permission, I'll be able to search across your Snowflake, Databricks, and BigQuery tables to find all assets related to sales data.\n\nThe search will look for tables with \"sales\" in their names or descriptions across all three data warehouse platforms.",
+    "success": true,
+    "error": null,
+    "metadata": {
+      "session_id": "25521aad-447d-4ad2-9c79-8d9160c46339",
+      "model_specific_usage": {
+        "inputTokens": 532,
+        "outputTokens": 28,
+        "cacheReadInputTokens": 0,
+        "cacheCreationInputTokens": 0,
+        "webSearchRequests": 0,
+        "costUSD": 0.0006720000000000001,
+        "contextWindow": 200000,
+        "maxOutputTokens": 64000
+      }
+    },
+    "timestamp": "2026-01-28T15:26:33.336003"
+  },
+  {
+    "model": "sonnet",
+    "scenario": "lineage_discovery",
+    "prompt": "Find all the Airflow DAGs that write to customer tables",
+    "duration_ms": 18013,
+    "duration_api_ms": 17222,
+    "num_turns": 6,
+    "total_cost_usd": 0.18054405,
+    "input_tokens": 20,
+    "output_tokens": 630,
+    "cache_creation_tokens": 36877,
+    "cache_read_tokens": 106911,
+    "result_text": "I need permissions to use both:\n1. **Airflow MCP tools** - to list DAGs and inspect their configurations\n2. **Observability MCP tools** - to search the data catalog for customer tables and trace which DAGs write to them\n\nOnce you grant these permissions, I'll be able to:\n- Search the Astro Cloud catalog for all customer-related tables\n- Identify which Airflow DAGs and tasks produce those tables\n- Show you the complete lineage from DAG \u2192 tasks \u2192 customer tables\n\nWould you like to grant these perm",
+    "success": true,
+    "error": null,
+    "metadata": {
+      "session_id": "e6e6f7ee-065a-44c6-ba27-fa989bec2af1",
+      "model_specific_usage": {
+        "inputTokens": 532,
+        "outputTokens": 28,
+        "cacheReadInputTokens": 0,
+        "cacheCreationInputTokens": 0,
+        "webSearchRequests": 0,
+        "costUSD": 0.0006720000000000001,
+        "contextWindow": 200000,
+        "maxOutputTokens": 64000
+      }
+    },
+    "timestamp": "2026-01-28T15:26:33.336005"
+  },
+  {
+    "model": "sonnet",
+    "scenario": "detailed_inspection",
+    "prompt": "Tell me about the customers table - who owns it, when was it last updated, and what deployment does it belong to?",
+    "duration_ms": 11547,
+    "duration_api_ms": 10406,
+    "num_turns": 2,
+    "total_cost_usd": 0.14090190000000005,
+    "input_tokens": 10,
+    "output_tokens": 187,
+    "cache_creation_tokens": 33938,
+    "cache_read_tokens": 33758,
+    "result_text": "I need permission to access the Astro Cloud Observability API to search for the customers table. This will allow me to query the catalog for information about data assets including ownership, last update time, and deployment details.",
+    "success": true,
+    "error": null,
+    "metadata": {
+      "session_id": "52202c46-d800-41e6-bc8b-ae4ddec3e0fb",
+      "model_specific_usage": {
+        "inputTokens": 532,
+        "outputTokens": 28,
+        "cacheReadInputTokens": 0,
+        "cacheCreationInputTokens": 0,
+        "webSearchRequests": 0,
+        "costUSD": 0.0006720000000000001,
+        "contextWindow": 200000,
+        "maxOutputTokens": 64000
+      }
+    },
+    "timestamp": "2026-01-28T15:26:33.336006"
+  }
+]
