@@ -189,10 +189,11 @@ The `data` plugin bundles an MCP server and skills into a single installable pac
 
 #### Data Analysis Flow
 
-```
-/data:init → /data:analyzing-data → /data:profiling-tables
-                    ↓
-            /data:checking-freshness
+```mermaid
+flowchart LR
+    init["/data:init"] --> analyzing["/data:analyzing-data"]
+    analyzing --> profiling["/data:profiling-tables"]
+    analyzing --> freshness["/data:checking-freshness"]
 ```
 
 1. **Initialize** (`/data:init`) - One-time setup to generate `warehouse.md` with schema metadata
@@ -202,10 +203,12 @@ The `data` plugin bundles an MCP server and skills into a single installable pac
 
 #### DAG Development Flow
 
-```
-/data:setting-up-astro-project → /data:authoring-dags → /data:testing-dags
-           ↓                                                    ↓
-/data:managing-astro-local-env                      /data:debugging-dags
+```mermaid
+flowchart LR
+    setup["/data:setting-up-astro-project"] --> authoring["/data:authoring-dags"]
+    setup --> env["/data:managing-astro-local-env"]
+    authoring --> testing["/data:testing-dags"]
+    testing --> debugging["/data:debugging-dags"]
 ```
 
 1. **Setup** (`/data:setting-up-astro-project`) - Initialize project structure and dependencies
