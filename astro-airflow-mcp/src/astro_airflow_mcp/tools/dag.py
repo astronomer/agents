@@ -2,9 +2,8 @@
 
 import json
 
+from astro_airflow_mcp.constants import DEFAULT_LIMIT, DEFAULT_OFFSET
 from astro_airflow_mcp.server import (
-    DEFAULT_LIMIT,
-    DEFAULT_OFFSET,
     _get_adapter,
     _wrap_list_response,
     mcp,

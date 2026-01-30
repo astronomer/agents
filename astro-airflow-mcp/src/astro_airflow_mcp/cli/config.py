@@ -6,6 +6,7 @@ import typer
 
 from astro_airflow_mcp.cli.context import get_adapter
 from astro_airflow_mcp.cli.output import output_error, output_json, wrap_list_response
+from astro_airflow_mcp.utils import filter_connection_passwords
 
 app = typer.Typer(help="Configuration and system commands", no_args_is_help=True)
 
@@ -69,19 +70,7 @@ def list_connections(
             total_entries = data.get("total_entries", len(connections))
 
             # Filter out passwords for security
-            filtered_connections = [
-                {
-                    "connection_id": conn.get("connection_id"),
-                    "conn_type": conn.get("conn_type"),
-                    "description": conn.get("description"),
-                    "host": conn.get("host"),
-                    "port": conn.get("port"),
-                    "schema": conn.get("schema"),
-                    "login": conn.get("login"),
-                    "extra": conn.get("extra"),
-                }
-                for conn in connections
-            ]
+            filtered_connections = filter_connection_passwords(connections)
 
             result = {
                 "total_connections": total_entries,

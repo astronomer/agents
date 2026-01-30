@@ -3,13 +3,13 @@
 import json
 from typing import Any
 
+from astro_airflow_mcp.constants import DEFAULT_LIMIT, DEFAULT_OFFSET
 from astro_airflow_mcp.server import (
-    DEFAULT_LIMIT,
-    DEFAULT_OFFSET,
     _get_adapter,
     _wrap_list_response,
     mcp,
 )
+from astro_airflow_mcp.utils import filter_connection_passwords
 
 
 def _list_connections_impl(
@@ -39,20 +39,7 @@ def _list_connections_impl(
 
             # Note: Adapter's _filter_passwords already filters password field
             # but we apply additional explicit filtering for defense in depth
-            filtered_connections = [
-                {
-                    "connection_id": conn.get("connection_id"),
-                    "conn_type": conn.get("conn_type"),
-                    "description": conn.get("description"),
-                    "host": conn.get("host"),
-                    "port": conn.get("port"),
-                    "schema": conn.get("schema"),
-                    "login": conn.get("login"),
-                    "extra": conn.get("extra"),
-                    # password is intentionally excluded
-                }
-                for conn in connections
-            ]
+            filtered_connections = filter_connection_passwords(connections)
 
             result: dict[str, Any] = {
                 "total_connections": total_entries,

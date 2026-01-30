@@ -12,16 +12,13 @@ from typing import Any
 from fastmcp import FastMCP
 from fastmcp.server.middleware.logging import LoggingMiddleware
 
-from astro_airflow_mcp.adapters import AirflowAdapter, create_adapter
-from astro_airflow_mcp.auth import TokenManager
+from astro_airflow_mcp.adapter_manager import AdapterManager
+from astro_airflow_mcp.adapters import AirflowAdapter
+from astro_airflow_mcp.constants import DEFAULT_LIMIT, DEFAULT_OFFSET
 from astro_airflow_mcp.logging import get_logger
+from astro_airflow_mcp.utils import wrap_list_response
 
 logger = get_logger(__name__)
-
-# Default configuration values
-DEFAULT_AIRFLOW_URL = "http://localhost:8080"
-DEFAULT_LIMIT = 100
-DEFAULT_OFFSET = 0
 
 
 # Create MCP server
@@ -48,21 +45,9 @@ mcp = FastMCP(
 mcp.add_middleware(LoggingMiddleware(include_payloads=True))
 
 
-# Global configuration for Airflow API access
-class AirflowConfig:
-    """Global configuration for Airflow API access."""
-
-    def __init__(self):
-        self.url: str = DEFAULT_AIRFLOW_URL
-        self.auth_token: str | None = None
-        self.token_manager: TokenManager | None = None
-        self.project_dir: str | None = None
-
-
-_config = AirflowConfig()
-
-# Global adapter instance (lazy-initialized)
-_adapter: AirflowAdapter | None = None
+# Global adapter manager and project directory
+_manager = AdapterManager()
+_project_dir: str | None = None
 
 
 def _get_adapter() -> AirflowAdapter:
@@ -74,22 +59,7 @@ def _get_adapter() -> AirflowAdapter:
     Returns:
         Version-specific AirflowAdapter instance
     """
-    global _adapter
-    if _adapter is None:
-        logger.info("Initializing adapter for %s", _config.url)
-        _adapter = create_adapter(
-            airflow_url=_config.url,
-            token_getter=_get_auth_token,
-            basic_auth_getter=_get_basic_auth,
-        )
-        logger.info("Created adapter for Airflow %s", _adapter.version)
-    return _adapter
-
-
-def _reset_adapter() -> None:
-    """Reset the global adapter (e.g., when config changes)."""
-    global _adapter
-    _adapter = None
+    return _manager.get_adapter()
 
 
 def configure(
@@ -114,59 +84,16 @@ def configure(
         will be created to fetch and refresh tokens automatically.
         If neither is provided, credential-less token fetch will be attempted.
     """
+    global _project_dir
     if project_dir:
-        _config.project_dir = project_dir
-    if url:
-        _config.url = url
-    if auth_token:
-        # Direct token takes precedence - no token manager needed
-        _config.auth_token = auth_token
-        _config.token_manager = None
-    elif username or password:
-        # Use token manager with credentials
-        _config.auth_token = None
-        _config.token_manager = TokenManager(
-            airflow_url=_config.url,
-            username=username,
-            password=password,
-        )
-    else:
-        # No auth provided - try credential-less token manager
-        _config.auth_token = None
-        _config.token_manager = TokenManager(
-            airflow_url=_config.url,
-            username=None,
-            password=None,
-        )
+        _project_dir = project_dir
 
-    # Reset adapter so it will be re-created with new config
-    _reset_adapter()
-
-
-def _get_auth_token() -> str | None:
-    """Get the current authentication token.
-
-    Returns:
-        Bearer token string, or None if no authentication configured
-    """
-    # Direct token takes precedence
-    if _config.auth_token:
-        return _config.auth_token
-    # Otherwise use token manager
-    if _config.token_manager:
-        return _config.token_manager.get_token()
-    return None
-
-
-def _get_basic_auth() -> tuple[str, str] | None:
-    """Get basic auth credentials for Airflow 2.x fallback.
-
-    Returns:
-        Tuple of (username, password) if available, None otherwise
-    """
-    if _config.token_manager:
-        return _config.token_manager.get_basic_auth()
-    return None
+    _manager.configure(
+        url=url,
+        auth_token=auth_token,
+        username=username,
+        password=password,
+    )
 
 
 def get_project_dir() -> str | None:
@@ -175,18 +102,19 @@ def get_project_dir() -> str | None:
     Returns:
         The project directory path, or None if not configured
     """
-    return _config.project_dir
+    return _project_dir
 
 
 def _invalidate_token() -> None:
     """Invalidate the current token to force refresh on next request."""
-    if _config.token_manager:
-        _config.token_manager.invalidate()
+    _manager.invalidate_token()
 
 
-# Helper functions for response formatting
 def _wrap_list_response(items: list[dict[str, Any]], key_name: str, data: dict[str, Any]) -> str:
-    """Wrap API list response with pagination metadata.
+    """Wrap API list response with pagination metadata (JSON string version).
+
+    This is a thin wrapper around the shared wrap_list_response that returns
+    a JSON string for MCP tool responses.
 
     Args:
         items: List of items from the API
@@ -196,13 +124,7 @@ def _wrap_list_response(items: list[dict[str, Any]], key_name: str, data: dict[s
     Returns:
         JSON string with pagination metadata
     """
-
-    total_entries = data.get("total_entries", len(items))
-    result: dict[str, Any] = {
-        f"total_{key_name}": total_entries,
-        "returned_count": len(items),
-        key_name: items,
-    }
+    result = wrap_list_response(items, key_name, data)
     return json.dumps(result, indent=2)
 
 

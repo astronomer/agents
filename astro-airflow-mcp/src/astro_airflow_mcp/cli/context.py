@@ -5,23 +5,25 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING
 
-from astro_airflow_mcp.adapters import AirflowAdapter, create_adapter
-from astro_airflow_mcp.auth import TokenManager
+from astro_airflow_mcp.adapter_manager import AdapterManager
+from astro_airflow_mcp.adapters import AirflowAdapter
+from astro_airflow_mcp.constants import DEFAULT_AIRFLOW_URL
 
 if TYPE_CHECKING:
     from astro_airflow_mcp.config import ResolvedConfig
 
 
 class CLIContext:
-    """Manages CLI context including adapter and authentication."""
+    """Manages CLI context including adapter and authentication.
+
+    Extends AdapterManager with CLI-specific features like config file
+    loading and environment variable resolution.
+    """
 
     _instance: CLIContext | None = None
 
     def __init__(self):
-        self._adapter: AirflowAdapter | None = None
-        self._token_manager: TokenManager | None = None
-        self._auth_token: str | None = None
-        self._airflow_url: str | None = None
+        self._manager = AdapterManager()
 
     @classmethod
     def get_instance(cls) -> CLIContext:
@@ -72,76 +74,50 @@ class CLIContext:
 
         # Determine final values with priority: CLI > config > env > default
         if airflow_url:
-            self._airflow_url = airflow_url
+            final_url = airflow_url
         elif config_values and config_values.url:
-            self._airflow_url = config_values.url
+            final_url = config_values.url
         else:
-            self._airflow_url = os.environ.get("AIRFLOW_API_URL") or "http://localhost:8080"
+            final_url = os.environ.get("AIRFLOW_API_URL") or DEFAULT_AIRFLOW_URL
 
         # Auth token priority
         if auth_token:
-            env_token = auth_token
+            final_token = auth_token
         elif config_values and config_values.token:
-            env_token = config_values.token
+            final_token = config_values.token
         else:
-            env_token = os.environ.get("AIRFLOW_AUTH_TOKEN")
+            final_token = os.environ.get("AIRFLOW_AUTH_TOKEN")
 
         # Username/password priority
         if username:
-            env_username = username
+            final_username = username
         elif config_values and config_values.username:
-            env_username = config_values.username
+            final_username = config_values.username
         else:
-            env_username = os.environ.get("AIRFLOW_USERNAME")
+            final_username = os.environ.get("AIRFLOW_USERNAME")
 
         if password:
-            env_password = password
+            final_password = password
         elif config_values and config_values.password:
-            env_password = config_values.password
+            final_password = config_values.password
         else:
-            env_password = os.environ.get("AIRFLOW_PASSWORD")
+            final_password = os.environ.get("AIRFLOW_PASSWORD")
 
-        if env_token:
-            self._auth_token = env_token
-            self._token_manager = None
-        else:
-            self._auth_token = None
-            self._token_manager = TokenManager(
-                airflow_url=self._airflow_url,
-                username=env_username,
-                password=env_password,
-            )
-
-        # Reset adapter
-        self._adapter = None
+        # Configure the underlying adapter manager
+        self._manager.configure(
+            url=final_url,
+            auth_token=final_token,
+            username=final_username,
+            password=final_password,
+        )
 
     def get_adapter(self) -> AirflowAdapter:
         """Get or create the adapter instance."""
-        if self._adapter is None:
-            if self._airflow_url is None:
-                # Configure with defaults if not already done
-                self.configure()
-
-            self._adapter = create_adapter(
-                airflow_url=self._airflow_url,  # type: ignore[arg-type]
-                token_getter=self._get_auth_token,
-                basic_auth_getter=self._get_basic_auth,
-            )
-        return self._adapter
-
-    def _get_auth_token(self) -> str | None:
-        """Get the current authentication token."""
-        if self._auth_token:
-            return self._auth_token
-        if self._token_manager:
-            return self._token_manager.get_token()
-        return None
-
-    def _get_basic_auth(self) -> tuple[str, str] | None:
-        """Get basic auth credentials."""
-        if self._token_manager:
-            return self._token_manager.get_basic_auth()
-        return None
+        # Configure with defaults if not already done
+        if self._manager.airflow_url == DEFAULT_AIRFLOW_URL:
+            # Check if we need to load config
+            self.configure()
+        return self._manager.get_adapter()
 
 
 def get_adapter() -> AirflowAdapter:
