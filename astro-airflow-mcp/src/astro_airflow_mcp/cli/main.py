@@ -7,6 +7,7 @@ import typer
 
 # Import subcommand modules - must be imported after app is defined
 # to avoid circular imports, so we import them here and register below
+from astro_airflow_mcp.cli import assets as assets_module
 from astro_airflow_mcp.cli import config as config_module
 from astro_airflow_mcp.cli import dags as dags_module
 from astro_airflow_mcp.cli import instances
@@ -183,6 +184,7 @@ def health() -> None:
 app.add_typer(dags_module.app, name="dags", help="DAG management commands")
 app.add_typer(runs_module.app, name="runs", help="DAG run management commands")
 app.add_typer(tasks_module.app, name="tasks", help="Task management commands")
+app.add_typer(assets_module.app, name="assets", help="Asset/dataset management commands")
 app.add_typer(config_module.app, name="config", help="Configuration and system commands")
 app.add_typer(instances.app, name="instance", help="Instance management commands")
 
