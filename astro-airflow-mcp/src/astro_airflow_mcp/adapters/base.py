@@ -175,6 +175,110 @@ class AirflowAdapter(ABC):
             response.raise_for_status()
             return response.json()
 
+    def _delete(
+        self,
+        endpoint: str,
+    ) -> dict[str, Any]:
+        """Make HTTP DELETE call to Airflow API.
+
+        Args:
+            endpoint: API endpoint path (without base path)
+
+        Returns:
+            Parsed JSON response (or empty dict if no content)
+
+        Raises:
+            NotFoundError: If endpoint returns 404
+            Exception: For other HTTP errors
+        """
+        headers, auth = self._setup_auth()
+        headers["Accept"] = "application/json"
+        url = f"{self.airflow_url}{self.api_base_path}/{endpoint}"
+
+        with httpx.Client(timeout=30.0) as client:
+            response = client.delete(url, headers=headers, auth=auth)
+
+            if response.status_code == 404:
+                raise NotFoundError(endpoint)
+
+            response.raise_for_status()
+            # DELETE often returns 204 No Content
+            if response.status_code == 204 or not response.text:
+                return {}
+            return response.json()
+
+    def raw_request(
+        self,
+        method: str,
+        endpoint: str,
+        params: dict[str, Any] | None = None,
+        json_data: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+        raw_endpoint: bool = False,
+    ) -> dict[str, Any]:
+        """Make raw HTTP request to Airflow API.
+
+        This method provides direct access to any Airflow REST API endpoint,
+        similar to `gh api` for GitHub. It automatically handles authentication
+        and API version prefixes based on the Airflow version.
+
+        Args:
+            method: HTTP method (GET, POST, PATCH, PUT, DELETE)
+            endpoint: API endpoint path (e.g., "dags" or "/dags")
+            params: Query parameters
+            json_data: JSON body for POST/PATCH/PUT requests
+            headers: Additional headers to include
+            raw_endpoint: If True, use endpoint path as-is without API version prefix.
+                         Useful for endpoints like /health that don't have version prefix.
+
+        Returns:
+            Dict with 'status_code', 'headers', 'body' keys containing the raw response.
+
+        Example:
+            # GET /api/v1/dags (AF2) or /api/v2/dags (AF3)
+            adapter.raw_request("GET", "dags")
+
+            # GET /health (no version prefix)
+            adapter.raw_request("GET", "health", raw_endpoint=True)
+
+            # POST with JSON body
+            adapter.raw_request("POST", "variables", json_data={"key": "x", "value": "y"})
+        """
+        auth_headers, auth = self._setup_auth()
+        all_headers = {**auth_headers, **(headers or {})}
+
+        # Build URL: with or without version prefix
+        endpoint = endpoint.lstrip("/")
+        if raw_endpoint:
+            url = f"{self.airflow_url}/{endpoint}"
+        else:
+            url = f"{self.airflow_url}{self.api_base_path}/{endpoint}"
+
+        with httpx.Client(timeout=30.0) as client:
+            response = client.request(
+                method=method.upper(),
+                url=url,
+                params=params,
+                json=json_data,
+                headers=all_headers,
+                auth=auth,
+            )
+
+        # Parse body - handle empty responses and non-JSON
+        body: Any = None
+        if response.text:
+            try:
+                body = response.json()
+            except ValueError:
+                # Not JSON, return as text
+                body = response.text
+
+        return {
+            "status_code": response.status_code,
+            "headers": dict(response.headers),
+            "body": body,
+        }
+
     def _handle_not_found(self, endpoint: str, alternative: str | None = None) -> dict[str, Any]:
         """Create a structured response for unavailable endpoints.
 

@@ -285,6 +285,14 @@ af config version
 af config connections
 af config variables
 af config pools
+
+# Direct API access (any endpoint)
+af api --endpoints                    # List all available endpoints
+af api --endpoints --filter variable  # Filter endpoints by pattern
+af api dags                           # GET /api/v{1,2}/dags
+af api dags -F limit=10               # With query parameters
+af api variables -X POST -F key=x -f value=y  # Create variable
+af api variables/x -X DELETE          # Delete variable
 ```
 
 ### Instance Management
@@ -308,6 +316,43 @@ af --instance staging dags list
 ```
 
 Config file location: `~/.af/config.yaml` (override with `--config` or `AF_CONFIG` env var)
+
+### Direct API Access
+
+The `af api` command provides direct access to any Airflow REST API endpoint, similar to `gh api` for GitHub:
+
+```bash
+# Discover available endpoints
+af api --endpoints
+af api --endpoints --filter variable
+
+# GET requests (default)
+af api dags
+af api dags -F limit=10 -F only_active=true
+af api dags/my_dag
+
+# POST/PATCH/DELETE requests
+af api variables -X POST -F key=my_var -f value="my value"
+af api dags/my_dag -X PATCH -F is_paused=false
+af api variables/old_var -X DELETE
+
+# With JSON body
+af api connections -X POST --body '{"connection_id": "x", "conn_type": "postgres"}'
+
+# Include response headers
+af api dags -i
+
+# Access non-versioned endpoints
+af api health --raw
+
+# Get full OpenAPI spec
+af api --spec
+```
+
+**Field syntax:**
+- `-F key=value`: Auto-converts types (numbers, booleans, null)
+- `-f key=value`: Keeps value as raw string
+- `--body '{}'`: Raw JSON body for complex objects
 
 ```yaml
 instances:
