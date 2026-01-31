@@ -92,6 +92,9 @@ Or CLI flags: `af --airflow-url http://localhost:8080 --token "$TOKEN" <command>
 | `af config plugins` | List plugins |
 | `af config providers` | List providers |
 | `af config assets` | List assets/datasets |
+| `af api <endpoint>` | Direct REST API access |
+| `af api --endpoints` | List available API endpoints |
+| `af api --endpoints --filter X` | List endpoints matching pattern |
 
 ## User Intent Patterns
 
@@ -119,6 +122,14 @@ Or CLI flags: `af --airflow-url http://localhost:8080 --token "$TOKEN" <command>
 - "What connections exist?" -> `af config connections`
 - "Are pools full?" -> `af config pools`
 - "Is Airflow healthy?" -> `af health`
+
+### API Exploration
+- "What API endpoints are available?" -> `af api --endpoints`
+- "Find variable endpoints" -> `af api --endpoints --filter variable`
+- "Access XCom values" / "Get XCom" -> `af api xcom-entries -F dag_id=X -F task_id=Y`
+- "Get event logs" / "Audit trail" -> `af api event-logs -F dag_id=X`
+- "Create connection via API" -> `af api connections -X POST --body '{...}'`
+- "Create variable via API" -> `af api variables -X POST -F key=name -f value=val`
 
 ## Common Workflows
 
@@ -214,6 +225,26 @@ af tasks logs my_dag run_id task_id --try 2
 # Get logs for mapped task index
 af tasks logs my_dag run_id task_id --map-index 5
 ```
+
+## Direct API Access with `af api`
+
+Use `af api` for endpoints not covered by high-level commands (XCom, event-logs, backfills, etc).
+
+```bash
+# Discover available endpoints
+af api --endpoints
+af api --endpoints --filter variable
+
+# Basic usage
+af api dags
+af api dags -F limit=10 -F only_active=true
+af api variables -X POST -F key=my_var -f value="my value"
+af api variables/old_var -X DELETE
+```
+
+**Field syntax**: `-F key=value` auto-converts types, `-f key=value` keeps as string.
+
+**Full reference**: See [api-reference.md](api-reference.md) for all options, common endpoints (XCom, event-logs, backfills), and examples.
 
 ## Related Skills
 

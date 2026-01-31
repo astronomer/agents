@@ -13,6 +13,7 @@ from astro_airflow_mcp.cli import dags as dags_module
 from astro_airflow_mcp.cli import instances
 from astro_airflow_mcp.cli import runs as runs_module
 from astro_airflow_mcp.cli import tasks as tasks_module
+from astro_airflow_mcp.cli.api import api_command
 from astro_airflow_mcp.cli.context import configure_context, get_adapter
 from astro_airflow_mcp.cli.output import output_json
 
@@ -181,6 +182,7 @@ def health() -> None:
 
 
 # Register subcommands (modules imported at top)
+app.command("api")(api_command)
 app.add_typer(dags_module.app, name="dags", help="DAG management commands")
 app.add_typer(runs_module.app, name="runs", help="DAG run management commands")
 app.add_typer(tasks_module.app, name="tasks", help="Task management commands")
