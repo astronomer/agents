@@ -287,8 +287,8 @@ af config variables
 af config pools
 
 # Direct API access (any endpoint)
-af api --endpoints                    # List all available endpoints
-af api --endpoints --filter variable  # Filter endpoints by pattern
+af api ls                             # List all available endpoints
+af api ls --filter variable           # Filter endpoints by pattern
 af api dags                           # GET /api/v{1,2}/dags
 af api dags -F limit=10               # With query parameters
 af api variables -X POST -F key=x -f value=y  # Create variable
@@ -323,8 +323,8 @@ The `af api` command provides direct access to any Airflow REST API endpoint, si
 
 ```bash
 # Discover available endpoints
-af api --endpoints
-af api --endpoints --filter variable
+af api ls
+af api ls --filter variable
 
 # GET requests (default)
 af api dags
@@ -346,7 +346,7 @@ af api dags -i
 af api health --raw
 
 # Get full OpenAPI spec
-af api --spec
+af api spec
 ```
 
 **Field syntax:**
