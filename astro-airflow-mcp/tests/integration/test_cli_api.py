@@ -262,18 +262,22 @@ class TestAfApiCommandIntegration:
         assert result.exit_code == 1
         print("Got expected error for non-existent DAG")
 
-    def test_af_api_connection_warning(self, cli_env, capsys):
+    def test_af_api_connection_warning(self, cli_env):
         """Should show warning when accessing connections endpoint."""
         result = runner.invoke(
             app,
             ["api", "connections", "-F", "limit=1"],
             env=cli_env,
+            catch_exceptions=False,
         )
 
         # Should succeed
         assert result.exit_code == 0
-        # Warning goes to stderr which runner captures
-        # Just verify the command works
-        output = json.loads(result.output)
+        # Warning goes to stderr, JSON to stdout
+        # The output may contain both, so find the JSON part (starts with '{')
+        output_lines = result.output.strip().split("\n")
+        json_lines = [line for line in output_lines if line.startswith("{")]
+        assert json_lines, f"No JSON found in output: {result.output}"
+        output = json.loads(json_lines[0])
         assert "connections" in output
         print("Connections endpoint works (warning shown)")
