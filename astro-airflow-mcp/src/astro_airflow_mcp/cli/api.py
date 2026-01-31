@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Annotated, Any
 
 import typer
+import yaml
 
 from astro_airflow_mcp.cli.context import get_adapter
 from astro_airflow_mcp.cli.output import output_error, output_json
@@ -222,11 +223,16 @@ def api_command(
             adapter = get_adapter()
             # Try AF3 location first (/openapi.json), then AF2 (/api/v1/openapi.yaml)
             result = adapter.raw_request("GET", "openapi.json", raw_endpoint=True)
+            is_yaml = False
             if result["status_code"] == 404:
-                # Fall back to AF2 location
+                # Fall back to AF2 location (YAML format)
                 result = adapter.raw_request("GET", "openapi.yaml", raw_endpoint=False)
+                is_yaml = True
             if result["status_code"] >= 400:
                 output_error(f"HTTP {result['status_code']}: {result.get('body', 'Unknown error')}")
+            # Parse YAML if needed
+            if is_yaml and isinstance(result["body"], str):
+                result["body"] = yaml.safe_load(result["body"])
             format_output(result, include_headers=include)
         except Exception as e:
             output_error(str(e))
@@ -238,12 +244,17 @@ def api_command(
             adapter = get_adapter()
             # Try AF3 location first (/openapi.json), then AF2 (/api/v1/openapi.yaml)
             result = adapter.raw_request("GET", "openapi.json", raw_endpoint=True)
+            is_yaml = False
             if result["status_code"] == 404:
+                # Fall back to AF2 location (YAML format)
                 result = adapter.raw_request("GET", "openapi.yaml", raw_endpoint=False)
+                is_yaml = True
             if result["status_code"] >= 400:
                 output_error(f"HTTP {result['status_code']}: {result.get('body', 'Unknown error')}")
-            # Extract and list endpoint paths
+            # Parse YAML if needed, extract endpoint paths
             spec_data = result["body"]
+            if is_yaml and isinstance(spec_data, str):
+                spec_data = yaml.safe_load(spec_data)
             if isinstance(spec_data, dict) and "paths" in spec_data:
                 paths = sorted(spec_data["paths"].keys())
                 if filter_pattern:
