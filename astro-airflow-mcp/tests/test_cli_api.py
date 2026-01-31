@@ -281,47 +281,38 @@ class TestApiCommand:
     """Tests for af api CLI command."""
 
     def test_api_no_endpoint_shows_error(self, mocker):
-        """Test api command requires endpoint or --spec."""
+        """Test api command requires endpoint or subcommand."""
         result = runner.invoke(app, ["api"])
         assert result.exit_code == 1
         assert "error" in result.output.lower()
 
-    def test_api_spec_flag(self, mocker):
-        """Test api --spec fetches OpenAPI spec."""
+    def test_api_spec_subcommand(self, mocker):
+        """Test api spec fetches OpenAPI spec."""
         mock_adapter = mocker.Mock()
-        mock_adapter.raw_request.return_value = {
-            "status_code": 200,
-            "headers": {},
-            "body": {"openapi": "3.0.0", "paths": {}},
-        }
+        mock_adapter.get_openapi_spec.return_value = {"openapi": "3.0.0", "paths": {}}
         mocker.patch("astro_airflow_mcp.cli.api.get_adapter", return_value=mock_adapter)
 
-        result = runner.invoke(app, ["api", "--spec"])
+        result = runner.invoke(app, ["api", "spec"])
 
         assert result.exit_code == 0
-        # OpenAPI spec is at root /openapi.json, not under API version path
-        mock_adapter.raw_request.assert_called_once_with("GET", "openapi.json", raw_endpoint=True)
+        mock_adapter.get_openapi_spec.assert_called_once()
         output = json.loads(result.output)
         assert output["openapi"] == "3.0.0"
 
-    def test_api_endpoints_flag(self, mocker):
-        """Test api --endpoints lists available endpoints."""
+    def test_api_ls_subcommand(self, mocker):
+        """Test api ls lists available endpoints."""
         mock_adapter = mocker.Mock()
-        mock_adapter.raw_request.return_value = {
-            "status_code": 200,
-            "headers": {},
-            "body": {
-                "openapi": "3.0.0",
-                "paths": {
-                    "/api/v2/dags": {},
-                    "/api/v2/variables": {},
-                    "/api/v2/connections": {},
-                },
+        mock_adapter.get_openapi_spec.return_value = {
+            "openapi": "3.0.0",
+            "paths": {
+                "/api/v2/dags": {},
+                "/api/v2/variables": {},
+                "/api/v2/connections": {},
             },
         }
         mocker.patch("astro_airflow_mcp.cli.api.get_adapter", return_value=mock_adapter)
 
-        result = runner.invoke(app, ["api", "--endpoints"])
+        result = runner.invoke(app, ["api", "ls"])
 
         assert result.exit_code == 0
         output = json.loads(result.output)
@@ -330,25 +321,21 @@ class TestApiCommand:
         assert output["count"] == 3
         assert "/api/v2/dags" in output["endpoints"]
 
-    def test_api_endpoints_with_filter(self, mocker):
-        """Test api --endpoints --filter filters endpoints."""
+    def test_api_ls_with_filter(self, mocker):
+        """Test api ls --filter filters endpoints."""
         mock_adapter = mocker.Mock()
-        mock_adapter.raw_request.return_value = {
-            "status_code": 200,
-            "headers": {},
-            "body": {
-                "openapi": "3.0.0",
-                "paths": {
-                    "/api/v2/dags": {},
-                    "/api/v2/variables": {},
-                    "/api/v2/variables/{key}": {},
-                    "/api/v2/connections": {},
-                },
+        mock_adapter.get_openapi_spec.return_value = {
+            "openapi": "3.0.0",
+            "paths": {
+                "/api/v2/dags": {},
+                "/api/v2/variables": {},
+                "/api/v2/variables/{key}": {},
+                "/api/v2/connections": {},
             },
         }
         mocker.patch("astro_airflow_mcp.cli.api.get_adapter", return_value=mock_adapter)
 
-        result = runner.invoke(app, ["api", "--endpoints", "--filter", "variable"])
+        result = runner.invoke(app, ["api", "ls", "--filter", "variable"])
 
         assert result.exit_code == 0
         output = json.loads(result.output)

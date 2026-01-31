@@ -93,8 +93,8 @@ Or CLI flags: `af --airflow-url http://localhost:8080 --token "$TOKEN" <command>
 | `af config providers` | List providers |
 | `af config assets` | List assets/datasets |
 | `af api <endpoint>` | Direct REST API access |
-| `af api --endpoints` | List available API endpoints |
-| `af api --endpoints --filter X` | List endpoints matching pattern |
+| `af api ls` | List available API endpoints |
+| `af api ls --filter X` | List endpoints matching pattern |
 
 ## User Intent Patterns
 
@@ -124,8 +124,8 @@ Or CLI flags: `af --airflow-url http://localhost:8080 --token "$TOKEN" <command>
 - "Is Airflow healthy?" -> `af health`
 
 ### API Exploration
-- "What API endpoints are available?" -> `af api --endpoints`
-- "Find variable endpoints" -> `af api --endpoints --filter variable`
+- "What API endpoints are available?" -> `af api ls`
+- "Find variable endpoints" -> `af api ls --filter variable`
 - "Access XCom values" / "Get XCom" -> `af api xcom-entries -F dag_id=X -F task_id=Y`
 - "Get event logs" / "Audit trail" -> `af api event-logs -F dag_id=X`
 - "Create connection via API" -> `af api connections -X POST --body '{...}'`
@@ -232,8 +232,8 @@ Use `af api` for endpoints not covered by high-level commands (XCom, event-logs,
 
 ```bash
 # Discover available endpoints
-af api --endpoints
-af api --endpoints --filter variable
+af api ls
+af api ls --filter variable
 
 # Basic usage
 af api dags

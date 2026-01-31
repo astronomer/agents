@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Annotated, Any
 
 import typer
-import yaml
 
 from astro_airflow_mcp.cli.context import get_adapter
 from astro_airflow_mcp.cli.output import output_error, output_json
@@ -96,11 +95,61 @@ def format_output(
                 output_json(result["body"])
 
 
+def _api_ls(filter_pattern: str | None = None) -> None:
+    """List available API endpoints."""
+    try:
+        adapter = get_adapter()
+        spec_data = adapter.get_openapi_spec()
+        if isinstance(spec_data, dict) and "paths" in spec_data:
+            paths = sorted(spec_data["paths"].keys())
+            if filter_pattern:
+                paths = [p for p in paths if filter_pattern.lower() in p.lower()]
+            output_json({"endpoints": paths, "count": len(paths)})
+        else:
+            output_error("Could not parse OpenAPI spec")
+            raise typer.Exit(1)
+    except typer.Exit:
+        raise
+    except Exception as e:
+        output_error(str(e))
+        raise typer.Exit(1) from None
+
+
+def _api_spec(include_headers: bool = False) -> None:
+    """Fetch the full OpenAPI specification."""
+    try:
+        adapter = get_adapter()
+        spec_data = adapter.get_openapi_spec()
+        if include_headers:
+            # Wrap in a response-like structure for consistency
+            output_json(
+                {
+                    "status_code": 200,
+                    "headers": {},
+                    "body": spec_data,
+                }
+            )
+        else:
+            output_json(spec_data)
+    except typer.Exit:
+        raise
+    except Exception as e:
+        output_error(str(e))
+        raise typer.Exit(1) from None
+
+
 def api_command(
     endpoint: Annotated[
         str | None,
         typer.Argument(
-            help="API endpoint path (e.g., 'dags', '/dags/my_dag'). Leading slash optional."
+            help="API endpoint path (e.g., 'dags', '/dags/my_dag'), or 'ls' to list endpoints, or 'spec' to get OpenAPI spec."
+        ),
+    ] = None,
+    filter_pattern: Annotated[
+        str | None,
+        typer.Option(
+            "--filter",
+            help="Filter endpoints containing this string (use with 'ls')",
         ),
     ] = None,
     method: Annotated[
@@ -157,27 +206,6 @@ def api_command(
             help="Use endpoint path as-is without API version prefix",
         ),
     ] = False,
-    spec: Annotated[
-        bool,
-        typer.Option(
-            "--spec",
-            help="Fetch full OpenAPI spec (JSON)",
-        ),
-    ] = False,
-    endpoints: Annotated[
-        bool,
-        typer.Option(
-            "--endpoints",
-            help="List available API endpoints",
-        ),
-    ] = False,
-    filter_pattern: Annotated[
-        str | None,
-        typer.Option(
-            "--filter",
-            help="Filter endpoints containing this string (use with --endpoints)",
-        ),
-    ] = None,
 ) -> None:
     """Make direct requests to any Airflow REST API endpoint.
 
@@ -188,10 +216,10 @@ def api_command(
     Examples:
 
         # List all available endpoints
-        af api --endpoints
+        af api ls
 
         # Filter endpoints by pattern
-        af api --endpoints --filter variable
+        af api ls --filter variable
 
         # List DAGs
         af api dags
@@ -215,63 +243,20 @@ def api_command(
         af api health --raw
 
         # Fetch full OpenAPI spec
-        af api --spec
+        af api spec
     """
-    # Handle --spec flag
-    if spec:
-        try:
-            adapter = get_adapter()
-            # Try AF3 location first (/openapi.json), then AF2 (/api/v1/openapi.yaml)
-            result = adapter.raw_request("GET", "openapi.json", raw_endpoint=True)
-            is_yaml = False
-            if result["status_code"] == 404:
-                # Fall back to AF2 location (YAML format)
-                result = adapter.raw_request("GET", "openapi.yaml", raw_endpoint=False)
-                is_yaml = True
-            if result["status_code"] >= 400:
-                output_error(f"HTTP {result['status_code']}: {result.get('body', 'Unknown error')}")
-            # Parse YAML if needed
-            if is_yaml and isinstance(result["body"], str):
-                result["body"] = yaml.safe_load(result["body"])
-            format_output(result, include_headers=include)
-        except Exception as e:
-            output_error(str(e))
+    # Handle subcommand dispatch for reserved names
+    if endpoint == "ls":
+        _api_ls(filter_pattern=filter_pattern)
+        return
+    if endpoint == "spec":
+        _api_spec(include_headers=include)
         return
 
-    # Handle --endpoints flag
-    if endpoints:
-        try:
-            adapter = get_adapter()
-            # Try AF3 location first (/openapi.json), then AF2 (/api/v1/openapi.yaml)
-            result = adapter.raw_request("GET", "openapi.json", raw_endpoint=True)
-            is_yaml = False
-            if result["status_code"] == 404:
-                # Fall back to AF2 location (YAML format)
-                result = adapter.raw_request("GET", "openapi.yaml", raw_endpoint=False)
-                is_yaml = True
-            if result["status_code"] >= 400:
-                output_error(f"HTTP {result['status_code']}: {result.get('body', 'Unknown error')}")
-            # Parse YAML if needed, extract endpoint paths
-            spec_data = result["body"]
-            if is_yaml and isinstance(spec_data, str):
-                spec_data = yaml.safe_load(spec_data)
-            if isinstance(spec_data, dict) and "paths" in spec_data:
-                paths = sorted(spec_data["paths"].keys())
-                if filter_pattern:
-                    paths = [p for p in paths if filter_pattern.lower() in p.lower()]
-                output_json({"endpoints": paths, "count": len(paths)})
-            else:
-                output_error("Could not parse OpenAPI spec")
-        except Exception as e:
-            output_error(str(e))
-        return
-
-    # Endpoint is required if not fetching spec or endpoints
+    # Endpoint is required for direct API calls
     if endpoint is None:
-        output_error(
-            "Endpoint is required. Use 'af api <endpoint>', 'af api --endpoints', or 'af api --spec'"
-        )
-        return
+        output_error("Endpoint is required. Use 'af api <endpoint>', 'af api ls', or 'af api spec'")
+        raise typer.Exit(1)
 
     # Validate method
     valid_methods = {"GET", "POST", "PATCH", "PUT", "DELETE"}

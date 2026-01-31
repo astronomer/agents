@@ -6,17 +6,17 @@ Direct REST API access for Airflow endpoints not covered by high-level commands.
 
 ```bash
 # List all available endpoints
-af api --endpoints
+af api ls
 
 # Filter endpoints by pattern
-af api --endpoints --filter variable
-af api --endpoints --filter xcom
+af api ls --filter variable
+af api ls --filter xcom
 
 # Get full OpenAPI spec (for detailed method/parameter info)
-af api --spec
+af api spec
 
 # Get details for specific endpoint
-af api --spec | jq '.paths["/api/v2/variables"]'
+af api spec | jq '.paths["/api/v2/variables"]'
 ```
 
 ## HTTP Methods

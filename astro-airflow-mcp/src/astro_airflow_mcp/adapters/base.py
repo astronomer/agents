@@ -524,6 +524,14 @@ class AirflowAdapter(ABC):
     def get_config(self) -> dict[str, Any]:
         """Get Airflow configuration."""
 
+    @abstractmethod
+    def get_openapi_spec(self) -> dict[str, Any]:
+        """Get the OpenAPI specification for the Airflow API.
+
+        Returns:
+            Parsed OpenAPI spec as a dict with 'openapi', 'paths', etc.
+        """
+
     # Task Instance Operations
     @abstractmethod
     def clear_task_instances(

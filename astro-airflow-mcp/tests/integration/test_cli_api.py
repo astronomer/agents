@@ -160,11 +160,11 @@ class TestAfApiCommandIntegration:
         assert output["dag_id"] == dag_id
         print(f"af api got DAG: {dag_id}")
 
-    def test_af_api_endpoints_flag(self, cli_env):
-        """Should list endpoints via --endpoints flag."""
+    def test_af_api_ls_subcommand(self, cli_env):
+        """Should list endpoints via ls subcommand."""
         result = runner.invoke(
             app,
-            ["api", "--endpoints"],
+            ["api", "ls"],
             env=cli_env,
         )
 
@@ -173,13 +173,13 @@ class TestAfApiCommandIntegration:
         assert "endpoints" in output
         assert "count" in output
         assert output["count"] > 0
-        print(f"af api --endpoints returned {output['count']} endpoints")
+        print(f"af api ls returned {output['count']} endpoints")
 
-    def test_af_api_endpoints_with_filter(self, cli_env):
-        """Should filter endpoints via --endpoints --filter."""
+    def test_af_api_ls_with_filter(self, cli_env):
+        """Should filter endpoints via ls --filter."""
         result = runner.invoke(
             app,
-            ["api", "--endpoints", "--filter", "dag"],
+            ["api", "ls", "--filter", "dag"],
             env=cli_env,
         )
 
@@ -191,11 +191,11 @@ class TestAfApiCommandIntegration:
             assert "dag" in endpoint.lower()
         print(f"Filtered to {output['count']} dag-related endpoints")
 
-    def test_af_api_spec_flag(self, cli_env):
-        """Should fetch OpenAPI spec via --spec flag."""
+    def test_af_api_spec_subcommand(self, cli_env):
+        """Should fetch OpenAPI spec via spec subcommand."""
         result = runner.invoke(
             app,
-            ["api", "--spec"],
+            ["api", "spec"],
             env=cli_env,
         )
 
@@ -204,7 +204,7 @@ class TestAfApiCommandIntegration:
         # Should have OpenAPI structure
         assert "openapi" in output or "swagger" in output
         assert "paths" in output
-        print(f"af api --spec returned OpenAPI spec with {len(output['paths'])} paths")
+        print(f"af api spec returned OpenAPI spec with {len(output['paths'])} paths")
 
     def test_af_api_include_headers(self, cli_env):
         """Should include headers with -i flag."""
