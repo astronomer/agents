@@ -88,8 +88,11 @@ class TestRawRequestIntegration:
 
     def test_raw_request_raw_endpoint(self, adapter):
         """Should access non-versioned endpoint with raw_endpoint=True."""
-        # /health is a non-versioned endpoint
+        # Try /health (AF2) first, then /api/v2/monitor/health (AF3)
         result = adapter.raw_request("GET", "health", raw_endpoint=True)
+        if result["status_code"] == 404:
+            # AF3 uses a different health endpoint
+            result = adapter.raw_request("GET", "api/v2/monitor/health", raw_endpoint=True)
 
         # Health endpoint returns 200 if healthy
         assert result["status_code"] == 200
