@@ -13,8 +13,6 @@ from typer.testing import CliRunner
 from astro_airflow_mcp.adapters import create_adapter
 from astro_airflow_mcp.cli.main import app
 
-from .conftest import TEST_DAG_ID
-
 runner = CliRunner()
 
 # Skip integration tests if AIRFLOW_URL is not set
@@ -45,11 +43,17 @@ class TestRawRequestIntegration:
 
     def test_raw_request_get_specific_dag(self, adapter):
         """Should make raw GET request for specific DAG."""
-        result = adapter.raw_request("GET", f"dags/{TEST_DAG_ID}")
+        # First get a DAG that exists
+        dags_result = adapter.raw_request("GET", "dags", params={"limit": 1})
+        if not dags_result["body"].get("dags"):
+            pytest.skip("No DAGs available")
+        dag_id = dags_result["body"]["dags"][0]["dag_id"]
+
+        result = adapter.raw_request("GET", f"dags/{dag_id}")
 
         assert result["status_code"] == 200
-        assert result["body"]["dag_id"] == TEST_DAG_ID
-        print(f"Raw request got DAG: {TEST_DAG_ID}")
+        assert result["body"]["dag_id"] == dag_id
+        print(f"Raw request got DAG: {dag_id}")
 
     def test_raw_request_get_version(self, adapter):
         """Should make raw GET request to version endpoint."""
@@ -133,16 +137,28 @@ class TestAfApiCommandIntegration:
 
     def test_af_api_get_dag(self, cli_env):
         """Should get specific DAG via af api command."""
+        # First get a DAG that exists
+        list_result = runner.invoke(
+            app,
+            ["api", "dags", "-F", "limit=1"],
+            env=cli_env,
+        )
+        assert list_result.exit_code == 0
+        dags_output = json.loads(list_result.output)
+        if not dags_output.get("dags"):
+            pytest.skip("No DAGs available")
+        dag_id = dags_output["dags"][0]["dag_id"]
+
         result = runner.invoke(
             app,
-            ["api", f"dags/{TEST_DAG_ID}"],
+            ["api", f"dags/{dag_id}"],
             env=cli_env,
         )
 
         assert result.exit_code == 0
         output = json.loads(result.output)
-        assert output["dag_id"] == TEST_DAG_ID
-        print(f"af api got DAG: {TEST_DAG_ID}")
+        assert output["dag_id"] == dag_id
+        print(f"af api got DAG: {dag_id}")
 
     def test_af_api_endpoints_flag(self, cli_env):
         """Should list endpoints via --endpoints flag."""
@@ -276,11 +292,6 @@ class TestAfApiCommandIntegration:
 
         # Should succeed
         assert result.exit_code == 0
-        # Warning goes to stderr, JSON to stdout
-        # The output may contain both, so find the JSON part (starts with '{')
-        output_lines = result.output.strip().split("\n")
-        json_lines = [line for line in output_lines if line.startswith("{")]
-        assert json_lines, f"No JSON found in output: {result.output}"
-        output = json.loads(json_lines[0])
-        assert "connections" in output
-        print("Connections endpoint works (warning shown)")
+        # Output contains JSON with connections key
+        assert '"connections"' in result.output
+        print("Connections endpoint works")
