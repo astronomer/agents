@@ -403,6 +403,40 @@ claude plugin uninstall data@astronomer && claude plugin install data@astronomer
 
 Contributions welcome! See [CLAUDE.md](./CLAUDE.md) for development guidelines.
 
+## Roadmap
+
+Skills we're likely to build:
+
+**Lineage**
+- Annotating pipelines with inlets/outlets for data lineage tracking
+- Instrumenting automatic OpenLineage extraction in custom operators
+
+**DAG Operations**
+- CI/CD pipelines for DAG deployment
+- Performance optimization and tuning
+- Monitoring and alerting setup
+- Data quality and validation workflows
+
+**Astronomer Open Source**
+- [Cosmos](https://github.com/astronomer/astronomer-cosmos) - Run dbt projects as Airflow DAGs
+- [DAG Factory](https://github.com/astronomer/dag-factory) - Generate DAGs from YAML
+- Other open source projects we maintain
+
+**Modern Data Stack**
+- dbt model development and testing
+- Fivetran connector management
+- Snowflake administration and optimization
+
+We welcome PRs from other data vendors to add skills for their tools.
+
+**Conference Learnings**
+- Reviewing talks from Airflow Summit, Coalesce, Data Council, and other conferences to extract reusable skills and patterns
+
+**Broader Data Practitioner Skills**
+- Churn prediction, data modeling, ML training, and other workflows that span DE/DS/analytics roles
+
+Don't see a skill you want? [Open an issue](https://github.com/astronomer/agents/issues) or submit a PR!
+
 ## License
 
 Apache 2.0
