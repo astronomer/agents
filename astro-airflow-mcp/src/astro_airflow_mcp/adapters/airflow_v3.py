@@ -332,6 +332,16 @@ class AirflowV3Adapter(AirflowAdapter):
         """Get Airflow configuration."""
         return self._call("config")
 
+    def get_openapi_spec(self) -> dict[str, Any]:
+        """Get the OpenAPI specification for the Airflow 3.x API.
+
+        Airflow 3.x serves the spec as JSON at /openapi.json (no version prefix).
+        """
+        result = self.raw_request("GET", "openapi.json", raw_endpoint=True)
+        if result["status_code"] >= 400:
+            raise Exception(f"HTTP {result['status_code']}: {result.get('body', 'Unknown error')}")
+        return result["body"]
+
     # Airflow 3.x specific features
 
     def get_task_instances(

@@ -2,6 +2,8 @@
 
 from typing import Any
 
+import yaml
+
 from astro_airflow_mcp.adapters.base import AirflowAdapter, NotFoundError
 
 
@@ -321,6 +323,20 @@ class AirflowV2Adapter(AirflowAdapter):
                 "error": str(e),
                 "note": "Config endpoint may require expose_config=True in airflow.cfg",
             }
+
+    def get_openapi_spec(self) -> dict[str, Any]:
+        """Get the OpenAPI specification for the Airflow 2.x API.
+
+        Airflow 2.x serves the spec as YAML at /api/v1/openapi.yaml.
+        """
+        result = self.raw_request("GET", "openapi.yaml", raw_endpoint=False)
+        if result["status_code"] >= 400:
+            raise Exception(f"HTTP {result['status_code']}: {result.get('body', 'Unknown error')}")
+        # Parse YAML
+        body = result["body"]
+        if isinstance(body, str):
+            return yaml.safe_load(body)
+        return body
 
     def clear_task_instances(
         self,
