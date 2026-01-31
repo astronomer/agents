@@ -112,7 +112,7 @@ def _api_ls(filter_pattern: str | None = None) -> None:
         raise
     except Exception as e:
         output_error(str(e))
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
 
 def _api_spec(include_headers: bool = False) -> None:
@@ -122,18 +122,20 @@ def _api_spec(include_headers: bool = False) -> None:
         spec_data = adapter.get_openapi_spec()
         if include_headers:
             # Wrap in a response-like structure for consistency
-            output_json({
-                "status_code": 200,
-                "headers": {},
-                "body": spec_data,
-            })
+            output_json(
+                {
+                    "status_code": 200,
+                    "headers": {},
+                    "body": spec_data,
+                }
+            )
         else:
             output_json(spec_data)
     except typer.Exit:
         raise
     except Exception as e:
         output_error(str(e))
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
 
 def api_command(
@@ -247,15 +249,13 @@ def api_command(
     if endpoint == "ls":
         _api_ls(filter_pattern=filter_pattern)
         return
-    elif endpoint == "spec":
+    if endpoint == "spec":
         _api_spec(include_headers=include)
         return
 
     # Endpoint is required for direct API calls
     if endpoint is None:
-        output_error(
-            "Endpoint is required. Use 'af api <endpoint>', 'af api ls', or 'af api spec'"
-        )
+        output_error("Endpoint is required. Use 'af api <endpoint>', 'af api ls', or 'af api spec'")
         raise typer.Exit(1)
 
     # Validate method
