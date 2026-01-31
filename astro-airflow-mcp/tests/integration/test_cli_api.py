@@ -211,7 +211,16 @@ class TestAfApiCommandIntegration:
         # Create variable
         create_result = runner.invoke(
             app,
-            ["api", "variables", "-X", "POST", "-F", f"key={test_key}", "-f", f"value={test_value}"],
+            [
+                "api",
+                "variables",
+                "-X",
+                "POST",
+                "-F",
+                f"key={test_key}",
+                "-f",
+                f"value={test_value}",
+            ],
             env=cli_env,
         )
 

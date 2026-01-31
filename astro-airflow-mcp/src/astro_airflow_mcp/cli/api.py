@@ -226,9 +226,7 @@ def api_command(
                 # Fall back to AF2 location
                 result = adapter.raw_request("GET", "openapi.yaml", raw_endpoint=False)
             if result["status_code"] >= 400:
-                output_error(
-                    f"HTTP {result['status_code']}: {result.get('body', 'Unknown error')}"
-                )
+                output_error(f"HTTP {result['status_code']}: {result.get('body', 'Unknown error')}")
             format_output(result, include_headers=include)
         except Exception as e:
             output_error(str(e))
@@ -243,9 +241,7 @@ def api_command(
             if result["status_code"] == 404:
                 result = adapter.raw_request("GET", "openapi.yaml", raw_endpoint=False)
             if result["status_code"] >= 400:
-                output_error(
-                    f"HTTP {result['status_code']}: {result.get('body', 'Unknown error')}"
-                )
+                output_error(f"HTTP {result['status_code']}: {result.get('body', 'Unknown error')}")
             # Extract and list endpoint paths
             spec_data = result["body"]
             if isinstance(spec_data, dict) and "paths" in spec_data:

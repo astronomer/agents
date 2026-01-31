@@ -294,17 +294,13 @@ class TestApiCommand:
             "headers": {},
             "body": {"openapi": "3.0.0", "paths": {}},
         }
-        mocker.patch(
-            "astro_airflow_mcp.cli.api.get_adapter", return_value=mock_adapter
-        )
+        mocker.patch("astro_airflow_mcp.cli.api.get_adapter", return_value=mock_adapter)
 
         result = runner.invoke(app, ["api", "--spec"])
 
         assert result.exit_code == 0
         # OpenAPI spec is at root /openapi.json, not under API version path
-        mock_adapter.raw_request.assert_called_once_with(
-            "GET", "openapi.json", raw_endpoint=True
-        )
+        mock_adapter.raw_request.assert_called_once_with("GET", "openapi.json", raw_endpoint=True)
         output = json.loads(result.output)
         assert output["openapi"] == "3.0.0"
 
@@ -323,9 +319,7 @@ class TestApiCommand:
                 },
             },
         }
-        mocker.patch(
-            "astro_airflow_mcp.cli.api.get_adapter", return_value=mock_adapter
-        )
+        mocker.patch("astro_airflow_mcp.cli.api.get_adapter", return_value=mock_adapter)
 
         result = runner.invoke(app, ["api", "--endpoints"])
 
@@ -352,9 +346,7 @@ class TestApiCommand:
                 },
             },
         }
-        mocker.patch(
-            "astro_airflow_mcp.cli.api.get_adapter", return_value=mock_adapter
-        )
+        mocker.patch("astro_airflow_mcp.cli.api.get_adapter", return_value=mock_adapter)
 
         result = runner.invoke(app, ["api", "--endpoints", "--filter", "variable"])
 
@@ -371,9 +363,7 @@ class TestApiCommand:
             "headers": {},
             "body": {"dags": [], "total_entries": 0},
         }
-        mocker.patch(
-            "astro_airflow_mcp.cli.api.get_adapter", return_value=mock_adapter
-        )
+        mocker.patch("astro_airflow_mcp.cli.api.get_adapter", return_value=mock_adapter)
 
         result = runner.invoke(app, ["api", "dags"])
 
@@ -395,9 +385,7 @@ class TestApiCommand:
             "headers": {},
             "body": {"dags": []},
         }
-        mocker.patch(
-            "astro_airflow_mcp.cli.api.get_adapter", return_value=mock_adapter
-        )
+        mocker.patch("astro_airflow_mcp.cli.api.get_adapter", return_value=mock_adapter)
 
         result = runner.invoke(app, ["api", "dags", "-F", "limit=10", "-F", "only_active=true"])
 
@@ -413,9 +401,7 @@ class TestApiCommand:
             "headers": {},
             "body": {"key": "test", "value": "hello"},
         }
-        mocker.patch(
-            "astro_airflow_mcp.cli.api.get_adapter", return_value=mock_adapter
-        )
+        mocker.patch("astro_airflow_mcp.cli.api.get_adapter", return_value=mock_adapter)
 
         result = runner.invoke(
             app, ["api", "variables", "-X", "POST", "-F", "key=test", "-f", "value=hello"]
@@ -435,9 +421,7 @@ class TestApiCommand:
             "headers": {},
             "body": {"key": "test"},
         }
-        mocker.patch(
-            "astro_airflow_mcp.cli.api.get_adapter", return_value=mock_adapter
-        )
+        mocker.patch("astro_airflow_mcp.cli.api.get_adapter", return_value=mock_adapter)
 
         result = runner.invoke(
             app, ["api", "variables", "-X", "POST", "--body", '{"key": "test", "value": "v"}']
@@ -455,9 +439,7 @@ class TestApiCommand:
             "headers": {},
             "body": None,
         }
-        mocker.patch(
-            "astro_airflow_mcp.cli.api.get_adapter", return_value=mock_adapter
-        )
+        mocker.patch("astro_airflow_mcp.cli.api.get_adapter", return_value=mock_adapter)
 
         result = runner.invoke(app, ["api", "variables/test", "-X", "DELETE"])
 
@@ -473,9 +455,7 @@ class TestApiCommand:
             "headers": {},
             "body": {"status": "healthy"},
         }
-        mocker.patch(
-            "astro_airflow_mcp.cli.api.get_adapter", return_value=mock_adapter
-        )
+        mocker.patch("astro_airflow_mcp.cli.api.get_adapter", return_value=mock_adapter)
 
         result = runner.invoke(app, ["api", "health", "--raw"])
 
@@ -491,9 +471,7 @@ class TestApiCommand:
             "headers": {"content-type": "application/json"},
             "body": {"dags": []},
         }
-        mocker.patch(
-            "astro_airflow_mcp.cli.api.get_adapter", return_value=mock_adapter
-        )
+        mocker.patch("astro_airflow_mcp.cli.api.get_adapter", return_value=mock_adapter)
 
         result = runner.invoke(app, ["api", "dags", "-i"])
 
@@ -512,9 +490,7 @@ class TestApiCommand:
             "headers": {},
             "body": {},
         }
-        mocker.patch(
-            "astro_airflow_mcp.cli.api.get_adapter", return_value=mock_adapter
-        )
+        mocker.patch("astro_airflow_mcp.cli.api.get_adapter", return_value=mock_adapter)
 
         result = runner.invoke(app, ["api", "dags", "-H", "X-Custom: my-value"])
 
@@ -530,9 +506,7 @@ class TestApiCommand:
             "headers": {},
             "body": {"detail": "Not Found"},
         }
-        mocker.patch(
-            "astro_airflow_mcp.cli.api.get_adapter", return_value=mock_adapter
-        )
+        mocker.patch("astro_airflow_mcp.cli.api.get_adapter", return_value=mock_adapter)
 
         result = runner.invoke(app, ["api", "nonexistent"])
 
@@ -540,9 +514,7 @@ class TestApiCommand:
 
     def test_api_invalid_method(self, mocker):
         """Test invalid HTTP method shows error."""
-        mocker.patch(
-            "astro_airflow_mcp.cli.api.get_adapter", return_value=mocker.Mock()
-        )
+        mocker.patch("astro_airflow_mcp.cli.api.get_adapter", return_value=mocker.Mock())
 
         result = runner.invoke(app, ["api", "dags", "-X", "INVALID"])
 
@@ -551,9 +523,7 @@ class TestApiCommand:
 
     def test_api_invalid_json_body(self, mocker):
         """Test invalid JSON body shows error."""
-        mocker.patch(
-            "astro_airflow_mcp.cli.api.get_adapter", return_value=mocker.Mock()
-        )
+        mocker.patch("astro_airflow_mcp.cli.api.get_adapter", return_value=mocker.Mock())
 
         result = runner.invoke(app, ["api", "dags", "-X", "POST", "--body", "not json"])
 
