@@ -1,6 +1,6 @@
 # agents
 
-AI agent tooling for data engineering workflows. Extends code agents and IDEs like [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and [Cursor](https://cursor.com) with specialized capabilities for working with Airflow and data warehouses.
+AI agent tooling for data engineering workflows. Includes an [MCP server](./astro-airflow-mcp/) for Airflow, a [CLI tool (`af`)](./astro-airflow-mcp/README.md#airflow-cli-tool) for interacting with Airflow from your terminal, and [skills](#skills) that extend AI coding agents with specialized capabilities for working with Airflow and data warehouses. Works with [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Cursor](https://cursor.com), and other MCP-compatible tools.
 
 Built by [Astronomer](https://www.astronomer.io/).
 
@@ -19,6 +19,7 @@ Built by [Astronomer](https://www.astronomer.io/).
   - [MCP Server](#mcp-server)
   - [Skills](#skills)
   - [User Journeys](#user-journeys)
+  - [Airflow CLI (`af`)](#airflow-cli-af)
 - [Configuration](#configuration)
   - [Warehouse Connections](#warehouse-connections)
   - [Airflow](#airflow)
@@ -218,6 +219,24 @@ flowchart LR
 3. **Author** (`/data:authoring-dags`) - Write DAG code following best practices
 4. **Test** (`/data:testing-dags`) - Run DAGs and fix issues iteratively
 5. **Debug** (`/data:debugging-dags`) - Deep investigation for complex failures
+
+### Airflow CLI (`af`)
+
+The `af` command-line tool lets you interact with Airflow directly from your terminal. Install it with:
+
+```bash
+uvx --from astro-airflow-mcp af --help
+```
+
+For frequent use, add an alias to your shell config (`~/.bashrc` or `~/.zshrc`):
+
+```bash
+alias af='uvx --from astro-airflow-mcp af'
+```
+
+Then use it for quick operations like `af health`, `af dags list`, or `af runs trigger <dag_id>`.
+
+See the [full CLI documentation](./astro-airflow-mcp/README.md#airflow-cli-tool) for all commands and instance management.
 
 ## Configuration
 
