@@ -1,6 +1,6 @@
 """Asset/dataset management CLI commands."""
 
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 
@@ -20,6 +20,14 @@ def list_assets(
         int,
         typer.Option("--offset", "-o", help="Offset for pagination"),
     ] = 0,
+    order_by: Annotated[
+        str | None,
+        typer.Option("--order-by", help="Sort field (prefix - for descending, e.g., -uri)"),
+    ] = None,
+    uri_pattern: Annotated[
+        str | None,
+        typer.Option("--uri-pattern", help="Filter by URI pattern (use % as wildcard)"),
+    ] = None,
 ) -> None:
     """List data assets/datasets tracked by Airflow.
 
@@ -27,8 +35,14 @@ def list_assets(
     and consuming DAGs for data lineage.
     """
     try:
+        kwargs: dict[str, Any] = {}
+        if order_by:
+            kwargs["order_by"] = order_by
+        if uri_pattern:
+            kwargs["uri_pattern"] = uri_pattern
+
         adapter = get_adapter()
-        data = adapter.list_assets(limit=limit, offset=offset)
+        data = adapter.list_assets(limit=limit, offset=offset, **kwargs)
 
         if "assets" in data:
             result = wrap_list_response(data["assets"], "assets", data)

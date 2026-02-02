@@ -28,6 +28,22 @@ def list_dag_runs(
         int,
         typer.Option("--offset", "-o", help="Offset for pagination"),
     ] = 0,
+    order_by: Annotated[
+        str | None,
+        typer.Option("--order-by", help="Sort field (prefix - for descending, e.g., -start_date)"),
+    ] = None,
+    state: Annotated[
+        str | None,
+        typer.Option("--state", "-s", help="Filter by state: running, success, failed, queued"),
+    ] = None,
+    start_date_gte: Annotated[
+        str | None,
+        typer.Option("--start-date-gte", help="Runs with start_date >= value (e.g., 2024-01-01T00:00:00Z)"),
+    ] = None,
+    start_date_lte: Annotated[
+        str | None,
+        typer.Option("--start-date-lte", help="Runs with start_date <= value (e.g., 2024-01-01T00:00:00Z)"),
+    ] = None,
 ) -> None:
     """List DAG runs (workflow executions).
 
@@ -35,8 +51,18 @@ def list_dag_runs(
     start_date, end_date, and run_type.
     """
     try:
+        kwargs: dict[str, Any] = {}
+        if order_by:
+            kwargs["order_by"] = order_by
+        if state:
+            kwargs["state"] = state
+        if start_date_gte:
+            kwargs["start_date_gte"] = start_date_gte
+        if start_date_lte:
+            kwargs["start_date_lte"] = start_date_lte
+
         adapter = get_adapter()
-        data = adapter.list_dag_runs(dag_id=dag_id, limit=limit, offset=offset)
+        data = adapter.list_dag_runs(dag_id=dag_id, limit=limit, offset=offset, **kwargs)
 
         if "dag_runs" in data:
             result = wrap_list_response(data["dag_runs"], "dag_runs", data)
