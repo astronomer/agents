@@ -365,7 +365,6 @@ class TestLocalDiscoveryBackend:
             8088,
             8089,
             8090,
-            8793,
         ]
 
     def test_discover_with_no_open_ports(self):

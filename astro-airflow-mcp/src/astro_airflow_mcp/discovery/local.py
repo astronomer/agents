@@ -24,7 +24,7 @@ class LocalDiscoveryBackend:
     the health endpoint.
     """
 
-    DEFAULT_PORTS = [8080, 8081, 8082, 8083, 8084, 8085, 8086, 8087, 8088, 8089, 8090, 8793]
+    DEFAULT_PORTS = [8080, 8081, 8082, 8083, 8084, 8085, 8086, 8087, 8088, 8089, 8090]
     DEFAULT_HOSTS = ["localhost", "127.0.0.1"]
 
     # Health endpoints to check (in order of preference)
