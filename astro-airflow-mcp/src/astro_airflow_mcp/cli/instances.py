@@ -210,7 +210,7 @@ def _determine_action(
 def discover_instances(
     all_workspaces: Annotated[
         bool,
-        typer.Option("--all", "-a", help="Discover from all accessible Astro workspaces"),
+        typer.Option("--all-workspaces", "-a", help="Discover from all accessible Astro workspaces"),
     ] = False,
     dry_run: Annotated[
         bool,
@@ -222,20 +222,12 @@ def discover_instances(
     ] = False,
     backend: Annotated[
         list[str] | None,
-        typer.Option("--backend", "-b", help="Specific backend(s) to use (default: all)"),
+        typer.Option("--backend", "-b", help="Backend(s) to use: astro, local (default: all)"),
     ] = None,
-    port: Annotated[
-        list[int] | None,
-        typer.Option("--port", help="Additional ports for local scan (repeatable)"),
-    ] = None,
-    wide: Annotated[
+    scan: Annotated[
         bool,
-        typer.Option("--wide", "-w", help="Deep scan ports 1024-65535 (local backend only)"),
+        typer.Option("--scan", "-s", help="Deep scan ports 1024-65535 (local backend only)"),
     ] = False,
-    concurrency: Annotated[
-        int,
-        typer.Option("--concurrency", "-c", help="Concurrent connections for wide scan"),
-    ] = 200,
 ) -> None:
     """Auto-discover Airflow instances and add them to the configuration.
 
@@ -245,11 +237,10 @@ def discover_instances(
 
     Examples:
         af instance discover                    # Discover from all backends
-        af instance discover --all              # Include all Astro workspaces
+        af instance discover --all-workspaces   # Include all Astro workspaces
         af instance discover --backend astro    # Only use Astro backend
         af instance discover --backend local    # Only scan local ports
-        af instance discover --port 9090        # Add custom port to scan
-        af instance discover --wide             # Deep scan all ports 1024-65535
+        af instance discover --scan             # Deep scan all ports 1024-65535
         af instance discover --dry-run          # Preview without changes
     """
     # Get the registry and available backends
@@ -298,13 +289,6 @@ def discover_instances(
         "create_tokens": False,  # Don't create tokens during discovery phase
     }
 
-    # Add custom ports for local backend
-    if port:
-        from astro_airflow_mcp.discovery.local import LocalDiscoveryBackend
-
-        default_ports = LocalDiscoveryBackend.DEFAULT_PORTS
-        discovery_options["ports"] = list(set(default_ports + port))
-
     # Run discovery
     console.print("Discovering instances...\n")
     all_instances: list[tuple[DiscoveredInstance, str]] = []  # (instance, action)
@@ -324,8 +308,8 @@ def discover_instances(
                     console.print(f"[yellow]Skipping {backend_name}:[/yellow] Not available")
                 continue
 
-            # Use wide scan for local backend if requested
-            if backend_name == "local" and wide:
+            # Use deep port scan for local backend if requested
+            if backend_name == "local" and scan:
                 from astro_airflow_mcp.discovery.local import LocalDiscoveryBackend
 
                 if isinstance(backend_obj, LocalDiscoveryBackend):
@@ -333,7 +317,6 @@ def discover_instances(
                         host="localhost",
                         start_port=1024,
                         end_port=65535,
-                        concurrency=concurrency,
                         verbose=True,
                     )
                 else:

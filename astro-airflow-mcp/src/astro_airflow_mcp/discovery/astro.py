@@ -100,9 +100,14 @@ class AstroDiscoveryBackend:
         if not deployments_data:
             return []
 
+        # Build workspace name -> ID mapping if discovering across workspaces
+        workspace_map: dict[str, str] = {}
+        if all_workspaces:
+            workspace_map = self._get_workspace_map()
+
         instances: list[DiscoveredInstance] = []
         for dep_data in deployments_data:
-            instance = self._deployment_to_instance(dep_data, create_tokens)
+            instance = self._deployment_to_instance(dep_data, create_tokens, workspace_map)
             if instance:
                 instances.append(instance)
 
@@ -130,14 +135,30 @@ class AstroDiscoveryBackend:
         except AstroCliError as e:
             raise AstroDiscoveryError(f"Failed to list deployments: {e}") from e
 
+    def _get_workspace_map(self) -> dict[str, str]:
+        """Get a mapping of workspace name to workspace ID.
+
+        Returns:
+            Dict mapping workspace name to ID
+        """
+        try:
+            workspaces = self._cli.list_workspaces()
+            return {ws.get("name", ""): ws.get("id", "") for ws in workspaces}
+        except AstroCliError:
+            return {}
+
     def _deployment_to_instance(
-        self, dep_data: dict[str, Any], create_tokens: bool
+        self,
+        dep_data: dict[str, Any],
+        create_tokens: bool,
+        workspace_map: dict[str, str] | None = None,
     ) -> DiscoveredInstance | None:
         """Convert deployment data to a DiscoveredInstance.
 
         Args:
             dep_data: Raw deployment data from list command
             create_tokens: If True, create deployment token
+            workspace_map: Optional mapping of workspace name to ID
 
         Returns:
             DiscoveredInstance or None if deployment can't be inspected
@@ -146,8 +167,14 @@ class AstroDiscoveryBackend:
         if not dep_id:
             return None
 
+        # Look up workspace ID from workspace name if we have a mapping
+        workspace_id = None
+        if workspace_map:
+            workspace_name = dep_data.get("workspace", "")
+            workspace_id = workspace_map.get(workspace_name)
+
         try:
-            deployment = self._cli.inspect_deployment(dep_id)
+            deployment = self._cli.inspect_deployment(dep_id, workspace_id=workspace_id)
         except AstroCliError:
             return None
 

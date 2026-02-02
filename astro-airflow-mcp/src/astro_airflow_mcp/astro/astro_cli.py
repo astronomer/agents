@@ -213,6 +213,19 @@ class AstroCli:
         except (AstroCliError, subprocess.TimeoutExpired):
             return None
 
+    def list_workspaces(self) -> list[dict]:
+        """List all accessible workspaces.
+
+        Returns:
+            List of workspace dictionaries with 'name' and 'id' keys
+        """
+        result = self._run_command(["workspace", "list"], timeout=30)
+
+        if result.returncode != 0:
+            raise AstroCliError(f"Failed to list workspaces: {result.stderr}")
+
+        return self._parse_table_output(result.stdout)
+
     def list_deployments(self, all_workspaces: bool = False) -> list[dict]:
         """List deployments.
 
