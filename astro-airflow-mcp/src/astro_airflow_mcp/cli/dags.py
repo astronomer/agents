@@ -34,7 +34,9 @@ def list_dags(
     ] = None,
     only_active: Annotated[
         bool | None,
-        typer.Option("--only-active/--include-inactive", help="Only active DAGs (default: include all)"),
+        typer.Option(
+            "--only-active/--include-inactive", help="Only active DAGs (default: include all)"
+        ),
     ] = None,
     paused: Annotated[
         bool | None,

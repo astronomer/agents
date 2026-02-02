@@ -38,11 +38,15 @@ def list_dag_runs(
     ] = None,
     start_date_gte: Annotated[
         str | None,
-        typer.Option("--start-date-gte", help="Runs with start_date >= value (e.g., 2024-01-01T00:00:00Z)"),
+        typer.Option(
+            "--start-date-gte", help="Runs with start_date >= value (e.g., 2024-01-01T00:00:00Z)"
+        ),
     ] = None,
     start_date_lte: Annotated[
         str | None,
-        typer.Option("--start-date-lte", help="Runs with start_date <= value (e.g., 2024-01-01T00:00:00Z)"),
+        typer.Option(
+            "--start-date-lte", help="Runs with start_date <= value (e.g., 2024-01-01T00:00:00Z)"
+        ),
     ] = None,
 ) -> None:
     """List DAG runs (workflow executions).
