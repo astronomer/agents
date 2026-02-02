@@ -8,7 +8,6 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from astro_airflow_mcp.astro.astro_cli import AstroCli, AstroCliError
 from astro_airflow_mcp.cli.output import output_error
 from astro_airflow_mcp.config import ConfigError, ConfigManager
 from astro_airflow_mcp.discovery import (
@@ -18,6 +17,7 @@ from astro_airflow_mcp.discovery import (
 )
 from astro_airflow_mcp.discovery.astro import (
     AstroDiscoveryBackend,
+    AstroDiscoveryError,
     AstroNotAuthenticatedError,
 )
 
@@ -386,8 +386,9 @@ def discover_instances(
         # For Astro instances without a token, try to create one
         if inst.source == "astro" and token is None:
             deployment_id = inst.metadata.get("deployment_id") if inst.metadata else None
-            if deployment_id:
-                token = _create_astro_token(deployment_id, inst.name, inst.url)
+            astro_backend = registry.get_backend("astro")
+            if deployment_id and isinstance(astro_backend, AstroDiscoveryBackend):
+                token = _create_astro_token(astro_backend, deployment_id, inst.name, inst.url)
                 if token is None:
                     continue
 
@@ -407,10 +408,13 @@ def discover_instances(
         console.print("No instances were added.")
 
 
-def _create_astro_token(deployment_id: str, instance_name: str, url: str) -> str | None:
+def _create_astro_token(
+    backend: AstroDiscoveryBackend, deployment_id: str, instance_name: str, url: str
+) -> str | None:
     """Create an Astro deployment token.
 
     Args:
+        backend: The Astro discovery backend
         deployment_id: The deployment ID
         instance_name: The instance name (for error messages)
         url: The instance URL (for error messages)
@@ -418,17 +422,9 @@ def _create_astro_token(deployment_id: str, instance_name: str, url: str) -> str
     Returns:
         Token value or None if creation failed
     """
-    cli = AstroCli()
-
-    try:
-        token_exists = cli.token_exists(deployment_id, AstroCli.TOKEN_NAME)
-    except AstroCliError as e:
-        console.print(f"  [yellow]Warning:[/yellow] Could not check tokens: {e}")
-        token_exists = False
-
-    if token_exists:
+    if backend.token_exists(deployment_id):
         console.print(
-            f"  [yellow]Warning:[/yellow] Token '{AstroCli.TOKEN_NAME}' already exists.\n"
+            f"  [yellow]Warning:[/yellow] Token '{backend.TOKEN_NAME}' already exists.\n"
             f"  Cannot retrieve existing token value. Either:\n"
             f"  - Delete the token in Astro UI and re-run discover\n"
             f"  - Manually add with: af instance add {instance_name} --url {url} --token <token>"
@@ -436,8 +432,8 @@ def _create_astro_token(deployment_id: str, instance_name: str, url: str) -> str
         return None
 
     try:
-        console.print(f"  Creating token '{AstroCli.TOKEN_NAME}'...")
-        return cli.create_deployment_token(deployment_id, AstroCli.TOKEN_NAME)
-    except AstroCliError as e:
-        console.print(f"  [red]Error:[/red] Failed to create token: {e}")
+        console.print(f"  Creating token '{backend.TOKEN_NAME}'...")
+        return backend.create_token(deployment_id)
+    except AstroDiscoveryError as e:
+        console.print(f"  [red]Error:[/red] {e}")
         return None

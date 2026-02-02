@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from astro_airflow_mcp.astro.astro_cli import (
+from astro_airflow_mcp.discovery.astro_cli import (
     AstroCli,
     AstroCliError,
     AstroCliNotAuthenticatedError,

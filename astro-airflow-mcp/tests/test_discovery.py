@@ -7,7 +7,6 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 
-from astro_airflow_mcp.astro.astro_cli import AstroCliError, AstroDeployment
 from astro_airflow_mcp.discovery import (
     DiscoveredInstance,
     DiscoveryError,
@@ -20,6 +19,7 @@ from astro_airflow_mcp.discovery.astro import (
     AstroNotAuthenticatedError,
     _generate_instance_name,
 )
+from astro_airflow_mcp.discovery.astro_cli import AstroCliError, AstroDeployment
 from astro_airflow_mcp.discovery.local import LocalDiscoveryBackend
 
 
@@ -267,7 +267,7 @@ class TestAstroDiscoveryBackend:
 
     def test_discover_handles_auth_error(self, mock_cli):
         """Test discover raises on auth error."""
-        from astro_airflow_mcp.astro.astro_cli import AstroCliNotAuthenticatedError
+        from astro_airflow_mcp.discovery.astro_cli import AstroCliNotAuthenticatedError
 
         mock_cli.list_deployments.side_effect = AstroCliNotAuthenticatedError("Not authenticated")
 
