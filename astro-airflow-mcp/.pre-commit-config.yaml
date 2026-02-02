@@ -39,7 +39,7 @@ repos:
           - types-requests
           - types-PyYAML
         args: [--ignore-missing-imports, --no-strict-optional]
-        exclude: ^(tests/|skills/)
+        exclude: ^tests/
 
   # Security checks
   - repo: https://github.com/PyCQA/bandit
@@ -48,4 +48,4 @@ repos:
       - id: bandit
         args: ['-c', 'pyproject.toml']
         additional_dependencies: ['bandit[toml]']
-        exclude: ^(tests/|skills/)
+        exclude: ^tests/
