@@ -422,7 +422,7 @@ claude plugin uninstall data@astronomer && claude plugin install data@astronomer
 
 ## Contributing
 
-Contributions welcome! See [CLAUDE.md](./CLAUDE.md) for development guidelines.
+Contributions welcome! Please read our [Code of Conduct](./CODE_OF_CONDUCT.md) and [Contributing Guide](./CONTRIBUTING.md) before getting started.
 
 ## License
 
