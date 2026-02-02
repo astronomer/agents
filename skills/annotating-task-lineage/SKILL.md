@@ -59,6 +59,15 @@ from airflow.sdk import Asset
 orders_asset = Asset(uri="s3://my-bucket/data/orders")
 ```
 
+### Airflow Datasets (Airflow 2.4+)
+
+```python
+from airflow.datasets import Dataset
+
+# Using Airflow's Dataset type (Airflow 2.4-2.x)
+orders_dataset = Dataset(uri="s3://my-bucket/data/orders")
+```
+
 ---
 
 ## Basic Usage
@@ -169,7 +178,7 @@ class MyCustomOperator(BaseOperator):
 
 ### Option 2: Set Inlets/Outlets Dynamically
 
-For simpler cases, set lineage within the `execute` method:
+For simpler cases, set lineage within the `execute` method (non-deferrable operators only):
 
 ```python
 from airflow.models import BaseOperator
@@ -197,18 +206,58 @@ class MyCustomOperator(BaseOperator):
 
 ---
 
-## Dataset Namespace Conventions
+## Dataset Naming Helpers
 
-Follow [OpenLineage naming conventions](https://openlineage.io/docs/spec/naming) for dataset namespaces:
+Use the [OpenLineage dataset naming helpers](https://openlineage.io/docs/client/python/best-practices#dataset-naming-helpers) to ensure consistent naming across platforms:
 
-| Data Source | Namespace Format | Example |
-|-------------|------------------|---------|
-| PostgreSQL | `postgres://host:port` | `postgres://mydb.example.com:5432` |
-| Snowflake | `snowflake://account` | `snowflake://xy12345.us-east-1` |
-| BigQuery | `bigquery://project` | `bigquery://my-project` |
-| S3 | `s3://bucket` | `s3://data-lake-bucket` |
-| GCS | `gs://bucket` | `gs://my-gcs-bucket` |
-| Local files | `file://` | `file:///opt/airflow/data` |
+```python
+from openlineage.client.event_v2 import Dataset
+
+# Snowflake
+from openlineage.client.naming.snowflake import SnowflakeDatasetNaming
+
+naming = SnowflakeDatasetNaming(
+    account_identifier="myorg-myaccount",
+    database="mydb",
+    schema="myschema",
+    table="mytable",
+)
+dataset = Dataset(namespace=naming.get_namespace(), name=naming.get_name())
+# -> namespace: "snowflake://myorg-myaccount", name: "mydb.myschema.mytable"
+
+# BigQuery
+from openlineage.client.naming.bigquery import BigQueryDatasetNaming
+
+naming = BigQueryDatasetNaming(
+    project="my-project",
+    dataset="my_dataset",
+    table="my_table",
+)
+dataset = Dataset(namespace=naming.get_namespace(), name=naming.get_name())
+# -> namespace: "bigquery", name: "my-project.my_dataset.my_table"
+
+# S3
+from openlineage.client.naming.s3 import S3DatasetNaming
+
+naming = S3DatasetNaming(bucket="my-bucket", key="path/to/file.parquet")
+dataset = Dataset(namespace=naming.get_namespace(), name=naming.get_name())
+# -> namespace: "s3://my-bucket", name: "path/to/file.parquet"
+
+# PostgreSQL
+from openlineage.client.naming.postgres import PostgresDatasetNaming
+
+naming = PostgresDatasetNaming(
+    host="localhost",
+    port=5432,
+    database="mydb",
+    schema="public",
+    table="users",
+)
+dataset = Dataset(namespace=naming.get_namespace(), name=naming.get_name())
+# -> namespace: "postgres://localhost:5432", name: "mydb.public.users"
+```
+
+> **Note:** Always use the naming helpers instead of constructing namespaces manually. If a helper is missing for your platform, check the [OpenLineage repo](https://github.com/OpenLineage/OpenLineage) or request it.
 
 ---
 
@@ -227,25 +276,29 @@ OpenLineage uses this precedence for lineage extraction:
 
 ## Best Practices
 
-### Use Consistent Naming
+### Use the Naming Helpers
 
-Define a helper function for consistent dataset creation:
+Always use OpenLineage naming helpers for consistent dataset creation:
 
 ```python
 from openlineage.client.event_v2 import Dataset
+from openlineage.client.naming.snowflake import SnowflakeDatasetNaming
 
 
-def warehouse_dataset(schema: str, table: str) -> Dataset:
-    """Create a Dataset with standard warehouse settings."""
-    return Dataset(
-        namespace="snowflake://mycompany.snowflakecomputing.com",
-        name=f"{schema}.{table}",
+def snowflake_dataset(schema: str, table: str) -> Dataset:
+    """Create a Snowflake Dataset using the naming helper."""
+    naming = SnowflakeDatasetNaming(
+        account_identifier="mycompany",
+        database="analytics",
+        schema=schema,
+        table=table,
     )
+    return Dataset(namespace=naming.get_namespace(), name=naming.get_name())
 
 
 # Usage
-source = warehouse_dataset("raw", "orders")
-target = warehouse_dataset("staging", "orders_clean")
+source = snowflake_dataset("raw", "orders")
+target = snowflake_dataset("staging", "orders_clean")
 ```
 
 ### Document Your Lineage
@@ -258,11 +311,11 @@ transform = SqlOperator(
     sql="...",
     # Lineage: Reads raw orders, joins with customers, writes to staging
     inlets=[
-        warehouse_dataset("raw", "orders"),
-        warehouse_dataset("raw", "customers"),
+        snowflake_dataset("raw", "orders"),
+        snowflake_dataset("raw", "customers"),
     ],
     outlets=[
-        warehouse_dataset("staging", "order_details"),
+        snowflake_dataset("staging", "order_details"),
     ],
 )
 ```
@@ -282,6 +335,7 @@ transform = SqlOperator(
 | Table-level only (no column lineage) | Use OpenLineage methods or custom extractor |
 | Overridden by extractors/methods | Only use for operators without extractors |
 | Static at DAG parse time | Set dynamically in `execute()` or use OL methods |
+| Deferrable operators lose dynamic lineage | Use OL methods instead; attributes set in `execute()` are lost when deferring |
 
 ---
 
