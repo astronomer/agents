@@ -189,6 +189,7 @@ app.add_typer(tasks_module.app, name="tasks", help="Task management commands")
 app.add_typer(assets_module.app, name="assets", help="Asset/dataset management commands")
 app.add_typer(config_module.app, name="config", help="Configuration and system commands")
 app.add_typer(instances.app, name="instance", help="Instance management commands")
+app.add_typer(instances.app, name="instances", hidden=True)  # Alias for "instance"
 
 
 def cli_main() -> None:

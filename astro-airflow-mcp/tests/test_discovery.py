@@ -441,28 +441,10 @@ class TestLocalDiscoveryBackend:
         assert result is False
 
     def test_detect_airflow_v1_health(self):
-        """Test _detect_airflow detects v1 API."""
+        """Test _detect_airflow detects v1 API when v2 is not available."""
         backend = LocalDiscoveryBackend()
 
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "metadatabase": {"status": "healthy"},
-            "scheduler": {"status": "healthy"},
-        }
-
-        with patch("httpx.Client") as mock_client:
-            mock_client.return_value.__enter__.return_value.get.return_value = mock_response
-            result = backend._detect_airflow("http://localhost:8080", 1.0)
-
-        assert result is not None
-        assert result["api_version"] == "v1"
-
-    def test_detect_airflow_v2_health(self):
-        """Test _detect_airflow detects v2 API."""
-        backend = LocalDiscoveryBackend()
-
-        # First call (v1) fails, second call (v2) succeeds
+        # v2 fails, v1 succeeds
         mock_response_fail = MagicMock()
         mock_response_fail.status_code = 404
 
@@ -474,12 +456,30 @@ class TestLocalDiscoveryBackend:
         }
 
         def get_side_effect(url):
-            if "/api/v1/" in url:
+            if "/api/v2/" in url:
                 return mock_response_fail
             return mock_response_success
 
         with patch("httpx.Client") as mock_client:
             mock_client.return_value.__enter__.return_value.get.side_effect = get_side_effect
+            result = backend._detect_airflow("http://localhost:8080", 1.0)
+
+        assert result is not None
+        assert result["api_version"] == "v1"
+
+    def test_detect_airflow_v2_health(self):
+        """Test _detect_airflow detects v2 API (checked first)."""
+        backend = LocalDiscoveryBackend()
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "metadatabase": {"status": "healthy"},
+            "scheduler": {"status": "healthy"},
+        }
+
+        with patch("httpx.Client") as mock_client:
+            mock_client.return_value.__enter__.return_value.get.return_value = mock_response
             result = backend._detect_airflow("http://localhost:8080", 1.0)
 
         assert result is not None
@@ -512,15 +512,6 @@ class TestLocalDiscoveryBackend:
 
         assert result is None
 
-    def test_looks_like_airflow_detects_airflow_strings(self):
-        """Test _looks_like_airflow detects Airflow-related content."""
-        backend = LocalDiscoveryBackend()
-
-        assert backend._looks_like_airflow("Welcome to Apache Airflow") is True
-        assert backend._looks_like_airflow("Airflow Webserver") is True
-        assert backend._looks_like_airflow("<title>DAGs</title>") is True
-        assert backend._looks_like_airflow("Some random content") is False
-
     def test_parse_health_response_extracts_info(self):
         """Test _parse_health_response extracts Airflow info."""
         backend = LocalDiscoveryBackend()
@@ -548,26 +539,12 @@ class TestLocalDiscoveryBackend:
 
         assert result is None
 
-    def test_parse_health_response_fallback_for_non_json_airflow(self):
-        """Test _parse_health_response falls back to text check for non-JSON."""
+    def test_parse_health_response_none_for_non_json(self):
+        """Test _parse_health_response returns None for non-JSON responses."""
         backend = LocalDiscoveryBackend()
 
         mock_response = MagicMock()
         mock_response.json.side_effect = ValueError("Not JSON")
-        mock_response.text = "Apache Airflow is running"
-
-        result = backend._parse_health_response(mock_response, "/health")
-
-        assert result is not None
-        assert result["detected_from"] == "/health"
-
-    def test_parse_health_response_none_for_non_json_non_airflow(self):
-        """Test _parse_health_response returns None for non-JSON, non-Airflow."""
-        backend = LocalDiscoveryBackend()
-
-        mock_response = MagicMock()
-        mock_response.json.side_effect = ValueError("Not JSON")
-        mock_response.text = "Some random service"
 
         result = backend._parse_health_response(mock_response, "/health")
 

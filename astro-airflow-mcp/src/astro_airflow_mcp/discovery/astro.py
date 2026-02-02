@@ -49,6 +49,8 @@ class AstroDiscoveryBackend:
     deployment tokens for authentication.
     """
 
+    TOKEN_NAME = AstroCli.TOKEN_NAME
+
     def __init__(self, cli: AstroCli | None = None) -> None:
         """Initialize the Astro discovery backend.
 
@@ -94,9 +96,33 @@ class AstroDiscoveryBackend:
             AstroNotAuthenticatedError: If not authenticated with Astro
             AstroDiscoveryError: If discovery fails
         """
-        # List deployments
+        deployments_data = self._list_deployments(all_workspaces)
+        if not deployments_data:
+            return []
+
+        instances: list[DiscoveredInstance] = []
+        for dep_data in deployments_data:
+            instance = self._deployment_to_instance(dep_data, create_tokens)
+            if instance:
+                instances.append(instance)
+
+        return instances
+
+    def _list_deployments(self, all_workspaces: bool) -> list[dict[str, Any]]:
+        """List deployments from Astro CLI.
+
+        Args:
+            all_workspaces: If True, list from all accessible workspaces
+
+        Returns:
+            List of deployment data dictionaries
+
+        Raises:
+            AstroNotAuthenticatedError: If not authenticated with Astro
+            AstroDiscoveryError: If listing fails
+        """
         try:
-            deployments_data = self._cli.list_deployments(all_workspaces=all_workspaces)
+            return self._cli.list_deployments(all_workspaces=all_workspaces)
         except AstroCliNotAuthenticatedError as e:
             raise AstroNotAuthenticatedError(
                 "Not authenticated with Astro. Run 'astro login' first."
@@ -104,65 +130,57 @@ class AstroDiscoveryBackend:
         except AstroCliError as e:
             raise AstroDiscoveryError(f"Failed to list deployments: {e}") from e
 
-        if not deployments_data:
-            return []
+    def _deployment_to_instance(
+        self, dep_data: dict[str, Any], create_tokens: bool
+    ) -> DiscoveredInstance | None:
+        """Convert deployment data to a DiscoveredInstance.
 
-        # Inspect each deployment to get full details
-        instances: list[DiscoveredInstance] = []
-        for dep_data in deployments_data:
-            dep_id = dep_data.get("deployment_id", "")
+        Args:
+            dep_data: Raw deployment data from list command
+            create_tokens: If True, create deployment token
 
-            if not dep_id:
-                continue
+        Returns:
+            DiscoveredInstance or None if deployment can't be inspected
+        """
+        dep_id = dep_data.get("deployment_id", "")
+        if not dep_id:
+            return None
 
-            try:
-                deployment = self._cli.inspect_deployment(dep_id)
-            except AstroCliError:
-                continue
+        try:
+            deployment = self._cli.inspect_deployment(dep_id)
+        except AstroCliError:
+            return None
 
-            instance_name = _generate_instance_name(deployment)
+        token = self._get_or_create_token(deployment.id) if create_tokens else None
 
-            # Optionally create token
-            token: str | None = None
-            if create_tokens:
-                token = self._get_or_create_token(deployment)
+        return DiscoveredInstance(
+            name=_generate_instance_name(deployment),
+            url=deployment.airflow_api_url,
+            source=self.name,
+            auth_token=token,
+            metadata={
+                "deployment_id": deployment.id,
+                "workspace_id": deployment.workspace_id,
+                "workspace_name": deployment.workspace_name,
+                "status": deployment.status,
+                "airflow_version": deployment.airflow_version,
+                "release_name": deployment.release_name,
+            },
+        )
 
-            instances.append(
-                DiscoveredInstance(
-                    name=instance_name,
-                    url=deployment.airflow_api_url,
-                    source=self.name,
-                    auth_token=token,
-                    metadata={
-                        "deployment_id": deployment.id,
-                        "workspace_id": deployment.workspace_id,
-                        "workspace_name": deployment.workspace_name,
-                        "status": deployment.status,
-                        "airflow_version": deployment.airflow_version,
-                        "release_name": deployment.release_name,
-                    },
-                )
-            )
-
-        return instances
-
-    def _get_or_create_token(self, deployment: AstroDeployment) -> str | None:
+    def _get_or_create_token(self, deployment_id: str) -> str | None:
         """Get existing token or create a new one.
 
         Args:
-            deployment: The deployment to get/create token for
+            deployment_id: The deployment ID
 
         Returns:
-            Token value or None if token already exists and can't be retrieved
+            Token value or None if token already exists or creation fails
         """
         try:
-            # Check if token already exists
-            if self._cli.token_exists(deployment.id, AstroCli.TOKEN_NAME):
-                # Can't retrieve existing token value
+            if self._cli.token_exists(deployment_id, self.TOKEN_NAME):
                 return None
-
-            # Create new token
-            return self._cli.create_deployment_token(deployment.id, AstroCli.TOKEN_NAME)
+            return self._cli.create_deployment_token(deployment_id, self.TOKEN_NAME)
         except AstroCliError:
             return None
 
@@ -176,7 +194,7 @@ class AstroDiscoveryBackend:
             True if token exists
         """
         try:
-            return self._cli.token_exists(deployment_id, AstroCli.TOKEN_NAME)
+            return self._cli.token_exists(deployment_id, self.TOKEN_NAME)
         except AstroCliError:
             return False
 
@@ -193,6 +211,6 @@ class AstroDiscoveryBackend:
             AstroDiscoveryError: If token creation fails
         """
         try:
-            return self._cli.create_deployment_token(deployment_id, AstroCli.TOKEN_NAME)
+            return self._cli.create_deployment_token(deployment_id, self.TOKEN_NAME)
         except AstroCliError as e:
             raise AstroDiscoveryError(f"Failed to create token: {e}") from e

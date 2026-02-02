@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import socket
-import time
 from pathlib import Path
 from typing import Any
 
@@ -28,14 +27,23 @@ class LocalDiscoveryBackend:
     DEFAULT_PORTS = [8080, 8081, 8082, 8083, 8084, 8085, 8086, 8087, 8088, 8089, 8090, 8793]
     DEFAULT_HOSTS = ["localhost", "127.0.0.1"]
 
-    # Indicators that a service is Airflow
-    AIRFLOW_INDICATORS = [
-        "airflow",
+    # Health endpoints to check (in order of preference)
+    HEALTH_ENDPOINTS = [
+        "/api/v2/monitor/health",  # Airflow 3.x REST API
+        "/api/v1/health",  # Airflow 2.x REST API
+    ]
+
+    # Keys in health JSON response that indicate Airflow
+    AIRFLOW_HEALTH_KEYS = [
         "metadatabase",
         "scheduler",
         "triggerer",
         "dag_processor",
     ]
+
+    # Timeout and concurrency defaults
+    DEFAULT_HTTP_TIMEOUT = 2.0
+    DEFAULT_PORT_SCAN_CONCURRENCY = 200
 
     def __init__(self) -> None:
         """Initialize the local discovery backend."""
@@ -92,7 +100,7 @@ class LocalDiscoveryBackend:
         self,
         ports: list[int] | None = None,
         hosts: list[str] | None = None,
-        timeout: float = 2.0,
+        timeout: float | None = None,
         **kwargs: Any,
     ) -> list[DiscoveredInstance]:
         """Discover local Airflow instances by scanning ports.
@@ -109,6 +117,9 @@ class LocalDiscoveryBackend:
         Returns:
             List of discovered instances
         """
+        if timeout is None:
+            timeout = self.DEFAULT_HTTP_TIMEOUT
+
         # Build port list: check .astro/config.yaml first, then fallback to defaults
         if ports:
             scan_ports = ports
@@ -174,32 +185,34 @@ class LocalDiscoveryBackend:
         except OSError:
             return False
 
-    def _detect_airflow(self, url: str, timeout: float) -> dict[str, Any] | None:
+    def _detect_airflow(
+        self,
+        url: str,
+        timeout: float | None = None,
+        client: httpx.Client | None = None,
+    ) -> dict[str, Any] | None:
         """Try to detect if a URL is an Airflow instance.
 
         Checks various health endpoints and looks for Airflow indicators.
 
         Args:
             url: Base URL to check
-            timeout: Request timeout in seconds
+            timeout: Request timeout in seconds (default: DEFAULT_HTTP_TIMEOUT)
+            client: Optional httpx client to reuse (creates one if not provided)
 
         Returns:
             Dict with Airflow info if detected, None otherwise
         """
-        # Endpoints to try (in order of preference)
-        health_endpoints = [
-            "/api/v1/health",  # Airflow 2.x REST API
-            "/api/v2/health",  # Airflow 3.x REST API
-            "/health",  # Legacy health endpoint
-        ]
+        if timeout is None:
+            timeout = self.DEFAULT_HTTP_TIMEOUT
 
         # Use strict timeout that applies to entire request, not per-phase
         strict_timeout = httpx.Timeout(timeout, connect=timeout, read=timeout, write=timeout)
 
-        with httpx.Client(timeout=strict_timeout) as client:
-            for endpoint in health_endpoints:
+        def _check_with_client(http_client: httpx.Client) -> dict[str, Any] | None:
+            for endpoint in self.HEALTH_ENDPOINTS:
                 try:
-                    response = client.get(f"{url}{endpoint}")
+                    response = http_client.get(f"{url}{endpoint}")
                     if response.status_code == 200:
                         return self._parse_health_response(response, endpoint)
                 except httpx.TimeoutException:
@@ -208,15 +221,14 @@ class LocalDiscoveryBackend:
                 except httpx.RequestError:
                     continue
 
-            # Try to detect from root or other endpoints
-            try:
-                response = client.get(url)
-                if response.status_code == 200 and self._looks_like_airflow(response.text):
-                    return {"detected_from": "root", "api_version": "unknown"}
-            except httpx.RequestError:
-                pass
+            return None
 
-        return None
+        # Use provided client or create a new one
+        if client is not None:
+            return _check_with_client(client)
+
+        with httpx.Client(timeout=strict_timeout) as new_client:
+            return _check_with_client(new_client)
 
     def _parse_health_response(
         self, response: httpx.Response, endpoint: str
@@ -233,14 +245,12 @@ class LocalDiscoveryBackend:
         try:
             data = response.json()
         except (ValueError, TypeError):
-            # Not JSON, check if it looks like Airflow anyway
-            if self._looks_like_airflow(response.text):
-                return {"detected_from": endpoint, "api_version": "unknown"}
+            # Health endpoint should return JSON; if not, it's not Airflow
             return None
 
         # Check for Airflow health response structure
         # Airflow 2.x/3.x return {"metadatabase": {...}, "scheduler": {...}, ...}
-        if isinstance(data, dict) and any(key in data for key in self.AIRFLOW_INDICATORS):
+        if isinstance(data, dict) and any(key in data for key in self.AIRFLOW_HEALTH_KEYS):
             api_version = (
                 "v2" if "/api/v2" in endpoint else "v1" if "/api/v1" in endpoint else "unknown"
             )
@@ -251,25 +261,6 @@ class LocalDiscoveryBackend:
             }
 
         return None
-
-    def _looks_like_airflow(self, text: str) -> bool:
-        """Check if text content looks like it's from Airflow.
-
-        Args:
-            text: Response text to check
-
-        Returns:
-            True if content appears to be from Airflow
-        """
-        text_lower = text.lower()
-        # Look for Airflow-specific strings
-        airflow_strings = [
-            "airflow",
-            "apache airflow",
-            "dag",
-            "airflow webserver",
-        ]
-        return any(s in text_lower for s in airflow_strings)
 
     # -------------------------------------------------------------------------
     # Experimental: Async wide port scanning
@@ -308,7 +299,7 @@ class LocalDiscoveryBackend:
         start_port: int,
         end_port: int,
         timeout: float = 0.1,
-        concurrency: int = 500,
+        concurrency: int | None = None,
         progress_callback: Any | None = None,
     ) -> list[int]:
         """Scan a range of ports asynchronously with concurrency control.
@@ -324,6 +315,9 @@ class LocalDiscoveryBackend:
         Returns:
             List of open ports
         """
+        if concurrency is None:
+            concurrency = self.DEFAULT_PORT_SCAN_CONCURRENCY
+
         semaphore = asyncio.Semaphore(concurrency)
         open_ports: list[int] = []
         scanned = 0
@@ -347,13 +341,58 @@ class LocalDiscoveryBackend:
 
         return sorted(open_ports)
 
+    def _check_ports_for_airflow(
+        self,
+        host: str,
+        ports: list[int],
+    ) -> list[DiscoveredInstance]:
+        """Check a list of open ports for Airflow instances.
+
+        Args:
+            host: Host to check
+            ports: List of open ports to check
+
+        Returns:
+            List of discovered Airflow instances
+        """
+        instances: list[DiscoveredInstance] = []
+
+        if not ports:
+            return instances
+
+        # Reuse a single httpx client for all checks
+        strict_timeout = httpx.Timeout(
+            self.DEFAULT_HTTP_TIMEOUT,
+            connect=self.DEFAULT_HTTP_TIMEOUT,
+            read=self.DEFAULT_HTTP_TIMEOUT,
+            write=self.DEFAULT_HTTP_TIMEOUT,
+        )
+
+        with httpx.Client(timeout=strict_timeout) as client:
+            for port in ports:
+                url = f"http://{host}:{port}"
+                airflow_info = self._detect_airflow(url, client=client)
+                if airflow_info:
+                    instance_name = f"local-{port}"
+                    instances.append(
+                        DiscoveredInstance(
+                            name=instance_name,
+                            url=url,
+                            source=self.name,
+                            auth_token=None,
+                            metadata=airflow_info,
+                        )
+                    )
+
+        return instances
+
     def discover_wide(
         self,
         host: str = "localhost",
         start_port: int = 1024,
         end_port: int = 65535,
         timeout: float = 0.1,
-        concurrency: int = 200,
+        concurrency: int | None = None,
         verbose: bool = True,
     ) -> list[DiscoveredInstance]:
         """Experimental: Scan a wide port range for Airflow instances.
@@ -365,7 +404,7 @@ class LocalDiscoveryBackend:
             start_port: Start of port range (default: 1024)
             end_port: End of port range (default: 65535)
             timeout: Timeout per port check in seconds (default: 0.1)
-            concurrency: Max concurrent connections (default: 200, higher values may miss ports)
+            concurrency: Max concurrent connections (default: DEFAULT_PORT_SCAN_CONCURRENCY)
             verbose: Print progress updates
 
         Returns:
@@ -373,27 +412,14 @@ class LocalDiscoveryBackend:
         """
         from rich.console import Console
 
-        console = Console()
-        start_time = time.time()
-        total_ports = end_port - start_port + 1
+        if concurrency is None:
+            concurrency = self.DEFAULT_PORT_SCAN_CONCURRENCY
 
-        # Run the async port scan with spinner
-        if verbose:
-            with console.status(
-                f"[bold]Scanning {total_ports:,} ports on {host}...", spinner="dots"
-            ):
-                open_ports = asyncio.run(
-                    self._scan_port_range_async(
-                        host=host,
-                        start_port=start_port,
-                        end_port=end_port,
-                        timeout=timeout,
-                        concurrency=concurrency,
-                        progress_callback=None,
-                    )
-                )
-        else:
-            open_ports = asyncio.run(
+        console = Console()
+
+        # Helper to run the async port scan
+        def run_port_scan() -> list[int]:
+            return asyncio.run(
                 self._scan_port_range_async(
                     host=host,
                     start_port=start_port,
@@ -404,54 +430,22 @@ class LocalDiscoveryBackend:
                 )
             )
 
-        scan_time = time.time() - start_time
-
-        # Check each open port for Airflow with spinner
-        instances: list[DiscoveredInstance] = []
-        if open_ports:
-            if verbose:
-                with console.status(
-                    f"[bold]Checking {len(open_ports)} open ports for Airflow...",
-                    spinner="dots",
-                ):
-                    for port in open_ports:
-                        url = f"http://{host}:{port}"
-                        airflow_info = self._detect_airflow(url, timeout=2.0)
-                        if airflow_info:
-                            instance_name = f"local-{port}"
-                            instances.append(
-                                DiscoveredInstance(
-                                    name=instance_name,
-                                    url=url,
-                                    source=self.name,
-                                    auth_token=None,
-                                    metadata=airflow_info,
-                                )
-                            )
-            else:
-                for port in open_ports:
-                    url = f"http://{host}:{port}"
-                    airflow_info = self._detect_airflow(url, timeout=2.0)
-                    if airflow_info:
-                        instance_name = f"local-{port}"
-                        instances.append(
-                            DiscoveredInstance(
-                                name=instance_name,
-                                url=url,
-                                source=self.name,
-                                auth_token=None,
-                                metadata=airflow_info,
-                            )
-                        )
-
-        total_time = time.time() - start_time
+        # Run port scan (with optional spinner)
+        if verbose:
+            with console.status(
+                f"[bold]Scanning for Airflow on {host}...", spinner="dots"
+            ):
+                open_ports = run_port_scan()
+                instances = self._check_ports_for_airflow(host, open_ports)
+        else:
+            open_ports = run_port_scan()
+            instances = self._check_ports_for_airflow(host, open_ports)
 
         # Print summary
         if verbose:
-            console.print(
-                f"Scanned {total_ports:,} ports in {scan_time:.1f}s, "
-                f"found {len(open_ports)} open, "
-                f"{len(instances)} Airflow instance(s) ({total_time:.1f}s total)"
-            )
+            if instances:
+                console.print(f"Found {len(instances)} Airflow instance(s)")
+            else:
+                console.print("No Airflow instances found")
 
         return instances

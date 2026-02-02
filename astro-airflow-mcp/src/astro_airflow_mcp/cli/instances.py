@@ -97,7 +97,7 @@ def use_instance(
     try:
         manager = ConfigManager()
         manager.use_instance(name)
-        console.print(f"Switched to instance [bold]{name}[/bold]")
+        console.print(f"Switched to instance [bold]{name}[/bold]", highlight=False)
     except (ConfigError, ValueError) as e:
         output_error(str(e))
 
