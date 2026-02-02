@@ -150,3 +150,5 @@ Before making changes:
 - Trace where data comes from: **tracing-upstream-lineage** skill
 - Check downstream freshness: **checking-freshness** skill
 - Debug any broken DAGs: **debugging-dags** skill
+- Add manual lineage annotations: **annotating-task-lineage** skill
+- Build custom lineage extractors: **creating-openlineage-extractors** skill

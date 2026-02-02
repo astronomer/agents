@@ -125,3 +125,5 @@ Describe how data flows and transforms:
 - Check source freshness: **checking-freshness** skill
 - Debug source DAG: **debugging-dags** skill
 - Trace downstream impacts: **tracing-downstream-lineage** skill
+- Add manual lineage annotations: **annotating-task-lineage** skill
+- Build custom lineage extractors: **creating-openlineage-extractors** skill

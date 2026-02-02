@@ -167,6 +167,8 @@ The `data` plugin bundles an MCP server and skills into a single installable pac
 |-------|-------------|
 | [tracing-downstream-lineage](./skills/tracing-downstream-lineage/) | Analyze what breaks if you change something |
 | [tracing-upstream-lineage](./skills/tracing-upstream-lineage/) | Trace where data comes from |
+| [annotating-task-lineage](./skills/annotating-task-lineage/) | Add manual lineage to tasks using inlets/outlets |
+| [creating-openlineage-extractors](./skills/creating-openlineage-extractors/) | Build custom OpenLineage extractors for operators |
 
 #### DAG Development
 
