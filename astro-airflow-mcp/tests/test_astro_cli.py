@@ -112,20 +112,15 @@ class TestAstroCliAuthentication:
     @pytest.mark.parametrize(
         "error_message",
         [
-            "please login to continue",
-            "Not authenticated",
-            "have you authenticated to Astro",
+            # Actual error from `astro` CLI when not logged in
+            "no context set, have you authenticated to Astro? Run astro login and try again",
+            # Partial matches
             "no context set",
-            "Run astro login and try again",
-            "Unauthorized access",
-            "authentication required",
-            "login required",
-            "token expired",
-            "invalid token",
+            "Run astro login",
         ],
     )
     def test_run_command_detects_auth_errors(self, mock_cli, error_message):
-        """Test _run_command detects various auth error messages."""
+        """Test _run_command detects auth error from astro CLI."""
         mock_result = MagicMock()
         mock_result.returncode = 1
         mock_result.stdout = ""

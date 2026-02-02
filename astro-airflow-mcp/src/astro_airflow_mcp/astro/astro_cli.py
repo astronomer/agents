@@ -64,18 +64,11 @@ class AstroCli:
     """Wrapper for the Astro CLI."""
 
     # Keywords in stderr that indicate authentication issues
-    AUTH_ERROR_KEYWORDS = [
-        "please login",
-        "not authenticated",
-        "have you authenticated",
+    # These match the actual error message from `astro` CLI when not logged in
+    AUTH_ERROR_KEYWORDS = frozenset([
         "no context set",
-        "unauthorized",
-        "authentication required",
-        "login required",
-        "token expired",
-        "invalid token",
         "astro login",
-    ]
+    ])
 
     TOKEN_NAME = "af-cli-discover"  # nosec B105 - not a password, just a token name
 
@@ -124,13 +117,33 @@ class AstroCli:
         # Check for authentication errors in stderr
         if check_auth and result.returncode != 0:
             stderr_lower = result.stderr.lower()
-            for keyword in self.AUTH_ERROR_KEYWORDS:
-                if keyword in stderr_lower:
-                    raise AstroCliNotAuthenticatedError(
-                        "Not authenticated with Astro. Run 'astro login' first."
-                    )
+            if any(keyword in stderr_lower for keyword in self.AUTH_ERROR_KEYWORDS):
+                raise AstroCliNotAuthenticatedError(
+                    "Not authenticated with Astro. Run 'astro login' first."
+                )
 
         return result
+
+    def _run_list_command(
+        self, args: list[str], entity: str, timeout: int = 30
+    ) -> list[dict]:
+        """Run a list command and parse table output.
+
+        Args:
+            args: Command arguments (without 'astro' prefix)
+            entity: Name of the entity being listed (for error messages)
+            timeout: Timeout in seconds
+
+        Returns:
+            List of dicts with column headers as keys
+
+        Raises:
+            AstroCliError: If the command fails
+        """
+        result = self._run_command(args, timeout=timeout)
+        if result.returncode != 0:
+            raise AstroCliError(f"Failed to list {entity}: {result.stderr}")
+        return self._parse_table_output(result.stdout)
 
     def _parse_table_output(self, output: str) -> list[dict]:
         """Parse table output from astro CLI commands.
@@ -219,12 +232,7 @@ class AstroCli:
         Returns:
             List of workspace dictionaries with 'name' and 'id' keys
         """
-        result = self._run_command(["workspace", "list"], timeout=30)
-
-        if result.returncode != 0:
-            raise AstroCliError(f"Failed to list workspaces: {result.stderr}")
-
-        return self._parse_table_output(result.stdout)
+        return self._run_list_command(["workspace", "list"], "workspaces")
 
     def list_deployments(self, all_workspaces: bool = False) -> list[dict]:
         """List deployments.
@@ -239,12 +247,7 @@ class AstroCli:
         if all_workspaces:
             args.append("--all")
 
-        result = self._run_command(args, timeout=60)
-
-        if result.returncode != 0:
-            raise AstroCliError(f"Failed to list deployments: {result.stderr}")
-
-        return self._parse_table_output(result.stdout)
+        return self._run_list_command(args, "deployments", timeout=60)
 
     def inspect_deployment(
         self, deployment_id: str, workspace_id: str | None = None
@@ -283,13 +286,7 @@ class AstroCli:
             List of token dictionaries with id, name, role, etc.
         """
         args = ["deployment", "token", "list", "--deployment-id", deployment_id]
-
-        result = self._run_command(args, timeout=30)
-
-        if result.returncode != 0:
-            raise AstroCliError(f"Failed to list deployment tokens: {result.stderr}")
-
-        return self._parse_table_output(result.stdout)
+        return self._run_list_command(args, "deployment tokens")
 
     def token_exists(self, deployment_id: str, token_name: str) -> bool:
         """Check if a token with the given name exists for a deployment.
@@ -342,24 +339,25 @@ class AstroCli:
         if result.returncode != 0:
             raise AstroCliError(f"Failed to create deployment token: {result.stderr}")
 
-        # Token is printed to stdout - extract it
-        # Output format may vary, look for JWT-like token
+        # Extract the token from stdout. The CLI output format varies by version,
+        # so we try multiple extraction strategies in order of specificity.
         output = result.stdout.strip()
 
-        # Look for a JWT token pattern (base64.base64.base64)
+        # Strategy 1: Look for a JWT token (header.payload.signature format)
+        # JWTs from Astro start with "eyJ" (base64 for '{"')
         jwt_pattern = re.compile(r"eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+")
         match = jwt_pattern.search(output)
         if match:
             return match.group(0)
 
-        # If no JWT found, try to find any long alphanumeric string that looks like a token
-        # Tokens are typically 100+ characters
+        # Strategy 2: Look for any long alphanumeric string (100+ chars)
+        # Some token formats may not be JWTs
         token_pattern = re.compile(r"[A-Za-z0-9_-]{100,}")
         match = token_pattern.search(output)
         if match:
             return match.group(0)
 
-        # Last resort - return the entire output if it looks like a token
+        # Strategy 3: If the output is a single line of reasonable length, assume it's the token
         if len(output) > 50 and "\n" not in output:
             return output
 
