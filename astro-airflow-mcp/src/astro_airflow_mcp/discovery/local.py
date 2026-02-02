@@ -153,7 +153,7 @@ class LocalDiscoveryBackend:
 
                 airflow_info = self._detect_airflow(url, timeout)
                 if airflow_info:
-                    instance_name = f"local-{port}"
+                    instance_name = f"localhost:{port}"
                     instances.append(
                         DiscoveredInstance(
                             name=instance_name,
@@ -373,7 +373,7 @@ class LocalDiscoveryBackend:
                 url = f"http://{host}:{port}"
                 airflow_info = self._detect_airflow(url, client=client)
                 if airflow_info:
-                    instance_name = f"local-{port}"
+                    instance_name = f"localhost:{port}"
                     instances.append(
                         DiscoveredInstance(
                             name=instance_name,

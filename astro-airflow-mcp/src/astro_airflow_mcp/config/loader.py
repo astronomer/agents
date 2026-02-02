@@ -61,10 +61,10 @@ class ConfigManager:
         self.config_path.parent.mkdir(parents=True, exist_ok=True)
 
     def _create_default_config(self) -> AirflowCliConfig:
-        """Create default config with localhost instance."""
+        """Create default config with localhost:8080 instance."""
         config = AirflowCliConfig()
-        config.add_instance("localhost", "http://localhost:8080")
-        config.use_instance("localhost")
+        config.add_instance("localhost:8080", "http://localhost:8080", source="local")
+        config.use_instance("localhost:8080")
         return config
 
     def load(self) -> AirflowCliConfig:

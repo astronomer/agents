@@ -13,6 +13,7 @@ from astro_airflow_mcp.config import ConfigError, ConfigManager
 from astro_airflow_mcp.discovery import (
     DiscoveredInstance,
     DiscoveryError,
+    DiscoveryRegistry,
     get_default_registry,
 )
 from astro_airflow_mcp.discovery.astro import (
@@ -170,6 +171,56 @@ def delete_instance(
         output_error(str(e))
 
 
+@app.command("reset")
+def reset_instances(
+    force: Annotated[
+        bool,
+        typer.Option("--force", "-f", help="Skip confirmation prompt"),
+    ] = False,
+) -> None:
+    """Reset configuration to default (localhost only).
+
+    Removes all configured instances and restores the default
+    localhost instance at http://localhost:8080.
+    """
+    try:
+        manager = ConfigManager()
+        config = manager.load()
+
+        if not config.instances:
+            console.print("No instances to clean.", style="dim")
+            return
+
+        # Show what will be removed
+        non_default = [i for i in config.instances if i.name != "localhost:8080"]
+        if not non_default and len(config.instances) == 1:
+            console.print("Already at default configuration.", style="dim")
+            return
+
+        console.print("This will remove the following instances:")
+        for inst in config.instances:
+            if inst.name == "localhost:8080":
+                console.print(f"  [dim]{inst.name}[/dim] (will be reset)")
+            else:
+                console.print(f"  [red]{inst.name}[/red]")
+
+        if not force:
+            confirm = typer.confirm("\nProceed?")
+            if not confirm:
+                console.print("Cancelled.", style="dim")
+                return
+
+        # Reset to default
+        default_config = manager._create_default_config()
+        manager.save(default_config)
+        console.print("\nReset to default configuration.")
+        console.print("  Instance: [bold]localhost:8080[/bold]")
+        console.print("  URL: http://localhost:8080")
+
+    except ConfigError as e:
+        output_error(str(e))
+
+
 def _format_status(status: str | None) -> str:
     """Format status with color."""
     if not status:
@@ -206,138 +257,20 @@ def _determine_action(
     return "add"
 
 
-@app.command("discover")
-def discover_instances(
-    all_workspaces: Annotated[
-        bool,
-        typer.Option(
-            "--all-workspaces", "-a", help="Discover from all accessible Astro workspaces"
-        ),
-    ] = False,
-    dry_run: Annotated[
-        bool,
-        typer.Option("--dry-run", "-n", help="Preview without making changes"),
-    ] = False,
-    overwrite: Annotated[
-        bool,
-        typer.Option("--overwrite", "-o", help="Overwrite existing instances without prompting"),
-    ] = False,
-    backend: Annotated[
-        list[str] | None,
-        typer.Option("--backend", "-b", help="Backend(s) to use: astro, local (default: all)"),
-    ] = None,
-    scan: Annotated[
-        bool,
-        typer.Option("--scan", "-s", help="Deep scan ports 1024-65535 (local backend only)"),
-    ] = False,
+def _display_and_add_instances(
+    all_instances: list[tuple[DiscoveredInstance, str]],
+    manager: ConfigManager,
+    registry: DiscoveryRegistry,
+    dry_run: bool,
 ) -> None:
-    """Auto-discover Airflow instances and add them to the configuration.
+    """Display discovered instances and add them to config.
 
-    Uses multiple discovery backends:
-    - astro: Discovers Astro deployments via the Astro CLI
-    - local: Scans local ports for running Airflow instances
-
-    Examples:
-        af instance discover                    # Discover from all backends
-        af instance discover --all-workspaces   # Include all Astro workspaces
-        af instance discover --backend astro    # Only use Astro backend
-        af instance discover --backend local    # Only scan local ports
-        af instance discover --scan             # Deep scan all ports 1024-65535
-        af instance discover --dry-run          # Preview without changes
+    Args:
+        all_instances: List of (instance, action) tuples
+        manager: Config manager for adding instances
+        registry: Discovery registry for getting backends
+        dry_run: If True, preview without making changes
     """
-    # Get the registry and available backends
-    registry = get_default_registry()
-
-    # Show available backends
-    available = registry.get_available_backends()
-    if not available:
-        output_error("No discovery backends available.")
-        return
-
-    # Validate requested backends
-    if backend:
-        for b in backend:
-            if registry.get_backend(b) is None:
-                output_error(f"Unknown backend: {b}")
-                return
-        backends_to_use = backend
-    else:
-        backends_to_use = [b.name for b in available]
-
-    console.print(f"Discovery backends: {', '.join(backends_to_use)}\n")
-
-    # Show Astro context if using astro backend
-    if "astro" in backends_to_use:
-        astro_backend = registry.get_backend("astro")
-        if isinstance(astro_backend, AstroDiscoveryBackend):
-            context = astro_backend.get_context()
-            if context:
-                console.print(f"Astro context: [bold]{context}[/bold]")
-            scope = "all workspaces" if all_workspaces else "current workspace"
-            console.print(f"Astro scope: {scope}\n")
-
-    # Load existing config
-    try:
-        manager = ConfigManager()
-        config = manager.load()
-        existing_names = {inst.name for inst in config.instances}
-    except ConfigError as e:
-        output_error(f"Failed to load config: {e}")
-        return
-
-    # Prepare options for discovery
-    discovery_options = {
-        "all_workspaces": all_workspaces,
-        "create_tokens": False,  # Don't create tokens during discovery phase
-    }
-
-    # Run discovery
-    console.print("Discovering instances...\n")
-    all_instances: list[tuple[DiscoveredInstance, str]] = []  # (instance, action)
-
-    for backend_name in backends_to_use:
-        try:
-            backend_obj = registry.get_backend(backend_name)
-            if backend_obj is None:
-                continue
-
-            if not backend_obj.is_available():
-                if backend_name == "astro":
-                    console.print(
-                        f"[yellow]Skipping {backend_name}:[/yellow] Astro CLI not installed"
-                    )
-                else:
-                    console.print(f"[yellow]Skipping {backend_name}:[/yellow] Not available")
-                continue
-
-            # Use deep port scan for local backend if requested
-            if backend_name == "local" and scan:
-                from astro_airflow_mcp.discovery.local import LocalDiscoveryBackend
-
-                if isinstance(backend_obj, LocalDiscoveryBackend):
-                    instances = backend_obj.discover_wide(
-                        host="localhost",
-                        start_port=1024,
-                        end_port=65535,
-                        verbose=True,
-                    )
-                else:
-                    instances = backend_obj.discover(**discovery_options)
-            else:
-                instances = backend_obj.discover(**discovery_options)
-
-            for inst in instances:
-                action = _determine_action(inst, existing_names, overwrite)
-                all_instances.append((inst, action))
-
-        except AstroNotAuthenticatedError:
-            console.print(
-                f"[yellow]Skipping {backend_name}:[/yellow] Not authenticated. "
-                "Run 'astro login' first."
-            )
-        except DiscoveryError as e:
-            console.print(f"[yellow]Skipping {backend_name}:[/yellow] {e}")
-
     if not all_instances:
         console.print("No instances discovered.", style="dim")
         return
@@ -406,6 +339,213 @@ def discover_instances(
         console.print(f"Successfully added {added_count} instance(s).")
     else:
         console.print("No instances were added.")
+
+
+# Discover subcommands
+discover_app = typer.Typer(help="Auto-discover Airflow instances", no_args_is_help=False)
+app.add_typer(discover_app, name="discover")
+
+
+@discover_app.callback(invoke_without_command=True)
+def discover_all(
+    ctx: typer.Context,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", "-n", help="Preview without making changes"),
+    ] = False,
+    overwrite: Annotated[
+        bool,
+        typer.Option("--overwrite", "-o", help="Overwrite existing instances"),
+    ] = False,
+) -> None:
+    """Discover from all available backends.
+
+    For backend-specific options, use subcommands:
+        af instance discover astro    # Astro-specific options
+        af instance discover local    # Local-specific options
+    """
+    # If a subcommand was invoked, skip the callback logic
+    if ctx.invoked_subcommand is not None:
+        return
+
+    registry = get_default_registry()
+    available = registry.get_available_backends()
+
+    if not available:
+        output_error("No discovery backends available.")
+        return
+
+    backends_to_use = [b.name for b in available]
+    console.print(f"Discovery backends: {', '.join(backends_to_use)}\n")
+
+    # Load existing config
+    try:
+        manager = ConfigManager()
+        config = manager.load()
+        existing_names = {inst.name for inst in config.instances}
+    except ConfigError as e:
+        output_error(f"Failed to load config: {e}")
+        return
+
+    console.print("Discovering instances...\n")
+    all_instances: list[tuple[DiscoveredInstance, str]] = []
+
+    for backend_name in backends_to_use:
+        try:
+            backend_obj = registry.get_backend(backend_name)
+            if backend_obj is None:
+                continue
+
+            if not backend_obj.is_available():
+                if backend_name == "astro":
+                    console.print(
+                        f"[yellow]Skipping {backend_name}:[/yellow] Astro CLI not installed"
+                    )
+                else:
+                    console.print(f"[yellow]Skipping {backend_name}:[/yellow] Not available")
+                continue
+
+            instances = backend_obj.discover(create_tokens=False)
+            for inst in instances:
+                action = _determine_action(inst, existing_names, overwrite)
+                all_instances.append((inst, action))
+
+        except AstroNotAuthenticatedError:
+            console.print(
+                f"[yellow]Skipping {backend_name}:[/yellow] Not authenticated. "
+                "Run 'astro login' first."
+            )
+        except DiscoveryError as e:
+            console.print(f"[yellow]Skipping {backend_name}:[/yellow] {e}")
+
+    _display_and_add_instances(all_instances, manager, registry, dry_run)
+
+
+@discover_app.command("astro")
+def discover_astro(
+    all_workspaces: Annotated[
+        bool,
+        typer.Option("--all-workspaces", "-a", help="Discover from all accessible workspaces"),
+    ] = False,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", "-n", help="Preview without making changes"),
+    ] = False,
+    overwrite: Annotated[
+        bool,
+        typer.Option("--overwrite", "-o", help="Overwrite existing instances"),
+    ] = False,
+) -> None:
+    """Discover Astro deployments via the Astro CLI.
+
+    Examples:
+        af instance discover astro                  # Current workspace only
+        af instance discover astro --all-workspaces # All accessible workspaces
+    """
+    registry = get_default_registry()
+    backend = registry.get_backend("astro")
+
+    if backend is None:
+        output_error("Astro backend not available.")
+        return
+
+    if not backend.is_available():
+        output_error("Astro CLI is not installed. Install with: brew install astro")
+        return
+
+    if not isinstance(backend, AstroDiscoveryBackend):
+        output_error("Invalid backend type.")
+        return
+
+    # Show context info
+    context = backend.get_context()
+    if context:
+        console.print(f"Astro context: [bold]{context}[/bold]")
+    scope = "all workspaces" if all_workspaces else "current workspace"
+    console.print(f"Scope: {scope}\n")
+
+    # Load existing config
+    try:
+        manager = ConfigManager()
+        config = manager.load()
+        existing_names = {inst.name for inst in config.instances}
+    except ConfigError as e:
+        output_error(f"Failed to load config: {e}")
+        return
+
+    console.print("Discovering Astro deployments...\n")
+
+    try:
+        instances = backend.discover(all_workspaces=all_workspaces, create_tokens=False)
+        all_instances = [
+            (inst, _determine_action(inst, existing_names, overwrite)) for inst in instances
+        ]
+    except AstroNotAuthenticatedError:
+        output_error("Not authenticated with Astro. Run 'astro login' first.")
+        return
+    except DiscoveryError as e:
+        output_error(f"Discovery failed: {e}")
+        return
+
+    _display_and_add_instances(all_instances, manager, registry, dry_run)
+
+
+@discover_app.command("local")
+def discover_local(
+    scan: Annotated[
+        bool,
+        typer.Option("--scan", "-s", help="Deep scan all ports 1024-65535"),
+    ] = False,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", "-n", help="Preview without making changes"),
+    ] = False,
+    overwrite: Annotated[
+        bool,
+        typer.Option("--overwrite", "-o", help="Overwrite existing instances"),
+    ] = False,
+) -> None:
+    """Discover local Airflow instances by scanning ports.
+
+    Examples:
+        af instance discover local         # Scan common Airflow ports
+        af instance discover local --scan  # Deep scan all ports 1024-65535
+    """
+    from astro_airflow_mcp.discovery.local import LocalDiscoveryBackend
+
+    registry = get_default_registry()
+    backend = registry.get_backend("local")
+
+    if backend is None or not isinstance(backend, LocalDiscoveryBackend):
+        output_error("Local backend not available.")
+        return
+
+    # Load existing config
+    try:
+        manager = ConfigManager()
+        config = manager.load()
+        existing_names = {inst.name for inst in config.instances}
+    except ConfigError as e:
+        output_error(f"Failed to load config: {e}")
+        return
+
+    if scan:
+        console.print("Deep scanning ports 1024-65535...\n")
+        instances = backend.discover_wide(
+            host="localhost",
+            start_port=1024,
+            end_port=65535,
+            verbose=True,
+        )
+    else:
+        console.print("Scanning common Airflow ports...\n")
+        instances = backend.discover()
+
+    all_instances = [
+        (inst, _determine_action(inst, existing_names, overwrite)) for inst in instances
+    ]
+
+    _display_and_add_instances(all_instances, manager, registry, dry_run)
 
 
 def _create_astro_token(

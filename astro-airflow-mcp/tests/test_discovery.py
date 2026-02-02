@@ -392,7 +392,7 @@ class TestLocalDiscoveryBackend:
             instances = backend.discover(ports=[8080], hosts=["localhost"])
 
         assert len(instances) == 1
-        assert instances[0].name == "local-8080"
+        assert instances[0].name == "localhost:8080"
         assert instances[0].url == "http://localhost:8080"
         assert instances[0].source == "local"
         assert instances[0].auth_token is None

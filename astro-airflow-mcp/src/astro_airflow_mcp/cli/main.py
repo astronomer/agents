@@ -190,6 +190,7 @@ app.add_typer(assets_module.app, name="assets", help="Asset/dataset management c
 app.add_typer(config_module.app, name="config", help="Configuration and system commands")
 app.add_typer(instances.app, name="instance", help="Instance management commands")
 app.add_typer(instances.app, name="instances", hidden=True)  # Alias for "instance"
+app.add_typer(instances.app, name="inst", hidden=True)  # Short alias for "instance"
 
 
 def cli_main() -> None:
