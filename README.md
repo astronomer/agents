@@ -424,6 +424,29 @@ claude plugin uninstall data@astronomer && claude plugin install data@astronomer
 
 Contributions welcome! Please read our [Code of Conduct](./CODE_OF_CONDUCT.md) and [Contributing Guide](./CONTRIBUTING.md) before getting started.
 
+## Roadmap
+
+Skills we're likely to build:
+
+**DAG Operations**
+- CI/CD pipelines for DAG deployment
+- Performance optimization and tuning
+- Monitoring and alerting setup
+- Data quality and validation workflows
+
+**Astronomer Open Source**
+- [Cosmos](https://github.com/astronomer/astronomer-cosmos) - Run dbt projects as Airflow DAGs
+- [DAG Factory](https://github.com/astronomer/dag-factory) - Generate DAGs from YAML
+- Other open source projects we maintain
+
+**Conference Learnings**
+- Reviewing talks from Airflow Summit, Coalesce, Data Council, and other conferences to extract reusable skills and patterns
+
+**Broader Data Practitioner Skills**
+- Churn prediction, data modeling, ML training, and other workflows that span DE/DS/analytics roles
+
+**Don't see a skill you want? [Open an issue](https://github.com/astronomer/agents/issues) or submit a PR!**
+
 ## License
 
 Apache 2.0
