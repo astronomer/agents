@@ -20,6 +20,28 @@ def list_dags(
         int,
         typer.Option("--offset", "-o", help="Offset for pagination"),
     ] = 0,
+    order_by: Annotated[
+        str | None,
+        typer.Option("--order-by", help="Sort field (prefix - for descending, e.g., -dag_id)"),
+    ] = None,
+    tags: Annotated[
+        list[str] | None,
+        typer.Option("--tags", "-t", help="Filter by tags (can specify multiple)"),
+    ] = None,
+    dag_id_pattern: Annotated[
+        str | None,
+        typer.Option("--dag-id-pattern", help="Filter by DAG ID pattern (use % as wildcard)"),
+    ] = None,
+    only_active: Annotated[
+        bool | None,
+        typer.Option(
+            "--only-active/--include-inactive", help="Only active DAGs (default: include all)"
+        ),
+    ] = None,
+    paused: Annotated[
+        bool | None,
+        typer.Option("--paused/--not-paused", help="Filter by paused status"),
+    ] = None,
 ) -> None:
     """List all DAGs in Airflow.
 
@@ -27,8 +49,20 @@ def list_dags(
     description, tags, and owners.
     """
     try:
+        kwargs: dict[str, Any] = {}
+        if order_by:
+            kwargs["order_by"] = order_by
+        if tags:
+            kwargs["tags"] = tags
+        if dag_id_pattern:
+            kwargs["dag_id_pattern"] = dag_id_pattern
+        if only_active is not None:
+            kwargs["only_active"] = only_active
+        if paused is not None:
+            kwargs["paused"] = paused
+
         adapter = get_adapter()
-        data = adapter.list_dags(limit=limit, offset=offset)
+        data = adapter.list_dags(limit=limit, offset=offset, **kwargs)
 
         if "dags" in data:
             result = wrap_list_response(data["dags"], "dags", data)
