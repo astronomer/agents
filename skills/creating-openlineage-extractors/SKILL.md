@@ -7,37 +7,114 @@ description: Create custom OpenLineage extractors for Airflow operators. Use whe
 
 This skill guides you through creating custom OpenLineage extractors to capture lineage from Airflow operators that don't have built-in support.
 
-## When to Use Custom Extractors
+> **Reference:** See the [OpenLineage provider developer guide](https://airflow.apache.org/docs/apache-airflow-providers-openlineage/stable/guides/developer.html) for the latest patterns and list of supported operators/hooks.
+
+## When to Use Each Approach
 
 | Scenario | Approach |
 |----------|----------|
+| Operator you own/maintain | **OpenLineage Methods** (recommended, simplest) |
 | Third-party operator you can't modify | Custom Extractor |
-| Need column-level lineage | Custom Extractor |
-| Complex extraction logic | Custom Extractor |
-| Operator you own/maintain | OpenLineage Methods (simpler) |
-| Simple table-level lineage | Inlets/Outlets (simplest) |
+| Need column-level lineage | OpenLineage Methods or Custom Extractor |
+| Complex extraction logic | OpenLineage Methods or Custom Extractor |
+| Simple table-level lineage | Inlets/Outlets (simplest, but lowest priority) |
+
+> **Important:** Always prefer OpenLineage methods over custom extractors when possible. Extractors are harder to write, easier to diverge from operator behavior after changes, and harder to debug.
 
 ---
 
 ## Two Approaches
 
-### 1. Custom Extractors (for operators you can't modify)
+### 1. OpenLineage Methods (Recommended)
 
-Use when you need lineage from third-party or provider operators.
+Use when you can add methods directly to your custom operator. This is the **go-to solution** for operators you own.
 
-### 2. OpenLineage Methods (for operators you own)
+### 2. Custom Extractors
 
-Use when you can add methods directly to your custom operator.
+Use when you need lineage from third-party or provider operators that you **cannot modify**.
 
 ---
 
-## Approach 1: Custom Extractors
+## Approach 1: OpenLineage Methods (Recommended)
+
+When you own the operator, add OpenLineage methods directly:
+
+```python
+from airflow.models import BaseOperator
+
+
+class MyCustomOperator(BaseOperator):
+    """Custom operator with built-in OpenLineage support."""
+
+    def __init__(self, source_table: str, target_table: str, **kwargs):
+        super().__init__(**kwargs)
+        self.source_table = source_table
+        self.target_table = target_table
+        self._rows_processed = 0  # Set during execution
+
+    def execute(self, context):
+        # Do the actual work
+        self._rows_processed = self._process_data()
+        return self._rows_processed
+
+    def get_openlineage_facets_on_start(self):
+        """Called when task starts. Return known inputs/outputs."""
+        # Import locally to avoid circular imports
+        from openlineage.client.event_v2 import Dataset
+        from airflow.providers.openlineage.extractors import OperatorLineage
+
+        return OperatorLineage(
+            inputs=[Dataset(namespace="postgres://db", name=self.source_table)],
+            outputs=[Dataset(namespace="postgres://db", name=self.target_table)],
+        )
+
+    def get_openlineage_facets_on_complete(self, task_instance):
+        """Called after success. Add runtime metadata."""
+        from openlineage.client.event_v2 import Dataset
+        from openlineage.client.facet_v2 import output_statistics_output_dataset
+        from airflow.providers.openlineage.extractors import OperatorLineage
+
+        return OperatorLineage(
+            inputs=[Dataset(namespace="postgres://db", name=self.source_table)],
+            outputs=[
+                Dataset(
+                    namespace="postgres://db",
+                    name=self.target_table,
+                    facets={
+                        "outputStatistics": output_statistics_output_dataset.OutputStatisticsOutputDatasetFacet(
+                            rowCount=self._rows_processed
+                        )
+                    },
+                )
+            ],
+        )
+
+    def get_openlineage_facets_on_failure(self, task_instance):
+        """Called after failure. Optional - for partial lineage."""
+        return None
+```
+
+### OpenLineage Methods Reference
+
+| Method | When Called | Required |
+|--------|-------------|----------|
+| `get_openlineage_facets_on_start()` | Task enters RUNNING | No |
+| `get_openlineage_facets_on_complete(ti)` | Task succeeds | No |
+| `get_openlineage_facets_on_failure(ti)` | Task fails | No |
+
+> Implement only the methods you need. Unimplemented methods fall through to Hook-Level Lineage or inlets/outlets.
+
+---
+
+## Approach 2: Custom Extractors
+
+Use this approach only when you **cannot modify** the operator (e.g., third-party or provider operators).
 
 ### Basic Structure
 
 ```python
 from airflow.providers.openlineage.extractors.base import BaseExtractor, OperatorLineage
-from airflow.providers.common.compat.openlineage.facet import Dataset
+from openlineage.client.event_v2 import Dataset
 
 
 class MyOperatorExtractor(BaseExtractor):
@@ -80,12 +157,13 @@ class MyOperatorExtractor(BaseExtractor):
 
 ```python
 from airflow.providers.openlineage.extractors.base import OperatorLineage
-from airflow.providers.common.compat.openlineage.facet import Dataset, SQLJobFacet
+from openlineage.client.event_v2 import Dataset
+from openlineage.client.facet_v2 import sql_job
 
 lineage = OperatorLineage(
     inputs=[Dataset(namespace="...", name="...")],      # Input datasets
     outputs=[Dataset(namespace="...", name="...")],     # Output datasets
-    run_facets={"sql": SQLJobFacet(query="SELECT...")},  # Run metadata
+    run_facets={"sql": sql_job.SQLJobFacet(query="SELECT...")},  # Run metadata
     job_facets={},                                      # Job metadata
 )
 ```
@@ -117,83 +195,14 @@ AIRFLOW__OPENLINEAGE__EXTRACTORS='mypackage.extractors.MyOperatorExtractor;mypac
 
 ---
 
-## Approach 2: OpenLineage Methods
-
-When you own the operator, add OpenLineage methods directly:
-
-```python
-from airflow.models import BaseOperator
-
-
-class MyCustomOperator(BaseOperator):
-    """Custom operator with built-in OpenLineage support."""
-
-    def __init__(self, source_table: str, target_table: str, **kwargs):
-        super().__init__(**kwargs)
-        self.source_table = source_table
-        self.target_table = target_table
-        self._rows_processed = 0  # Set during execution
-
-    def execute(self, context):
-        # Do the actual work
-        self._rows_processed = self._process_data()
-        return self._rows_processed
-
-    def get_openlineage_facets_on_start(self):
-        """Called when task starts. Return known inputs/outputs."""
-        # Import locally to avoid circular imports!
-        from airflow.providers.common.compat.openlineage.facet import Dataset
-        from airflow.providers.openlineage.extractors.base import OperatorLineage
-
-        return OperatorLineage(
-            inputs=[Dataset(namespace="postgres://db", name=self.source_table)],
-            outputs=[Dataset(namespace="postgres://db", name=self.target_table)],
-        )
-
-    def get_openlineage_facets_on_complete(self, task_instance):
-        """Called after success. Add runtime metadata."""
-        from airflow.providers.common.compat.openlineage.facet import Dataset, OutputStatisticsOutputDatasetFacet
-        from airflow.providers.openlineage.extractors.base import OperatorLineage
-
-        return OperatorLineage(
-            inputs=[Dataset(namespace="postgres://db", name=self.source_table)],
-            outputs=[
-                Dataset(
-                    namespace="postgres://db",
-                    name=self.target_table,
-                    facets={
-                        "outputStatistics": OutputStatisticsOutputDatasetFacet(
-                            rowCount=self._rows_processed
-                        )
-                    },
-                )
-            ],
-        )
-
-    def get_openlineage_facets_on_failure(self, task_instance):
-        """Called after failure. Optional - for partial lineage."""
-        return None
-```
-
-### OpenLineage Methods Reference
-
-| Method | When Called | Required |
-|--------|-------------|----------|
-| `get_openlineage_facets_on_start()` | Task enters RUNNING | No |
-| `get_openlineage_facets_on_complete(ti)` | Task succeeds | No |
-| `get_openlineage_facets_on_failure(ti)` | Task fails | No |
-
-> Implement only the methods you need. Unimplemented methods fall through to extractors or inlets/outlets.
-
----
-
 ## Common Patterns
 
 ### SQL Operator Extractor
 
 ```python
 from airflow.providers.openlineage.extractors.base import BaseExtractor, OperatorLineage
-from airflow.providers.common.compat.openlineage.facet import Dataset, SQLJobFacet
+from openlineage.client.event_v2 import Dataset
+from openlineage.client.facet_v2 import sql_job
 
 
 class MySqlOperatorExtractor(BaseExtractor):
@@ -215,7 +224,7 @@ class MySqlOperatorExtractor(BaseExtractor):
             inputs=[Dataset(namespace=namespace, name=t) for t in inputs],
             outputs=[Dataset(namespace=namespace, name=t) for t in outputs],
             job_facets={
-                "sql": SQLJobFacet(query=sql)
+                "sql": sql_job.SQLJobFacet(query=sql)
             },
         )
 
@@ -232,7 +241,7 @@ class MySqlOperatorExtractor(BaseExtractor):
 
 ```python
 from airflow.providers.openlineage.extractors.base import BaseExtractor, OperatorLineage
-from airflow.providers.common.compat.openlineage.facet import Dataset
+from openlineage.client.event_v2 import Dataset
 
 
 class S3ToSnowflakeExtractor(BaseExtractor):
@@ -265,6 +274,9 @@ class S3ToSnowflakeExtractor(BaseExtractor):
 ### Dynamic Lineage from Execution
 
 ```python
+from openlineage.client.event_v2 import Dataset
+
+
 class DynamicOutputExtractor(BaseExtractor):
     @classmethod
     def get_operator_classnames(cls) -> list[str]:
@@ -296,7 +308,7 @@ class DynamicOutputExtractor(BaseExtractor):
 **Problem:** Importing Airflow modules at the top level causes circular imports.
 
 ```python
-# ❌ BAD - causes circular import
+# ❌ BAD - can cause circular import issues
 from airflow.models import TaskInstance
 from openlineage.client.event_v2 import Dataset
 
@@ -375,7 +387,8 @@ OpenLineage checks for lineage in this order:
 
 1. **Custom Extractors** (highest priority)
 2. **OpenLineage Methods** on operator
-3. **Inlets/Outlets** (lowest priority)
+3. **Hook-Level Lineage** (from `HookLineageCollector`)
+4. **Inlets/Outlets** (lowest priority)
 
 If a custom extractor exists, it overrides built-in extraction and inlets/outlets.
 
