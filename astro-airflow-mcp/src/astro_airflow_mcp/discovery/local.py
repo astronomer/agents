@@ -432,9 +432,7 @@ class LocalDiscoveryBackend:
 
         # Run port scan (with optional spinner)
         if verbose:
-            with console.status(
-                f"[bold]Scanning for Airflow on {host}...", spinner="dots"
-            ):
+            with console.status(f"[bold]Scanning for Airflow on {host}...", spinner="dots"):
                 open_ports = run_port_scan()
                 instances = self._check_ports_for_airflow(host, open_ports)
         else:

@@ -39,13 +39,13 @@ repos:
           - types-requests
           - types-PyYAML
         args: [--ignore-missing-imports, --no-strict-optional]
-        exclude: ^tests/
+        exclude: ^(tests/|skills/)
 
   # Security checks
   - repo: https://github.com/PyCQA/bandit
     rev: 1.9.3
     hooks:
       - id: bandit
-        args: ['-c', 'pyproject.toml']
+        args: ['-c', 'astro-airflow-mcp/pyproject.toml']
         additional_dependencies: ['bandit[toml]']
-        exclude: ^tests/
+        exclude: ^(tests/|skills/)

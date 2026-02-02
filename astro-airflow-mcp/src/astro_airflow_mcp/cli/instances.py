@@ -210,7 +210,9 @@ def _determine_action(
 def discover_instances(
     all_workspaces: Annotated[
         bool,
-        typer.Option("--all-workspaces", "-a", help="Discover from all accessible Astro workspaces"),
+        typer.Option(
+            "--all-workspaces", "-a", help="Discover from all accessible Astro workspaces"
+        ),
     ] = False,
     dry_run: Annotated[
         bool,
