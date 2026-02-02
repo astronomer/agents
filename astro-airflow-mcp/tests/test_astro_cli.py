@@ -200,6 +200,30 @@ class TestTableParsing:
         result = mock_cli._parse_table_output(output)
         assert result == []
 
+    def test_parse_table_output_data_wider_than_header(self, mock_cli):
+        """Test that data wider than its header doesn't get truncated."""
+        # ID column is short but data is long
+        output = """ NAME     ID
+ test     very-long-deployment-identifier-123"""
+
+        result = mock_cli._parse_table_output(output)
+        assert len(result) == 1
+        assert result[0]["name"] == "test"
+        assert result[0]["id"] == "very-long-deployment-identifier-123"
+
+    def test_parse_table_output_short_lines(self, mock_cli):
+        """Test handling lines shorter than header columns."""
+        output = """ NAME     NAMESPACE     STATUS
+ test     ns-1
+ test2    ns-2          HEALTHY"""
+
+        result = mock_cli._parse_table_output(output)
+        assert len(result) == 2
+        assert result[0]["name"] == "test"
+        assert result[0]["namespace"] == "ns-1"
+        assert result[0]["status"] == ""
+        assert result[1]["status"] == "HEALTHY"
+
 
 class TestAstroCliContext:
     """Tests for context management."""

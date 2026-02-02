@@ -65,10 +65,12 @@ class AstroCli:
 
     # Keywords in stderr that indicate authentication issues
     # These match the actual error message from `astro` CLI when not logged in
-    AUTH_ERROR_KEYWORDS = frozenset([
-        "no context set",
-        "astro login",
-    ])
+    AUTH_ERROR_KEYWORDS = frozenset(
+        [
+            "no context set",
+            "astro login",
+        ]
+    )
 
     TOKEN_NAME = "af-cli-discover"  # nosec B105 - not a password, just a token name
 
@@ -124,9 +126,7 @@ class AstroCli:
 
         return result
 
-    def _run_list_command(
-        self, args: list[str], entity: str, timeout: int = 30
-    ) -> list[dict]:
+    def _run_list_command(self, args: list[str], entity: str, timeout: int = 30) -> list[dict]:
         """Run a list command and parse table output.
 
         Args:
@@ -145,12 +145,39 @@ class AstroCli:
             raise AstroCliError(f"Failed to list {entity}: {result.stderr}")
         return self._parse_table_output(result.stdout)
 
+    def _find_column_boundaries(self, header_line: str) -> list[int]:
+        """Find column start positions by detecting 2+ space separators.
+
+        Returns:
+            List of column start positions (character indices)
+        """
+        boundaries: list[int] = []
+        # Find the start of each column (non-space after 2+ spaces, or start of line)
+        in_space_run = True  # Treat start of line as after spaces
+        space_count = 0
+
+        for i, char in enumerate(header_line):
+            if char == " ":
+                space_count += 1
+                in_space_run = True
+            else:
+                # Non-space character
+                if in_space_run and (space_count >= 2 or i == 0 or not boundaries):
+                    boundaries.append(i)
+                in_space_run = False
+                space_count = 0
+
+        return boundaries
+
     def _parse_table_output(self, output: str) -> list[dict]:
         """Parse table output from astro CLI commands.
 
         The CLI outputs space-aligned tables like:
          NAME     NAMESPACE     DEPLOYMENT ID     ...
          test     foo-1234      abc123            ...
+
+        Uses column boundaries detected by 2+ space separators.
+        This handles multi-word headers and varying column widths.
 
         Args:
             output: Raw stdout from CLI command
@@ -162,22 +189,24 @@ class AstroCli:
         if len(lines) < 2:
             return []
 
-        # First line is headers - find column positions by looking at where headers start
         header_line = lines[0]
+        boundaries = self._find_column_boundaries(header_line)
 
-        # Find all column headers and their positions
-        # Headers are words/phrases separated by 2+ spaces
+        if not boundaries:
+            return []
+
+        # Extract header names using boundaries
         headers: list[tuple[str, int]] = []
-        col_pattern = re.compile(r"(\S+(?:\s\S+)*)")
-
-        for match in col_pattern.finditer(header_line):
-            header_name = match.group(1).strip().lower().replace(" ", "_")
-            headers.append((header_name, match.start()))
+        for i, start in enumerate(boundaries):
+            end = boundaries[i + 1] if i + 1 < len(boundaries) else len(header_line)
+            header_name = header_line[start:end].strip().lower().replace(" ", "_")
+            if header_name:
+                headers.append((header_name, start))
 
         if not headers:
             return []
 
-        # Parse data rows
+        # Parse data rows using same boundaries
         results = []
         for line in lines[1:]:
             if not line.strip():
@@ -187,7 +216,8 @@ class AstroCli:
             for i, (header_name, start_pos) in enumerate(headers):
                 # End position is start of next column or end of line
                 end_pos = headers[i + 1][1] if i + 1 < len(headers) else len(line)
-                value = line[start_pos:end_pos].strip()
+                # Handle lines shorter than expected
+                value = line[start_pos:end_pos].strip() if start_pos < len(line) else ""
                 row[header_name] = value
 
             if any(row.values()):  # Skip empty rows
