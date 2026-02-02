@@ -1,0 +1,510 @@
+#!/usr/bin/env python3
+"""Fair Benchmark: Warehouse SQL vs Observe Semantic Search.
+
+This benchmark tests scenarios that are fair to both approaches:
+1. Uses prompts that don't assume SQL-specific concepts
+2. Tests use cases where both approaches can reasonably compete
+3. Measures speed, turns, cost (quality validation is separate)
+
+Key insight: These approaches are complementary, not competitive:
+- Warehouse: Best for precise schema queries, column search, data analysis
+- Observe: Best for cross-warehouse discovery, semantic search, metadata lookup
+
+Usage:
+    python fair_benchmark.py --org-id <ORG_ID>
+"""
+
+import argparse
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+
+@dataclass
+class BenchmarkResult:
+    """Results from a single benchmark run."""
+    approach: str
+    scenario: str
+    prompt: str
+    duration_ms: float
+    num_turns: int
+    total_cost_usd: float
+    result_text: str
+    success: bool
+    error: str | None = None
+
+
+@dataclass
+class Scenario:
+    """Benchmark scenario definition."""
+    name: str
+    prompt: str  # Same prompt for both approaches
+    description: str
+    expected_behavior: str  # What we expect each approach to do
+
+
+# Scenarios with identical prompts - let the skill determine the approach
+SCENARIOS = [
+    Scenario(
+        name="find_tables_by_keyword",
+        prompt="Find all tables with 'customer' in the name. List the table names.",
+        description="Keyword search for tables",
+        expected_behavior="Warehouse uses SQL INFORMATION_SCHEMA, Observe uses catalog search.",
+    ),
+    Scenario(
+        name="list_tables_simple",
+        prompt="List 20 tables from the database.",
+        description="Simple table listing",
+        expected_behavior="Both return ~20 tables via their respective methods.",
+    ),
+    Scenario(
+        name="find_schemas",
+        prompt="What schemas exist in the database? List them.",
+        description="Schema discovery",
+        expected_behavior="Warehouse queries INFORMATION_SCHEMA.SCHEMATA, Observe searches catalog.",
+    ),
+    Scenario(
+        name="table_count",
+        prompt="How many tables are in the database?",
+        description="Count tables",
+        expected_behavior="Both should return a count via their respective methods.",
+    ),
+    Scenario(
+        name="find_tables_with_column",
+        prompt="Find tables that have a column named 'email'. List the table names.",
+        description="Column-based table search",
+        expected_behavior="Warehouse queries INFORMATION_SCHEMA.COLUMNS, Observe may struggle (no column indexing).",
+    ),
+]
+
+
+def run_warehouse_scenario(scenario: Scenario, timeout: int = 120) -> BenchmarkResult:
+    """Run scenario using warehouse SQL approach (NO Observe MCP)."""
+    agents_root = Path(__file__).parent.parent
+
+    # Create temp plugin config WITHOUT observe MCP (SQL-only)
+    temp_dir = Path(tempfile.mkdtemp(prefix="warehouse_benchmark_"))
+    plugin_dir = temp_dir / ".claude-plugin"
+    plugin_dir.mkdir(parents=True)
+
+    # Copy skills directory
+    skills_src = agents_root / "skills"
+    skills_dst = temp_dir / "skills"
+    shutil.copytree(skills_src, skills_dst)
+
+    config = {
+        "name": "astronomer",
+        "owner": {"name": "Benchmark", "email": "benchmark@test.io"},
+        "plugins": [{
+            "name": "data",
+            "source": str(temp_dir),
+            "strict": False,
+            "description": "Warehouse SQL benchmark (no Observe)",
+            "version": "0.1.0",
+            "mcpServers": {
+                # Only airflow MCP - NO observe MCP
+                "airflow": {
+                    "command": "uvx",
+                    "args": ["astro-airflow-mcp@0.2.3", "--transport", "stdio", "--airflow-project-dir", "${PWD}"]
+                }
+            }
+        }]
+    }
+
+    config_path = plugin_dir / "marketplace.json"
+    with open(config_path, 'w') as f:
+        json.dump(config, f, indent=2)
+
+    prompt = f"""/data:analyzing-data
+
+{scenario.prompt}"""
+
+    cmd = [
+        'claude',
+        '--print',
+        '--model', 'haiku',
+        '--output-format', 'json',
+        '--plugin-dir', str(temp_dir),
+        '--no-session-persistence',
+        '--permission-mode', 'bypassPermissions',
+    ]
+
+    # Use isolated config dir to prevent loading global plugins
+    config_dir = temp_dir / '.claude-config'
+    config_dir.mkdir(exist_ok=True)
+    env = {**os.environ, 'CLAUDE_CONFIG_DIR': str(config_dir)}
+
+    try:
+        start = time.time()
+        result = subprocess.run(
+            cmd,
+            input=prompt,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env=env,
+        )
+        elapsed_ms = (time.time() - start) * 1000
+
+        if result.returncode != 0:
+            return BenchmarkResult(
+                approach="warehouse",
+                scenario=scenario.name,
+                prompt=scenario.prompt,
+                duration_ms=elapsed_ms,
+                num_turns=0,
+                total_cost_usd=0,
+                result_text="",
+                success=False,
+                error=f"Claude failed: {result.stderr[:200]}",
+            )
+
+        output = json.loads(result.stdout)
+
+        return BenchmarkResult(
+            approach="warehouse",
+            scenario=scenario.name,
+            prompt=scenario.prompt,
+            duration_ms=output.get('duration_ms', elapsed_ms),
+            num_turns=output.get('num_turns', 0),
+            total_cost_usd=output.get('total_cost_usd', 0),
+            result_text=output.get('result', ''),
+            success=not output.get('is_error', False),
+        )
+
+    except subprocess.TimeoutExpired:
+        return BenchmarkResult(
+            approach="warehouse",
+            scenario=scenario.name,
+            prompt=scenario.prompt,
+            duration_ms=timeout * 1000,
+            num_turns=0,
+            total_cost_usd=0,
+            result_text="",
+            success=False,
+            error=f"Timeout after {timeout}s",
+        )
+    except Exception as e:
+        return BenchmarkResult(
+            approach="warehouse",
+            scenario=scenario.name,
+            prompt=scenario.prompt,
+            duration_ms=0,
+            num_turns=0,
+            total_cost_usd=0,
+            result_text="",
+            success=False,
+            error=str(e),
+        )
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def run_observe_scenario(scenario: Scenario, org_id: str, timeout: int = 120) -> BenchmarkResult:
+    """Run scenario using Observe semantic search approach."""
+    agents_root = Path(__file__).parent.parent
+    observe_path = agents_root / "astro-observe-mcp"
+
+    # Create temp plugin config
+    temp_dir = Path(tempfile.mkdtemp(prefix="observe_benchmark_"))
+    plugin_dir = temp_dir / ".claude-plugin"
+    plugin_dir.mkdir(parents=True)
+
+    config = {
+        "name": "observe-benchmark",
+        "owner": {"name": "Benchmark", "email": "benchmark@test.io"},
+        "plugins": [{
+            "name": "catalog",
+            "source": str(agents_root),
+            "strict": False,
+            "description": "Catalog-based asset discovery",
+            "version": "0.1.0",
+            "mcpServers": {
+                "observe": {
+                    "command": "uv",
+                    "args": ["--directory", str(observe_path), "run", "astro-observe-mcp"],
+                    "env": {"ASTRO_ORGANIZATION_ID": org_id}
+                }
+            }
+        }]
+    }
+
+    config_path = plugin_dir / "marketplace.json"
+    with open(config_path, 'w') as f:
+        json.dump(config, f, indent=2)
+
+    prompt = f"""/catalog:analyzing-data-observe
+
+{scenario.prompt}"""
+
+    cmd = [
+        'claude',
+        '--print',
+        '--model', 'haiku',
+        '--output-format', 'json',
+        '--plugin-dir', str(temp_dir),
+        '--no-session-persistence',
+        '--permission-mode', 'bypassPermissions',
+    ]
+
+    # Use isolated config dir to prevent loading global plugins
+    config_dir = temp_dir / '.claude-config'
+    config_dir.mkdir(exist_ok=True)
+    env = {**os.environ, 'CLAUDE_CONFIG_DIR': str(config_dir)}
+
+    try:
+        start = time.time()
+        result = subprocess.run(
+            cmd,
+            input=prompt,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env=env,
+        )
+        elapsed_ms = (time.time() - start) * 1000
+
+        if result.returncode != 0:
+            return BenchmarkResult(
+                approach="observe",
+                scenario=scenario.name,
+                prompt=scenario.prompt,
+                duration_ms=elapsed_ms,
+                num_turns=0,
+                total_cost_usd=0,
+                result_text="",
+                success=False,
+                error=f"Claude failed: {result.stderr[:200]}",
+            )
+
+        output = json.loads(result.stdout)
+
+        return BenchmarkResult(
+            approach="observe",
+            scenario=scenario.name,
+            prompt=scenario.prompt,
+            duration_ms=output.get('duration_ms', elapsed_ms),
+            num_turns=output.get('num_turns', 0),
+            total_cost_usd=output.get('total_cost_usd', 0),
+            result_text=output.get('result', ''),
+            success=not output.get('is_error', False),
+        )
+
+    except subprocess.TimeoutExpired:
+        return BenchmarkResult(
+            approach="observe",
+            scenario=scenario.name,
+            prompt=scenario.prompt,
+            duration_ms=timeout * 1000,
+            num_turns=0,
+            total_cost_usd=0,
+            result_text="",
+            success=False,
+            error=f"Timeout after {timeout}s",
+        )
+    except Exception as e:
+        return BenchmarkResult(
+            approach="observe",
+            scenario=scenario.name,
+            prompt=scenario.prompt,
+            duration_ms=0,
+            num_turns=0,
+            total_cost_usd=0,
+            result_text="",
+            success=False,
+            error=str(e),
+        )
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def print_comparison(warehouse: BenchmarkResult, observe: BenchmarkResult, scenario: Scenario):
+    """Print side-by-side comparison."""
+    print(f"\n{'─'*70}")
+    print(f"Scenario: {scenario.name}")
+    print(f"Description: {scenario.description}")
+    print(f"{'─'*70}")
+
+    print(f"\n{'Metric':<15} {'Warehouse':<20} {'Observe':<20} {'Winner'}")
+    print(f"{'─'*65}")
+
+    # Time comparison
+    w_time = f"{warehouse.duration_ms:.0f}ms" if warehouse.success else "FAILED"
+    o_time = f"{observe.duration_ms:.0f}ms" if observe.success else "FAILED"
+    if warehouse.success and observe.success:
+        time_winner = "Warehouse" if warehouse.duration_ms < observe.duration_ms else "Observe"
+        speedup = max(warehouse.duration_ms, observe.duration_ms) / min(warehouse.duration_ms, observe.duration_ms)
+        time_winner += f" ({speedup:.1f}x)"
+    else:
+        time_winner = "-"
+    print(f"{'Time':<15} {w_time:<20} {o_time:<20} {time_winner}")
+
+    # Turns comparison
+    w_turns = str(warehouse.num_turns) if warehouse.success else "-"
+    o_turns = str(observe.num_turns) if observe.success else "-"
+    if warehouse.success and observe.success:
+        turns_winner = "Warehouse" if warehouse.num_turns < observe.num_turns else "Observe"
+        if warehouse.num_turns == observe.num_turns:
+            turns_winner = "Tie"
+    else:
+        turns_winner = "-"
+    print(f"{'Turns':<15} {w_turns:<20} {o_turns:<20} {turns_winner}")
+
+    # Cost comparison
+    w_cost = f"${warehouse.total_cost_usd:.4f}" if warehouse.success else "-"
+    o_cost = f"${observe.total_cost_usd:.4f}" if observe.success else "-"
+    if warehouse.success and observe.success:
+        cost_winner = "Warehouse" if warehouse.total_cost_usd < observe.total_cost_usd else "Observe"
+    else:
+        cost_winner = "-"
+    print(f"{'Cost':<15} {w_cost:<20} {o_cost:<20} {cost_winner}")
+
+    # Show expected behavior
+    print(f"\n📋 Expected: {scenario.expected_behavior}")
+
+    # Show result previews
+    if warehouse.success:
+        print(f"\n🔧 Warehouse result preview:")
+        print(f"   {warehouse.result_text[:150]}...")
+    if observe.success:
+        print(f"\n🔍 Observe result preview:")
+        print(f"   {observe.result_text[:150]}...")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Fair benchmark: Warehouse vs Observe")
+    parser.add_argument('--org-id', required=True, help='Astro organization ID')
+    parser.add_argument('--scenarios', nargs='+', help='Specific scenarios to run')
+    parser.add_argument('--timeout', type=int, default=120, help='Timeout per scenario')
+    parser.add_argument('--output', default='fair_benchmark_results.json', help='Output file')
+
+    args = parser.parse_args()
+
+    # Filter scenarios
+    scenarios = SCENARIOS
+    if args.scenarios:
+        scenarios = [s for s in SCENARIOS if s.name in args.scenarios]
+
+    print("="*70)
+    print("FAIR BENCHMARK: Warehouse SQL vs Observe Semantic Search")
+    print("="*70)
+    print(f"\nScenarios: {len(scenarios)}")
+    print(f"Org ID: {args.org_id}")
+    print("\nNote: Each approach gets a tailored prompt for its strengths.")
+
+    results = []
+
+    for scenario in scenarios:
+        print(f"\n📝 Running: {scenario.name}...")
+
+        print("  [Warehouse] Starting...")
+        warehouse_result = run_warehouse_scenario(scenario, args.timeout)
+        if warehouse_result.success:
+            print(f"  [Warehouse] ✓ {warehouse_result.duration_ms:.0f}ms, {warehouse_result.num_turns} turns")
+        else:
+            print(f"  [Warehouse] ✗ {warehouse_result.error}")
+
+        print("  [Observe] Starting...")
+        observe_result = run_observe_scenario(scenario, args.org_id, args.timeout)
+        if observe_result.success:
+            print(f"  [Observe] ✓ {observe_result.duration_ms:.0f}ms, {observe_result.num_turns} turns")
+        else:
+            print(f"  [Observe] ✗ {observe_result.error}")
+
+        results.append((warehouse_result, observe_result, scenario))
+        print_comparison(warehouse_result, observe_result, scenario)
+
+    # Summary
+    print(f"\n{'='*70}")
+    print("SUMMARY")
+    print(f"{'='*70}")
+
+    w_wins = o_wins = ties = 0
+    w_total_time = o_total_time = 0
+    w_total_turns = o_total_turns = 0
+    w_total_cost = o_total_cost = 0
+    w_count = o_count = 0
+
+    for w, o, s in results:
+        if w.success and o.success:
+            if w.duration_ms < o.duration_ms * 0.8:
+                w_wins += 1
+            elif o.duration_ms < w.duration_ms * 0.8:
+                o_wins += 1
+            else:
+                ties += 1
+
+        if w.success:
+            w_total_time += w.duration_ms
+            w_total_turns += w.num_turns
+            w_total_cost += w.total_cost_usd
+            w_count += 1
+
+        if o.success:
+            o_total_time += o.duration_ms
+            o_total_turns += o.num_turns
+            o_total_cost += o.total_cost_usd
+            o_count += 1
+
+    print(f"\nSpeed Wins: Warehouse={w_wins}, Observe={o_wins}, Ties={ties}")
+
+    if w_count > 0:
+        print(f"\nWarehouse Averages ({w_count} successful):")
+        print(f"  Time: {w_total_time/w_count:.0f}ms")
+        print(f"  Turns: {w_total_turns/w_count:.1f}")
+        print(f"  Cost: ${w_total_cost/w_count:.4f}")
+
+    if o_count > 0:
+        print(f"\nObserve Averages ({o_count} successful):")
+        print(f"  Time: {o_total_time/o_count:.0f}ms")
+        print(f"  Turns: {o_total_turns/o_count:.1f}")
+        print(f"  Cost: ${o_total_cost/o_count:.4f}")
+
+    # Save results
+    output_data = {
+        "timestamp": datetime.now().isoformat(),
+        "org_id": args.org_id,
+        "results": [
+            {
+                "scenario": s.name,
+                "description": s.description,
+                "expected_behavior": s.expected_behavior,
+                "warehouse": {
+                    "prompt": w.prompt,
+                    "success": w.success,
+                    "duration_ms": w.duration_ms,
+                    "num_turns": w.num_turns,
+                    "cost": w.total_cost_usd,
+                    "result_preview": w.result_text[:500] if w.success else None,
+                    "error": w.error,
+                },
+                "observe": {
+                    "prompt": o.prompt,
+                    "success": o.success,
+                    "duration_ms": o.duration_ms,
+                    "num_turns": o.num_turns,
+                    "cost": o.total_cost_usd,
+                    "result_preview": o.result_text[:500] if o.success else None,
+                    "error": o.error,
+                },
+            }
+            for w, o, s in results
+        ]
+    }
+
+    with open(args.output, 'w') as f:
+        json.dump(output_data, f, indent=2)
+
+    print(f"\n💾 Results saved to: {args.output}")
+
+
+if __name__ == "__main__":
+    main()
