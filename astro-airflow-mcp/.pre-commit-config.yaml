@@ -46,6 +46,6 @@ repos:
     rev: 1.9.3
     hooks:
       - id: bandit
-        args: ['-c', 'astro-airflow-mcp/pyproject.toml']
+        args: ['-c', 'pyproject.toml']
         additional_dependencies: ['bandit[toml]']
         exclude: ^(tests/|skills/)
