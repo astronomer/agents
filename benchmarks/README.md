@@ -28,13 +28,33 @@ python benchmark.py --org-id <YOUR_ORG_ID>
 
 ## Scenarios
 
-| Scenario | Prompt | Tests |
-|----------|--------|-------|
-| `find_tables_by_keyword` | "Find all tables with 'customer' in the name" | Keyword search |
-| `list_tables_simple` | "List 20 tables from the database" | Basic listing |
-| `find_schemas` | "What schemas exist in the database?" | Schema discovery |
-| `table_count` | "How many tables are in the database?" | Counting |
-| `find_tables_with_column` | "Find tables that have a column named 'email'" | Column search |
+Realistic business questions that test the full workflow (discover → understand schema → query → answer).
+
+### Customer Analytics
+| Scenario | Prompt |
+|----------|--------|
+| `customers_using_airflow3` | "How many customers are currently using Airflow 3?" |
+| `top_customers_by_dag_runs` | "Which 10 customers have the most DAG runs this month?" |
+| `customers_in_trial` | "How many organizations are currently in trial status?" |
+
+### Usage & Adoption
+| Scenario | Prompt |
+|----------|--------|
+| `deployments_by_cloud` | "How many active deployments do we have by cloud provider?" |
+| `inactive_customers` | "Which customers haven't had any DAG runs in the last 30 days?" |
+| `avg_deployments_per_customer` | "What's the average number of deployments per customer?" |
+
+### Product Health
+| Scenario | Prompt |
+|----------|--------|
+| `failed_dag_runs_by_customer` | "Which 5 customers have the most failed DAG runs this week?" |
+| `alerts_configured` | "How many deployments have alerts configured?" |
+
+### Discovery
+| Scenario | Prompt |
+|----------|--------|
+| `find_customer_tables` | "What tables contain customer data? List them with descriptions." |
+| `find_org_id_tables` | "Find all tables that have an ORG_ID column." |
 
 **Note**: Both approaches receive identical prompts - the skill determines the method.
 

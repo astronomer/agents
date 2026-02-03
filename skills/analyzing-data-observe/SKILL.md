@@ -14,19 +14,66 @@ hooks:
           command: "uv run ${CLAUDE_PLUGIN_ROOT}/skills/analyzing-data/scripts/cli.py stop"
 ---
 
-# Data Asset Discovery (Catalog)
+# Data Asset Discovery (Catalog) + SQL Execution
 
-Discover and explore data assets using the Astro Cloud Observability catalog API, with SQL execution capability for follow-up analysis.
+Discover data assets using Observe catalog, then query data using SQL.
+
+## CRITICAL: Required Tools - NO CODEBASE READING
+
+**You MUST use ONLY these specific tools:**
+
+1. **`search_assets()`** - Observe MCP tool for discovering tables
+2. **`run_sql()`** - SQL execution via kernel for querying data
+
+**FORBIDDEN - DO NOT USE:**
+- Grep, Read, or Glob to search the codebase
+- Reading any JSON files for cached results
+- Searching for answers in benchmark files or test results
+- INFORMATION_SCHEMA queries (use Observe MCP instead)
+
+**WORKFLOW:**
+1. Use `search_assets()` to discover relevant tables
+2. Use `run_sql()` to query the discovered tables
+3. Return results directly - never read from filesystem
+
+---
+
+## Workflow
+
+**Step 1: Discovery** - Use the `search_assets` MCP tool (NOT codebase search)
+```python
+# Use the Observe MCP tool - this queries the live catalog
+search_assets(search="customer", asset_types=["snowflakeTable"], limit=50)
+```
+
+**Step 2: Query Data** - Use SQL via kernel to get actual data
+```bash
+uv run ${CLAUDE_PLUGIN_ROOT}/skills/analyzing-data/scripts/cli.py exec "df = run_sql('SELECT COUNT(*) FROM HQ.MART_CUST.CURRENT_ASTRO_CUSTS'); print(df)"
+```
+
+## Example: "How many customers use Airflow 3?"
+
+```
+1. search_assets(search="deployment", asset_types=["snowflakeTable"])
+   → Finds HQ.MODEL_ASTRO.DEPLOYMENTS table
+
+2. run_sql("SELECT COUNT(DISTINCT ORG_ID) FROM HQ.MODEL_ASTRO.DEPLOYMENTS WHERE AIRFLOW_VERSION LIKE '3%'")
+   → Returns actual count
+```
+
+**IMPORTANT**:
+- Step 1 uses the Observe MCP `search_assets` tool (NOT Grep/Read)
+- Step 2 uses SQL to query actual data (NOT reading cached results)
+
+---
 
 ## Overview
 
-This skill uses the **Observe MCP** to search the centralized catalog for:
-- **Tables**: Snowflake, Databricks, BigQuery
-- **Airflow**: DAGs, tasks, datasets
-- **OpenLineage datasets**
-- **Metadata**: Ownership, deployment info, lineage
+This skill combines:
+- **Observe MCP**: Fast catalog search across all warehouses
+- **SQL Execution**: Query actual data via Jupyter kernel
 
-**Key difference from warehouse-direct approach**: This queries a centralized catalog (fast, cross-warehouse search) rather than querying INFORMATION_SCHEMA in each warehouse directly.
+Use Observe for discovery, SQL for data retrieval.
 
 ---
 

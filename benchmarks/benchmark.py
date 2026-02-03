@@ -20,6 +20,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -52,37 +53,67 @@ class Scenario:
     expected_behavior: str  # What we expect each approach to do
 
 
-# Scenarios with identical prompts - let the skill determine the approach
+# BI-like data analysis scenarios grounded in actual warehouse tables
 SCENARIOS = [
     Scenario(
-        name="find_tables_by_keyword",
-        prompt="Find all tables with 'customer' in the name. List the table names.",
-        description="Keyword search for tables",
-        expected_behavior="Warehouse uses SQL INFORMATION_SCHEMA, Observe uses catalog search.",
+        name="total_arr_2025",
+        prompt="What was our total ARR in 2025?",
+        description="Total ARR calculation for a fiscal year",
+        expected_behavior="Query CONTRACT_ARR_LOG to aggregate ARR by date, filtering for 2025.",
     ),
     Scenario(
-        name="list_tables_simple",
-        prompt="List 20 tables from the database.",
-        description="Simple table listing",
-        expected_behavior="Both return ~20 tables via their respective methods.",
+        name="arr_by_product",
+        prompt="Show ARR by product (Astro Cloud, Software, Observe) for 2025.",
+        description="ARR breakdown by product line",
+        expected_behavior="Join CONTRACT_ARR_LOG with SF_PRODUCTS to segment ARR by product.",
     ),
     Scenario(
-        name="find_schemas",
-        prompt="What schemas exist in the database? List them.",
-        description="Schema discovery",
-        expected_behavior="Warehouse queries INFORMATION_SCHEMA.SCHEMATA, Observe searches catalog.",
+        name="deals_with_observe",
+        prompt="How many deals closed-won in 2025 that included Observe as a product?",
+        description="Sales deals including a specific product",
+        expected_behavior="Query SF_OPPS joined with SF_PRODUCTS filtering for Observe and closed-won status.",
     ),
     Scenario(
-        name="table_count",
-        prompt="How many tables are in the database?",
-        description="Count tables",
-        expected_behavior="Both should return a count via their respective methods.",
+        name="observe_paying_customers",
+        prompt="How many paying customers are actively using Observe?",
+        description="Product adoption among paying customers",
+        expected_behavior="Query OBSERVE_ADOPTION_MULTI or CURRENT_ORGANIZATIONS filtered for paying status.",
     ),
     Scenario(
-        name="find_tables_with_column",
-        prompt="Find tables that have a column named 'email'. List the table names.",
-        description="Column-based table search",
-        expected_behavior="Warehouse queries INFORMATION_SCHEMA.COLUMNS, Observe may struggle (no column indexing).",
+        name="support_tickets_by_account",
+        prompt="Which accounts have the most support tickets this quarter?",
+        description="Customer support volume analysis",
+        expected_behavior="Aggregate ZD_TICKETS by account, join with SF_ACCOUNTS for account names.",
+    ),
+    Scenario(
+        name="trial_to_paygo_conversion",
+        prompt="How many customers converted from trial to Paygo in 2025?",
+        description="PLG funnel conversion metrics",
+        expected_behavior="Count events in UPGRADE_TRIAL_TO_PAYGO table for the specified period.",
+    ),
+    Scenario(
+        name="mql_conversion_rate",
+        prompt="What's our MQL to opportunity conversion rate by quarter in 2025?",
+        description="Marketing funnel conversion analysis",
+        expected_behavior="Join SF_MQLS with SF_OPPS to calculate conversion rates by quarter.",
+    ),
+    Scenario(
+        name="arr_growth_by_account",
+        prompt="Which accounts have the highest ARR growth year over year?",
+        description="Year-over-year customer growth analysis",
+        expected_behavior="Calculate YoY ARR change per account from CONTRACT_ARR_LOG, rank by growth.",
+    ),
+    Scenario(
+        name="observe_monitors_by_org",
+        prompt="Which organizations have the most data quality monitors configured in Observe?",
+        description="Product feature usage by organization",
+        expected_behavior="Aggregate MONITORS table by organization, rank by count.",
+    ),
+    Scenario(
+        name="deal_size_by_segment",
+        prompt="What's our average deal size by segment (Enterprise, Commercial, SMB)?",
+        description="Sales metrics segmented by customer tier",
+        expected_behavior="Aggregate SF_OPPS by segment from SF_ACCOUNTS or SF_ACCOUNT_SEGMENT_LOG.",
     ),
 ]
 
@@ -132,7 +163,7 @@ def run_warehouse_scenario(scenario: Scenario, timeout: int = 120) -> BenchmarkR
     with open(config_path, "w") as f:
         json.dump(config, f, indent=2)
 
-    prompt = f"""/data:analyzing-data
+    prompt = f"""/data:analyzing-data-benchmark
 
 {scenario.prompt}"""
 
@@ -266,7 +297,7 @@ def run_observe_scenario(
     with open(config_path, "w") as f:
         json.dump(config, f, indent=2)
 
-    prompt = f"""/data:analyzing-data-observe
+    prompt = f"""/data:analyzing-data-observe-benchmark
 
 {scenario.prompt}"""
 
@@ -417,6 +448,51 @@ def print_comparison(
         print(f"   {observe.result_text[:150]}...")
 
 
+def save_results(all_runs: list, org_id: str, output_path: str, total_runs: int):
+    """Save results to file (called incrementally as scenarios complete)."""
+    output_data = {
+        "timestamp": datetime.now().isoformat(),
+        "org_id": org_id,
+        "total_runs": total_runs,
+        "completed_runs": len(all_runs),
+        "runs": [
+            {
+                "run_number": run_idx + 1,
+                "results": [
+                    {
+                        "scenario": s.name,
+                        "description": s.description,
+                        "expected_behavior": s.expected_behavior,
+                        "warehouse": {
+                            "prompt": w.prompt,
+                            "success": w.success,
+                            "duration_ms": w.duration_ms,
+                            "num_turns": w.num_turns,
+                            "cost": w.total_cost_usd,
+                            "result_preview": w.result_text[:500] if w.success else None,
+                            "error": w.error,
+                        },
+                        "observe": {
+                            "prompt": o.prompt,
+                            "success": o.success,
+                            "duration_ms": o.duration_ms,
+                            "num_turns": o.num_turns,
+                            "cost": o.total_cost_usd,
+                            "result_preview": o.result_text[:500] if o.success else None,
+                            "error": o.error,
+                        },
+                    }
+                    for w, o, s in run_results
+                ],
+            }
+            for run_idx, run_results in enumerate(all_runs)
+        ],
+    }
+
+    with open(output_path, "w") as f:
+        json.dump(output_data, f, indent=2)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Fair benchmark: Warehouse vs Observe")
     parser.add_argument("--org-id", required=True, help="Astro organization ID")
@@ -424,6 +500,9 @@ def main():
     parser.add_argument("--timeout", type=int, default=120, help="Timeout per scenario")
     parser.add_argument(
         "--output", default="fair_benchmark_results.json", help="Output file"
+    )
+    parser.add_argument(
+        "--runs", type=int, default=1, help="Number of times to run all scenarios"
     )
 
     args = parser.parse_args()
@@ -437,55 +516,73 @@ def main():
     print("FAIR BENCHMARK: Warehouse SQL vs Observe Semantic Search")
     print("=" * 70)
     print(f"\nScenarios: {len(scenarios)}")
+    print(f"Runs: {args.runs}")
     print(f"Org ID: {args.org_id}")
     print("\nNote: Each approach gets a tailored prompt for its strengths.")
 
-    results = []
+    all_runs = []  # List of runs, each run is a list of (warehouse, observe, scenario)
+    save_lock = threading.Lock()
 
-    # Run all scenarios and both approaches concurrently
-    print(f"\n🚀 Running all {len(scenarios)} scenarios concurrently...")
+    for run_num in range(1, args.runs + 1):
+        if args.runs > 1:
+            print(f"\n{'#' * 70}")
+            print(f"# RUN {run_num}/{args.runs}")
+            print(f"{'#' * 70}")
 
-    future_to_info = {}
-    with ThreadPoolExecutor(max_workers=len(scenarios) * 2) as executor:
-        for scenario in scenarios:
-            # Submit both approaches for each scenario
-            w_future = executor.submit(run_warehouse_scenario, scenario, args.timeout)
-            o_future = executor.submit(
-                run_observe_scenario, scenario, args.org_id, args.timeout
-            )
-            future_to_info[w_future] = ("warehouse", scenario)
-            future_to_info[o_future] = ("observe", scenario)
+        # Run all scenarios and both approaches concurrently
+        print(f"\n🚀 Running all {len(scenarios)} scenarios concurrently...")
 
-        # Print progress as each completes
-        scenario_results = {}
-        for future in as_completed(future_to_info):
-            approach, scenario = future_to_info[future]
-            result = future.result()
-
-            # Print completion message
-            if result.success:
-                print(
-                    f"  ✓ [{scenario.name}] {approach}: {result.duration_ms:.0f}ms, {result.num_turns} turns"
+        future_to_info = {}
+        with ThreadPoolExecutor(max_workers=len(scenarios) * 2) as executor:
+            for scenario in scenarios:
+                # Submit both approaches for each scenario
+                w_future = executor.submit(
+                    run_warehouse_scenario, scenario, args.timeout
                 )
-            else:
-                print(f"  ✗ [{scenario.name}] {approach}: {result.error}")
+                o_future = executor.submit(
+                    run_observe_scenario, scenario, args.org_id, args.timeout
+                )
+                future_to_info[w_future] = ("warehouse", scenario)
+                future_to_info[o_future] = ("observe", scenario)
 
-            # Store result
-            if scenario.name not in scenario_results:
-                scenario_results[scenario.name] = {"scenario": scenario}
-            scenario_results[scenario.name][approach] = result
+            # Print progress as each completes
+            scenario_results = {}
+            for future in as_completed(future_to_info):
+                approach, scenario = future_to_info[future]
+                result = future.result()
 
-    # Print comparisons in order
-    for scenario in scenarios:
-        sr = scenario_results[scenario.name]
-        warehouse_result = sr["warehouse"]
-        observe_result = sr["observe"]
-        results.append((warehouse_result, observe_result, scenario))
-        print_comparison(warehouse_result, observe_result, scenario)
+                # Print completion message
+                if result.success:
+                    print(
+                        f"  ✓ [{scenario.name}] {approach}: {result.duration_ms:.0f}ms, {result.num_turns} turns"
+                    )
+                else:
+                    print(f"  ✗ [{scenario.name}] {approach}: {result.error}")
 
-    # Summary
+                # Store result
+                if scenario.name not in scenario_results:
+                    scenario_results[scenario.name] = {"scenario": scenario}
+                scenario_results[scenario.name][approach] = result
+
+        # Collect results for this run
+        run_results = []
+        for scenario in scenarios:
+            sr = scenario_results[scenario.name]
+            warehouse_result = sr["warehouse"]
+            observe_result = sr["observe"]
+            run_results.append((warehouse_result, observe_result, scenario))
+            print_comparison(warehouse_result, observe_result, scenario)
+
+        all_runs.append(run_results)
+
+        # Save after each run completes
+        with save_lock:
+            save_results(all_runs, args.org_id, args.output, args.runs)
+            print(f"\n💾 Progress saved (run {run_num}/{args.runs})")
+
+    # Summary - aggregate across all runs
     print(f"\n{'=' * 70}")
-    print("SUMMARY")
+    print("SUMMARY" + (f" (across {args.runs} runs)" if args.runs > 1 else ""))
     print(f"{'=' * 70}")
 
     w_wins = o_wins = ties = 0
@@ -494,77 +591,43 @@ def main():
     w_total_cost = o_total_cost = 0
     w_count = o_count = 0
 
-    for w, o, s in results:
-        if w.success and o.success:
-            if w.duration_ms < o.duration_ms * 0.8:
-                w_wins += 1
-            elif o.duration_ms < w.duration_ms * 0.8:
-                o_wins += 1
-            else:
-                ties += 1
+    for run_results in all_runs:
+        for w, o, s in run_results:
+            if w.success and o.success:
+                if w.duration_ms < o.duration_ms * 0.8:
+                    w_wins += 1
+                elif o.duration_ms < w.duration_ms * 0.8:
+                    o_wins += 1
+                else:
+                    ties += 1
 
-        if w.success:
-            w_total_time += w.duration_ms
-            w_total_turns += w.num_turns
-            w_total_cost += w.total_cost_usd
-            w_count += 1
+            if w.success:
+                w_total_time += w.duration_ms
+                w_total_turns += w.num_turns
+                w_total_cost += w.total_cost_usd
+                w_count += 1
 
-        if o.success:
-            o_total_time += o.duration_ms
-            o_total_turns += o.num_turns
-            o_total_cost += o.total_cost_usd
-            o_count += 1
+            if o.success:
+                o_total_time += o.duration_ms
+                o_total_turns += o.num_turns
+                o_total_cost += o.total_cost_usd
+                o_count += 1
 
     print(f"\nSpeed Wins: Warehouse={w_wins}, Observe={o_wins}, Ties={ties}")
 
     if w_count > 0:
-        print(f"\nWarehouse Averages ({w_count} successful):")
+        print(f"\nWarehouse Averages ({w_count} successful across {args.runs} run(s)):")
         print(f"  Time: {w_total_time / w_count:.0f}ms")
         print(f"  Turns: {w_total_turns / w_count:.1f}")
         print(f"  Cost: ${w_total_cost / w_count:.4f}")
 
     if o_count > 0:
-        print(f"\nObserve Averages ({o_count} successful):")
+        print(f"\nObserve Averages ({o_count} successful across {args.runs} run(s)):")
         print(f"  Time: {o_total_time / o_count:.0f}ms")
         print(f"  Turns: {o_total_turns / o_count:.1f}")
         print(f"  Cost: ${o_total_cost / o_count:.4f}")
 
-    # Save results
-    output_data = {
-        "timestamp": datetime.now().isoformat(),
-        "org_id": args.org_id,
-        "results": [
-            {
-                "scenario": s.name,
-                "description": s.description,
-                "expected_behavior": s.expected_behavior,
-                "warehouse": {
-                    "prompt": w.prompt,
-                    "success": w.success,
-                    "duration_ms": w.duration_ms,
-                    "num_turns": w.num_turns,
-                    "cost": w.total_cost_usd,
-                    "result_preview": w.result_text[:500] if w.success else None,
-                    "error": w.error,
-                },
-                "observe": {
-                    "prompt": o.prompt,
-                    "success": o.success,
-                    "duration_ms": o.duration_ms,
-                    "num_turns": o.num_turns,
-                    "cost": o.total_cost_usd,
-                    "result_preview": o.result_text[:500] if o.success else None,
-                    "error": o.error,
-                },
-            }
-            for w, o, s in results
-        ],
-    }
-
-    with open(args.output, "w") as f:
-        json.dump(output_data, f, indent=2)
-
-    print(f"\n💾 Results saved to: {args.output}")
+    print(f"\n💾 Final results saved to: {args.output}")
 
 
 if __name__ == "__main__":
