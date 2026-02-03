@@ -92,11 +92,48 @@ def current_instance() -> None:
 
 @app.command("use")
 def use_instance(
-    name: Annotated[str, typer.Argument(help="Name of the instance to switch to")],
+    name: Annotated[str | None, typer.Argument(help="Name of the instance to switch to")] = None,
 ) -> None:
-    """Switch to a different instance."""
+    """Switch to a different instance.
+
+    If no name is provided, an interactive menu will be shown.
+    """
     try:
         manager = ConfigManager()
+
+        # If no name provided, show interactive selector
+        if name is None:
+            from simple_term_menu import TerminalMenu
+
+            config = manager.load()
+            if not config.instances:
+                console.print("No instances configured.", style="dim")
+                console.print(
+                    "\nAdd one with: af instance add <name> --url <url>",
+                    style="dim",
+                )
+                return
+
+            instance_names = [inst.name for inst in config.instances]
+
+            # Pre-select current instance if set
+            cursor_index = 0
+            if config.current_instance and config.current_instance in instance_names:
+                cursor_index = instance_names.index(config.current_instance)
+
+            menu = TerminalMenu(
+                instance_names,
+                title="Select instance:",
+                cursor_index=cursor_index,
+            )
+            choice_index = menu.show()
+
+            if choice_index is None:  # User pressed Escape
+                console.print("Cancelled.", style="dim")
+                return
+
+            name = instance_names[choice_index]
+
         manager.use_instance(name)
         console.print(f"Switched to instance [bold]{name}[/bold]", highlight=False)
     except (ConfigError, ValueError) as e:
