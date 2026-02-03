@@ -37,7 +37,7 @@ class BenchmarkResult:
     prompt: str
     duration_ms: float
     num_turns: int
-    total_cost_usd: float
+    total_tokens: int
     result_text: str
     success: bool
     error: str | None = None
@@ -50,69 +50,83 @@ class Scenario:
     name: str
     prompt: str  # Same prompt for both approaches
     description: str
-    expected_behavior: str  # What we expect each approach to do
 
 
 SCENARIOS = [
     Scenario(
-        name="find_customer_tables",
-        prompt="What tables contain customer data? List the top 10.",
-        description="Semantic search for customer-related tables",
-        expected_behavior="Observe uses semantic search, Warehouse uses INFORMATION_SCHEMA.",
+        name="revenue_by_month",
+        prompt="What's our revenue by month this year?",
+        description="BI query requiring revenue table discovery + monthly aggregation",
     ),
     Scenario(
-        name="find_revenue_tables",
-        prompt="What tables have revenue or billing data?",
-        description="Semantic search for financial data",
-        expected_behavior="Observe uses semantic search for revenue/billing concepts.",
+        name="opportunity_win_rate",
+        prompt="What's the win rate for sales opportunities by quarter?",
+        description="BI query requiring OPPORTUNITY discovery + win/loss aggregation",
     ),
     Scenario(
-        name="find_deployment_tables",
-        prompt="What tables track Airflow deployments and their metadata?",
-        description="Semantic search for deployment/infrastructure data",
-        expected_behavior="Observe uses semantic search for deployment concepts.",
+        name="monthly_arr_trend",
+        prompt="What's our ARR trend by month?",
+        description="BI query requiring ARR discovery + monthly aggregation",
     ),
     Scenario(
-        name="find_usage_tables",
-        prompt="What tables track product usage and feature adoption?",
-        description="Semantic search for usage/adoption data",
-        expected_behavior="Observe uses semantic search for usage/adoption concepts.",
+        name="top_revenue_customers",
+        prompt="Who are our top 5 customers by revenue?",
+        description="BI query requiring customer revenue discovery + ranking",
     ),
     Scenario(
-        name="find_sales_tables",
-        prompt="What tables contain sales pipeline or opportunity data?",
-        description="Semantic search for sales data",
-        expected_behavior="Observe uses semantic search for sales/pipeline concepts.",
+        name="largest_account_arr",
+        prompt="What account has the largest ARR?",
+        description="BI query requiring ARR discovery + max",
     ),
     Scenario(
-        name="find_support_tables",
-        prompt="What tables have support ticket or customer service data?",
-        description="Semantic search for support data",
-        expected_behavior="Observe uses semantic search for support/ticket concepts.",
+        name="active_trials",
+        prompt="How many active trials do we have?",
+        description="BI query requiring trials table discovery + active count",
     ),
     Scenario(
-        name="find_marketing_tables",
-        prompt="What tables track marketing leads and campaigns?",
-        description="Semantic search for marketing data",
-        expected_behavior="Observe uses semantic search for marketing/lead concepts.",
+        name="total_accounts",
+        prompt="How many accounts do we have in Salesforce?",
+        description="BI query requiring Salesforce accounts discovery + count",
     ),
     Scenario(
-        name="find_dag_tables",
-        prompt="What tables contain DAG run history and task execution data?",
-        description="Semantic search for Airflow execution data",
-        expected_behavior="Observe uses semantic search for DAG/task concepts.",
+        name="support_arr",
+        prompt="What's our Support product ARR?",
+        description="BI query requiring product ARR discovery + filter",
     ),
     Scenario(
-        name="find_metrics_tables",
-        prompt="What tables have pre-aggregated metrics or KPIs?",
-        description="Semantic search for metrics/analytics tables",
-        expected_behavior="Observe uses semantic search for metrics concepts.",
+        name="total_revenue",
+        prompt="What's our total revenue?",
+        description="BI query requiring revenue discovery + sum",
     ),
     Scenario(
-        name="find_contract_tables",
-        prompt="What tables store contract and subscription information?",
-        description="Semantic search for contract/subscription data",
-        expected_behavior="Observe uses semantic search for contract concepts.",
+        name="observe_arr",
+        prompt="What's our Observe product ARR?",
+        description="BI query requiring product ARR discovery + filter",
+    ),
+    Scenario(
+        name="nebula_arr",
+        prompt="What's our Nebula product ARR?",
+        description="BI query requiring product ARR discovery + filter",
+    ),
+    Scenario(
+        name="avg_invoice_amount",
+        prompt="What's the average invoice amount?",
+        description="BI query requiring invoice table discovery + average calculation",
+    ),
+    Scenario(
+        name="hybrid_arr",
+        prompt="What's our Astro Hybrid ARR?",
+        description="BI query requiring product ARR discovery + filter",
+    ),
+    Scenario(
+        name="software_arr",
+        prompt="What's our Software product ARR?",
+        description="BI query requiring product ARR discovery + filter",
+    ),
+    Scenario(
+        name="hosted_arr",
+        prompt="What's our Astro Hosted ARR?",
+        description="BI query requiring product ARR discovery + filter",
     ),
 ]
 
@@ -201,7 +215,7 @@ def run_warehouse_scenario(scenario: Scenario, timeout: int = 120) -> BenchmarkR
                 prompt=scenario.prompt,
                 duration_ms=elapsed_ms,
                 num_turns=0,
-                total_cost_usd=0,
+                total_tokens=0,
                 result_text="",
                 success=False,
                 error=f"Claude failed: {result.stderr[:200]}",
@@ -209,13 +223,16 @@ def run_warehouse_scenario(scenario: Scenario, timeout: int = 120) -> BenchmarkR
 
         output = json.loads(result.stdout)
 
+        usage = output.get("usage", {})
+        total_tokens = usage.get("input_tokens", 0) + usage.get("output_tokens", 0)
+
         return BenchmarkResult(
             approach="warehouse",
             scenario=scenario.name,
             prompt=scenario.prompt,
             duration_ms=output.get("duration_ms", elapsed_ms),
             num_turns=output.get("num_turns", 0),
-            total_cost_usd=output.get("total_cost_usd", 0),
+            total_tokens=total_tokens,
             result_text=output.get("result", ""),
             success=not output.get("is_error", False),
         )
@@ -227,7 +244,7 @@ def run_warehouse_scenario(scenario: Scenario, timeout: int = 120) -> BenchmarkR
             prompt=scenario.prompt,
             duration_ms=timeout * 1000,
             num_turns=0,
-            total_cost_usd=0,
+            total_tokens=0,
             result_text="",
             success=False,
             error=f"Timeout after {timeout}s",
@@ -239,7 +256,7 @@ def run_warehouse_scenario(scenario: Scenario, timeout: int = 120) -> BenchmarkR
             prompt=scenario.prompt,
             duration_ms=0,
             num_turns=0,
-            total_cost_usd=0,
+            total_tokens=0,
             result_text="",
             success=False,
             error=str(e),
@@ -335,7 +352,7 @@ def run_observe_scenario(
                 prompt=scenario.prompt,
                 duration_ms=elapsed_ms,
                 num_turns=0,
-                total_cost_usd=0,
+                total_tokens=0,
                 result_text="",
                 success=False,
                 error=f"Claude failed: {result.stderr[:200]}",
@@ -343,13 +360,16 @@ def run_observe_scenario(
 
         output = json.loads(result.stdout)
 
+        usage = output.get("usage", {})
+        total_tokens = usage.get("input_tokens", 0) + usage.get("output_tokens", 0)
+
         return BenchmarkResult(
             approach="observe",
             scenario=scenario.name,
             prompt=scenario.prompt,
             duration_ms=output.get("duration_ms", elapsed_ms),
             num_turns=output.get("num_turns", 0),
-            total_cost_usd=output.get("total_cost_usd", 0),
+            total_tokens=total_tokens,
             result_text=output.get("result", ""),
             success=not output.get("is_error", False),
         )
@@ -361,7 +381,7 @@ def run_observe_scenario(
             prompt=scenario.prompt,
             duration_ms=timeout * 1000,
             num_turns=0,
-            total_cost_usd=0,
+            total_tokens=0,
             result_text="",
             success=False,
             error=f"Timeout after {timeout}s",
@@ -373,7 +393,7 @@ def run_observe_scenario(
             prompt=scenario.prompt,
             duration_ms=0,
             num_turns=0,
-            total_cost_usd=0,
+            total_tokens=0,
             result_text="",
             success=False,
             error=str(e),
@@ -422,21 +442,19 @@ def print_comparison(
         turns_winner = "-"
     print(f"{'Turns':<15} {w_turns:<20} {o_turns:<20} {turns_winner}")
 
-    # Cost comparison
-    w_cost = f"${warehouse.total_cost_usd:.4f}" if warehouse.success else "-"
-    o_cost = f"${observe.total_cost_usd:.4f}" if observe.success else "-"
+    # Tokens comparison
+    w_tokens = f"{warehouse.total_tokens:,}" if warehouse.success else "-"
+    o_tokens = f"{observe.total_tokens:,}" if observe.success else "-"
     if warehouse.success and observe.success:
-        cost_winner = (
+        tokens_winner = (
             "Warehouse"
-            if warehouse.total_cost_usd < observe.total_cost_usd
+            if warehouse.total_tokens < observe.total_tokens
             else "Observe"
         )
     else:
-        cost_winner = "-"
-    print(f"{'Cost':<15} {w_cost:<20} {o_cost:<20} {cost_winner}")
+        tokens_winner = "-"
+    print(f"{'Tokens':<15} {w_tokens:<20} {o_tokens:<20} {tokens_winner}")
 
-    # Show expected behavior
-    print(f"\n📋 Expected: {scenario.expected_behavior}")
 
     # Show result previews
     if warehouse.success:
@@ -461,13 +479,12 @@ def save_results(all_runs: list, org_id: str, output_path: str, total_runs: int)
                     {
                         "scenario": s.name,
                         "description": s.description,
-                        "expected_behavior": s.expected_behavior,
                         "warehouse": {
                             "prompt": w.prompt,
                             "success": w.success,
                             "duration_ms": w.duration_ms,
                             "num_turns": w.num_turns,
-                            "cost": w.total_cost_usd,
+                            "tokens": w.total_tokens,
                             "result_preview": w.result_text[:500] if w.success else None,
                             "error": w.error,
                         },
@@ -476,7 +493,7 @@ def save_results(all_runs: list, org_id: str, output_path: str, total_runs: int)
                             "success": o.success,
                             "duration_ms": o.duration_ms,
                             "num_turns": o.num_turns,
-                            "cost": o.total_cost_usd,
+                            "tokens": o.total_tokens,
                             "result_preview": o.result_text[:500] if o.success else None,
                             "error": o.error,
                         },
@@ -587,7 +604,7 @@ def main():
     w_wins = o_wins = ties = 0
     w_total_time = o_total_time = 0
     w_total_turns = o_total_turns = 0
-    w_total_cost = o_total_cost = 0
+    w_total_tokens = o_total_tokens = 0
     w_count = o_count = 0
 
     for run_results in all_runs:
@@ -603,13 +620,13 @@ def main():
             if w.success:
                 w_total_time += w.duration_ms
                 w_total_turns += w.num_turns
-                w_total_cost += w.total_cost_usd
+                w_total_tokens += w.total_tokens
                 w_count += 1
 
             if o.success:
                 o_total_time += o.duration_ms
                 o_total_turns += o.num_turns
-                o_total_cost += o.total_cost_usd
+                o_total_tokens += o.total_tokens
                 o_count += 1
 
     print(f"\nSpeed Wins: Warehouse={w_wins}, Observe={o_wins}, Ties={ties}")
@@ -618,13 +635,13 @@ def main():
         print(f"\nWarehouse Averages ({w_count} successful across {args.runs} run(s)):")
         print(f"  Time: {w_total_time / w_count:.0f}ms")
         print(f"  Turns: {w_total_turns / w_count:.1f}")
-        print(f"  Cost: ${w_total_cost / w_count:.4f}")
+        print(f"  Tokens: {w_total_tokens / w_count:,.0f}")
 
     if o_count > 0:
         print(f"\nObserve Averages ({o_count} successful across {args.runs} run(s)):")
         print(f"  Time: {o_total_time / o_count:.0f}ms")
         print(f"  Turns: {o_total_turns / o_count:.1f}")
-        print(f"  Cost: ${o_total_cost / o_count:.4f}")
+        print(f"  Tokens: {o_total_tokens / o_count:,.0f}")
 
     print(f"\n💾 Final results saved to: {args.output}")
 
