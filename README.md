@@ -31,6 +31,7 @@ Built by [Astronomer](https://www.astronomer.io/). [Apache 2.0 licensed](https:/
 - [Troubleshooting](#troubleshooting)
   - [Common Issues](#common-issues)
 - [Contributing](#contributing)
+- [Roadmap](#roadmap)
 - [License](#license)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
