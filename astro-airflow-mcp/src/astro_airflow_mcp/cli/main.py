@@ -14,7 +14,7 @@ from astro_airflow_mcp.cli import instances
 from astro_airflow_mcp.cli import runs as runs_module
 from astro_airflow_mcp.cli import tasks as tasks_module
 from astro_airflow_mcp.cli.api import api_command
-from astro_airflow_mcp.cli.context import configure_context, get_adapter
+from astro_airflow_mcp.cli.context import get_adapter, init_context
 from astro_airflow_mcp.cli.output import output_json
 
 app = typer.Typer(
@@ -35,47 +35,6 @@ def version_callback(value: bool) -> None:
 
 @app.callback()
 def main(
-    airflow_url: Annotated[
-        str | None,
-        typer.Option(
-            "--airflow-url",
-            "-u",
-            envvar="AIRFLOW_API_URL",
-            help="Airflow API URL (default: http://localhost:8080)",
-        ),
-    ] = None,
-    username: Annotated[
-        str | None,
-        typer.Option(
-            "--username",
-            envvar="AIRFLOW_USERNAME",
-            help="Username for Airflow authentication",
-        ),
-    ] = None,
-    password: Annotated[
-        str | None,
-        typer.Option(
-            "--password",
-            envvar="AIRFLOW_PASSWORD",
-            help="Password for Airflow authentication",
-        ),
-    ] = None,
-    auth_token: Annotated[
-        str | None,
-        typer.Option(
-            "--token",
-            envvar="AIRFLOW_AUTH_TOKEN",
-            help="Bearer token for Airflow authentication (takes precedence)",
-        ),
-    ] = None,
-    instance: Annotated[
-        str | None,
-        typer.Option(
-            "--instance",
-            "-i",
-            help="Use a specific instance from config file",
-        ),
-    ] = None,
     config: Annotated[
         str | None,
         typer.Option(
@@ -98,26 +57,20 @@ def main(
 ) -> None:
     """Airflow CLI - interact with Apache Airflow from the command line.
 
-    Configure connection using environment variables or CLI options:
-    - AIRFLOW_API_URL / --airflow-url
-    - AIRFLOW_USERNAME / --username
-    - AIRFLOW_PASSWORD / --password
-    - AIRFLOW_AUTH_TOKEN / --token
+    Configure connection using environment variables:
+    - AIRFLOW_API_URL: Airflow webserver URL
+    - AIRFLOW_USERNAME: Username for basic auth
+    - AIRFLOW_PASSWORD: Password for basic auth
+    - AIRFLOW_AUTH_TOKEN: Bearer token (takes precedence over basic auth)
 
-    Or use a named instance from ~/.af/config.yaml:
-    - --instance <name>
+    Or configure named instances in ~/.af/config.yaml and switch with:
+        af instance use <name>
     """
     # Set config path env var so all ConfigManager instances use it
     if config:
         os.environ["AF_CONFIG"] = config
 
-    configure_context(
-        airflow_url=airflow_url,
-        username=username,
-        password=password,
-        auth_token=auth_token,
-        instance_name=instance,
-    )
+    init_context()
 
 
 @app.command()
