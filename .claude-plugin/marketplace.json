@@ -37,7 +37,7 @@
         },
         "observe": {
           "command": "uv",
-          "args": ["--directory", "/Users/milton.li/src/astro-ai/astro-agents/astro-observe-mcp", "run", "astro-observe-mcp"]
+          "args": ["--directory", "${CLAUDE_PLUGIN_ROOT}/astro-observe-mcp", "run", "astro-observe-mcp"]
         }
       }
     }

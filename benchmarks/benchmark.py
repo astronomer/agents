@@ -19,18 +19,18 @@ import json
 import os
 import shutil
 import subprocess
-import sys
 import tempfile
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
 
 
 @dataclass
 class BenchmarkResult:
     """Results from a single benchmark run."""
+
     approach: str
     scenario: str
     prompt: str
@@ -45,6 +45,7 @@ class BenchmarkResult:
 @dataclass
 class Scenario:
     """Benchmark scenario definition."""
+
     name: str
     prompt: str  # Same prompt for both approaches
     description: str
@@ -103,24 +104,32 @@ def run_warehouse_scenario(scenario: Scenario, timeout: int = 120) -> BenchmarkR
     config = {
         "name": "astronomer",
         "owner": {"name": "Benchmark", "email": "benchmark@test.io"},
-        "plugins": [{
-            "name": "data",
-            "source": str(temp_dir),
-            "strict": False,
-            "description": "Warehouse SQL benchmark (no Observe)",
-            "version": "0.1.0",
-            "mcpServers": {
-                # Only airflow MCP - NO observe MCP
-                "airflow": {
-                    "command": "uvx",
-                    "args": ["astro-airflow-mcp@0.2.3", "--transport", "stdio", "--airflow-project-dir", "${PWD}"]
-                }
+        "plugins": [
+            {
+                "name": "data",
+                "source": str(temp_dir),
+                "strict": False,
+                "description": "Warehouse SQL benchmark (no Observe)",
+                "version": "0.1.0",
+                "mcpServers": {
+                    # Only airflow MCP - NO observe MCP
+                    "airflow": {
+                        "command": "uvx",
+                        "args": [
+                            "astro-airflow-mcp@0.2.3",
+                            "--transport",
+                            "stdio",
+                            "--airflow-project-dir",
+                            "${PWD}",
+                        ],
+                    }
+                },
             }
-        }]
+        ],
     }
 
     config_path = plugin_dir / "marketplace.json"
-    with open(config_path, 'w') as f:
+    with open(config_path, "w") as f:
         json.dump(config, f, indent=2)
 
     prompt = f"""/data:analyzing-data
@@ -128,19 +137,20 @@ def run_warehouse_scenario(scenario: Scenario, timeout: int = 120) -> BenchmarkR
 {scenario.prompt}"""
 
     cmd = [
-        'claude',
-        '--print',
-        '--model', 'haiku',
-        '--output-format', 'json',
-        '--plugin-dir', str(temp_dir),
-        '--no-session-persistence',
-        '--permission-mode', 'bypassPermissions',
+        "claude",
+        "--print",
+        "--model",
+        "haiku",
+        "--output-format",
+        "json",
+        "--plugin-dir",
+        str(temp_dir),
+        "--no-session-persistence",
+        "--permission-mode",
+        "bypassPermissions",
     ]
 
-    # Use isolated config dir to prevent loading global plugins
-    config_dir = temp_dir / '.claude-config'
-    config_dir.mkdir(exist_ok=True)
-    env = {**os.environ, 'CLAUDE_CONFIG_DIR': str(config_dir)}
+    env = os.environ.copy()
 
     try:
         start = time.time()
@@ -173,11 +183,11 @@ def run_warehouse_scenario(scenario: Scenario, timeout: int = 120) -> BenchmarkR
             approach="warehouse",
             scenario=scenario.name,
             prompt=scenario.prompt,
-            duration_ms=output.get('duration_ms', elapsed_ms),
-            num_turns=output.get('num_turns', 0),
-            total_cost_usd=output.get('total_cost_usd', 0),
-            result_text=output.get('result', ''),
-            success=not output.get('is_error', False),
+            duration_ms=output.get("duration_ms", elapsed_ms),
+            num_turns=output.get("num_turns", 0),
+            total_cost_usd=output.get("total_cost_usd", 0),
+            result_text=output.get("result", ""),
+            success=not output.get("is_error", False),
         )
 
     except subprocess.TimeoutExpired:
@@ -208,7 +218,9 @@ def run_warehouse_scenario(scenario: Scenario, timeout: int = 120) -> BenchmarkR
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
-def run_observe_scenario(scenario: Scenario, org_id: str, timeout: int = 120) -> BenchmarkResult:
+def run_observe_scenario(
+    scenario: Scenario, org_id: str, timeout: int = 120
+) -> BenchmarkResult:
     """Run scenario using Observe semantic search approach."""
     agents_root = Path(__file__).parent.parent
     observe_path = agents_root / "astro-observe-mcp"
@@ -218,47 +230,61 @@ def run_observe_scenario(scenario: Scenario, org_id: str, timeout: int = 120) ->
     plugin_dir = temp_dir / ".claude-plugin"
     plugin_dir.mkdir(parents=True)
 
+    # Copy skills directory so plugin can find them
+    skills_src = agents_root / "skills"
+    skills_dst = temp_dir / "skills"
+    shutil.copytree(skills_src, skills_dst)
+
     config = {
         "name": "observe-benchmark",
         "owner": {"name": "Benchmark", "email": "benchmark@test.io"},
-        "plugins": [{
-            "name": "catalog",
-            "source": str(agents_root),
-            "strict": False,
-            "description": "Catalog-based asset discovery",
-            "version": "0.1.0",
-            "mcpServers": {
-                "observe": {
-                    "command": "uv",
-                    "args": ["--directory", str(observe_path), "run", "astro-observe-mcp"],
-                    "env": {"ASTRO_ORGANIZATION_ID": org_id}
-                }
+        "plugins": [
+            {
+                "name": "data",
+                "source": str(temp_dir),
+                "strict": False,
+                "description": "Catalog-based asset discovery",
+                "version": "0.1.0",
+                "mcpServers": {
+                    "observe": {
+                        "command": "uv",
+                        "args": [
+                            "--directory",
+                            str(observe_path),
+                            "run",
+                            "astro-observe-mcp",
+                            "--org-id",
+                            org_id,
+                        ],
+                    }
+                },
             }
-        }]
+        ],
     }
 
     config_path = plugin_dir / "marketplace.json"
-    with open(config_path, 'w') as f:
+    with open(config_path, "w") as f:
         json.dump(config, f, indent=2)
 
-    prompt = f"""/catalog:analyzing-data-observe
+    prompt = f"""/data:analyzing-data-observe
 
 {scenario.prompt}"""
 
     cmd = [
-        'claude',
-        '--print',
-        '--model', 'haiku',
-        '--output-format', 'json',
-        '--plugin-dir', str(temp_dir),
-        '--no-session-persistence',
-        '--permission-mode', 'bypassPermissions',
+        "claude",
+        "--print",
+        "--model",
+        "haiku",
+        "--output-format",
+        "json",
+        "--plugin-dir",
+        str(temp_dir),
+        "--no-session-persistence",
+        "--permission-mode",
+        "bypassPermissions",
     ]
 
-    # Use isolated config dir to prevent loading global plugins
-    config_dir = temp_dir / '.claude-config'
-    config_dir.mkdir(exist_ok=True)
-    env = {**os.environ, 'CLAUDE_CONFIG_DIR': str(config_dir)}
+    env = os.environ.copy()
 
     try:
         start = time.time()
@@ -291,11 +317,11 @@ def run_observe_scenario(scenario: Scenario, org_id: str, timeout: int = 120) ->
             approach="observe",
             scenario=scenario.name,
             prompt=scenario.prompt,
-            duration_ms=output.get('duration_ms', elapsed_ms),
-            num_turns=output.get('num_turns', 0),
-            total_cost_usd=output.get('total_cost_usd', 0),
-            result_text=output.get('result', ''),
-            success=not output.get('is_error', False),
+            duration_ms=output.get("duration_ms", elapsed_ms),
+            num_turns=output.get("num_turns", 0),
+            total_cost_usd=output.get("total_cost_usd", 0),
+            result_text=output.get("result", ""),
+            success=not output.get("is_error", False),
         )
 
     except subprocess.TimeoutExpired:
@@ -326,22 +352,28 @@ def run_observe_scenario(scenario: Scenario, org_id: str, timeout: int = 120) ->
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
-def print_comparison(warehouse: BenchmarkResult, observe: BenchmarkResult, scenario: Scenario):
+def print_comparison(
+    warehouse: BenchmarkResult, observe: BenchmarkResult, scenario: Scenario
+):
     """Print side-by-side comparison."""
-    print(f"\n{'─'*70}")
+    print(f"\n{'─' * 70}")
     print(f"Scenario: {scenario.name}")
     print(f"Description: {scenario.description}")
-    print(f"{'─'*70}")
+    print(f"{'─' * 70}")
 
     print(f"\n{'Metric':<15} {'Warehouse':<20} {'Observe':<20} {'Winner'}")
-    print(f"{'─'*65}")
+    print(f"{'─' * 65}")
 
     # Time comparison
     w_time = f"{warehouse.duration_ms:.0f}ms" if warehouse.success else "FAILED"
     o_time = f"{observe.duration_ms:.0f}ms" if observe.success else "FAILED"
     if warehouse.success and observe.success:
-        time_winner = "Warehouse" if warehouse.duration_ms < observe.duration_ms else "Observe"
-        speedup = max(warehouse.duration_ms, observe.duration_ms) / min(warehouse.duration_ms, observe.duration_ms)
+        time_winner = (
+            "Warehouse" if warehouse.duration_ms < observe.duration_ms else "Observe"
+        )
+        speedup = max(warehouse.duration_ms, observe.duration_ms) / min(
+            warehouse.duration_ms, observe.duration_ms
+        )
         time_winner += f" ({speedup:.1f}x)"
     else:
         time_winner = "-"
@@ -351,7 +383,9 @@ def print_comparison(warehouse: BenchmarkResult, observe: BenchmarkResult, scena
     w_turns = str(warehouse.num_turns) if warehouse.success else "-"
     o_turns = str(observe.num_turns) if observe.success else "-"
     if warehouse.success and observe.success:
-        turns_winner = "Warehouse" if warehouse.num_turns < observe.num_turns else "Observe"
+        turns_winner = (
+            "Warehouse" if warehouse.num_turns < observe.num_turns else "Observe"
+        )
         if warehouse.num_turns == observe.num_turns:
             turns_winner = "Tie"
     else:
@@ -362,7 +396,11 @@ def print_comparison(warehouse: BenchmarkResult, observe: BenchmarkResult, scena
     w_cost = f"${warehouse.total_cost_usd:.4f}" if warehouse.success else "-"
     o_cost = f"${observe.total_cost_usd:.4f}" if observe.success else "-"
     if warehouse.success and observe.success:
-        cost_winner = "Warehouse" if warehouse.total_cost_usd < observe.total_cost_usd else "Observe"
+        cost_winner = (
+            "Warehouse"
+            if warehouse.total_cost_usd < observe.total_cost_usd
+            else "Observe"
+        )
     else:
         cost_winner = "-"
     print(f"{'Cost':<15} {w_cost:<20} {o_cost:<20} {cost_winner}")
@@ -372,19 +410,21 @@ def print_comparison(warehouse: BenchmarkResult, observe: BenchmarkResult, scena
 
     # Show result previews
     if warehouse.success:
-        print(f"\n🔧 Warehouse result preview:")
+        print("\n🔧 Warehouse result preview:")
         print(f"   {warehouse.result_text[:150]}...")
     if observe.success:
-        print(f"\n🔍 Observe result preview:")
+        print("\n🔍 Observe result preview:")
         print(f"   {observe.result_text[:150]}...")
 
 
 def main():
     parser = argparse.ArgumentParser(description="Fair benchmark: Warehouse vs Observe")
-    parser.add_argument('--org-id', required=True, help='Astro organization ID')
-    parser.add_argument('--scenarios', nargs='+', help='Specific scenarios to run')
-    parser.add_argument('--timeout', type=int, default=120, help='Timeout per scenario')
-    parser.add_argument('--output', default='fair_benchmark_results.json', help='Output file')
+    parser.add_argument("--org-id", required=True, help="Astro organization ID")
+    parser.add_argument("--scenarios", nargs="+", help="Specific scenarios to run")
+    parser.add_argument("--timeout", type=int, default=120, help="Timeout per scenario")
+    parser.add_argument(
+        "--output", default="fair_benchmark_results.json", help="Output file"
+    )
 
     args = parser.parse_args()
 
@@ -393,39 +433,60 @@ def main():
     if args.scenarios:
         scenarios = [s for s in SCENARIOS if s.name in args.scenarios]
 
-    print("="*70)
+    print("=" * 70)
     print("FAIR BENCHMARK: Warehouse SQL vs Observe Semantic Search")
-    print("="*70)
+    print("=" * 70)
     print(f"\nScenarios: {len(scenarios)}")
     print(f"Org ID: {args.org_id}")
     print("\nNote: Each approach gets a tailored prompt for its strengths.")
 
     results = []
 
+    # Run all scenarios and both approaches concurrently
+    print(f"\n🚀 Running all {len(scenarios)} scenarios concurrently...")
+
+    future_to_info = {}
+    with ThreadPoolExecutor(max_workers=len(scenarios) * 2) as executor:
+        for scenario in scenarios:
+            # Submit both approaches for each scenario
+            w_future = executor.submit(run_warehouse_scenario, scenario, args.timeout)
+            o_future = executor.submit(
+                run_observe_scenario, scenario, args.org_id, args.timeout
+            )
+            future_to_info[w_future] = ("warehouse", scenario)
+            future_to_info[o_future] = ("observe", scenario)
+
+        # Print progress as each completes
+        scenario_results = {}
+        for future in as_completed(future_to_info):
+            approach, scenario = future_to_info[future]
+            result = future.result()
+
+            # Print completion message
+            if result.success:
+                print(
+                    f"  ✓ [{scenario.name}] {approach}: {result.duration_ms:.0f}ms, {result.num_turns} turns"
+                )
+            else:
+                print(f"  ✗ [{scenario.name}] {approach}: {result.error}")
+
+            # Store result
+            if scenario.name not in scenario_results:
+                scenario_results[scenario.name] = {"scenario": scenario}
+            scenario_results[scenario.name][approach] = result
+
+    # Print comparisons in order
     for scenario in scenarios:
-        print(f"\n📝 Running: {scenario.name}...")
-
-        print("  [Warehouse] Starting...")
-        warehouse_result = run_warehouse_scenario(scenario, args.timeout)
-        if warehouse_result.success:
-            print(f"  [Warehouse] ✓ {warehouse_result.duration_ms:.0f}ms, {warehouse_result.num_turns} turns")
-        else:
-            print(f"  [Warehouse] ✗ {warehouse_result.error}")
-
-        print("  [Observe] Starting...")
-        observe_result = run_observe_scenario(scenario, args.org_id, args.timeout)
-        if observe_result.success:
-            print(f"  [Observe] ✓ {observe_result.duration_ms:.0f}ms, {observe_result.num_turns} turns")
-        else:
-            print(f"  [Observe] ✗ {observe_result.error}")
-
+        sr = scenario_results[scenario.name]
+        warehouse_result = sr["warehouse"]
+        observe_result = sr["observe"]
         results.append((warehouse_result, observe_result, scenario))
         print_comparison(warehouse_result, observe_result, scenario)
 
     # Summary
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("SUMMARY")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     w_wins = o_wins = ties = 0
     w_total_time = o_total_time = 0
@@ -458,15 +519,15 @@ def main():
 
     if w_count > 0:
         print(f"\nWarehouse Averages ({w_count} successful):")
-        print(f"  Time: {w_total_time/w_count:.0f}ms")
-        print(f"  Turns: {w_total_turns/w_count:.1f}")
-        print(f"  Cost: ${w_total_cost/w_count:.4f}")
+        print(f"  Time: {w_total_time / w_count:.0f}ms")
+        print(f"  Turns: {w_total_turns / w_count:.1f}")
+        print(f"  Cost: ${w_total_cost / w_count:.4f}")
 
     if o_count > 0:
         print(f"\nObserve Averages ({o_count} successful):")
-        print(f"  Time: {o_total_time/o_count:.0f}ms")
-        print(f"  Turns: {o_total_turns/o_count:.1f}")
-        print(f"  Cost: ${o_total_cost/o_count:.4f}")
+        print(f"  Time: {o_total_time / o_count:.0f}ms")
+        print(f"  Turns: {o_total_turns / o_count:.1f}")
+        print(f"  Cost: ${o_total_cost / o_count:.4f}")
 
     # Save results
     output_data = {
@@ -497,10 +558,10 @@ def main():
                 },
             }
             for w, o, s in results
-        ]
+        ],
     }
 
-    with open(args.output, 'w') as f:
+    with open(args.output, "w") as f:
         json.dump(output_data, f, indent=2)
 
     print(f"\n💾 Results saved to: {args.output}")
