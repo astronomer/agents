@@ -21,6 +21,10 @@ This skill helps migrate **Airflow 2.x DAG code** to **Airflow 3.x**, focusing o
    - `ruff check --preview --select AIR --fix --unsafe-fixes .`
 2. Scan for remaining issues using the manual search checklist in [reference/migration-checklist.md](reference/migration-checklist.md).
    - Focus on: direct metadata DB access, legacy imports, scheduling/context keys, XCom pickling, datasets-to-assets, REST API/auth, plugins, and file paths.
+   - Hard behavior/config gotchas to explicitly review:
+     - Cron scheduling semantics: consider `AIRFLOW__SCHEDULER__CREATE_CRON_DATA_INTERVAL=True` if you need Airflow 2-style cron data intervals.
+     - `.airflowignore` syntax changed from regexp to glob; set `AIRFLOW__CORE__DAG_IGNORE_FILE_SYNTAX=regexp` if you must keep regexp behavior.
+     - OAuth callback URLs add an `/auth/` prefix (e.g. `/auth/oauth-authorized/google`).
 3. Plan changes per file and issue type:
    - Fix imports - update operators/hooks/providers - refactor metadata access to using the Airflow client instead of direct access - fix use of outdated context variables - fix scheduling logic.
 4. Implement changes incrementally, re-running Ruff and code searches after each major change.
@@ -36,6 +40,8 @@ Airflow 3 changes how components talk to the metadata database:
 - Task code runs via the **Task Execution API** exposed by the **API server**.
 - The **DAG processor** runs as an independent process **separate from the scheduler**.
 - The **Triggerer** uses the task execution mechanism via an **in-process API server**.
+
+**Trigger implementation gotcha**: If a trigger calls hooks synchronously inside the asyncio event loop, it may fail or block. Prefer calling hooks via `sync_to_async(...)` (or otherwise ensure hook calls are async-safe).
 
 **Key code impact**: Task code can still import ORM sessions/models, but **any attempt to use them to talk to the metadata DB will fail** with:
 
@@ -140,6 +146,8 @@ For detailed code examples and migration patterns, see:
 - **[reference/migration-checklist.md](reference/migration-checklist.md)** - Manual search checklist with:
   - Search patterns for each issue type
   - Recommended fixes
+  - FAB plugin warnings
+  - Callback and behavior changes
 
 ---
 
@@ -161,9 +169,16 @@ For detailed code examples and migration patterns, see:
 | Removed Key | Replacement |
 |-------------|-------------|
 | `execution_date` | `context["dag_run"].logical_date` |
-| `tomorrow_ds` / `yesterday_ds` | `data_interval_start` / `data_interval_end` |
+| `tomorrow_ds` / `yesterday_ds` | Use `ds` with date math: `macros.ds_add(ds, 1)` / `macros.ds_add(ds, -1)` |
 | `prev_ds` / `next_ds` | `prev_start_date_success` or timetable API |
 | `triggering_dataset_events` | `triggering_asset_events` |
+| `templates_dict` | `context["params"]` |
+
+**Asset-triggered runs**: `logical_date` may be `None`; use `context["dag_run"].logical_date` defensively.
+
+**Cannot trigger with future `logical_date`**: Use `logical_date=None` and rely on `run_id` instead.
+
+Cron note: for scheduled runs using cron, `logical_date` semantics differ under `CronTriggerTimetable` (aligning `logical_date` with `run_after`). If you need Airflow 2-style cron data intervals, consider `AIRFLOW__SCHEDULER__CREATE_CRON_DATA_INTERVAL=True`.
 
 ### Default Behavior Changes
 
@@ -171,6 +186,11 @@ For detailed code examples and migration patterns, see:
 |---------|-------------------|-------------------|
 | `schedule` | `timedelta(days=1)` | `None` |
 | `catchup` | `True` | `False` |
+
+### Callback Behavior Changes
+
+- `on_success_callback` no longer runs on skip; use `on_skipped_callback` if needed.
+- `@teardown` with `TriggerRule.ALWAYS` not allowed; teardowns now execute even if DAG run terminated early.
 
 ---
 
