@@ -218,7 +218,7 @@ The `body` parameter supports **markdown formatting** and is **Jinja templatable
 hitl = HITLOperator(
     ...,
     body="""**Total Budget:** {{ ti.xcom_pull(task_ids='get_budget') }}
-    
+
 | Category | Amount |
 |----------|--------|
 | Marketing | $1M |
@@ -259,7 +259,7 @@ HOST = os.getenv("AIRFLOW_HOST")
 TOKEN = os.getenv("AIRFLOW_API_TOKEN")
 
 # Get pending actions
-r = requests.get(f"{HOST}/api/v2/hitlDetails/?state=pending", 
+r = requests.get(f"{HOST}/api/v2/hitlDetails/?state=pending",
                  headers={"Authorization": f"Bearer {TOKEN}"})
 
 # Respond
