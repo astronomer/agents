@@ -33,6 +33,10 @@ class AstroNotFoundError(AstroClientError):
     """Raised when a resource is not found."""
 
 
+class _TokenRefreshedError(Exception):
+    """Internal: raised when token was refreshed and request should retry."""
+
+
 class AstroClient:
     """HTTP client for Astro Cloud Observability API.
 
@@ -97,11 +101,15 @@ class AstroClient:
             AstroClientError: For other error responses
         """
         if response.status_code == 401:
-            raise AstroAuthenticationError(
-                "Authentication failed - the token is expired or invalid. "
-                "Please tell the user to run 'astro login' in their terminal to re-authenticate, "
-                "then try this request again."
-            )
+            # Try to refresh token automatically - raise special error to trigger retry
+            if self.token_manager.refresh():
+                raise _TokenRefreshedError("Token refreshed, retry request")
+            else:
+                raise AstroAuthenticationError(
+                    "Authentication failed - the token is expired or invalid. "
+                    "Please tell the user to run 'astro login' in their terminal to re-authenticate, "
+                    "then try this request again."
+                )
         if response.status_code == 403:
             raise AstroAuthenticationError(
                 "Access denied - the user may not have Observability permissions for this organization. "
@@ -234,10 +242,17 @@ class AstroClient:
 
         logger.debug("Searching assets: %s", params)
 
-        with httpx.Client(timeout=self.timeout) as client:
-            response = client.get(url, headers=self._get_headers(), params=params)
-
-        return self._handle_response(response)
+        # Retry once if token was refreshed
+        for attempt in range(2):
+            try:
+                with httpx.Client(timeout=self.timeout) as client:
+                    response = client.get(url, headers=self._get_headers(), params=params)
+                return self._handle_response(response)
+            except _TokenRefreshedError:
+                if attempt == 0:
+                    logger.info("Token refreshed, retrying request...")
+                    continue
+                raise AstroAuthenticationError("Token refresh failed after retry")
 
     def get_asset(self, asset_id: str) -> dict[str, Any]:
         """Get detailed information about a specific asset.
@@ -253,10 +268,17 @@ class AstroClient:
 
         logger.debug("Getting asset: %s", asset_id)
 
-        with httpx.Client(timeout=self.timeout) as client:
-            response = client.get(url, headers=self._get_headers())
-
-        return self._handle_response(response)
+        # Retry once if token was refreshed
+        for attempt in range(2):
+            try:
+                with httpx.Client(timeout=self.timeout) as client:
+                    response = client.get(url, headers=self._get_headers())
+                return self._handle_response(response)
+            except _TokenRefreshedError:
+                if attempt == 0:
+                    logger.info("Token refreshed, retrying request...")
+                    continue
+                raise AstroAuthenticationError("Token refresh failed after retry")
 
     def list_asset_filters(
         self,
@@ -293,7 +315,14 @@ class AstroClient:
 
         logger.debug("Listing asset filters: type=%s, params=%s", filter_type, params)
 
-        with httpx.Client(timeout=self.timeout) as client:
-            response = client.get(url, headers=self._get_headers(), params=params)
-
-        return self._handle_response(response)
+        # Retry once if token was refreshed
+        for attempt in range(2):
+            try:
+                with httpx.Client(timeout=self.timeout) as client:
+                    response = client.get(url, headers=self._get_headers(), params=params)
+                return self._handle_response(response)
+            except _TokenRefreshedError:
+                if attempt == 0:
+                    logger.info("Token refreshed, retrying request...")
+                    continue
+                raise AstroAuthenticationError("Token refresh failed after retry")

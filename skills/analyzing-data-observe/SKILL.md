@@ -43,10 +43,16 @@ Discover data assets using Observe catalog, then query data using SQL.
 **Step 1: Discovery** - Use the `search_assets` MCP tool (NOT codebase search)
 ```python
 # Use the Observe MCP tool - this queries the live catalog
-search_assets(search="customer", asset_types=["snowflakeTable"], limit=50)
+search_assets(search="customer", asset_types=["snowflakeTable"], limit=10)
 ```
 
-**Step 2: Query Data** - Use SQL via kernel to get actual data
+**Step 2: Get Column Details** - Use `get_asset` to retrieve column schema
+```python
+# Get column names, types, and descriptions for accurate SQL
+get_asset(asset_id="HQ.MART_CUST.CURRENT_ASTRO_CUSTS")
+```
+
+**Step 3: Query Data** - Use SQL via kernel to get actual data
 ```bash
 uv run ${CLAUDE_PLUGIN_ROOT}/skills/analyzing-data/scripts/cli.py exec "df = run_sql('SELECT COUNT(*) FROM HQ.MART_CUST.CURRENT_ASTRO_CUSTS'); print(df)"
 ```
@@ -57,13 +63,17 @@ uv run ${CLAUDE_PLUGIN_ROOT}/skills/analyzing-data/scripts/cli.py exec "df = run
 1. search_assets(search="deployment", asset_types=["snowflakeTable"])
    → Finds HQ.MODEL_ASTRO.DEPLOYMENTS table
 
-2. run_sql("SELECT COUNT(DISTINCT ORG_ID) FROM HQ.MODEL_ASTRO.DEPLOYMENTS WHERE AIRFLOW_VERSION LIKE '3%'")
+2. get_asset(asset_id="HQ.MODEL_ASTRO.DEPLOYMENTS")
+   → Returns columns: ORG_ID, AIRFLOW_VERSION, DEPLOYMENT_ID, etc.
+
+3. run_sql("SELECT COUNT(DISTINCT ORG_ID) FROM HQ.MODEL_ASTRO.DEPLOYMENTS WHERE AIRFLOW_VERSION LIKE '3%'")
    → Returns actual count
 ```
 
 **IMPORTANT**:
 - Step 1 uses the Observe MCP `search_assets` tool (NOT Grep/Read)
-- Step 2 uses SQL to query actual data (NOT reading cached results)
+- Step 2 uses `get_asset` to get column schema (returns column names, types, descriptions)
+- Step 3 uses SQL to query actual data (NOT reading cached results)
 
 ---
 
@@ -199,11 +209,12 @@ Search and filter catalog assets. **This should be your main tool - it returns r
 
 **⚡ Performance tip**: Results include most metadata you need! Only call `get_asset` if you need detailed lineage or ownership.
 
-### 2. `get_asset` - Detailed Lookup (Use Sparingly)
+### 2. `get_asset` - Column Schema & Detailed Lookup
 
-Get detailed information about a **specific** asset.
+Get detailed information about a **specific** asset, including **column definitions**.
 
 **When to use**:
+- ✅ **Before writing SQL** - get column names, types, and descriptions
 - ✅ User asks about a specific table's ownership or lineage
 - ✅ Need upstream/downstream dependencies
 - ✅ Need connection details
@@ -211,7 +222,8 @@ Get detailed information about a **specific** asset.
 **When NOT to use**:
 - ❌ Just listing tables (use search_assets results directly)
 - ❌ In loops over many assets
-- ❌ When search_assets metadata is sufficient
+
+**Note**: `search_assets` returns empty `columns: []`. Use `get_asset` to retrieve full column schema.
 
 **Parameters**:
 - `asset_id` (string): The asset ID from search results
@@ -321,28 +333,30 @@ search_assets(
 
 ---
 
-### Pattern 5: Detailed Metadata Lookup (2-3 calls)
+### Pattern 5: Query Data with Column Discovery (3 calls)
 
-**User asks**: "Who owns the CUSTOMER table and what deployment is it in?"
+**User asks**: "What's the total ARR?"
 
 ```python
-# Call 1: Find the table
+# Call 1: Find relevant tables
 results = search_assets(
-    search="CUSTOMER",
+    search="ARR",
     asset_types=["snowflakeTable"],
-    limit=20
+    limit=10
 )
 
-# Call 2: Get detailed metadata (ONLY if needed for ownership/lineage)
-asset_details = get_asset(asset_id=results['assets'][0]['assetId'])
+# Call 2: Get column schema for the best match
+asset_details = get_asset(asset_id="HQ.METRICS_FINANCE.CONTRACT_ARR_MONTHLY")
+# Returns: columns with names, types, descriptions (ARR_AMT, PRODUCT, EOM_DATE, etc.)
 
-# Format: owner, deployment, connection info
+# Call 3: Query with accurate column names
+run_sql("SELECT SUM(ARR_AMT) FROM HQ.METRICS_FINANCE.CONTRACT_ARR_MONTHLY WHERE EOM_DATE = (SELECT MAX(EOM_DATE) FROM HQ.METRICS_FINANCE.CONTRACT_ARR_MONTHLY)")
 ```
 
-**Calls**: 2
-**Expected time**: 10-15 seconds
+**Calls**: 3
+**Expected time**: 15-20 seconds
 
-**Important**: Only call `get_asset` if search results don't have enough info!
+**Important**: Always use `get_asset` before writing SQL to get accurate column names!
 
 ---
 
@@ -508,7 +522,7 @@ uv run ${CLAUDE_PLUGIN_ROOT}/skills/analyzing-data/scripts/cli.py exec "print(df
 ## Limitations
 
 - **Catalog Freshness**: Data may have slight latency (typically minutes) from event processing
-- **No Schema Details**: Limited column-level metadata compared to INFORMATION_SCHEMA
+- **Column Schema**: Use `get_asset` to retrieve column details (not available in `search_assets`)
 - **Lineage Scope**: Only shows lineage captured by Airflow/OpenLineage
 
 ---

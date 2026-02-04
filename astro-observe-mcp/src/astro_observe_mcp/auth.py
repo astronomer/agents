@@ -10,6 +10,7 @@ import logging
 import os
 from pathlib import Path
 
+import httpx
 import yaml
 
 logger = logging.getLogger(__name__)
@@ -133,6 +134,94 @@ def get_token_from_config() -> str | None:
     return None
 
 
+def get_refresh_token_from_config() -> str | None:
+    """Get the refresh token from the current Astro CLI context.
+
+    Returns:
+        Refresh token string, or None if not found
+    """
+    context = get_current_context()
+    if context:
+        return context.get("refreshtoken")
+    return None
+
+
+def refresh_access_token() -> str | None:
+    """Use the refresh token to get a new access token from Auth0.
+
+    Returns:
+        New access token, or None if refresh failed
+    """
+    config = load_astro_config()
+    if not config:
+        return None
+
+    context_name = config.get("context", "")
+    context = get_current_context(config)
+    if not context:
+        return None
+
+    refresh_token = context.get("refreshtoken")
+    if not refresh_token:
+        logger.warning("No refresh token found in config")
+        return None
+
+    # Determine Auth0 domain and client ID based on context
+    if "dev" in context_name:
+        auth_domain = "https://auth.astronomer-dev.io"
+        client_id = "PH3Nac2DtpSx1Tx3IGQmh2zaRbF5ubZG"
+    else:
+        auth_domain = "https://auth.astronomer.io"
+        client_id = "5XYJZYf5xZ0eKALgBH3O08WzgfUfz7y9"
+
+    try:
+        logger.info("Refreshing access token via Auth0...")
+        response = httpx.post(
+            f"{auth_domain}/oauth/token",
+            json={
+                "grant_type": "refresh_token",
+                "client_id": client_id,
+                "refresh_token": refresh_token,
+            },
+            timeout=30,
+        )
+
+        if response.status_code == 200:
+            data = response.json()
+            new_token = data.get("access_token")
+            if new_token:
+                logger.info("Successfully refreshed access token")
+                # Update the config file with new token
+                _update_config_token(config, context_name, new_token)
+                return new_token
+        else:
+            logger.warning("Token refresh failed: %s %s", response.status_code, response.text[:200])
+    except Exception as e:
+        logger.warning("Token refresh error: %s", e)
+
+    return None
+
+
+def _update_config_token(config: dict, context_name: str, new_token: str) -> None:
+    """Update the token in the Astro config file.
+
+    Args:
+        config: The loaded config dict
+        context_name: The context name (e.g., "astronomer.io")
+        new_token: The new access token
+    """
+    try:
+        context_key = context_name.replace(".", "_")
+        if "contexts" in config and context_key in config["contexts"]:
+            config["contexts"][context_key]["token"] = f"Bearer {new_token}"
+
+            with open(ASTRO_CONFIG_FILE, "w") as f:
+                yaml.safe_dump(config, f, default_flow_style=False)
+            logger.info("Updated token in config file")
+    except Exception as e:
+        logger.warning("Failed to update config file: %s", e)
+
+
 class AstroTokenManager:
     """Manages authentication tokens for Astro Cloud API.
 
@@ -209,6 +298,29 @@ class AstroTokenManager:
         """Clear cached token to force re-discovery on next request."""
         self._cached_token = None
         self._token_source = None
+
+    def refresh(self) -> bool:
+        """Attempt to refresh the token using the stored refresh token.
+
+        Uses the refresh token from ~/.astro/config.yaml to get a new
+        access token from Auth0, then updates the config file.
+
+        Returns:
+            True if refresh succeeded, False otherwise
+        """
+        logger.info("Token expired, attempting refresh via Auth0...")
+        self.invalidate()
+
+        # Try to refresh using the refresh token
+        new_token = refresh_access_token()
+        if new_token:
+            self._cached_token = new_token
+            self._token_source = f"refreshed:{ASTRO_CONFIG_FILE}"
+            logger.info("Token refresh succeeded")
+            return True
+        else:
+            logger.warning("Token refresh failed")
+            return False
 
     def has_token(self) -> bool:
         """Check if a valid token is available.

@@ -1,6 +1,6 @@
 ---
 name: analyzing-data-observe-benchmark
-description: Discovers data assets using Astro Observability catalog and queries data via SQL.
+description: Queries data warehouse and answers business questions about data. Uses Astro Observability catalog to discover tables, then queries via SQL. Handles ARR, revenue, metrics, customer data, financial questions, and any SQL analysis.
 hooks:
   PreToolUse:
     - matcher: "Bash"
@@ -14,29 +14,42 @@ hooks:
           command: "uv run ${CLAUDE_PLUGIN_ROOT}/skills/analyzing-data/scripts/cli.py stop"
 ---
 
-# EXECUTE IMMEDIATELY - NO EXPLORATION
+# COMPLETE THE TASK - DO NOT STOP EARLY
 
-## YOUR FIRST TOOL CALL MUST BE:
+You MUST complete these 2 steps in order:
 
-Tool: `mcp__plugin_data_observe__search_assets`
-Parameters: `{"search": "<keywords>", "asset_types": ["snowflakeTable"], "limit": 30}`
+## STEP 1: Search for tables (MCP)
 
-This MCP tool is already available to you. Call it NOW like you call Bash or Read.
-
----
-
-## AFTER MCP returns tables, run SQL:
-
-```bash
-uv run ${CLAUDE_PLUGIN_ROOT}/skills/analyzing-data/scripts/cli.py exec "df = run_sql('SELECT ...'); print(df)"
+```
+Tool: mcp__plugin_data_observe__search_assets
+Parameters: {"search": "<keywords>", "asset_types": ["snowflakeTable"], "limit": 10}
 ```
 
----
+## STEP 2: Get column details for the best match (MCP)
 
-## STRICT RULES
+Pick the most relevant table from Step 1 (prefer HQ.METRICS_* or HQ.MART_* schemas) and get its columns:
 
-- First call = MCP search (mandatory)
-- Second call = SQL query (mandatory)
-- For "total ARR" questions: get the MAX date value, not SUM of all rows
+```
+Tool: mcp__plugin_data_observe__get_asset
+Parameters: {"asset_id": "HQ.SCHEMA.TABLE_NAME"}
+```
+
+This returns column names, types, and descriptions to help write accurate SQL.
+
+## STEP 3: Query the data (SQL) - DO NOT SKIP THIS
+
+After finding tables, you MUST run SQL to get the actual answer:
+
+```bash
+uv run ${CLAUDE_PLUGIN_ROOT}/skills/analyzing-data/scripts/cli.py exec "df = run_sql('SELECT ... FROM HQ.SCHEMA.TABLE ...'); print(df)"
+```
+
+**CRITICAL: Do NOT stop after step 1. Do NOT ask "would you like me to query?" - just query it.**
+
+## Rules
+
+- All 3 steps are MANDATORY - never respond with just table names
+- For ARR questions: `SELECT MAX(ARR_AMT) FROM table WHERE EOM_DATE = (SELECT MAX(EOM_DATE) FROM table)`
+- For product ARR: Filter by PRODUCT column (e.g., `WHERE PRODUCT = 'Software'`)
 - Tables from METRICS_* or MART_* schemas are best
-- DO NOT use ls, find, --help, Glob, Read, or Grep
+- ALWAYS return a number as the final answer

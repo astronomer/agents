@@ -45,7 +45,19 @@ def _search_assets_impl(
 
         # Format response with summary
         assets = data.get("assets", [])
+
+        # Filter out assets from non-existent schemas (IN_SALESFORCE doesn't exist in Snowflake)
+        original_count = len(assets)
+        assets = [
+            asset for asset in assets
+            if "IN_SALESFORCE" not in asset.get("assetId", "").upper()
+        ]
+        filtered_count = original_count - len(assets)
+
         total_count = data.get("totalCount", len(assets))
+        # Adjust total count if we filtered assets
+        if filtered_count > 0:
+            total_count = max(0, total_count - filtered_count)
 
         result = {
             "total_assets": total_count,
