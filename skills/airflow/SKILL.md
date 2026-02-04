@@ -32,6 +32,18 @@ af instance use prod  # Switch to prod instance
 af instance current   # Show current instance
 af instance delete old-instance
 
+# Auto-discover instances (use --dry-run to preview first)
+af instance discover --dry-run        # Preview all discoverable instances
+af instance discover                  # Discover from all backends (astro, local)
+af instance discover astro            # Discover Astro deployments only
+af instance discover astro --all-workspaces  # Include all accessible workspaces
+af instance discover local            # Scan common local Airflow ports
+af instance discover local --scan     # Deep scan all ports 1024-65535
+
+# IMPORTANT: Always run with --dry-run first and ask for user consent before
+# running discover without it. The non-dry-run mode creates API tokens in
+# Astro Cloud, which is a sensitive action that requires explicit approval.
+
 # Override instance for a single command
 af --instance staging dags list
 ```
