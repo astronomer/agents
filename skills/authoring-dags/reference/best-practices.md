@@ -85,11 +85,11 @@ def my_dag():
     def get_data():
         hook = PostgresHook("conn")
         return hook.get_records("SELECT * FROM table")
-    
+
     @task
     def process(data):
         return data
-    
+
     process(get_data())
 ```
 
