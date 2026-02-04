@@ -1,0 +1,396 @@
+"""Astro CLI wrapper for auto-discovering deployments."""
+
+from __future__ import annotations
+
+import re
+import shutil
+import subprocess  # nosec B404 - subprocess is needed for CLI wrapper
+from dataclasses import dataclass
+
+import yaml
+
+
+class AstroCliError(Exception):
+    """Base exception for Astro CLI errors."""
+
+
+class AstroCliNotInstalledError(AstroCliError):
+    """Raised when the Astro CLI is not installed."""
+
+
+class AstroCliNotAuthenticatedError(AstroCliError):
+    """Raised when the user is not authenticated with Astro CLI."""
+
+
+@dataclass
+class AstroDeployment:
+    """Information about an Astro deployment."""
+
+    id: str
+    name: str
+    workspace_id: str
+    workspace_name: str
+    airflow_api_url: str
+    status: str
+    airflow_version: str | None = None
+    release_name: str | None = None
+
+    @classmethod
+    def from_inspect_yaml(cls, data: dict) -> AstroDeployment:
+        """Create from astro deployment inspect YAML output."""
+        deployment = data.get("deployment", data)
+        config = deployment.get("configuration", {})
+        metadata = deployment.get("metadata", {})
+
+        # Get the webserver URL (base URL without /api/v2 suffix)
+        # The adapter will add the appropriate API path
+        webserver_url = metadata.get("webserver_url", "")
+        if webserver_url and not webserver_url.startswith("http"):
+            webserver_url = f"https://{webserver_url}"
+
+        return cls(
+            id=metadata.get("deployment_id", ""),
+            name=config.get("name", ""),
+            workspace_id=metadata.get("workspace_id", ""),
+            workspace_name=config.get("workspace_name", ""),
+            airflow_api_url=webserver_url,
+            status=metadata.get("status", "UNKNOWN"),
+            airflow_version=metadata.get("airflow_version"),
+            release_name=metadata.get("release_name"),
+        )
+
+
+class AstroCli:
+    """Wrapper for the Astro CLI."""
+
+    # Keywords in stderr that indicate authentication issues
+    # These match the actual error message from `astro` CLI when not logged in
+    AUTH_ERROR_KEYWORDS = frozenset(
+        [
+            "no context set",
+            "astro login",
+        ]
+    )
+
+    TOKEN_NAME = "af-cli-discover"  # nosec B105 - not a password, just a token name
+
+    def __init__(self) -> None:
+        """Initialize the Astro CLI wrapper."""
+        self._astro_path: str | None = None
+
+    def _get_astro_path(self) -> str:
+        """Get the path to the astro CLI executable."""
+        if self._astro_path is None:
+            self._astro_path = shutil.which("astro")
+            if self._astro_path is None:
+                raise AstroCliNotInstalledError(
+                    "Astro CLI is not installed. Install it with: brew install astro"
+                )
+        return self._astro_path
+
+    def _run_command(
+        self, args: list[str], timeout: int = 30, check_auth: bool = True
+    ) -> subprocess.CompletedProcess[str]:
+        """Run an astro CLI command.
+
+        Args:
+            args: Command arguments (without 'astro' prefix)
+            timeout: Timeout in seconds
+            check_auth: Whether to check for authentication errors
+
+        Returns:
+            CompletedProcess with stdout/stderr
+
+        Raises:
+            AstroCliNotInstalledError: If astro CLI is not found
+            AstroCliNotAuthenticatedError: If user is not authenticated
+            AstroCliError: For other CLI errors
+        """
+        astro_path = self._get_astro_path()
+
+        result = subprocess.run(  # nosec B603 - astro CLI path is validated via shutil.which
+            [astro_path, *args],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+
+        # Check for authentication errors in stderr
+        if check_auth and result.returncode != 0:
+            stderr_lower = result.stderr.lower()
+            if any(keyword in stderr_lower for keyword in self.AUTH_ERROR_KEYWORDS):
+                raise AstroCliNotAuthenticatedError(
+                    "Not authenticated with Astro. Run 'astro login' first."
+                )
+
+        return result
+
+    def _run_list_command(self, args: list[str], entity: str, timeout: int = 30) -> list[dict]:
+        """Run a list command and parse table output.
+
+        Args:
+            args: Command arguments (without 'astro' prefix)
+            entity: Name of the entity being listed (for error messages)
+            timeout: Timeout in seconds
+
+        Returns:
+            List of dicts with column headers as keys
+
+        Raises:
+            AstroCliError: If the command fails
+        """
+        result = self._run_command(args, timeout=timeout)
+        if result.returncode != 0:
+            raise AstroCliError(f"Failed to list {entity}: {result.stderr}")
+        return self._parse_table_output(result.stdout)
+
+    def _find_column_boundaries(self, header_line: str) -> list[int]:
+        """Find column start positions by detecting 2+ space separators.
+
+        Returns:
+            List of column start positions (character indices)
+        """
+        boundaries: list[int] = []
+        # Find the start of each column (non-space after 2+ spaces, or start of line)
+        in_space_run = True  # Treat start of line as after spaces
+        space_count = 0
+
+        for i, char in enumerate(header_line):
+            if char == " ":
+                space_count += 1
+                in_space_run = True
+            else:
+                # Non-space character
+                if in_space_run and (space_count >= 2 or i == 0 or not boundaries):
+                    boundaries.append(i)
+                in_space_run = False
+                space_count = 0
+
+        return boundaries
+
+    def _parse_table_output(self, output: str) -> list[dict]:
+        """Parse table output from astro CLI commands.
+
+        The CLI outputs space-aligned tables like:
+         NAME     NAMESPACE     DEPLOYMENT ID     ...
+         test     foo-1234      abc123            ...
+
+        Uses column boundaries detected by 2+ space separators.
+        This handles multi-word headers and varying column widths.
+
+        Args:
+            output: Raw stdout from CLI command
+
+        Returns:
+            List of dicts with column headers as keys
+        """
+        lines = output.strip().split("\n")
+        if len(lines) < 2:
+            return []
+
+        header_line = lines[0]
+        boundaries = self._find_column_boundaries(header_line)
+
+        if not boundaries:
+            return []
+
+        # Extract header names using boundaries
+        headers: list[tuple[str, int]] = []
+        for i, start in enumerate(boundaries):
+            end = boundaries[i + 1] if i + 1 < len(boundaries) else len(header_line)
+            header_name = header_line[start:end].strip().lower().replace(" ", "_")
+            if header_name:
+                headers.append((header_name, start))
+
+        if not headers:
+            return []
+
+        # Parse data rows using same boundaries
+        results = []
+        for line in lines[1:]:
+            if not line.strip():
+                continue
+
+            row = {}
+            for i, (header_name, start_pos) in enumerate(headers):
+                # End position is start of next column or end of line
+                end_pos = headers[i + 1][1] if i + 1 < len(headers) else len(line)
+                # Handle lines shorter than expected
+                value = line[start_pos:end_pos].strip() if start_pos < len(line) else ""
+                row[header_name] = value
+
+            if any(row.values()):  # Skip empty rows
+                results.append(row)
+
+        return results
+
+    def is_installed(self) -> bool:
+        """Check if the Astro CLI is installed."""
+        try:
+            self._get_astro_path()
+            return True
+        except AstroCliNotInstalledError:
+            return False
+
+    def get_context(self) -> str | None:
+        """Get the current Astro context (domain).
+
+        Returns:
+            Context domain (e.g., 'cloud.astronomer.io') or None
+        """
+        try:
+            result = self._run_command(["context", "list"], check_auth=False)
+            if result.returncode != 0:
+                return None
+
+            # Parse table output - look for row with asterisk (current context)
+            for line in result.stdout.strip().split("\n")[1:]:  # Skip header
+                if line.strip().startswith("*"):
+                    # Format: * DOMAIN  ...
+                    parts = line.strip().split()
+                    if len(parts) >= 2:
+                        return parts[1]  # Domain is second field after *
+
+            return None
+        except (AstroCliError, subprocess.TimeoutExpired):
+            return None
+
+    def list_workspaces(self) -> list[dict]:
+        """List all accessible workspaces.
+
+        Returns:
+            List of workspace dictionaries with 'name' and 'id' keys
+        """
+        return self._run_list_command(["workspace", "list"], "workspaces")
+
+    def list_deployments(self, all_workspaces: bool = False) -> list[dict]:
+        """List deployments.
+
+        Args:
+            all_workspaces: If True, list from all accessible workspaces
+
+        Returns:
+            List of deployment dictionaries with basic info
+        """
+        args = ["deployment", "list"]
+        if all_workspaces:
+            args.append("--all")
+
+        return self._run_list_command(args, "deployments", timeout=60)
+
+    def inspect_deployment(
+        self, deployment_id: str, workspace_id: str | None = None
+    ) -> AstroDeployment:
+        """Get detailed information about a deployment.
+
+        Args:
+            deployment_id: Deployment ID (not name)
+            workspace_id: Optional workspace ID (needed if not in current workspace)
+
+        Returns:
+            AstroDeployment with full details including API URL
+        """
+        args = ["deployment", "inspect", deployment_id]
+        if workspace_id:
+            args.extend(["--workspace-id", workspace_id])
+
+        result = self._run_command(args, timeout=30)
+
+        if result.returncode != 0:
+            raise AstroCliError(f"Failed to inspect deployment '{deployment_id}': {result.stderr}")
+
+        try:
+            data = yaml.safe_load(result.stdout)
+            return AstroDeployment.from_inspect_yaml(data)
+        except yaml.YAMLError as e:
+            raise AstroCliError(f"Failed to parse deployment info: {e}") from e
+
+    def list_deployment_tokens(self, deployment_id: str) -> list[dict]:
+        """List API tokens for a deployment.
+
+        Args:
+            deployment_id: The deployment ID
+
+        Returns:
+            List of token dictionaries with id, name, role, etc.
+        """
+        args = ["deployment", "token", "list", "--deployment-id", deployment_id]
+        return self._run_list_command(args, "deployment tokens")
+
+    def token_exists(self, deployment_id: str, token_name: str) -> bool:
+        """Check if a token with the given name exists for a deployment.
+
+        Args:
+            deployment_id: The deployment ID
+            token_name: Name of the token to check
+
+        Returns:
+            True if token exists, False otherwise
+        """
+        tokens = self.list_deployment_tokens(deployment_id)
+        return any(t.get("name") == token_name for t in tokens)
+
+    def create_deployment_token(
+        self,
+        deployment_id: str,
+        name: str,
+        role: str = "DEPLOYMENT_ADMIN",
+        expiry_days: int = 0,
+    ) -> str:
+        """Create a new deployment API token.
+
+        Args:
+            deployment_id: The deployment ID
+            name: Name for the token
+            role: Token role (DEPLOYMENT_ADMIN, etc.)
+            expiry_days: Days until expiration (0 = never)
+
+        Returns:
+            The token value (only available at creation time)
+        """
+        args = [
+            "deployment",
+            "token",
+            "create",
+            "--deployment-id",
+            deployment_id,
+            "--name",
+            name,
+            "--role",
+            role,
+        ]
+
+        if expiry_days > 0:
+            args.extend(["--expiry", str(expiry_days)])
+
+        result = self._run_command(args, timeout=30)
+
+        if result.returncode != 0:
+            raise AstroCliError(f"Failed to create deployment token: {result.stderr}")
+
+        # Extract the token from stdout. The CLI output format varies by version,
+        # so we try multiple extraction strategies in order of specificity.
+        output = result.stdout.strip()
+
+        # Strategy 1: Look for a JWT token (header.payload.signature format)
+        # JWTs from Astro start with "eyJ" (base64 for '{"')
+        jwt_pattern = re.compile(r"eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+")
+        match = jwt_pattern.search(output)
+        if match:
+            return match.group(0)
+
+        # Strategy 2: Look for any long alphanumeric string (100+ chars)
+        # Some token formats may not be JWTs
+        token_pattern = re.compile(r"[A-Za-z0-9_-]{100,}")
+        match = token_pattern.search(output)
+        if match:
+            return match.group(0)
+
+        # Strategy 3: If the output is a single line of reasonable length, assume it's the token
+        if len(output) > 50 and "\n" not in output:
+            return output
+
+        raise AstroCliError(
+            f"Token creation succeeded but could not extract token value from output: {output[:200]}"
+        )

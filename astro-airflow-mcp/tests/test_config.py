@@ -272,16 +272,16 @@ class TestConfigManager:
     """Tests for ConfigManager."""
 
     def test_load_nonexistent_file(self, tmp_path):
-        """Test loading creates default localhost config when file doesn't exist."""
+        """Test loading creates default localhost:8080 config when file doesn't exist."""
         config_path = tmp_path / "nonexistent.yaml"
         manager = ConfigManager(config_path=config_path)
         config = manager.load()
 
-        # Should create default localhost instance
+        # Should create default localhost:8080 instance
         assert len(config.instances) == 1
-        assert config.get_instance("localhost") is not None
-        assert config.get_instance("localhost").url == "http://localhost:8080"
-        assert config.current_instance == "localhost"
+        assert config.get_instance("localhost:8080") is not None
+        assert config.get_instance("localhost:8080").url == "http://localhost:8080"
+        assert config.current_instance == "localhost:8080"
 
         # Should save the config file
         assert config_path.exists()
@@ -459,10 +459,10 @@ class TestConfigManager:
         config_path = tmp_path / "config.yaml"
         manager = ConfigManager(config_path=config_path)
 
-        # Default localhost instance is created on first load
+        # Default localhost:8080 instance is created on first load
         config = manager.load()
-        assert config.get_instance("localhost") is not None
-        assert config.current_instance == "localhost"
+        assert config.get_instance("localhost:8080") is not None
+        assert config.current_instance == "localhost:8080"
 
         # Add another instance
         manager.add_instance("staging", "https://staging.example.com", token="token")
@@ -487,12 +487,12 @@ class TestConfigManager:
         config_path = tmp_path / "config.yaml"
         manager = ConfigManager(config_path=config_path)
 
-        # Default localhost is created, add more instances
+        # Default localhost:8080 is created, add more instances
         manager.add_instance("staging", "https://staging.example.com", token="token")
 
         instances = manager.list_instances()
-        assert len(instances) == 2  # localhost + staging
-        assert manager.get_current_instance() == "localhost"  # default is set
+        assert len(instances) == 2  # localhost:8080 + staging
+        assert manager.get_current_instance() == "localhost:8080"  # default is set
 
         manager.use_instance("staging")
         assert manager.get_current_instance() == "staging"

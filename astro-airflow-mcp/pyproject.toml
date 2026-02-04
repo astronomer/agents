@@ -11,6 +11,7 @@ dependencies = [
     "packaging>=21.0",
     "pydantic>=2.0.0",
     "pyyaml>=6.0",
+    "simple-term-menu>=1.6.0",
     "typer>=0.12.0",
 ]
 

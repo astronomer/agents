@@ -310,9 +310,6 @@ af instance list      # Shows all instances in a table
 af instance use prod  # Switch to prod instance
 af instance current   # Show current instance
 af instance delete old-instance
-
-# Override instance for a single command
-af --instance staging dags list
 ```
 
 Config file location: `~/.af/config.yaml` (override with `--config` or `AF_CONFIG` env var)
@@ -373,7 +370,7 @@ current-instance: local
 
 ### Configuration
 
-You can also configure connections via environment variables or CLI flags:
+Configure connections via environment variables:
 
 ```bash
 # Environment variables
@@ -381,8 +378,8 @@ export AIRFLOW_API_URL=http://localhost:8080
 export AIRFLOW_USERNAME=admin
 export AIRFLOW_PASSWORD=admin
 
-# Or use CLI flags
-af --airflow-url http://localhost:8080 --username admin --password admin dags list
+# Or inline for one-off commands
+AIRFLOW_API_URL=http://localhost:5500 af dags list
 ```
 
 All commands output JSON (except `instance` commands which use human-readable tables), making them easy to use with tools like `jq`:
@@ -403,7 +400,8 @@ For HTTP-based integrations or connecting multiple clients to one server:
 
 ```bash
 # Run server (HTTP mode is default)
-uvx astro-airflow-mcp --airflow-url https://my-airflow.example.com --username admin --password admin
+# Configure via environment variables
+AIRFLOW_API_URL=https://my-airflow.example.com AIRFLOW_USERNAME=admin AIRFLOW_PASSWORD=admin uvx astro-airflow-mcp
 ```
 
 Connect MCP clients to: `http://localhost:8000/mcp`
@@ -419,16 +417,30 @@ echo astro-airflow-mcp >> requirements.txt
 
 ### CLI Options
 
+**MCP Server Options:**
+
 | Flag | Environment Variable | Default | Description |
 |------|---------------------|---------|-------------|
 | `--transport` | `MCP_TRANSPORT` | `stdio` | Transport mode (`stdio` or `http`) |
 | `--host` | `MCP_HOST` | `localhost` | Host to bind to (HTTP mode only) |
 | `--port` | `MCP_PORT` | `8000` | Port to bind to (HTTP mode only) |
-| `--airflow-url` | `AIRFLOW_API_URL` | Auto-discovered or `http://localhost:8080` | Airflow webserver URL |
-| `--airflow-project-dir` | `AIRFLOW_PROJECT_DIR` | `$PWD` | Astro project directory for auto-discovering Airflow URL from `.astro/config.yaml` |
-| `--auth-token` | `AIRFLOW_AUTH_TOKEN` | `None` | Bearer token for authentication |
-| `--username` | `AIRFLOW_USERNAME` | `None` | Username for authentication (Airflow 3.x uses OAuth2 token exchange) |
-| `--password` | `AIRFLOW_PASSWORD` | `None` | Password for authentication |
+| `--airflow-project-dir` | `AIRFLOW_PROJECT_DIR` | `$PWD` | Astro project directory for auto-discovering Airflow URL |
+
+**Airflow Connection (Environment Variables):**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AIRFLOW_API_URL` | `http://localhost:8080` | Airflow webserver URL |
+| `AIRFLOW_AUTH_TOKEN` | `None` | Bearer token for authentication |
+| `AIRFLOW_USERNAME` | `None` | Username for authentication |
+| `AIRFLOW_PASSWORD` | `None` | Password for authentication |
+
+**af CLI Options:**
+
+| Flag | Environment Variable | Description |
+|------|---------------------|-------------|
+| `--config`, `-c` | `AF_CONFIG` | Path to config file (default: `~/.af/config.yaml`) |
+| `--version`, `-v` | | Show version and exit |
 
 ## Architecture
 

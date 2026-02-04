@@ -27,7 +27,7 @@ install-dev-ci:  ## Install the package with dev dependencies (CI - system Pytho
 	uv pip install --system -e .
 
 install-hooks:  ## Install prek hooks
-	prek install
+	uv run prek install
 	@echo "✓ prek hooks installed"
 
 run:  ## Run the MCP server in HTTP mode (default is stdio, but HTTP can be useful for local testing)
@@ -96,10 +96,10 @@ check: lint type-check security  ## Run all checks (lint, type-check, security)
 	@echo "✓ All checks passed"
 
 prek:  ## Run prek on all files
-	prek run --all-files
+	uv run prek run --all-files
 
 prek-update:  ## Update prek hook versions
-	prek autoupdate
+	uv run prek autoupdate
 
 clean:  ## Clean up build artifacts and cache files
 	rm -rf build/
