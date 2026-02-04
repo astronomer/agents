@@ -5,7 +5,7 @@
 - [Migration Checklist](#migration-checklist)
   - [1. Direct metadata DB access](#1-direct-metadata-db-access)
   - [2. Legacy imports](#2-legacy-imports)
-  - [3. Removed DAG arguments](#3-removed-dag-arguments)
+  - [3. Removed/renamed DAG arguments](#3-removedrenamed-dag-arguments)
   - [4. Deprecated context keys](#4-deprecated-context-keys)
   - [5. XCom pickling](#5-xcom-pickling)
   - [6. Datasets to Assets](#6-datasets-to-assets)
@@ -13,6 +13,8 @@
   - [8. Email changes](#8-email-changes)
   - [9. REST API v1](#9-rest-api-v1)
   - [10. File paths](#10-file-paths)
+  - [11. FAB-based plugins](#11-fab-based-plugins)
+  - [12. Callback and behavior changes](#12-callback-and-behavior-changes)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -25,8 +27,15 @@ After running Ruff's AIR rules, use this manual search checklist to find remaini
 **Search for:**
 - `provide_session`
 - `create_session`
+- `@provide_session`
 - `Session(`
 - `engine`
+- `with Session()`
+- `engine.connect(`
+- `Session(bind=engine)`
+- `from airflow.settings import Session`
+- `from airflow.settings import engine`
+- `from sqlalchemy.orm.session import Session`
 
 **Fix:** Refactor to use Airflow Python client or REST API
 
@@ -43,15 +52,21 @@ After running Ruff's AIR rules, use this manual search checklist to find remaini
 
 ---
 
-## 3. Removed DAG arguments
+## 3. Removed/renamed DAG arguments
 
 **Search for:**
 - `schedule_interval=`
 - `timetable=`
 - `days_ago(`
 - `fail_stop=`
+- `sla=`
+- `sla_miss_callback`
 
-**Fix:** Use `schedule=` and `pendulum`
+**Fix:**
+- `schedule_interval` and `timetable` → use `schedule=`
+- `days_ago` → use `pendulum.today("UTC").add(days=-N)`
+- `fail_stop` → renamed to `fail_fast`
+- `sla` and `sla_miss_callback` → removed; use **Astro Alerts** or OSS **Deadline Alerts** (Airflow 3.1+ experimental)
 
 ---
 
@@ -63,8 +78,13 @@ After running Ruff's AIR rules, use this manual search checklist to find remaini
 - `next_ds`
 - `yesterday_ds`
 - `tomorrow_ds`
+- `templates_dict`
 
-**Fix:** Use `data_interval_start/end` and `dag_run.logical_date`
+**Fix:**
+- `execution_date` → use `context["dag_run"].logical_date`
+- `tomorrow_ds` / `yesterday_ds` → use `ds` with date math: `macros.ds_add(ds, 1)` / `macros.ds_add(ds, -1)`
+- `prev_ds` / `next_ds` → use `prev_start_date_success` or timetable API
+- `templates_dict` → use `params` via `context["params"]`
 
 ---
 
@@ -83,8 +103,13 @@ After running Ruff's AIR rules, use this manual search checklist to find remaini
 **Search for:**
 - `airflow.datasets`
 - `triggering_dataset_events`
+- `DatasetOrTimeSchedule`
+- `on_dataset_created`
+- `on_dataset_changed`
+- `outlet_events["`
+- `inlet_events["`
 
-**Fix:** Switch to `airflow.sdk.Asset`
+**Fix:** Switch to `airflow.sdk.Asset`, `AssetOrTimeSchedule`, `on_asset_created`/`on_asset_changed`. Use `Asset(name=...)` objects as keys in `outlet_events`/`inlet_events` (not strings)
 
 ---
 
@@ -104,8 +129,10 @@ After running Ruff's AIR rules, use this manual search checklist to find remaini
 
 **Search for:**
 - `airflow.operators.email.EmailOperator`
+- `airflow.utils.email`
+- `email=` (task parameter for email on failure/retry)
 
-**Fix:** Use SMTP provider
+**Fix:** Use SMTP provider (`apache-airflow-providers-smtp`). Replace legacy email behavior with SMTP-provider callbacks such as `send_smtp_notification(...)` or `SmtpNotifier`.
 
 ---
 
@@ -113,15 +140,55 @@ After running Ruff's AIR rules, use this manual search checklist to find remaini
 
 **Search for:**
 - `/api/v1`
+- `auth=(`
+- `execution_date` (in API params)
 
-**Fix:** Update to `/api/v2` with Bearer tokens
+**Fix:** Update to `/api/v2` with Bearer tokens. Replace `execution_date` params with `logical_date`. Dataset endpoints now under `asset` resources
 
 ---
 
 ## 10. File paths
 
 **Search for:**
-- `open("include/...)`
+- `open("include/`
+- `open("data/`
+- `template_searchpath=`
 - relative paths
 
-**Fix:** Use `__file__` or `AIRFLOW_HOME` anchoring
+**Fix:** Use `__file__` or `AIRFLOW_HOME` anchoring. Note: triggers cannot be in DAG bundle; must be elsewhere on `sys.path`
+
+---
+
+## 11. FAB-based plugins
+
+**Search for:**
+- `appbuilder_views`
+- `appbuilder_menu_items`
+- `flask_blueprints`
+- `AirflowPlugin`
+
+**Fix:** Flask-AppBuilder removed from core. FAB plugins need manual migration to new system (React apps, FastAPI, listeners). Do not auto-migrate; recommend separate PR
+
+---
+
+## 12. Callback and behavior changes
+
+**Search for:**
+- `on_success_callback`
+- `@teardown`
+- `templates_dict`
+- `expanded_ti_count`
+- `external_trigger`
+- `test_mode`
+- `trigger_rule="dummy"` or `TriggerRule.DUMMY`
+- `trigger_rule="none_failed_or_skipped"` or `NONE_FAILED_OR_SKIPPED`
+
+**Fix:**
+- `on_success_callback` no longer runs on skip; use `on_skipped_callback` if needed
+- `@teardown` with trigger rule `always` not allowed; teardowns now execute even if DAG run terminated early
+- `templates_dict` removed → use `params` via `context["params"]`
+- `expanded_ti_count` removed → use REST API "Get Mapped Task Instances"
+- `dag_run.external_trigger` removed → infer from `dag_run.run_type`
+- `test_mode` removed; avoid relying on this flag
+- `dummy` trigger rule removed → use `always` (or `TriggerRule.ALWAYS`)
+- `none_failed_or_skipped` trigger rule removed → use `none_failed_min_one_success` (or `TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS`)
