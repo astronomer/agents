@@ -1,5 +1,5 @@
 ---
-name: orbiter-translation-dev
+name: orbiter
 description: Use when you need to migrate legacy orchestrator workflows (XML/JSON/YAML) to Apache Airflow DAGs using Orbiter, extend an existing Orbiter translation ruleset, or create a new ruleset. Covers translation rule types, object/operator mapping, and common implementation patterns. Before implementing, verify Python >= 3.10, the source format (XML/JSON/YAML), and that target Airflow version supports the operators you plan to emit.
 ---
 
