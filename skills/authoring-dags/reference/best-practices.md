@@ -235,7 +235,7 @@ process_file.partial(output_dir="/out").expand(filename=get_files())
 
 ## Handle Large Data (XCom Limits)
 
-XCom default limit is ~1MB. For large data, use external storage:
+Airflow doesn’t define a single universal “max XCom size”. The official guidance is that XComs are **only designed for small amounts of data** (don’t pass large payloads like dataframes); for larger data, use external/object storage and pass a reference (for example, a URL/path) via XCom. See the core docs: `https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/xcoms.html`.
 
 ```python
 # WRONG - May exceed XCom limits
@@ -256,10 +256,12 @@ def transform(path: str):
     ...
 ```
 
-For automatic offloading, configure Object Storage XCom backend:
+For automatic offloading, use the Object Storage XCom backend (providers `common-io`): values above a configured threshold are stored in object storage, while smaller values remain in the metadata DB. The threshold is **configurable** (docs examples often use `1048576` bytes = 1 MiB, but that’s not a global default limit).
 ```bash
 AIRFLOW__CORE__XCOM_BACKEND=airflow.providers.common.io.xcom.backend.XComObjectStorageBackend
 AIRFLOW__COMMON_IO__XCOM_OBJECTSTORAGE_PATH=s3://conn_id@bucket/xcom
+AIRFLOW__COMMON_IO__XCOM_OBJECTSTORAGE_THRESHOLD=1048576
+AIRFLOW__COMMON_IO__XCOM_OBJECTSTORAGE_COMPRESSION=gzip
 ```
 
 ---
