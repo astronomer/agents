@@ -241,7 +241,7 @@ from orbiter.objects import RenderAttributes
 
 class OrbiterTriggerDagRunOperator(OrbiterOperator):
     """Custom operator for triggering other DAGs"""
-    
+
     imports = [
         OrbiterRequirement(
             package="apache-airflow",
@@ -250,12 +250,12 @@ class OrbiterTriggerDagRunOperator(OrbiterOperator):
         )
     ]
     operator: str = "TriggerDagRunOperator"
-    
+
     render_attributes: RenderAttributes = OrbiterOperator.render_attributes + [
         "trigger_dag_id",
         "wait_for_completion",
     ]
-    
+
     trigger_dag_id: str
     wait_for_completion: bool = False
 ```

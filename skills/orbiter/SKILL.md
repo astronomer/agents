@@ -175,13 +175,13 @@ def extract_dependencies(val: OrbiterDAG) -> List[OrbiterTaskDependency] | None:
     for task_id, task in val.tasks.items():
         original = (task.orbiter_kwargs or {}).get("val", {})
         downstream = original.get("ok_to") or original.get("downstream")
-        
+
         if downstream:
             dependencies.append(OrbiterTaskDependency(
                 task_id=task_id,
                 downstream=downstream,  # Can be str or List[str]
             ))
-    
+
     return dependencies if dependencies else None
 ```
 
