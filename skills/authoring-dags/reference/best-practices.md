@@ -44,15 +44,54 @@ The examples below use Airflow 2 imports for compatibility. On Airflow 3, these 
 
 ## Table of Contents
 
+- [Avoid Top-Level Code](#avoid-top-level-code)
 - [TaskFlow API](#use-taskflow-api)
 - [Credentials Management](#never-hard-code-credentials)
 - [Provider Operators](#use-provider-operators)
 - [Idempotency](#ensure-idempotency)
 - [Data Intervals](#use-data-intervals)
 - [Task Groups](#organize-with-task-groups)
+- [Dynamic Task Mapping](#use-dynamic-task-mapping)
+- [Large Data / XCom](#handle-large-data-xcom-limits)
+- [Retries and Scaling](#configure-retries-and-scaling)
+- [Deferrable Operators](#use-deferrable-operators)
 - [Setup/Teardown](#use-setupteardown)
 - [Data Quality Checks](#include-data-quality-checks)
 - [Anti-Patterns](#anti-patterns)
+- [Assets (Airflow 3.x)](#assets-airflow-3x)
+
+---
+
+## Avoid Top-Level Code
+
+DAG files are parsed every ~30 seconds. Code outside tasks runs on every parse.
+
+```python
+# WRONG - Runs on every parse (every 30 seconds!)
+hook = PostgresHook("conn")
+results = hook.get_records("SELECT * FROM table")  # Executes repeatedly!
+
+@dag(...)
+def my_dag():
+    @task
+    def process(data):
+        return data
+    process(results)
+
+# CORRECT - Only runs when task executes
+@dag(...)
+def my_dag():
+    @task
+    def get_data():
+        hook = PostgresHook("conn")
+        return hook.get_records("SELECT * FROM table")
+    
+    @task
+    def process(data):
+        return data
+    
+    process(get_data())
+```
 
 ---
 
@@ -167,6 +206,109 @@ def extract_sources():
 
 ---
 
+## Use Dynamic Task Mapping
+
+Process variable numbers of items in parallel instead of loops:
+
+```python
+# WRONG - Sequential, one failure fails all
+@task
+def process_all():
+    for f in ["a.csv", "b.csv", "c.csv"]:
+        process(f)
+
+# CORRECT - Parallel execution
+@task
+def get_files():
+    return ["a.csv", "b.csv", "c.csv"]
+
+@task
+def process_file(filename): ...
+
+process_file.expand(filename=get_files())
+
+# With constant parameters
+process_file.partial(output_dir="/out").expand(filename=get_files())
+```
+
+---
+
+## Handle Large Data (XCom Limits)
+
+XCom default limit is ~1MB. For large data, use external storage:
+
+```python
+# WRONG - May exceed XCom limits
+@task
+def get_data():
+    return huge_dataframe.to_dict()  # Could be huge!
+
+# CORRECT - Return path, not data
+@task
+def extract(**context):
+    path = f"s3://bucket/{context['ds']}/data.parquet"
+    data.to_parquet(path)
+    return path  # Small string
+
+@task
+def transform(path: str):
+    data = pd.read_parquet(path)
+    ...
+```
+
+For automatic offloading, configure Object Storage XCom backend:
+```bash
+AIRFLOW__CORE__XCOM_BACKEND=airflow.providers.common.io.xcom.backend.XComObjectStorageBackend
+AIRFLOW__COMMON_IO__XCOM_OBJECTSTORAGE_PATH=s3://conn_id@bucket/xcom
+```
+
+---
+
+## Configure Retries and Scaling
+
+```python
+from datetime import timedelta
+
+@dag(
+    max_active_runs=1,       # Concurrent DAG runs
+    max_active_tasks=10,     # Concurrent tasks per run
+    default_args={
+        "retries": 3,
+        "retry_delay": timedelta(minutes=5),
+        "retry_exponential_backoff": True,
+    },
+)
+def my_dag(): ...
+
+# Use pools for resource-constrained operations
+@task(pool="db_pool", retries=5)
+def query_database(): ...
+```
+
+Environment defaults:
+```bash
+AIRFLOW__CORE__DEFAULT_TASK_RETRIES=2
+AIRFLOW__CORE__PARALLELISM=32
+```
+
+---
+
+## Use Deferrable Operators
+
+Free worker slots during long waits:
+
+```python
+from airflow.providers.amazon.aws.sensors.s3 import S3KeySensor
+
+S3KeySensor(
+    task_id="wait_for_file",
+    bucket_key="data/{{ ds }}/input.csv",
+    deferrable=True,  # Frees worker while waiting
+)
+```
+
+---
+
 ## Use Setup/Teardown
 
 ```python
@@ -270,4 +412,39 @@ open(os.path.join(dag_dir, "data.csv"))
 
 # CORRECT - Files in include/
 open(f"{os.getenv('AIRFLOW_HOME')}/include/data.csv")
+```
+
+### DON'T: Use `datetime.now()` in Tasks
+
+```python
+# WRONG - Not idempotent
+today = datetime.today()
+
+# CORRECT - Use execution context
+@task
+def process(**context):
+    logical_date = context["logical_date"]
+    start = context["data_interval_start"]
+```
+
+---
+
+## Assets (Airflow 3.x)
+
+Data-driven scheduling between DAGs:
+
+```python
+from airflow.sdk import dag, task, Asset
+
+# Producer
+@dag(schedule="@hourly")
+def extract():
+    @task(outlets=[Asset("orders_raw")])
+    def pull(): ...
+
+# Consumer - triggered when asset updates
+@dag(schedule=[Asset("orders_raw")])
+def transform():
+    @task
+    def process(): ...
 ```
