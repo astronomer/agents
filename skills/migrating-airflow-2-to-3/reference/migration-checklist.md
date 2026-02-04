@@ -62,7 +62,7 @@ After running Ruff's AIR rules, use this manual search checklist to find remaini
 - `sla=`
 - `sla_miss_callback`
 
-**Fix:** 
+**Fix:**
 - `schedule_interval` and `timetable` → use `schedule=`
 - `days_ago` → use `pendulum.today("UTC").add(days=-N)`
 - `fail_stop` → renamed to `fail_fast`
@@ -80,7 +80,7 @@ After running Ruff's AIR rules, use this manual search checklist to find remaini
 - `tomorrow_ds`
 - `templates_dict`
 
-**Fix:** 
+**Fix:**
 - `execution_date` → use `context["dag_run"].logical_date`
 - `tomorrow_ds` / `yesterday_ds` → use `ds` with date math: `macros.ds_add(ds, 1)` / `macros.ds_add(ds, -1)`
 - `prev_ds` / `next_ds` → use `prev_start_date_success` or timetable API
