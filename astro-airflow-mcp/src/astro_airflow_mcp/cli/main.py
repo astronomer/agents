@@ -1,5 +1,10 @@
 """Main CLI application with Typer."""
 
+# Suppress SyntaxWarning from analytics-python before any imports trigger it
+import warnings
+
+warnings.filterwarnings("ignore", category=SyntaxWarning, module="analytics")
+
 import os
 from typing import Annotated, Any
 
@@ -16,6 +21,7 @@ from astro_airflow_mcp.cli import tasks as tasks_module
 from astro_airflow_mcp.cli.api import api_command
 from astro_airflow_mcp.cli.context import get_adapter, init_context
 from astro_airflow_mcp.cli.output import output_json
+from astro_airflow_mcp.cli.tracking import track_command
 
 app = typer.Typer(
     name="af",
@@ -71,6 +77,9 @@ def main(
         os.environ["AF_CONFIG"] = config
 
     init_context()
+
+    # Track command invocation (async, non-blocking)
+    track_command()
 
 
 @app.command()
