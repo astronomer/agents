@@ -45,6 +45,10 @@ done
 
 # If Airflow keywords detected, inject skill suggestion
 if [ "$MATCHED" = true ]; then
+    # Warm the uvx cache in the background with @latest
+    # This ensures subsequent `uvx --from astro-airflow-mcp af` calls are fast
+    (uvx --from astro-airflow-mcp@latest af --version > /dev/null 2>&1 &)
+
     # Check if user already explicitly mentioned using the skill
     if echo "$PROMPT_LOWER" | grep -q "use.*skill\|/data:airflow"; then
         # User already wants to use the skill, no need to inject
