@@ -17,19 +17,7 @@
       },
       "homepage": "https://github.com/astronomer/agents",
       "repository": "https://github.com/astronomer/agents",
-      "keywords": ["data-engineering", "airflow", "snowflake", "bigquery", "jupyter", "astronomer"],
-      "hooks": {
-        "UserPromptSubmit": [
-          {
-            "hooks": [
-              {
-                "type": "command",
-                "command": "${CLAUDE_PLUGIN_ROOT}/skills/airflow/hooks/airflow-skill-suggester.sh"
-              }
-            ]
-          }
-        ]
-      }
+      "keywords": ["data-engineering", "airflow", "snowflake", "bigquery", "jupyter", "astronomer"]
     }
   ]
 }
