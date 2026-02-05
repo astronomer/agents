@@ -41,10 +41,12 @@ Built by [Astronomer](https://www.astronomer.io/). [Apache 2.0 licensed](https:/
 ### Quick Start
 
 ```bash
-npx skills add astronomer/agents --all
+npx skills add astronomer/agents --skill '*'
 ```
 
-This installs Astronomer skills into your project via [skills.sh](https://skills.sh). If you want to select skills individually, run `npx skills add astronomer/agents` without the `--all` flag. Works with Claude Code, Cursor, and other AI coding tools.
+This installs all Astronomer skills into your project via [skills.sh](https://skills.sh). You'll be prompted to select which agents to install to. To also select skills individually, omit the `--skill` flag.
+
+> **Claude Code users:** We recommend using the plugin instead (see [Claude Code](#claude-code) section below) for better integration with MCP servers and hooks.
 
 ### Compatibility
 
@@ -73,7 +75,7 @@ Cursor supports both MCP servers and skills.
 **Skills** - Install to your project:
 
 ```bash
-npx skills add astronomer/agents --all
+npx skills add astronomer/agents --skill '*' -a cursor
 ```
 
 This installs skills to `.cursor/skills/` in your project.
