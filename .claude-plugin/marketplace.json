@@ -10,7 +10,6 @@
       "source": "./",
       "strict": false,
       "description": "Data engineering plugin - warehouse exploration, pipeline authoring, Airflow integration",
-      "version": "0.2.0",
       "author": {
         "name": "Astronomer",
         "email": "support@astronomer.io"
