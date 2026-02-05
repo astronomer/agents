@@ -77,6 +77,45 @@ def _init_analytics() -> None:
     _initialized = True
 
 
+def _detect_invocation_context() -> tuple[str, str | None]:
+    """Detect if running interactively or via an agent/automation.
+
+    Returns:
+        Tuple of (context, agent_name):
+        - context: 'agent', 'ci', 'interactive', or 'non-interactive'
+        - agent_name: specific agent/CI name if detected, None otherwise
+    """
+    # Check for known AI agent environment variables
+    agent_env_vars = {
+        "CLAUDECODE": "claude-code",
+        "CLAUDE_CODE_ENTRYPOINT": "claude-code",
+        "CURSOR_TRACE_ID": "cursor",
+        "AIDER_MODEL": "aider",
+        "CONTINUE_GLOBAL_DIR": "continue",
+    }
+    for var, agent_name in agent_env_vars.items():
+        if os.environ.get(var):
+            return ("agent", agent_name)
+
+    # Check for CI/CD environments
+    ci_env_vars = {
+        "GITHUB_ACTIONS": "github-actions",
+        "GITLAB_CI": "gitlab-ci",
+        "JENKINS_URL": "jenkins",
+        "CIRCLECI": "circleci",
+        "CI": "ci-unknown",  # Generic CI flag, check last
+    }
+    for var, ci_name in ci_env_vars.items():
+        if os.environ.get(var):
+            return ("ci", ci_name)
+
+    # Check if running in an interactive terminal
+    if sys.stdin.isatty() and sys.stdout.isatty():
+        return ("interactive", None)
+
+    return ("non-interactive", None)
+
+
 def _get_command_from_argv() -> str:
     """Extract the command path from sys.argv.
 
@@ -128,14 +167,23 @@ def track_command() -> None:
 
     anonymous_id = _get_anonymous_id()
     command_path = _get_command_from_argv()
+    context, agent = _detect_invocation_context()
 
     # Track the event (suppress errors to never affect CLI operation)
     with contextlib.suppress(Exception):
+        from astro_airflow_mcp import __version__
+
+        properties = {
+            "command": command_path,
+            "af_version": __version__,
+            "python_version": f"{sys.version_info.major}.{sys.version_info.minor}",
+            "context": context,
+        }
+        if agent:
+            properties["agent"] = agent
+
         analytics.track(
             anonymous_id=anonymous_id,
             event="CLI Command",
-            properties={
-                "command": command_path,
-                "python_version": f"{sys.version_info.major}.{sys.version_info.minor}",
-            },
+            properties=properties,
         )
