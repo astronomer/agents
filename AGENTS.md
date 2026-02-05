@@ -19,7 +19,8 @@
 ```
 project-root/
 ├── .claude-plugin/
-│   └── marketplace.json        # Marketplace + plugin definition (strict: false)
+│   ├── marketplace.json        # Marketplace catalog (strict: false)
+│   └── plugin.json             # Plugin manifest with hooks
 └── skills/                     # Skills (auto-discovered)
     └── skill-name/
         ├── SKILL.md            # Skill with YAML frontmatter
@@ -64,21 +65,23 @@ description: When to use this skill (Claude uses this to decide when to invoke i
 
 ## Configuration
 
-Everything is defined inline in `.claude-plugin/marketplace.json` following the [advanced plugin entries](https://code.claude.com/docs/en/plugin-marketplaces#advanced-plugin-entries) pattern:
+Plugin configuration is split across two files:
 
-- **hooks**: Inlined in marketplace.json, scripts co-located in `skills/<name>/hooks/`
-- **mcpServers**: Inlined in marketplace.json
+- **hooks**: Inlined in `.claude-plugin/plugin.json`, scripts co-located in `skills/<name>/hooks/`
+- **mcpServers**: Inlined in `.claude-plugin/plugin.json`
 - **skills**: Auto-discovered from `skills/` directory
+- **marketplace metadata**: Defined in `.claude-plugin/marketplace.json` (`strict: false`)
 
 Use `${CLAUDE_PLUGIN_ROOT}` to reference files within the plugin (required because plugins are copied to a cache location when installed).
 
-**Important:** Hooks in `SKILL.md` frontmatter can use **relative paths** from the skill's directory (e.g., `./scripts/bar.py`). Use `${CLAUDE_PLUGIN_ROOT}` in `marketplace.json` to reference the plugin root.
+**Important:** Hooks in `SKILL.md` frontmatter can use **relative paths** from the skill's directory (e.g., `./scripts/bar.py`). Use `${CLAUDE_PLUGIN_ROOT}` in `plugin.json` to reference the plugin root.
 
 ## Key Files
 
-- `.claude-plugin/marketplace.json` - Marketplace catalog with inline plugin definition (hooks, mcpServers)
+- `.claude-plugin/plugin.json` - Plugin manifest with hooks and mcpServers
+- `.claude-plugin/marketplace.json` - Marketplace catalog (metadata only, `strict: false`)
 - `skills/*/SKILL.md` - Individual skills (auto-discovered)
-- `skills/*/hooks/*.sh` - Hook scripts (co-located with skills, referenced via relative paths from SKILL.md or `${CLAUDE_PLUGIN_ROOT}/skills/<name>/hooks/...` from marketplace.json)
+- `skills/*/hooks/*.sh` - Hook scripts (co-located with skills, referenced via relative paths from SKILL.md or `${CLAUDE_PLUGIN_ROOT}/skills/<name>/hooks/...` from plugin.json)
 
 ## Config Location
 
