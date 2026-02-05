@@ -1,0 +1,17 @@
+{
+    "name": "data",
+    "version": "0.1.0",
+    "description": "Data engineering plugin - warehouse exploration, pipeline authoring, Airflow integration",
+    "hooks": {
+      "UserPromptSubmit": [
+        {
+          "hooks": [
+            {
+              "type": "command",
+              "command": "${CLAUDE_PLUGIN_ROOT}/skills/airflow/hooks/airflow-skill-suggester.sh"
+            }
+          ]
+        }
+      ]
+    }
+  }
