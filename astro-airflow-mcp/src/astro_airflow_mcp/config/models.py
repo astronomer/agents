@@ -50,6 +50,7 @@ class AirflowCliConfig(BaseModel):
 
     instances: Annotated[list[Instance], Field(default_factory=list)]
     current_instance: Annotated[str | None, Field(default=None, alias="current-instance")]
+    tracking_disabled: Annotated[bool, Field(default=False, alias="tracking-disabled")]
 
     def get_instance(self, name: str) -> Instance | None:
         """Get an instance by name."""

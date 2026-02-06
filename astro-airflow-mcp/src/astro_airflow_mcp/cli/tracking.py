@@ -52,9 +52,21 @@ def _get_anonymous_id() -> str:
 
 
 def _is_tracking_disabled() -> bool:
-    """Check if tracking is disabled via environment variable."""
+    """Check if tracking is disabled via environment variable or config file."""
+    # Environment variable takes precedence
     disabled = os.environ.get(TRACKING_DISABLED_ENV, "").lower()
-    return disabled in ("1", "true", "yes")
+    if disabled in ("1", "true", "yes"):
+        return True
+
+    # Check config file
+    with contextlib.suppress(Exception):
+        from astro_airflow_mcp.config.loader import ConfigManager
+
+        config = ConfigManager().load()
+        if config.tracking_disabled:
+            return True
+
+    return False
 
 
 def _get_client() -> analytics.Client | None:

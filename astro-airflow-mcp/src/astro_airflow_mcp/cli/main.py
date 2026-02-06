@@ -20,8 +20,9 @@ from astro_airflow_mcp.cli import runs as runs_module
 from astro_airflow_mcp.cli import tasks as tasks_module
 from astro_airflow_mcp.cli.api import api_command
 from astro_airflow_mcp.cli.context import get_adapter, init_context
-from astro_airflow_mcp.cli.output import output_json
+from astro_airflow_mcp.cli.output import output_error, output_json
 from astro_airflow_mcp.cli.tracking import track_command
+from astro_airflow_mcp.config.loader import ConfigManager
 
 app = typer.Typer(
     name="af",
@@ -80,6 +81,45 @@ def main(
 
     # Track command invocation (async, non-blocking)
     track_command()
+
+
+@app.command()
+def telemetry(
+    action: Annotated[
+        str | None,
+        typer.Argument(help="Action: 'enable', 'disable', or omit to show current status"),
+    ] = None,
+) -> None:
+    """Enable or disable anonymous telemetry collection.
+
+    The af CLI collects anonymous usage telemetry to help improve the tool.
+    No personally identifiable information is ever collected.
+
+    With no argument, shows the current telemetry status.
+    Use 'enable' or 'disable' to change the setting.
+
+    Telemetry can also be disabled via the AF_TRACKING_DISABLED=1 environment variable.
+    """
+    try:
+        manager = ConfigManager()
+
+        if action is None:
+            config = manager.load()
+            status = "disabled" if config.tracking_disabled else "enabled"
+            output_json({"telemetry": status})
+            return
+
+        action_lower = action.lower()
+        if action_lower == "disable":
+            manager.set_tracking_disabled(True)
+            output_json({"telemetry": "disabled"})
+        elif action_lower == "enable":
+            manager.set_tracking_disabled(False)
+            output_json({"telemetry": "enabled"})
+        else:
+            output_error(f"Unknown action '{action}'. Use 'enable' or 'disable'.")
+    except Exception as e:
+        output_error(str(e))
 
 
 @app.command()

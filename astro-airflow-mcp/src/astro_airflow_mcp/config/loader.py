@@ -105,9 +105,11 @@ class ConfigManager:
 
         with FileLock(self.lock_path):
             data = config.model_dump(by_alias=True, exclude_none=False)
-            # Clean up None values at top level for cleaner YAML
+            # Clean up default values at top level for cleaner YAML
             if data.get("current-instance") is None:
                 del data["current-instance"]
+            if not data.get("tracking-disabled"):
+                data.pop("tracking-disabled", None)
 
             with open(self.config_path, "w") as f:
                 yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)
@@ -191,6 +193,12 @@ class ConfigManager:
         """Get the current instance name."""
         config = self.load()
         return config.current_instance
+
+    def set_tracking_disabled(self, disabled: bool) -> None:
+        """Enable or disable anonymous usage tracking."""
+        config = self.load()
+        config.tracking_disabled = disabled
+        self.save(config)
 
     def list_instances(self) -> list[Instance]:
         """List all instances."""
