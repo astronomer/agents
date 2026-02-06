@@ -104,12 +104,11 @@ class AstroClient:
             # Try to refresh token automatically - raise special error to trigger retry
             if self.token_manager.refresh():
                 raise _TokenRefreshedError("Token refreshed, retry request")
-            else:
-                raise AstroAuthenticationError(
-                    "Authentication failed - the token is expired or invalid. "
-                    "Please tell the user to run 'astro login' in their terminal to re-authenticate, "
-                    "then try this request again."
-                )
+            raise AstroAuthenticationError(
+                "Authentication failed - the token is expired or invalid. "
+                "Please tell the user to run 'astro login' in their terminal to re-authenticate, "
+                "then try this request again."
+            )
         if response.status_code == 403:
             raise AstroAuthenticationError(
                 "Access denied - the user may not have Observability permissions for this organization. "
@@ -252,7 +251,9 @@ class AstroClient:
                 if attempt == 0:
                     logger.info("Token refreshed, retrying request...")
                     continue
-                raise AstroAuthenticationError("Token refresh failed after retry")
+                raise AstroAuthenticationError("Token refresh failed after retry") from None
+
+        raise AstroAuthenticationError("Token refresh failed after retry")
 
     def get_asset(self, asset_id: str) -> dict[str, Any]:
         """Get detailed information about a specific asset.
@@ -278,7 +279,9 @@ class AstroClient:
                 if attempt == 0:
                     logger.info("Token refreshed, retrying request...")
                     continue
-                raise AstroAuthenticationError("Token refresh failed after retry")
+                raise AstroAuthenticationError("Token refresh failed after retry") from None
+
+        raise AstroAuthenticationError("Token refresh failed after retry")
 
     def list_asset_filters(
         self,
@@ -325,4 +328,6 @@ class AstroClient:
                 if attempt == 0:
                     logger.info("Token refreshed, retrying request...")
                     continue
-                raise AstroAuthenticationError("Token refresh failed after retry")
+                raise AstroAuthenticationError("Token refresh failed after retry") from None
+
+        raise AstroAuthenticationError("Token refresh failed after retry")

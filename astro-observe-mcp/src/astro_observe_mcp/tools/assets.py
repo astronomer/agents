@@ -49,8 +49,7 @@ def _search_assets_impl(
         # Filter out assets from non-existent schemas (IN_SALESFORCE doesn't exist in Snowflake)
         original_count = len(assets)
         assets = [
-            asset for asset in assets
-            if "IN_SALESFORCE" not in asset.get("assetId", "").upper()
+            asset for asset in assets if "IN_SALESFORCE" not in asset.get("assetId", "").upper()
         ]
         filtered_count = original_count - len(assets)
 

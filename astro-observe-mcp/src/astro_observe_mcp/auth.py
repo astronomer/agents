@@ -318,9 +318,8 @@ class AstroTokenManager:
             self._token_source = f"refreshed:{ASTRO_CONFIG_FILE}"
             logger.info("Token refresh succeeded")
             return True
-        else:
-            logger.warning("Token refresh failed")
-            return False
+        logger.warning("Token refresh failed")
+        return False
 
     def has_token(self) -> bool:
         """Check if a valid token is available.
