@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-import atexit
 import contextlib
 import os
+import platform
 import sys
+import threading
 import uuid
 from pathlib import Path
 
@@ -21,8 +22,11 @@ TRACKING_DISABLED_ENV = "AF_TRACKING_DISABLED"
 # File to store anonymous user ID
 ANONYMOUS_ID_FILE = Path.home() / ".af" / ".anonymous_id"
 
+# Timeout in seconds for the Segment API call
+TRACKING_TIMEOUT = 3
+
 # Global state
-_initialized = False
+_client: analytics.Client | None = None
 _tracked = False
 
 
@@ -53,28 +57,24 @@ def _is_tracking_disabled() -> bool:
     return disabled in ("1", "true", "yes")
 
 
-def _init_analytics() -> None:
-    """Initialize the Segment analytics client."""
-    global _initialized
+def _get_client() -> analytics.Client | None:
+    """Get or create the Segment analytics client with a timeout."""
+    global _client
 
-    if _initialized:
-        return
+    if _client is not None:
+        return _client
 
     if not SEGMENT_WRITE_KEY:
-        _initialized = True
-        return
+        return None
 
-    # Configure analytics client
-    analytics.write_key = SEGMENT_WRITE_KEY
+    _client = analytics.Client(
+        write_key=SEGMENT_WRITE_KEY,
+        sync_mode=True,
+        timeout=TRACKING_TIMEOUT,
+        send=True,
+    )
 
-    # Use async mode (events are batched and sent in background)
-    analytics.send = True
-    analytics.sync_mode = False
-
-    # Flush on exit
-    atexit.register(analytics.flush)
-
-    _initialized = True
+    return _client
 
 
 def _detect_invocation_context() -> tuple[str, str | None]:
@@ -144,10 +144,43 @@ def _get_command_from_argv() -> str:
     return " ".join(command_parts) if command_parts else "root"
 
 
+def _send_track_event(
+    anonymous_id: str,
+    command_path: str,
+    context: str,
+    agent: str | None,
+) -> None:
+    """Send tracking event to Segment. Runs in background thread."""
+    with contextlib.suppress(Exception):
+        from astro_airflow_mcp import __version__
+
+        client = _get_client()
+        if client is None:
+            return
+
+        properties = {
+            "command": command_path,
+            "af_version": __version__,
+            "python_version": f"{sys.version_info.major}.{sys.version_info.minor}",
+            "os": platform.system().lower(),  # darwin, linux, windows
+            "os_version": platform.release(),
+            "context": context,
+        }
+        if agent:
+            properties["agent"] = agent
+
+        client.track(
+            anonymous_id=anonymous_id,
+            event="CLI Command",
+            properties=properties,
+        )
+
+
 def track_command() -> None:
     """Track a CLI command invocation.
 
     Uses sys.argv to determine the full command path.
+    Runs in a daemon thread so it never blocks the CLI.
     This function is idempotent - it only tracks once per invocation.
     """
     global _tracked
@@ -163,27 +196,15 @@ def track_command() -> None:
     if not SEGMENT_WRITE_KEY:
         return
 
-    _init_analytics()
-
+    # Gather data in main thread
     anonymous_id = _get_anonymous_id()
     command_path = _get_command_from_argv()
     context, agent = _detect_invocation_context()
 
-    # Track the event (suppress errors to never affect CLI operation)
-    with contextlib.suppress(Exception):
-        from astro_airflow_mcp import __version__
-
-        properties = {
-            "command": command_path,
-            "af_version": __version__,
-            "python_version": f"{sys.version_info.major}.{sys.version_info.minor}",
-            "context": context,
-        }
-        if agent:
-            properties["agent"] = agent
-
-        analytics.track(
-            anonymous_id=anonymous_id,
-            event="CLI Command",
-            properties=properties,
-        )
+    # Fire and forget in daemon thread - won't block CLI exit
+    thread = threading.Thread(
+        target=_send_track_event,
+        args=(anonymous_id, command_path, context, agent),
+        daemon=True,
+    )
+    thread.start()
