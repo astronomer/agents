@@ -230,7 +230,7 @@ If issues found:
 
 ## Best Practices & Anti-Patterns
 
-For detailed code examples and patterns, see **[reference/best-practices.md](reference/best-practices.md)**.
+For detailed code examples and patterns, see **[best-practices.md](../_shared/reference/best-practices.md)**.
 
 Key topics covered:
 - TaskFlow API usage
