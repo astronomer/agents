@@ -442,6 +442,18 @@ echo astro-airflow-mcp >> requirements.txt
 | `--config`, `-c` | `AF_CONFIG` | Path to config file (default: `~/.af/config.yaml`) |
 | `--version`, `-v` | | Show version and exit |
 
+### Telemetry
+
+The `af` CLI collects anonymous usage telemetry to help improve the tool. No personally identifiable information is collected.
+
+To opt out:
+
+```bash
+af telemetry disable
+```
+
+You can also disable telemetry by setting the `AF_TRACKING_DISABLED=1` environment variable.
+
 ## Architecture
 
 The server is built using [FastMCP](https://github.com/jlowin/fastmcp) with an adapter pattern for Airflow version compatibility:
