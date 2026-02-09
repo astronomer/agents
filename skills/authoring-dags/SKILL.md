@@ -230,18 +230,9 @@ If issues found:
 
 ## Best Practices & Anti-Patterns
 
-For detailed code examples and patterns, see **[reference/best-practices.md](reference/best-practices.md)**.
+For code patterns and anti-patterns, see **[reference/best-practices.md](reference/best-practices.md)**.
 
-Key topics covered:
-- TaskFlow API usage
-- Credentials management (connections, variables)
-- Provider operators
-- Idempotency patterns
-- Data intervals
-- Task groups
-- Setup/Teardown patterns
-- Data quality checks
-- Anti-patterns to avoid
+**Read this reference when writing new DAGs or reviewing existing ones.** It covers what patterns are correct (including Airflow 3-specific behavior) and what to avoid.
 
 ---
 

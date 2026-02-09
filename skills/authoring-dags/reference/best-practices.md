@@ -30,7 +30,7 @@ The examples below use Airflow 2 imports for compatibility. On Airflow 3, these 
 - [Dynamic Task Mapping](#use-dynamic-task-mapping)
 - [Large Data / XCom](#handle-large-data-xcom-limits)
 - [Retries and Scaling](#configure-retries-and-scaling)
-- [Deferrable Operators](#use-deferrable-operators)
+- [Sensor Modes and Deferrable Operators](#sensor-modes-and-deferrable-operators)
 - [Setup/Teardown](#use-setupteardown)
 - [Data Quality Checks](#include-data-quality-checks)
 - [Anti-Patterns](#anti-patterns)
@@ -162,6 +162,21 @@ sql = """
 """
 ```
 
+**Airflow 3 context injection**: In Airflow 3 (Task SDK), context variables are automatically injected as function parameters by name. A bare type annotation is valid — no `= None` default required:
+
+```python
+import pendulum
+
+# Airflow 3 — both forms are valid
+@task
+def process(data_interval_end: pendulum.DateTime):  # No default needed
+    ...
+
+@task
+def process(data_interval_end: pendulum.DateTime = None):  # Also valid but unnecessary in AF3
+    ...
+```
+
 ---
 
 ## Organize with Task Groups
@@ -211,7 +226,7 @@ process_file.partial(output_dir="/out").expand(filename=get_files())
 
 ## Handle Large Data (XCom Limits)
 
-Airflow does not define a single universal "max XCom size". XComs are designed for **small** values only (do not pass large payloads like dataframes). For large data, write to external/object storage and pass a reference (URI/path) via XCom. See: `https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/xcoms.html`.
+For large data, prefer the **claim-check pattern**: write to external storage (S3, GCS, ADLS) and pass a URI/path reference via XCom.
 
 ```python
 # WRONG - May exceed XCom limits
@@ -219,20 +234,22 @@ Airflow does not define a single universal "max XCom size". XComs are designed f
 def get_data():
     return huge_dataframe.to_dict()  # Could be huge!
 
-# CORRECT - Return path, not data
+# CORRECT - Claim-check pattern: write to storage, return reference
 @task
 def extract(**context):
     path = f"s3://bucket/{context['ds']}/data.parquet"
     data.to_parquet(path)
-    return path  # Small string
+    return path  # Small string reference (the "claim check")
 
 @task
 def transform(path: str):
-    data = pd.read_parquet(path)
+    data = pd.read_parquet(path)  # Retrieve data using the reference
     ...
 ```
 
-For automatic offloading, use the Object Storage XCom backend (provider `common-io`): values larger than a configured threshold are stored in object storage, while smaller values remain in the metadata DB. The threshold is **configurable** (docs examples often use `1048576` bytes = 1 MiB).
+**Airflow 3 XCom serialization**: Airflow 3's Task SDK natively supports serialization of common Python types including DataFrames. Airflow 2 required a custom XCom backend or manual serialization for non-primitive types.
+
+For automatic offloading, use the Object Storage XCom backend (provider `common-io`).
 ```bash
 AIRFLOW__CORE__XCOM_BACKEND=airflow.providers.common.io.xcom.backend.XComObjectStorageBackend
 AIRFLOW__COMMON_IO__XCOM_OBJECTSTORAGE_PATH=s3://conn_id@bucket/xcom
@@ -271,17 +288,36 @@ AIRFLOW__CORE__PARALLELISM=32
 
 ---
 
-## Use Deferrable Operators
+## Sensor Modes and Deferrable Operators
 
-Free worker slots during long waits:
+Prefer `deferrable=True` when available. Otherwise, use `mode='reschedule'` for waits longer than a few minutes. Reserve `mode='poke'` (the default) for sub-minute checks only.
 
 ```python
 from airflow.providers.amazon.aws.sensors.s3 import S3KeySensor
 
+# WRONG for long waits - poke is the default, so omitting mode= has the same problem
 S3KeySensor(
     task_id="wait_for_file",
     bucket_key="data/{{ ds }}/input.csv",
-    deferrable=True,  # Frees worker while waiting
+    # mode defaults to "poke" — holds a worker slot the entire time
+    poke_interval=300,
+    timeout=7200,
+)
+
+# CORRECT - frees worker between checks
+S3KeySensor(
+    task_id="wait_for_file",
+    bucket_key="data/{{ ds }}/input.csv",
+    mode="reschedule",  # Releases worker between pokes
+    poke_interval=300,
+    timeout=7200,
+)
+
+# BEST - deferrable uses triggerer, most efficient
+S3KeySensor(
+    task_id="wait_for_file",
+    bucket_key="data/{{ ds }}/input.csv",
+    deferrable=True,
 )
 ```
 
@@ -414,15 +450,17 @@ Data-driven scheduling between DAGs:
 ```python
 from airflow.sdk import dag, task, Asset
 
-# Producer
+# Producer — declares what data this task writes
 @dag(schedule="@hourly")
 def extract():
     @task(outlets=[Asset("orders_raw")])
     def pull(): ...
 
-# Consumer - triggered when asset updates
+# Consumer — triggered when asset updates
 @dag(schedule=[Asset("orders_raw")])
 def transform():
     @task
     def process(): ...
 ```
+
+**Outlets without inlets are valid.** A task can declare `outlets` even if no other DAG currently uses that asset as an inlet/schedule trigger. Outlet-only assets are encouraged for lineage tracking.
