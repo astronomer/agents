@@ -325,6 +325,7 @@ transform = SqlOperator(
 - Update inlets/outlets when SQL queries change
 - Include all tables referenced in JOINs as inlets
 - Include all tables written to (including temp tables if relevant)
+- **Outlet-only and inlet-only annotations are valid.** One-sided annotations are encouraged for lineage visibility even without a corresponding inlet or outlet in another DAG.
 
 ---
 
