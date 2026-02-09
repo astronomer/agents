@@ -1,31 +1,3 @@
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
-
-- [Migration Patterns Reference](#migration-patterns-reference)
-  - [Table of Contents](#table-of-contents)
-  - [Removed Modules & Import Reorganizations](#removed-modules--import-reorganizations)
-    - [`airflow.contrib.*` removed](#airflowcontrib-removed)
-    - [Core operators moved to provider packages](#core-operators-moved-to-provider-packages)
-    - [Hook and sensor imports moved to providers](#hook-and-sensor-imports-moved-to-providers)
-    - [`EmailOperator` moved to SMTP provider](#emailoperator-moved-to-smtp-provider)
-  - [Task SDK & Param Usage](#task-sdk--param-usage)
-    - [Key Task SDK imports](#key-task-sdk-imports)
-    - [Import mappings from legacy to Task SDK](#import-mappings-from-legacy-to-task-sdk)
-  - [SubDAGs, SLAs, and Removed Features](#subdags-slas-and-removed-features)
-    - [SubDAGs removed](#subdags-removed)
-    - [SLAs removed](#slas-removed)
-    - [Other removed or renamed code features](#other-removed-or-renamed-code-features)
-  - [Scheduling & Context Changes](#scheduling--context-changes)
-    - [Default scheduling behavior](#default-scheduling-behavior)
-    - [Removed context keys and replacements](#removed-context-keys-and-replacements)
-    - [`days_ago` removed](#days_ago-removed)
-  - [XCom Pickling Removal](#xcom-pickling-removal)
-  - [Datasets to Assets](#datasets-to-assets)
-  - [DAG Bundles & File Paths](#dag-bundles--file-paths)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
 # Migration Patterns Reference
 
 Detailed code examples for Airflow 2 to 3 migration.

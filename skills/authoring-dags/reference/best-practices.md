@@ -1,27 +1,3 @@
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
-
-- [DAG Authoring Best Practices](#dag-authoring-best-practices)
-  - [Import Compatibility](#import-compatibility)
-  - [Table of Contents](#table-of-contents)
-  - [Use TaskFlow API](#use-taskflow-api)
-  - [Never Hard-Code Credentials](#never-hard-code-credentials)
-  - [Use Provider Operators](#use-provider-operators)
-  - [Ensure Idempotency](#ensure-idempotency)
-  - [Use Data Intervals](#use-data-intervals)
-  - [Organize with Task Groups](#organize-with-task-groups)
-  - [Use Setup/Teardown](#use-setupteardown)
-  - [Include Data Quality Checks](#include-data-quality-checks)
-  - [Anti-Patterns](#anti-patterns)
-    - [DON'T: Access Metadata DB Directly](#dont-access-metadata-db-directly)
-    - [DON'T: Use Deprecated Imports](#dont-use-deprecated-imports)
-    - [DON'T: Use SubDAGs](#dont-use-subdags)
-    - [DON'T: Use Deprecated Context Keys](#dont-use-deprecated-context-keys)
-    - [DON'T: Hard-Code File Paths](#dont-hard-code-file-paths)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
 # DAG Authoring Best Practices
 
 ## Import Compatibility
