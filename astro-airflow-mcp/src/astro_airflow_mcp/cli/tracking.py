@@ -3,18 +3,44 @@
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 import platform
+import subprocess  # nosec B404 - subprocess is needed for fire-and-forget telemetry
 import sys
-import threading
 import uuid
 from pathlib import Path
 
-import analytics
+# Segment write keys
+SEGMENT_WRITE_KEY_DEV = "Aeudw5dvteD7FmGkZXvYGXWm896bx32V"
+SEGMENT_WRITE_KEY_PROD = "E8HOxt5Mg033HsQ32fnOnttOLoDeFdzl"
 
-# Segment write key - prod key bundled, can be overridden via env var for dev
-SEGMENT_WRITE_KEY_PROD = "Aeudw5dvteD7FmGkZXvYGXWm896bx32V"
-SEGMENT_WRITE_KEY = os.environ.get("AF_SEGMENT_WRITE_KEY", SEGMENT_WRITE_KEY_PROD)
+
+def _is_dev_install() -> bool:
+    """Check if running from a local development install."""
+    with contextlib.suppress(Exception):
+        # Check if the package source lives inside a git repo,
+        # which indicates a local dev environment (uv run, uv sync, uv tool install -e)
+        source_dir = Path(__file__).resolve().parent
+        for parent in source_dir.parents:
+            if (parent / ".git").exists():
+                return True
+    return False
+
+
+def _get_write_key() -> str:
+    """Get the Segment write key, using dev key for local development."""
+    # Env var override takes precedence
+    if env_key := os.environ.get("AF_SEGMENT_WRITE_KEY"):
+        return env_key
+
+    if _is_dev_install():
+        return SEGMENT_WRITE_KEY_DEV
+
+    return SEGMENT_WRITE_KEY_PROD
+
+
+SEGMENT_WRITE_KEY = _get_write_key()
 
 # Environment variable to disable tracking
 TRACKING_DISABLED_ENV = "AF_TRACKING_DISABLED"
@@ -22,11 +48,7 @@ TRACKING_DISABLED_ENV = "AF_TRACKING_DISABLED"
 # File to store anonymous user ID
 ANONYMOUS_ID_FILE = Path.home() / ".af" / ".anonymous_id"
 
-# Timeout in seconds for the Segment API call
-TRACKING_TIMEOUT = 3
-
 # Global state
-_client: analytics.Client | None = None
 _tracked = False
 
 
@@ -34,11 +56,15 @@ def _get_anonymous_id() -> str:
     """Get or create a persistent anonymous user ID."""
     try:
         if ANONYMOUS_ID_FILE.exists():
-            return ANONYMOUS_ID_FILE.read_text().strip()
-    except OSError:
+            value = ANONYMOUS_ID_FILE.read_text().strip()
+            # Validate it looks like a UUID (36 chars: 8-4-4-4-12)
+            if len(value) == 36:
+                uuid.UUID(value)
+                return value
+    except (OSError, ValueError):
         pass
 
-    # Generate new ID
+    # Generate new ID (also regenerates if existing file was invalid)
     anonymous_id = str(uuid.uuid4())
 
     # Persist it
@@ -67,26 +93,6 @@ def _is_tracking_disabled() -> bool:
             return True
 
     return False
-
-
-def _get_client() -> analytics.Client | None:
-    """Get or create the Segment analytics client with a timeout."""
-    global _client
-
-    if _client is not None:
-        return _client
-
-    if not SEGMENT_WRITE_KEY:
-        return None
-
-    _client = analytics.Client(
-        write_key=SEGMENT_WRITE_KEY,
-        sync_mode=True,
-        timeout=TRACKING_TIMEOUT,
-        send=True,
-    )
-
-    return _client
 
 
 def _detect_invocation_context() -> tuple[str, str | None]:
@@ -156,43 +162,11 @@ def _get_command_from_argv() -> str:
     return " ".join(command_parts) if command_parts else "root"
 
 
-def _send_track_event(
-    anonymous_id: str,
-    command_path: str,
-    context: str,
-    agent: str | None,
-) -> None:
-    """Send tracking event to Segment. Runs in background thread."""
-    with contextlib.suppress(Exception):
-        from astro_airflow_mcp import __version__
-
-        client = _get_client()
-        if client is None:
-            return
-
-        properties = {
-            "command": command_path,
-            "af_version": __version__,
-            "python_version": f"{sys.version_info.major}.{sys.version_info.minor}",
-            "os": platform.system().lower(),  # darwin, linux, windows
-            "os_version": platform.release(),
-            "context": context,
-        }
-        if agent:
-            properties["agent"] = agent
-
-        client.track(
-            anonymous_id=anonymous_id,
-            event="CLI Command",
-            properties=properties,
-        )
-
-
 def track_command() -> None:
     """Track a CLI command invocation.
 
     Uses sys.argv to determine the full command path.
-    Runs in a daemon thread so it never blocks the CLI.
+    Spawns a detached subprocess so the CLI exits immediately.
     This function is idempotent - it only tracks once per invocation.
     """
     global _tracked
@@ -208,15 +182,49 @@ def track_command() -> None:
     if not SEGMENT_WRITE_KEY:
         return
 
-    # Gather data in main thread
+    # Gather data in main process
     anonymous_id = _get_anonymous_id()
     command_path = _get_command_from_argv()
     context, agent = _detect_invocation_context()
 
-    # Fire and forget in daemon thread - won't block CLI exit
-    thread = threading.Thread(
-        target=_send_track_event,
-        args=(anonymous_id, command_path, context, agent),
-        daemon=True,
+    from astro_airflow_mcp import __version__
+
+    properties = {
+        "command": command_path,
+        "af_version": __version__,
+        "python_version": f"{sys.version_info.major}.{sys.version_info.minor}",
+        "os": platform.system().lower(),
+        "os_version": platform.release(),
+        "context": context,
+    }
+    if agent:
+        properties["agent"] = agent
+
+    payload = json.dumps(
+        {
+            "write_key": SEGMENT_WRITE_KEY,
+            "anonymous_id": anonymous_id,
+            "event": "CLI Command",
+            "properties": properties,
+        }
     )
-    thread.start()
+
+    # Spawn a detached subprocess that sends the event and exits.
+    # This way the CLI process exits immediately with no delay.
+    script = (
+        "import json, sys, analytics;"
+        "d = json.loads(sys.stdin.read());"
+        "c = analytics.Client(write_key=d['write_key'], sync_mode=True, send=True);"
+        "c.track(anonymous_id=d['anonymous_id'], event=d['event'], properties=d['properties'])"
+    )
+
+    with contextlib.suppress(Exception):
+        proc = subprocess.Popen(  # nosec B603 - no untrusted input, script and args are hardcoded
+            [sys.executable, "-c", script],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        proc.stdin.write(payload.encode())
+        proc.stdin.close()

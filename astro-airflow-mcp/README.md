@@ -444,7 +444,7 @@ echo astro-airflow-mcp >> requirements.txt
 
 ### Telemetry
 
-The `af` CLI collects anonymous usage telemetry to help improve the tool. No personally identifiable information is collected.
+The `af` CLI collects anonymous usage telemetry to help improve the tool.
 
 To opt out:
 
