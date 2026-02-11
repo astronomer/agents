@@ -61,11 +61,11 @@ Report status using this scale:
 
 Check Airflow for the source pipeline:
 
-1. **Find the DAG**: Which DAG populates this table? Use `list_dags` and look for matching names.
+1. **Find the DAG**: Which DAG populates this table? Use `af dags list` and look for matching names.
 
 2. **Check DAG status**:
-   - Is the DAG paused? Use `get_dag_details`
-   - Did the last run fail? Use `get_dag_stats`
+   - Is the DAG paused? Use `af dags get <dag_id>`
+   - Did the last run fail? Use `af dags stats`
    - Is a run currently in progress?
 
 3. **Diagnose if needed**: If the DAG failed, use the **debugging-dags** skill to investigate.

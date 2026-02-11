@@ -20,15 +20,15 @@ Determine what we're tracing:
 
 Tables are typically populated by Airflow DAGs. Find the connection:
 
-1. **Search DAGs by name**: Use `list_dags` and look for DAG names matching the table name
+1. **Search DAGs by name**: Use `af dags list` and look for DAG names matching the table name
    - `load_customers` -> `customers` table
    - `etl_daily_orders` -> `orders` table
 
-2. **Explore DAG source code**: Use `get_dag_source` to read the DAG definition
+2. **Explore DAG source code**: Use `af dags source <dag_id>` to read the DAG definition
    - Look for INSERT, MERGE, CREATE TABLE statements
    - Find the target table in the code
 
-3. **Check DAG tasks**: Use `list_tasks` to see what operations the DAG performs
+3. **Check DAG tasks**: Use `af tasks list <dag_id>` to see what operations the DAG performs
 
 ### Step 3: Trace Data Sources
 
@@ -77,7 +77,7 @@ TARGET: analytics.orders_daily
 
 For each upstream source:
 - **Tables**: Check freshness with the **checking-freshness** skill
-- **DAGs**: Check recent run status with `get_dag_stats`
+- **DAGs**: Check recent run status with `af dags stats`
 - **External systems**: Note connection info from DAG code
 
 ## Lineage for Columns

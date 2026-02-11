@@ -12,10 +12,10 @@ Use `af` commands to test, debug, and fix DAGs in iterative cycles.
 Run all `af` commands using uvx (no installation required):
 
 ```bash
-uvx --from astro-airflow-mcp@latest af <command>
+uvx --from astro-airflow-mcp af <command>
 ```
 
-Throughout this document, `af` is shorthand for `uvx --from astro-airflow-mcp@latest af`.
+Throughout this document, `af` is shorthand for `uvx --from astro-airflow-mcp af`.
 
 ---
 
