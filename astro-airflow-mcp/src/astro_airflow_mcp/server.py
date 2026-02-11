@@ -33,10 +33,17 @@ mcp = FastMCP(
     - Inspect Airflow connections, variables, and pools
     - Monitor DAG statistics and warnings
     - View system configuration and version information
+    - **Manage multiple Airflow instances/deployments**:
+      - List available instances with `list_instances`
+      - Switch between instances with `switch_instance`
 
     When the user asks about Airflow workflows, pipelines, or data orchestration,
     use these tools to provide detailed, accurate information directly from the
     Airflow instance.
+
+    When the user wants to check a different Airflow environment (e.g., staging,
+    production), use `switch_instance` to change the target, then proceed with
+    the requested operations against that environment.
     """,
 )
 

@@ -11,6 +11,7 @@
     - [Configuration](#configuration)
   - [Features](#features)
   - [Available Tools](#available-tools)
+    - [Instance Management Tools](#instance-management-tools)
     - [Consolidated Tools (Agent-Optimized)](#consolidated-tools-agent-optimized)
     - [Core Tools](#core-tools)
     - [MCP Resources](#mcp-resources)
@@ -157,6 +158,10 @@ claude mcp add airflow -e AIRFLOW_API_URL=https://your-airflow.example.com -e AI
 ## Features
 
 - **Airflow 2.x and 3.x Support**: Automatic version detection with adapter pattern
+- **Instance Management** via MCP tools:
+  - List and switch between Airflow instances directly from your AI assistant
+  - Switch between dev/staging/prod without restarting the server or using the CLI
+  - Shared config with `af` CLI (`~/.af/config.yaml`)
 - **MCP Tools** for accessing Airflow data:
   - DAG management (list, get details, get source code, stats, warnings, import errors, trigger, pause/unpause)
   - Task management (list, get details, get task instances, get logs)
@@ -182,6 +187,13 @@ claude mcp add airflow -e AIRFLOW_API_URL=https://your-airflow.example.com -e AI
 
 
 ## Available Tools
+
+### Instance Management Tools
+
+| Tool | Description |
+|------|-------------|
+| `list_instances` | List all configured Airflow instances and show which is active |
+| `switch_instance` | Switch to a different Airflow deployment (e.g., dev → prod) |
 
 ### Consolidated Tools (Agent-Optimized)
 

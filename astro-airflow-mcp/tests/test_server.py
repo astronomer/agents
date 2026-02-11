@@ -19,6 +19,10 @@ from astro_airflow_mcp.tools.dag import (
     _get_dag_details_impl,
     _list_dags_impl,
 )
+from astro_airflow_mcp.tools.instance import (
+    _list_instances_impl,
+    _switch_instance_impl,
+)
 from astro_airflow_mcp.tools.task import (
     _clear_task_instances_impl,
 )
@@ -237,6 +241,145 @@ class TestImplFunctions:
         )
 
         assert "DAG not found" in result
+
+    # --- Instance management _impl tests ---
+
+    def test_list_instances_impl_empty(self, mocker):
+        """Test _list_instances_impl with no instances configured."""
+        mock_config = mocker.Mock()
+        mock_config.instances = []
+        mock_config.current_instance = None
+
+        mock_manager = mocker.Mock()
+        mock_manager.load.return_value = mock_config
+
+        mocker.patch(
+            "astro_airflow_mcp.tools.instance._get_config_manager",
+            return_value=mock_manager,
+        )
+
+        result = _list_instances_impl()
+        result_data = json.loads(result)
+
+        assert result_data["total_instances"] == 0
+        assert result_data["current_instance"] is None
+        assert result_data["instances"] == []
+
+    def test_list_instances_impl_with_multiple(self, mocker):
+        """Test _list_instances_impl with multiple instances."""
+        inst_local = mocker.Mock()
+        inst_local.name = "local"
+        inst_local.url = "http://localhost:8080"
+        inst_local.auth = None
+        inst_local.source = "local"
+
+        inst_staging = mocker.Mock()
+        inst_staging.name = "staging"
+        inst_staging.url = "https://staging.example.com"
+        inst_staging.auth = mocker.Mock()
+        inst_staging.auth.token = None
+        inst_staging.auth.username = "admin"
+        inst_staging.source = "manual"
+
+        inst_prod = mocker.Mock()
+        inst_prod.name = "prod"
+        inst_prod.url = "https://prod.example.com"
+        inst_prod.auth = mocker.Mock()
+        inst_prod.auth.token = "my-token"
+        inst_prod.source = "astro"
+
+        mock_config = mocker.Mock()
+        mock_config.instances = [inst_local, inst_staging, inst_prod]
+        mock_config.current_instance = "staging"
+
+        mock_manager = mocker.Mock()
+        mock_manager.load.return_value = mock_config
+
+        mocker.patch(
+            "astro_airflow_mcp.tools.instance._get_config_manager",
+            return_value=mock_manager,
+        )
+
+        result = _list_instances_impl()
+        result_data = json.loads(result)
+
+        assert result_data["total_instances"] == 3
+        assert result_data["current_instance"] == "staging"
+        assert result_data["instances"][0]["auth"] == "none"
+        assert result_data["instances"][0]["is_current"] is False
+        assert result_data["instances"][1]["auth"] == "basic"
+        assert result_data["instances"][1]["is_current"] is True
+        assert result_data["instances"][2]["auth"] == "token"
+        assert result_data["instances"][2]["is_current"] is False
+
+    def test_list_instances_impl_config_error(self, mocker):
+        """Test _list_instances_impl handles config errors."""
+        from astro_airflow_mcp.config import ConfigError
+
+        mock_manager = mocker.Mock()
+        mock_manager.load.side_effect = ConfigError("Invalid config file")
+
+        mocker.patch(
+            "astro_airflow_mcp.tools.instance._get_config_manager",
+            return_value=mock_manager,
+        )
+
+        result = _list_instances_impl()
+
+        assert "Invalid config file" in result
+
+    def test_switch_instance_impl_success(self, mocker):
+        """Test _switch_instance_impl with valid instance."""
+        inst = mocker.Mock()
+        inst.name = "prod"
+        inst.url = "https://prod.example.com"
+        inst.auth = mocker.Mock()
+        inst.auth.token = "tok"
+        inst.source = "astro"
+
+        mock_config = mocker.Mock()
+        mock_config.get_instance.return_value = inst
+
+        mock_manager = mocker.Mock()
+        mock_manager.load.return_value = mock_config
+
+        mocker.patch(
+            "astro_airflow_mcp.tools.instance._get_config_manager",
+            return_value=mock_manager,
+        )
+        mocker.patch("astro_airflow_mcp.tools.instance._apply_instance_config")
+
+        result = _switch_instance_impl("prod")
+        result_data = json.loads(result)
+
+        assert result_data["switched"] is True
+        assert result_data["instance"]["name"] == "prod"
+        assert result_data["instance"]["url"] == "https://prod.example.com"
+        mock_manager.use_instance.assert_called_once_with("prod")
+
+    def test_switch_instance_impl_not_found(self, mocker):
+        """Test _switch_instance_impl with nonexistent instance."""
+        inst_local = mocker.Mock()
+        inst_local.name = "local"
+
+        mock_config = mocker.Mock()
+        mock_config.get_instance.return_value = None
+        mock_config.instances = [inst_local]
+
+        mock_manager = mocker.Mock()
+        mock_manager.load.return_value = mock_config
+
+        mocker.patch(
+            "astro_airflow_mcp.tools.instance._get_config_manager",
+            return_value=mock_manager,
+        )
+
+        result = _switch_instance_impl("nonexistent")
+        result_data = json.loads(result)
+
+        assert "error" in result_data
+        assert "nonexistent" in result_data["error"]
+        assert "available_instances" in result_data
 
 
 class TestConfiguration:
