@@ -67,13 +67,15 @@ def _list_instances_impl() -> str:
 
         instances: list[dict[str, Any]] = []
         for inst in config.instances:
-            instances.append({
-                "name": inst.name,
-                "url": inst.url,
-                "auth": _get_auth_type(inst),
-                "source": inst.source or "unknown",
-                "is_current": inst.name == config.current_instance,
-            })
+            instances.append(
+                {
+                    "name": inst.name,
+                    "url": inst.url,
+                    "auth": _get_auth_type(inst),
+                    "source": inst.source or "unknown",
+                    "is_current": inst.name == config.current_instance,
+                }
+            )
 
         result: dict[str, Any] = {
             "total_instances": len(instances),
@@ -103,11 +105,14 @@ def _switch_instance_impl(instance_name: str) -> str:
         instance = config.get_instance(instance_name)
         if instance is None:
             available = [inst.name for inst in config.instances]
-            return json.dumps({
-                "error": f"Instance '{instance_name}' not found",
-                "available_instances": available,
-                "hint": "Use list_instances to see all available instances",
-            }, indent=2)
+            return json.dumps(
+                {
+                    "error": f"Instance '{instance_name}' not found",
+                    "available_instances": available,
+                    "hint": "Use list_instances to see all available instances",
+                },
+                indent=2,
+            )
 
         # Persist the switch in config
         manager.use_instance(instance_name)
@@ -130,11 +135,14 @@ def _switch_instance_impl(instance_name: str) -> str:
     except ConfigError as e:
         return str(e)
     except Exception as e:
-        return json.dumps({
-            "switched": False,
-            "error": str(e),
-            "message": "Failed to switch instance. The previous instance remains active.",
-        }, indent=2)
+        return json.dumps(
+            {
+                "switched": False,
+                "error": str(e),
+                "message": "Failed to switch instance. The previous instance remains active.",
+            },
+            indent=2,
+        )
 
 
 # =============================================================================
