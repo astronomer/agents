@@ -241,6 +241,8 @@ Then use it for quick operations like `af health`, `af dags list`, or `af runs t
 
 See the [full CLI documentation](./astro-airflow-mcp/README.md#airflow-cli-tool) for all commands and instance management.
 
+> **Telemetry:** The `af` CLI collects anonymous usage telemetry to help improve the tool. Only the command name is collected (e.g., `dags list`), never the arguments or their values. Opt out with `af telemetry disable`.
+
 ## Configuration
 
 ### Warehouse Connections
