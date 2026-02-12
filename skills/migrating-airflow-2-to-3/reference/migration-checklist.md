@@ -127,15 +127,21 @@ After running Ruff's AIR rules, use this manual search checklist to find remaini
 
 ---
 
-## 10. File paths
+## 10. File paths and shared utility imports
 
 **Search for:**
 - `open("include/`
 - `open("data/`
 - `template_searchpath=`
 - relative paths
+- `import common` or `from common` (bare imports from `dags/common/` or similar)
+- `import utils` or `from utils` (bare imports from `dags/utils/` or similar)
+- `sys.path.append` or `sys.path.insert` (custom path manipulation)
 
-**Fix:** Use `__file__` or `AIRFLOW_HOME` anchoring. Note: triggers cannot be in DAG bundle; must be elsewhere on `sys.path`
+**Fix:**
+- Use `__file__` or `AIRFLOW_HOME` anchoring for file paths
+- Note: triggers cannot be in DAG bundle; must be elsewhere on `sys.path`
+- **Shared utility imports**: Bare imports like `import common` no longer work. Use fully qualified imports: `import dags.common` or `from dags.common.utils import helper_function`
 
 ---
 
