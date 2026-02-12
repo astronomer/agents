@@ -168,7 +168,11 @@ class SnowflakeConnector(DatabaseConnector):
         return env_vars
 
     def to_python_prelude(self) -> str:
-        from templates import HELPERS_CODE, PRIVATE_KEY_CONTENT_TEMPLATE, PRIVATE_KEY_FILE_TEMPLATE
+        from templates import (
+            HELPERS_CODE,
+            PRIVATE_KEY_CONTENT_TEMPLATE,
+            PRIVATE_KEY_FILE_TEMPLATE,
+        )
 
         sections = []
 
