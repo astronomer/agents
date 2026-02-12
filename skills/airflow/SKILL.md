@@ -118,16 +118,24 @@ Or CLI flags: `af --airflow-url http://localhost:8080 --token "$TOKEN" <command>
 - "Stop DAG X" / "Pause this workflow" -> `af dags pause <dag_id>`
 - "Resume DAG X" -> `af dags unpause <dag_id>`
 - "Are there any DAG errors?" -> `af dags errors`
+- "Create a new DAG" / "Write a pipeline" -> use the **authoring-dags** skill
 
 ### Run Operations
 - "What runs have executed?" -> `af runs list`
 - "Run DAG X" / "Trigger the pipeline" -> `af runs trigger <dag_id>`
 - "Run DAG X and wait" -> `af runs trigger-wait <dag_id>`
 - "Why did this run fail?" -> `af runs diagnose <dag_id> <run_id>`
+- "Test this DAG and fix if it fails" -> use the **testing-dags** skill
 
 ### Task Operations
 - "What tasks are in DAG X?" -> `af tasks list <dag_id>`
 - "Get task logs" / "Why did task fail?" -> `af tasks logs <dag_id> <run_id> <task_id>`
+- "Full root cause analysis" / "Diagnose and fix" -> use the **debugging-dags** skill
+
+### Data Operations
+- "Is the data fresh?" / "When was this table last updated?" -> use the **checking-freshness** skill
+- "Where does this data come from?" -> use the **tracing-upstream-lineage** skill
+- "What depends on this table?" / "What breaks if I change this?" -> use the **tracing-downstream-lineage** skill
 
 ### System Operations
 - "What version of Airflow?" -> `af config version`
@@ -260,7 +268,14 @@ af api variables/old_var -X DELETE
 
 ## Related Skills
 
-- `testing-dags` - Test DAGs with debugging and fixing cycles
-- `debugging-dags` - Comprehensive DAG failure diagnosis and root cause analysis
-- `authoring-dags` - Creating and editing DAG files with best practices
-- `managing-astro-local-env` - Starting/stopping local Airflow environment
+| Skill | Use when... |
+|-------|-------------|
+| **authoring-dags** | Creating or editing DAG files with best practices |
+| **testing-dags** | Iterative test -> debug -> fix -> retest cycles |
+| **debugging-dags** | Deep root cause analysis and failure diagnosis |
+| **checking-freshness** | Checking if data is up to date or stale |
+| **tracing-upstream-lineage** | Finding where data comes from |
+| **tracing-downstream-lineage** | Impact analysis -- what breaks if something changes |
+| **migrating-airflow-2-to-3** | Upgrading DAGs from Airflow 2.x to 3.x |
+| **managing-astro-local-env** | Starting, stopping, or troubleshooting local Airflow |
+| **setting-up-astro-project** | Initializing a new Astro/Airflow project |

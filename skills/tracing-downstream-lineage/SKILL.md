@@ -18,8 +18,8 @@ Find everything that reads from this target:
 **For Tables:**
 
 1. **Search DAG source code**: Look for DAGs that SELECT from this table
-   - Use `list_dags` to get all DAGs
-   - Use `get_dag_source` to search for table references
+   - Use `af dags list` to get all DAGs
+   - Use `af dags source <dag_id>` to search for table references
    - Look for: `FROM target_table`, `JOIN target_table`
 
 2. **Check for dependent views**:
@@ -37,7 +37,7 @@ Find everything that reads from this target:
 
 **For DAGs:**
 
-1. **Check what the DAG produces**: Use `get_dag_source` to find output tables
+1. **Check what the DAG produces**: Use `af dags source <dag_id>` to find output tables
 2. **Then trace those tables' consumers** (recursive)
 
 ### Step 2: Build Dependency Tree
