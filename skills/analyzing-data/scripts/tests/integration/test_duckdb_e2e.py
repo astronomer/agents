@@ -2,7 +2,7 @@
 
 import pytest
 
-from lib.connectors import SQLAlchemyConnector
+from connectors import SQLAlchemyConnector
 
 
 class TestDuckDBEndToEnd:

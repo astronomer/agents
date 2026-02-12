@@ -30,9 +30,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from lib.kernel import KernelManager
-from lib.warehouse import WarehouseConfig
-from lib import cache
+from kernel import KernelManager
+from warehouse import WarehouseConfig
+import cache
 
 
 def check_uv_installed():

@@ -1,6 +1,6 @@
 """End-to-end tests for SQLite via SQLAlchemy connector."""
 
-from lib.connectors import SQLAlchemyConnector
+from connectors import SQLAlchemyConnector
 
 
 class TestSQLiteEndToEnd:

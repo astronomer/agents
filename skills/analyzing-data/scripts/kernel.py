@@ -10,7 +10,7 @@ from pathlib import Path
 from jupyter_client import KernelManager as JupyterKernelManager
 from jupyter_client import BlockingKernelClient
 
-from .config import get_kernel_venv_dir, get_kernel_connection_file
+from config import get_kernel_venv_dir, get_kernel_connection_file
 
 DEFAULT_PACKAGES = [
     "ipykernel",

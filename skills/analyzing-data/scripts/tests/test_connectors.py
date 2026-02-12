@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from lib.connectors import (
+from connectors import (
     BigQueryConnector,
     PostgresConnector,
     SnowflakeConnector,
