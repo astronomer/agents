@@ -1,24 +1,13 @@
 ---
 name: init
 description: Initialize warehouse schema discovery. Generates .astro/warehouse.md with all table metadata for instant lookups. Run once per project, refresh when schema changes. Use when user says "/data:init" or asks to set up data discovery.
-hooks:
-  PreToolUse:
-    - matcher: "Bash"
-      hooks:
-        - type: command
-          command: "uv run ../analyzing-data/scripts/cli.py ensure"
-          once: true
-  Stop:
-    - hooks:
-        - type: command
-          command: "uv run ../analyzing-data/scripts/cli.py stop"
 ---
 
 # Initialize Warehouse Schema
 
 Generate a comprehensive, user-editable schema reference file for the data warehouse.
 
-**Scripts:** `../analyzing-data/scripts/`
+**Scripts:** `../analyzing-data/scripts/` — All CLI commands below are relative to the `analyzing-data` skill's directory. Before running any `scripts/cli.py` command, `cd` to `../analyzing-data/` relative to this file.
 
 ## What This Does
 

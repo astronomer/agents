@@ -10,7 +10,7 @@ class TestConfigPaths:
 
     def test_get_kernel_venv_dir_new_path(self):
         """Test kernel venv dir returns new path when no legacy exists."""
-        import lib.config as config_module
+        import config as config_module
 
         config_module._legacy_warning_shown = False
 
@@ -21,7 +21,7 @@ class TestConfigPaths:
 
     def test_get_kernel_connection_file_new_path(self):
         """Test kernel connection file returns new path when no legacy exists."""
-        import lib.config as config_module
+        import config as config_module
 
         config_module._legacy_warning_shown = False
 
@@ -33,7 +33,7 @@ class TestConfigPaths:
 
     def test_get_config_dir_new_path(self):
         """Test config dir returns new path when no legacy exists."""
-        import lib.config as config_module
+        import config as config_module
 
         config_module._legacy_warning_shown = False
 
@@ -48,7 +48,7 @@ class TestLegacyPathFallback:
 
     def test_get_config_dir_uses_legacy_when_exists(self):
         """Test that legacy path is used when it exists and new path doesn't."""
-        import lib.config as config_module
+        import config as config_module
 
         config_module._legacy_warning_shown = False
 
@@ -73,7 +73,7 @@ class TestLegacyPathFallback:
 
     def test_get_config_dir_prefers_new_path(self):
         """Test that new path is used when both exist."""
-        import lib.config as config_module
+        import config as config_module
 
         config_module._legacy_warning_shown = False
 
@@ -93,7 +93,7 @@ class TestLegacyPathFallback:
 
     def test_legacy_warning_shown_once(self):
         """Test that deprecation warning is only shown once."""
-        import lib.config as config_module
+        import config as config_module
 
         config_module._legacy_warning_shown = False
 
@@ -121,7 +121,7 @@ class TestLegacyPathFallback:
 
     def test_kernel_paths_use_legacy_parent(self):
         """Test that kernel paths use legacy parent dir when legacy config exists."""
-        import lib.config as config_module
+        import config as config_module
 
         config_module._legacy_warning_shown = False
 

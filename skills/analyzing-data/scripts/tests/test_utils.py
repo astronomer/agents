@@ -2,7 +2,7 @@
 
 import pytest
 
-from lib.connectors.utils import substitute_env_vars
+from connectors import substitute_env_vars
 
 
 class TestSubstituteEnvVars:

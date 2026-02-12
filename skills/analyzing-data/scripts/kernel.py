@@ -10,7 +10,7 @@ from pathlib import Path
 from jupyter_client import KernelManager as JupyterKernelManager
 from jupyter_client import BlockingKernelClient
 
-from .config import get_kernel_venv_dir, get_kernel_connection_file
+from config import get_kernel_venv_dir, get_kernel_connection_file
 
 DEFAULT_PACKAGES = [
     "ipykernel",
@@ -153,6 +153,26 @@ class KernelManager:
             raise RuntimeError(f"Kernel failed: {e}") from e
         finally:
             kc.stop_channels()
+
+        # Inject idle timeout watchdog into the kernel
+        self._km.client().execute(
+            "import threading, time, os, signal\n"
+            "_idle_timeout = 1800\n"  # 30 minutes
+            "_last_active = [time.time()]\n"
+            "_orig_execute = get_ipython().run_cell\n"
+            "def _tracked_execute(*a, **kw):\n"
+            "    _last_active[0] = time.time()\n"
+            "    return _orig_execute(*a, **kw)\n"
+            "get_ipython().run_cell = _tracked_execute\n"
+            "def _idle_watchdog():\n"
+            "    while True:\n"
+            "        time.sleep(60)\n"
+            "        if time.time() - _last_active[0] > _idle_timeout:\n"
+            "            os._exit(0)\n"
+            "_t = threading.Thread(target=_idle_watchdog, daemon=True)\n"
+            "_t.start()\n",
+            silent=True,
+        )
 
         self._km = None
         print(f"Kernel started ({self.connection_file})")
