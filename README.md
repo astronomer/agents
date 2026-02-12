@@ -184,6 +184,14 @@ The `data` plugin bundles an MCP server and skills into a single installable pac
 | [authoring-dags](./skills/authoring-dags/) | Create and validate Airflow DAGs with best practices |
 | [testing-dags](./skills/testing-dags/) | Test and debug Airflow DAGs locally |
 | [debugging-dags](./skills/debugging-dags/) | Deep failure diagnosis and root cause analysis |
+| [airflow-hitl](./skills/airflow-hitl/) | Human-in-the-loop workflows: approval gates, form input, branching (Airflow 3.1+) |
+
+#### dbt Integration
+
+| Skill | Description |
+|-------|-------------|
+| [cosmos-dbt-core](./skills/cosmos-dbt-core/) | Run dbt Core projects as Airflow DAGs using [Astronomer Cosmos](https://github.com/astronomer/astronomer-cosmos) |
+| [cosmos-dbt-fusion](./skills/cosmos-dbt-fusion/) | Run dbt Fusion projects with Cosmos (Snowflake/Databricks only) |
 
 #### Migration
 
@@ -440,7 +448,6 @@ Skills we're likely to build:
 - Data quality and validation workflows
 
 **Astronomer Open Source**
-- [Cosmos](https://github.com/astronomer/astronomer-cosmos) - Run dbt projects as Airflow DAGs
 - [DAG Factory](https://github.com/astronomer/dag-factory) - Generate DAGs from YAML
 - Other open source projects we maintain
 
