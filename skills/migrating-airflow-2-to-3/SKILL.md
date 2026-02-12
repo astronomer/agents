@@ -25,6 +25,7 @@ This skill helps migrate **Airflow 2.x DAG code** to **Airflow 3.x**, focusing o
      - Cron scheduling semantics: consider `AIRFLOW__SCHEDULER__CREATE_CRON_DATA_INTERVAL=True` if you need Airflow 2-style cron data intervals.
      - `.airflowignore` syntax changed from regexp to glob; set `AIRFLOW__CORE__DAG_IGNORE_FILE_SYNTAX=regexp` if you must keep regexp behavior.
      - OAuth callback URLs add an `/auth/` prefix (e.g. `/auth/oauth-authorized/google`).
+     - **Shared utility imports**: Bare imports like `import common` from `dags/common/` no longer work on Astro. Use fully qualified imports: `import dags.common`.
 3. Plan changes per file and issue type:
    - Fix imports - update operators/hooks/providers - refactor metadata access to using the Airflow client instead of direct access - fix use of outdated context variables - fix scheduling logic.
 4. Implement changes incrementally, re-running Ruff and code searches after each major change.
