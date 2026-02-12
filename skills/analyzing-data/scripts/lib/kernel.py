@@ -93,8 +93,13 @@ class KernelManager:
             )
 
         print("Installing packages...")
+        constraints_file = Path(__file__).parent.parent / "constraints.txt"
+        install_cmd = ["uv", "pip", "install", "--python", str(self.python_path)]
+        if constraints_file.exists():
+            install_cmd.extend(["--constraint", str(constraints_file)])
+        install_cmd.extend(packages)
         subprocess.run(
-            ["uv", "pip", "install", "--python", str(self.python_path)] + packages,
+            install_cmd,
             check=True,
             capture_output=True,
         )
