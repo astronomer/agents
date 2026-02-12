@@ -12,3 +12,6 @@ DEFAULT_OFFSET = 0
 
 # Default Airflow URL
 DEFAULT_AIRFLOW_URL = "http://localhost:8080"
+
+# Read-only mode environment variable
+READ_ONLY_ENV_VAR = "AF_READ_ONLY"
