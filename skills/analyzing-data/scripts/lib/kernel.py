@@ -73,6 +73,18 @@ class KernelManager:
         except Exception:
             return False
 
+    @staticmethod
+    def _find_constraints_file() -> Path | None:
+        """Walk up from this file to find constraints.txt next to pyproject.toml."""
+        current = Path(__file__).resolve().parent
+        for parent in (current, *current.parents):
+            if (parent / "pyproject.toml").exists():
+                candidate = parent / "constraints.txt"
+                if candidate.exists():
+                    return candidate
+                return None
+        return None
+
     def ensure_environment(self, extra_packages: list[str] | None = None) -> None:
         if not shutil.which("uv"):
             raise RuntimeError(
@@ -93,8 +105,13 @@ class KernelManager:
             )
 
         print("Installing packages...")
+        constraints_file = self._find_constraints_file()
+        install_cmd = ["uv", "pip", "install", "--python", str(self.python_path)]
+        if constraints_file is not None:
+            install_cmd.extend(["--constraint", str(constraints_file)])
+        install_cmd.extend(packages)
         subprocess.run(
-            ["uv", "pip", "install", "--python", str(self.python_path)] + packages,
+            install_cmd,
             check=True,
             capture_output=True,
         )
