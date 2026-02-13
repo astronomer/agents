@@ -160,7 +160,7 @@ The `data` plugin bundles an MCP server and skills into a single installable pac
 
 | Skill | Description |
 |-------|-------------|
-| [init](./skills/init/) | Initialize schema discovery - generates `.astro/warehouse.md` for instant lookups |
+| [warehouse-init](./skills/warehouse-init/) | Initialize schema discovery - generates `.astro/warehouse.md` for instant lookups |
 | [analyzing-data](./skills/analyzing-data/) | SQL-based analysis to answer business questions (uses background Jupyter kernel) |
 | [checking-freshness](./skills/checking-freshness/) | Check how current your data is |
 | [profiling-tables](./skills/profiling-tables/) | Comprehensive table profiling and quality assessment |
@@ -205,12 +205,12 @@ The `data` plugin bundles an MCP server and skills into a single installable pac
 
 ```mermaid
 flowchart LR
-    init["/data:init"] --> analyzing["/data:analyzing-data"]
+    init["/data:warehouse-init"] --> analyzing["/data:analyzing-data"]
     analyzing --> profiling["/data:profiling-tables"]
     analyzing --> freshness["/data:checking-freshness"]
 ```
 
-1. **Initialize** (`/data:init`) - One-time setup to generate `warehouse.md` with schema metadata
+1. **Initialize** (`/data:warehouse-init`) - One-time setup to generate `warehouse.md` with schema metadata
 2. **Analyze** (`/data:analyzing-data`) - Answer business questions with SQL
 3. **Profile** (`/data:profiling-tables`) - Deep dive into specific tables for statistics and quality
 4. **Check freshness** (`/data:checking-freshness`) - Verify data is up to date before using
@@ -376,7 +376,7 @@ Skills are invoked automatically based on what you ask. You can also invoke them
 
 1. **Initialize your warehouse** (recommended first step):
    ```
-   /data:init
+   /data:warehouse-init
    ```
    This generates `.astro/warehouse.md` with schema metadata for faster queries.
 
