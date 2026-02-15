@@ -116,6 +116,76 @@ class TestSnowflakeConnector:
         assert "account='test-account'" in prelude
         assert "def run_sql" in prelude
 
+    @pytest.mark.parametrize(
+        "data,expected_tag",
+        [
+            (
+                {
+                    "account": "a",
+                    "user": "u",
+                    "password": "p",
+                    "query_tag": "team=data-eng",
+                },
+                "team=data-eng",
+            ),
+            ({"account": "a", "user": "u", "password": "p"}, ""),
+        ],
+        ids=["with_query_tag", "without_query_tag"],
+    )
+    def test_from_dict_query_tag(self, data, expected_tag):
+        conn = SnowflakeConnector.from_dict(data)
+        assert conn.query_tag == expected_tag
+
+    @pytest.mark.parametrize(
+        "query_tag",
+        [
+            "team=data-eng",
+            "x" * 2000,
+            "",
+        ],
+        ids=["typical_tag", "max_length", "empty"],
+    )
+    def test_validate_valid_query_tag(self, query_tag):
+        conn = SnowflakeConnector(
+            account="a", user="u", password="p", databases=[], query_tag=query_tag
+        )
+        conn.validate("test")  # Should not raise
+
+    def test_validate_invalid_query_tag(self):
+        conn = SnowflakeConnector(
+            account="a",
+            user="u",
+            password="p",
+            databases=[],
+            query_tag="x" * 2001,
+        )
+        with pytest.raises(ValueError, match="2000 character limit"):
+            conn.validate("test")
+
+    def test_to_python_prelude_with_query_tag(self):
+        conn = SnowflakeConnector(
+            account="a",
+            user="u",
+            password="p",
+            databases=["DB"],
+            query_tag="team=data-eng",
+        )
+        prelude = conn.to_python_prelude()
+        assert "session_parameters" in prelude
+        assert "QUERY_TAG" in prelude
+        assert "team=data-eng" in prelude
+
+    def test_to_python_prelude_query_tag_in_status(self):
+        conn = SnowflakeConnector(
+            account="a",
+            user="u",
+            password="p",
+            databases=["DB"],
+            query_tag="team=data-eng",
+        )
+        prelude = conn.to_python_prelude()
+        assert "Query Tag:" in prelude
+
 
 class TestPostgresConnector:
     def test_connector_type(self):
@@ -790,6 +860,13 @@ class TestPreludeCompilation:
                 private_key_path="/k.pem",
                 databases=[],
             ),
+            SnowflakeConnector(
+                account="a",
+                user="u",
+                password="p",
+                query_tag="team=data-eng",
+                databases=[],
+            ),
             PostgresConnector(
                 host="h", port=5432, user="u", database="db", databases=["db"]
             ),
@@ -823,6 +900,7 @@ class TestPreludeCompilation:
         ids=[
             "snowflake_password",
             "snowflake_private_key",
+            "snowflake_query_tag",
             "postgres_basic",
             "postgres_ssl",
             "bigquery_basic",
