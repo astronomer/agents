@@ -211,6 +211,97 @@ class TestBigQueryConnector:
         assert "service_account" in prelude
         assert "from_service_account_file" in prelude
 
+    @pytest.mark.parametrize(
+        "data,expected_labels",
+        [
+            (
+                {"project": "p", "labels": {"team": "data-eng", "env": "prod"}},
+                {"team": "data-eng", "env": "prod"},
+            ),
+            ({"project": "p"}, {}),
+        ],
+        ids=["with_labels", "without_labels"],
+    )
+    def test_from_dict_labels(self, data, expected_labels):
+        conn = BigQueryConnector.from_dict(data)
+        assert conn.labels == expected_labels
+
+    @pytest.mark.parametrize(
+        "labels",
+        [
+            {"team": "data-eng", "env": "prod", "tool": "claude-code"},
+            {"team": ""},
+        ],
+        ids=["typical_labels", "empty_value"],
+    )
+    def test_validate_valid_labels(self, labels):
+        conn = BigQueryConnector(project="p", databases=[], labels=labels)
+        conn.validate("test")  # Should not raise
+
+    @pytest.mark.parametrize(
+        "labels,error_match",
+        [
+            ({"Team": "eng"}, "invalid BigQuery label key"),
+            ({"1team": "eng"}, "invalid BigQuery label key"),
+            ({"team": "Eng"}, "invalid BigQuery label value"),
+            ({f"key{i}": f"val{i}" for i in range(65)}, "at most 64 labels"),
+            ({"team": 12345}, "must be a string"),
+        ],
+        ids=[
+            "uppercase_key",
+            "key_starts_with_number",
+            "uppercase_value",
+            "too_many_labels",
+            "non_string_value",
+        ],
+    )
+    def test_validate_invalid_labels(self, labels, error_match):
+        conn = BigQueryConnector(project="p", databases=[], labels=labels)
+        with pytest.raises(ValueError, match=error_match):
+            conn.validate("test")
+
+    def test_to_python_prelude_with_labels(self):
+        conn = BigQueryConnector(
+            project="p",
+            databases=["p"],
+            labels={"team": "data-eng", "env": "prod"},
+        )
+        prelude = conn.to_python_prelude()
+        assert "labels=" in prelude
+        assert "'team': 'data-eng'" in prelude
+        assert "'env': 'prod'" in prelude
+
+    def test_to_python_prelude_location_in_query_call(self):
+        conn = BigQueryConnector(
+            project="p", location="US", databases=["p"]
+        )
+        prelude = conn.to_python_prelude()
+        assert "location='US'" in prelude
+        # location should be in _client.query(), not QueryJobConfig()
+        assert "_client.query(query, job_config=job_config, location='US')" in prelude
+
+    def test_to_python_prelude_location_and_labels(self):
+        conn = BigQueryConnector(
+            project="p",
+            location="EU",
+            databases=["p"],
+            labels={"team": "eng"},
+        )
+        prelude = conn.to_python_prelude()
+        compile(prelude, "<string>", "exec")
+        assert "labels={'team': 'eng'}" in prelude
+        assert "location='EU'" in prelude
+        assert "_client.query(query, job_config=job_config, location='EU')" in prelude
+
+    def test_to_python_prelude_labels_in_status(self):
+        conn = BigQueryConnector(
+            project="p",
+            databases=["p"],
+            labels={"team": "data-eng"},
+        )
+        prelude = conn.to_python_prelude()
+        assert "Labels:" in prelude
+
 
 class TestSQLAlchemyConnector:
     def test_connector_type(self):
@@ -717,6 +808,17 @@ class TestPreludeCompilation:
             BigQueryConnector(
                 project="p", credentials_path="/creds.json", databases=["p"]
             ),
+            BigQueryConnector(
+                project="p",
+                databases=["p"],
+                labels={"team": "data-eng", "env": "prod"},
+            ),
+            BigQueryConnector(
+                project="p",
+                location="EU",
+                databases=["p"],
+                labels={"tool": "claude-code"},
+            ),
             SQLAlchemyConnector(url="sqlite:///test.db", databases=["test"]),
             SQLAlchemyConnector(url="postgresql://u:p@h/d", databases=["d"]),
         ],
@@ -728,6 +830,8 @@ class TestPreludeCompilation:
             "bigquery_basic",
             "bigquery_location",
             "bigquery_credentials",
+            "bigquery_labels",
+            "bigquery_location_and_labels",
             "sqlalchemy_sqlite",
             "sqlalchemy_postgres",
         ],

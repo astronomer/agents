@@ -372,6 +372,11 @@ def run_sql_pandas(query: str, limit: int = 100):
 
 # --- BigQuery Connector ---
 
+# Google allows international characters in BQ labels, but we restrict to ASCII
+# for simplicity. Expand the regex if international support is needed.
+_BQ_LABEL_KEY_RE = re.compile(r"^[a-z][a-z0-9_-]{0,62}$")
+_BQ_LABEL_VALUE_RE = re.compile(r"^[a-z0-9_-]{0,63}$")
+
 
 @register_connector
 @dataclass
@@ -380,6 +385,7 @@ class BigQueryConnector(DatabaseConnector):
     credentials_path: str = ""
     location: str = ""
     databases: list[str] = field(default_factory=list)
+    labels: dict[str, str] = field(default_factory=dict)
 
     @classmethod
     def connector_type(cls) -> str:
@@ -395,11 +401,31 @@ class BigQueryConnector(DatabaseConnector):
             credentials_path=credentials_path,
             location=data.get("location", ""),
             databases=data.get("databases", [project] if project else []),
+            labels=data.get("labels", {}),
         )
 
     def validate(self, name: str) -> None:
         if not self.project or self.project.startswith("${"):
             raise ValueError(f"warehouse '{name}': project required for bigquery")
+        if len(self.labels) > 64:
+            raise ValueError(
+                f"warehouse '{name}': BigQuery supports at most 64 labels, got {len(self.labels)}"
+            )
+        for k, v in self.labels.items():
+            if not isinstance(k, str) or not _BQ_LABEL_KEY_RE.match(k):
+                raise ValueError(
+                    f"warehouse '{name}': invalid BigQuery label key {k!r} "
+                    "(must match [a-z][a-z0-9_-]{0,62})"
+                )
+            if not isinstance(v, str):
+                raise ValueError(
+                    f"warehouse '{name}': label value for {k!r} must be a string, got {type(v).__name__}"
+                )
+            if not _BQ_LABEL_VALUE_RE.match(v):
+                raise ValueError(
+                    f"warehouse '{name}': invalid BigQuery label value {v!r} for key {k!r} "
+                    "(must match [a-z0-9_-]{0,63})"
+                )
 
     def get_required_packages(self) -> list[str]:
         return ["google-cloud-bigquery[pandas,pyarrow]", "db-dtypes"]
@@ -418,7 +444,17 @@ _client = bigquery.Client(project={self.project!r}, credentials=_credentials)"""
         else:
             conn_code = f"_client = bigquery.Client(project={self.project!r})"
 
-        location_arg = f"location={self.location!r}" if self.location else ""
+        # Build QueryJobConfig arguments
+        job_config_args = []
+        if self.labels:
+            job_config_args.append(f"labels={self.labels!r}")
+        job_config_str = ", ".join(job_config_args)
+
+        # Build _client.query() extra kwargs
+        query_extra_args = ""
+        if self.location:
+            query_extra_args = f", location={self.location!r}"
+
         auth_type = (
             "Service Account"
             if self.credentials_path
@@ -432,6 +468,8 @@ _client = bigquery.Client(project={self.project!r}, credentials=_credentials)"""
         if self.location:
             status_lines.append(f'print(f"   Location: {self.location}")')
         status_lines.append(f'print("   Auth: {auth_type}")')
+        if self.labels:
+            status_lines.append(f'print(f"   Labels: {self.labels!r}")')
         status_lines.append(
             'print("\\nAvailable: run_sql(query) -> polars, run_sql_pandas(query) -> pandas")'
         )
@@ -446,8 +484,8 @@ import os
 
 def run_sql(query: str, limit: int = 100):
     """Execute SQL and return Polars DataFrame."""
-    job_config = bigquery.QueryJobConfig({location_arg})
-    query_job = _client.query(query, job_config=job_config)
+    job_config = bigquery.QueryJobConfig({job_config_str})
+    query_job = _client.query(query, job_config=job_config{query_extra_args})
     df = query_job.to_dataframe()
     result = pl.from_pandas(df)
     return result.head(limit) if limit > 0 and len(result) > limit else result
@@ -455,8 +493,8 @@ def run_sql(query: str, limit: int = 100):
 
 def run_sql_pandas(query: str, limit: int = 100):
     """Execute SQL and return Pandas DataFrame."""
-    job_config = bigquery.QueryJobConfig({location_arg})
-    query_job = _client.query(query, job_config=job_config)
+    job_config = bigquery.QueryJobConfig({job_config_str})
+    query_job = _client.query(query, job_config=job_config{query_extra_args})
     df = query_job.to_dataframe()
     return df.head(limit) if limit > 0 and len(df) > limit else df
 

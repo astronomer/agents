@@ -339,6 +339,10 @@ my_bigquery:
   type: bigquery
   project: my-gcp-project
   credentials_path: ~/.config/gcloud/service_account.json
+  location: US
+  labels:
+    team: data-eng
+    env: prod
 
 # SQLAlchemy (any supported database)
 my_duckdb:
