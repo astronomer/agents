@@ -272,9 +272,7 @@ class TestBigQueryConnector:
         assert "'env': 'prod'" in prelude
 
     def test_to_python_prelude_location_in_query_call(self):
-        conn = BigQueryConnector(
-            project="p", location="US", databases=["p"]
-        )
+        conn = BigQueryConnector(project="p", location="US", databases=["p"])
         prelude = conn.to_python_prelude()
         assert "location='US'" in prelude
         # location should be in _client.query(), not QueryJobConfig()
