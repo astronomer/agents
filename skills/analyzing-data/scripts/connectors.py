@@ -108,6 +108,7 @@ class SnowflakeConnector(DatabaseConnector):
     password_env_var: str | None = None
     private_key_env_var: str | None = None
     private_key_passphrase_env_var: str | None = None
+    query_tag: str = ""
 
     @classmethod
     def connector_type(cls) -> str:
@@ -137,6 +138,7 @@ class SnowflakeConnector(DatabaseConnector):
             password_env_var=pw_env,
             private_key_env_var=pk_env,
             private_key_passphrase_env_var=pp_env,
+            query_tag=data.get("query_tag", ""),
         )
 
     def validate(self, name: str) -> None:
@@ -150,6 +152,10 @@ class SnowflakeConnector(DatabaseConnector):
         elif self.auth_type == "private_key":
             if not self.private_key_path and not self.private_key:
                 raise ValueError(f"warehouse '{name}': private_key required")
+        if len(self.query_tag) > 2000:
+            raise ValueError(
+                f"warehouse '{name}': query_tag exceeds Snowflake's 2000 character limit"
+            )
 
     def get_required_packages(self) -> list[str]:
         pkgs = ["snowflake-connector-python[pandas]"]
@@ -228,6 +234,8 @@ import os""")
             lines.append(f"    role={self.role!r},")
         if self.databases:
             lines.append(f"    database={self.databases[0]!r},")
+        if self.query_tag:
+            lines.append(f"    session_parameters={{'QUERY_TAG': {self.query_tag!r}}},")
         lines.append(f"    client_session_keep_alive={self.client_session_keep_alive},")
         lines.append(")")
         sections.append("\n".join(lines))
@@ -250,6 +258,8 @@ import os""")
             status_lines.append(f'print(f"   Role: {self.role}")')
         if self.databases:
             status_lines.append(f'print(f"   Database: {self.databases[0]}")')
+        if self.query_tag:
+            status_lines.append(f'print(f"   Query Tag: {self.query_tag}")')
         status_lines.append(
             'print("\\nAvailable: run_sql(query) -> polars, run_sql_pandas(query) -> pandas")'
         )

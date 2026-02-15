@@ -267,6 +267,7 @@ my_warehouse:
   private_key_passphrase: ${SNOWFLAKE_PRIVATE_KEY_PASSPHRASE}
   warehouse: COMPUTE_WH
   role: ANALYST
+  query_tag: claude-code
   databases:
     - ANALYTICS
     - RAW
