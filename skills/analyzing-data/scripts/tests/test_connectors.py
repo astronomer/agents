@@ -237,6 +237,48 @@ class TestPostgresConnector:
         assert "host='localhost'" in prelude
         assert "def run_sql" in prelude
 
+    @pytest.mark.parametrize(
+        "data,expected_name",
+        [
+            (
+                {
+                    "host": "h",
+                    "user": "u",
+                    "database": "d",
+                    "application_name": "claude-code",
+                },
+                "claude-code",
+            ),
+            ({"host": "h", "user": "u", "database": "d"}, ""),
+        ],
+        ids=["with_application_name", "without_application_name"],
+    )
+    def test_from_dict_application_name(self, data, expected_name):
+        conn = PostgresConnector.from_dict(data)
+        assert conn.application_name == expected_name
+
+    def test_to_python_prelude_with_application_name(self):
+        conn = PostgresConnector(
+            host="h",
+            user="u",
+            database="db",
+            databases=["db"],
+            application_name="claude-code",
+        )
+        prelude = conn.to_python_prelude()
+        assert "application_name='claude-code'" in prelude
+
+    def test_to_python_prelude_application_name_in_status(self):
+        conn = PostgresConnector(
+            host="h",
+            user="u",
+            database="db",
+            databases=["db"],
+            application_name="claude-code",
+        )
+        prelude = conn.to_python_prelude()
+        assert "Application:" in prelude
+
 
 class TestBigQueryConnector:
     def test_connector_type(self):
@@ -878,6 +920,14 @@ class TestPreludeCompilation:
                 sslmode="require",
                 databases=[],
             ),
+            PostgresConnector(
+                host="h",
+                user="u",
+                password="p",
+                database="db",
+                databases=[],
+                application_name="claude-code",
+            ),
             BigQueryConnector(project="p", databases=["p"]),
             BigQueryConnector(project="p", location="US", databases=["p"]),
             BigQueryConnector(
@@ -903,6 +953,7 @@ class TestPreludeCompilation:
             "snowflake_query_tag",
             "postgres_basic",
             "postgres_ssl",
+            "postgres_application_name",
             "bigquery_basic",
             "bigquery_location",
             "bigquery_credentials",

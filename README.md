@@ -334,6 +334,7 @@ my_postgres:
   user: analyst
   password: ${POSTGRES_PASSWORD}
   database: analytics
+  application_name: claude-code
 
 # BigQuery
 my_bigquery:

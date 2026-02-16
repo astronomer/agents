@@ -282,6 +282,7 @@ class PostgresConnector(DatabaseConnector):
     sslmode: str = ""
     databases: list[str] = field(default_factory=list)
     password_env_var: str | None = None
+    application_name: str = ""
 
     @classmethod
     def connector_type(cls) -> str:
@@ -303,6 +304,7 @@ class PostgresConnector(DatabaseConnector):
             sslmode=data.get("sslmode", ""),
             databases=data.get("databases", [database] if database else []),
             password_env_var=pw_env,
+            application_name=data.get("application_name", ""),
         )
 
     def validate(self, name: str) -> None:
@@ -334,6 +336,8 @@ class PostgresConnector(DatabaseConnector):
         lines.append(f"    dbname={self.database!r},")
         if self.sslmode:
             lines.append(f"    sslmode={self.sslmode!r},")
+        if self.application_name:
+            lines.append(f"    application_name={self.application_name!r},")
         lines.append("    autocommit=True,")
         lines.append(")")
         connection_code = "\n".join(lines)
@@ -343,6 +347,10 @@ class PostgresConnector(DatabaseConnector):
             f'print("   Host: {self.host}:{self.port}")',
             f'print("   User: {self.user}")',
             f'print("   Database: {self.database}")',
+        ]
+        if self.application_name:
+            status_lines.append(f'print("   Application: {self.application_name}")')
+        status_lines += [
             'print("\\nAvailable: run_sql(query) -> polars, run_sql_pandas(query) -> pandas")',
         ]
         status_code = "\n".join(status_lines)
