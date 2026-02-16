@@ -352,6 +352,14 @@ my_duckdb:
   url: duckdb:///path/to/analytics.duckdb
   databases: [main]
 
+# SQLAlchemy with connect_args (passed to the DBAPI driver)
+my_pg_sqlalchemy:
+  type: sqlalchemy
+  url: postgresql://${PG_USER}:${PG_PASSWORD}@localhost/analytics
+  databases: [analytics]
+  connect_args:
+    application_name: claude-code
+
 # Redshift (via SQLAlchemy)
 my_redshift:
   type: sqlalchemy

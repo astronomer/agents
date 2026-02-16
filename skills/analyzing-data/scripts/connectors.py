@@ -618,6 +618,7 @@ class SQLAlchemyConnector(DatabaseConnector):
     pool_size: int = 5
     echo: bool = False
     url_env_var: str | None = None
+    connect_args: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def connector_type(cls) -> str:
@@ -633,6 +634,7 @@ class SQLAlchemyConnector(DatabaseConnector):
             pool_size=data.get("pool_size", 5),
             echo=data.get("echo", False),
             url_env_var=url_env,
+            connect_args=data.get("connect_args", {}),
         )
 
     def validate(self, name: str) -> None:
@@ -678,7 +680,7 @@ import pandas as pd
 import os
 import atexit
 
-_engine = create_engine({url_code}, pool_size={self.pool_size}, echo={self.echo})
+_engine = create_engine({url_code}, pool_size={self.pool_size}, echo={self.echo}{f", connect_args={self.connect_args!r}" if self.connect_args else ""})
 _conn = _engine.connect()
 atexit.register(lambda: (_conn.close(), _engine.dispose()))
 

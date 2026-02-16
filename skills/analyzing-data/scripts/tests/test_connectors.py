@@ -468,6 +468,53 @@ class TestSQLAlchemyConnector:
         assert "create_engine" in prelude
         assert "def run_sql" in prelude
 
+    @pytest.mark.parametrize(
+        "data,expected_args",
+        [
+            (
+                {
+                    "url": "postgresql://u:p@h/d",
+                    "databases": ["d"],
+                    "connect_args": {"application_name": "claude-code"},
+                },
+                {"application_name": "claude-code"},
+            ),
+            (
+                {"url": "postgresql://u:p@h/d", "databases": ["d"]},
+                {},
+            ),
+        ],
+        ids=["with_connect_args", "without_connect_args"],
+    )
+    def test_from_dict_connect_args(self, data, expected_args):
+        conn = SQLAlchemyConnector.from_dict(data)
+        assert conn.connect_args == expected_args
+
+    def test_to_python_prelude_with_connect_args(self):
+        conn = SQLAlchemyConnector(
+            url="postgresql://u:p@h/d",
+            databases=["d"],
+            connect_args={"application_name": "claude-code"},
+        )
+        prelude = conn.to_python_prelude()
+        assert "connect_args={'application_name': 'claude-code'}" in prelude
+
+    def test_to_python_prelude_without_connect_args(self):
+        conn = SQLAlchemyConnector(url="sqlite:///t.db", databases=["t"])
+        prelude = conn.to_python_prelude()
+        assert "connect_args" not in prelude
+
+    def test_to_python_prelude_nested_connect_args(self):
+        conn = SQLAlchemyConnector(
+            url="snowflake://u:p@a/d",
+            databases=["d"],
+            connect_args={"session_parameters": {"QUERY_TAG": "team=data-eng"}},
+        )
+        prelude = conn.to_python_prelude()
+        assert "connect_args=" in prelude
+        assert "QUERY_TAG" in prelude
+        assert "team=data-eng" in prelude
+
 
 class TestEnvVarSubstitution:
     def test_env_var_substitution(self, monkeypatch):
@@ -946,6 +993,16 @@ class TestPreludeCompilation:
             ),
             SQLAlchemyConnector(url="sqlite:///test.db", databases=["test"]),
             SQLAlchemyConnector(url="postgresql://u:p@h/d", databases=["d"]),
+            SQLAlchemyConnector(
+                url="postgresql://u:p@h/d",
+                databases=["d"],
+                connect_args={"application_name": "claude-code"},
+            ),
+            SQLAlchemyConnector(
+                url="snowflake://u:p@a/d",
+                databases=["d"],
+                connect_args={"session_parameters": {"QUERY_TAG": "team=data-eng"}},
+            ),
         ],
         ids=[
             "snowflake_password",
@@ -961,6 +1018,8 @@ class TestPreludeCompilation:
             "bigquery_location_and_labels",
             "sqlalchemy_sqlite",
             "sqlalchemy_postgres",
+            "sqlalchemy_connect_args",
+            "sqlalchemy_nested_connect_args",
         ],
     )
     def test_prelude_compiles(self, connector):
