@@ -23,6 +23,7 @@ class AdapterManager:
         self._token_manager: TokenManager | None = None
         self._auth_token: str | None = None
         self._airflow_url: str = DEFAULT_AIRFLOW_URL
+        self._verify: bool | str = True
 
     @property
     def airflow_url(self) -> str:
@@ -35,6 +36,7 @@ class AdapterManager:
         auth_token: str | None = None,
         username: str | None = None,
         password: str | None = None,
+        verify: bool | str = True,
     ) -> None:
         """Configure adapter connection settings.
 
@@ -43,6 +45,8 @@ class AdapterManager:
             auth_token: Direct bearer token for authentication (takes precedence)
             username: Username for token-based authentication
             password: Password for token-based authentication
+            verify: SSL verification setting. True (default) enables verification,
+                    False disables it, or a string path to a CA bundle file.
 
         Note:
             If auth_token is provided, it will be used directly.
@@ -52,6 +56,8 @@ class AdapterManager:
         """
         if url:
             self._airflow_url = url
+
+        self._verify = verify
 
         if auth_token:
             # Direct token takes precedence - no token manager needed
@@ -64,6 +70,7 @@ class AdapterManager:
                 airflow_url=self._airflow_url,
                 username=username,
                 password=password,
+                verify=self._verify,
             )
         else:
             # No auth provided - try credential-less token manager
@@ -72,6 +79,7 @@ class AdapterManager:
                 airflow_url=self._airflow_url,
                 username=None,
                 password=None,
+                verify=self._verify,
             )
 
         # Reset adapter so it will be re-created with new config
@@ -92,6 +100,7 @@ class AdapterManager:
                 airflow_url=self._airflow_url,
                 token_getter=self._get_auth_token,
                 basic_auth_getter=self._get_basic_auth,
+                verify=self._verify,
             )
             logger.info("Created adapter for Airflow %s", self._adapter.version)
         return self._adapter

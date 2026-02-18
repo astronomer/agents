@@ -28,6 +28,7 @@ class AirflowAdapter(ABC):
         version: str,
         token_getter: Callable[[], str | None] | None = None,
         basic_auth_getter: Callable[[], tuple[str, str] | None] | None = None,
+        verify: bool | str = True,
     ):
         """Initialize adapter with connection details.
 
@@ -37,11 +38,14 @@ class AirflowAdapter(ABC):
             token_getter: Callable that returns current auth token (or None)
             basic_auth_getter: Callable that returns (username, password) tuple or None
                              Used as fallback for Airflow 2.x which doesn't support token auth
+            verify: SSL verification setting. True (default) enables verification,
+                    False disables it, or a string path to a CA bundle file.
         """
         self.airflow_url = airflow_url
         self.version = version
         self._token_getter = token_getter
         self._basic_auth_getter = basic_auth_getter
+        self._verify: bool | str = verify
 
     @property
     @abstractmethod
@@ -102,7 +106,7 @@ class AirflowAdapter(ABC):
         # Remove None values
         all_params = {k: v for k, v in all_params.items() if v is not None}
 
-        with httpx.Client(timeout=30.0) as client:
+        with httpx.Client(timeout=30.0, verify=self._verify) as client:
             response = client.get(url, params=all_params, headers=headers, auth=auth)
 
             if response.status_code == 404:
@@ -134,7 +138,7 @@ class AirflowAdapter(ABC):
         headers["Content-Type"] = "application/json"
         url = f"{self.airflow_url}{self.api_base_path}/{endpoint}"
 
-        with httpx.Client(timeout=30.0) as client:
+        with httpx.Client(timeout=30.0, verify=self._verify) as client:
             response = client.post(url, json=json_data, headers=headers, auth=auth)
 
             if response.status_code == 404:
@@ -166,7 +170,7 @@ class AirflowAdapter(ABC):
         headers["Content-Type"] = "application/json"
         url = f"{self.airflow_url}{self.api_base_path}/{endpoint}"
 
-        with httpx.Client(timeout=30.0) as client:
+        with httpx.Client(timeout=30.0, verify=self._verify) as client:
             response = client.patch(url, json=json_data, headers=headers, auth=auth)
 
             if response.status_code == 404:
@@ -195,7 +199,7 @@ class AirflowAdapter(ABC):
         headers["Accept"] = "application/json"
         url = f"{self.airflow_url}{self.api_base_path}/{endpoint}"
 
-        with httpx.Client(timeout=30.0) as client:
+        with httpx.Client(timeout=30.0, verify=self._verify) as client:
             response = client.delete(url, headers=headers, auth=auth)
 
             if response.status_code == 404:
@@ -254,7 +258,7 @@ class AirflowAdapter(ABC):
         else:
             url = f"{self.airflow_url}{self.api_base_path}/{endpoint}"
 
-        with httpx.Client(timeout=30.0) as client:
+        with httpx.Client(timeout=30.0, verify=self._verify) as client:
             response = client.request(
                 method=method.upper(),
                 url=url,

@@ -13,6 +13,7 @@ def detect_version(
     airflow_url: str,
     token_getter: Callable[[], str | None] | None = None,
     basic_auth_getter: Callable[[], tuple[str, str] | None] | None = None,
+    verify: bool | str = True,
 ) -> tuple[int, str]:
     """Detect Airflow version by probing API endpoints.
 
@@ -20,6 +21,7 @@ def detect_version(
         airflow_url: Base URL of Airflow webserver
         token_getter: Callable that returns current auth token (or None)
         basic_auth_getter: Callable that returns (username, password) tuple or None
+        verify: SSL verification setting for httpx.Client
 
     Returns:
         Tuple of (major_version, full_version_string)
@@ -42,7 +44,7 @@ def detect_version(
 
     # Try Airflow 3 API first (/api/v2/version)
     try:
-        with httpx.Client(timeout=10.0) as client:
+        with httpx.Client(timeout=10.0, verify=verify) as client:
             response = client.get(
                 f"{airflow_url}/api/v2/version",
                 headers=headers,
@@ -58,7 +60,7 @@ def detect_version(
 
     # Try Airflow 2 API (/api/v1/version)
     try:
-        with httpx.Client(timeout=10.0) as client:
+        with httpx.Client(timeout=10.0, verify=verify) as client:
             response = client.get(
                 f"{airflow_url}/api/v1/version",
                 headers=headers,
@@ -82,6 +84,7 @@ def create_adapter(
     airflow_url: str,
     token_getter: Callable[[], str | None] | None = None,
     basic_auth_getter: Callable[[], tuple[str, str] | None] | None = None,
+    verify: bool | str = True,
 ) -> AirflowAdapter:
     """Create appropriate adapter based on detected Airflow version.
 
@@ -90,6 +93,7 @@ def create_adapter(
         token_getter: Callable that returns current auth token (or None)
         basic_auth_getter: Callable that returns (username, password) tuple or None
                          Used as fallback for Airflow 2.x which doesn't support token auth
+        verify: SSL verification setting for httpx.Client
 
     Returns:
         Version-specific adapter instance
@@ -98,7 +102,10 @@ def create_adapter(
         RuntimeError: If version detection fails or version is unsupported
     """
     major_version, full_version = detect_version(
-        airflow_url, token_getter=token_getter, basic_auth_getter=basic_auth_getter
+        airflow_url,
+        token_getter=token_getter,
+        basic_auth_getter=basic_auth_getter,
+        verify=verify,
     )
 
     if major_version == 2:
@@ -107,6 +114,7 @@ def create_adapter(
             full_version,
             token_getter=token_getter,
             basic_auth_getter=basic_auth_getter,
+            verify=verify,
         )
     if major_version >= 3:
         return AirflowV3Adapter(
@@ -114,6 +122,7 @@ def create_adapter(
             full_version,
             token_getter=token_getter,
             basic_auth_getter=basic_auth_getter,
+            verify=verify,
         )
     raise RuntimeError(f"Unsupported Airflow version: {major_version}")
 

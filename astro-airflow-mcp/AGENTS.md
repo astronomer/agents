@@ -47,11 +47,11 @@ src/astro_airflow_mcp/
 
 ### HTTP Client
 
-Use `httpx`, not `requests`. All HTTP calls should use `httpx.Client`:
+Use `httpx`, not `requests`. All HTTP calls should use `httpx.Client` and pass `self._verify` for SSL configuration:
 
 ```python
 # Good
-with httpx.Client(timeout=30.0) as client:
+with httpx.Client(timeout=30.0, verify=self._verify) as client:
     response = client.get(url, headers=headers)
 
 # Bad

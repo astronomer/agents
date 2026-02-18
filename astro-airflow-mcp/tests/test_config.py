@@ -537,3 +537,407 @@ class TestResolvedConfig:
             },
         )
         assert "instance:local" in resolved.sources["url"]
+
+    def test_resolved_config_ssl_defaults(self):
+        """Test ResolvedConfig has SSL defaults."""
+        resolved = ResolvedConfig(url="http://localhost:8080")
+        assert resolved.verify_ssl is True
+        assert resolved.ca_cert is None
+
+    def test_resolved_config_ssl_disabled(self):
+        """Test ResolvedConfig with SSL verification disabled."""
+        resolved = ResolvedConfig(
+            url="https://self-signed.example.com",
+            verify_ssl=False,
+        )
+        assert resolved.verify_ssl is False
+
+    def test_resolved_config_ca_cert(self):
+        """Test ResolvedConfig with custom CA cert."""
+        resolved = ResolvedConfig(
+            url="https://corporate.example.com",
+            ca_cert="/etc/ssl/certs/corporate-ca.pem",
+        )
+        assert resolved.ca_cert == "/etc/ssl/certs/corporate-ca.pem"
+
+
+class TestInstanceSSL:
+    """Tests for Instance model SSL fields."""
+
+    def test_instance_ssl_defaults(self):
+        """Test Instance has SSL defaults."""
+        instance = Instance(
+            name="local",
+            url="http://localhost:8080",
+        )
+        assert instance.verify_ssl is True
+        assert instance.ca_cert is None
+
+    def test_instance_verify_ssl_false(self):
+        """Test Instance with SSL verification disabled."""
+        instance = Instance(
+            name="self-signed",
+            url="https://self-signed.example.com",
+            verify_ssl=False,
+        )
+        assert instance.verify_ssl is False
+
+    def test_instance_ca_cert(self):
+        """Test Instance with custom CA cert."""
+        instance = Instance(
+            name="corporate",
+            url="https://corporate.example.com",
+            ca_cert="/path/to/ca.pem",
+        )
+        assert instance.ca_cert == "/path/to/ca.pem"
+
+    def test_instance_ssl_serialization(self):
+        """Test Instance SSL fields serialize with aliases."""
+        instance = Instance(
+            name="test",
+            url="https://example.com",
+            verify_ssl=False,
+            ca_cert="/path/to/ca.pem",
+        )
+        data = instance.model_dump(by_alias=True)
+        assert data["verify-ssl"] is False
+        assert data["ca-cert"] == "/path/to/ca.pem"
+
+    def test_instance_ssl_from_alias(self):
+        """Test Instance can be created from aliased field names (YAML loading)."""
+        instance = Instance.model_validate(
+            {
+                "name": "test",
+                "url": "https://example.com",
+                "verify-ssl": False,
+                "ca-cert": "/path/to/ca.pem",
+            }
+        )
+        assert instance.verify_ssl is False
+        assert instance.ca_cert == "/path/to/ca.pem"
+
+    def test_add_instance_with_ssl(self):
+        """Test add_instance stores SSL fields."""
+        config = AirflowCliConfig()
+        config.add_instance(
+            "self-signed",
+            "https://self-signed.example.com",
+            username="admin",
+            password="admin",
+            verify_ssl=False,
+        )
+        instance = config.get_instance("self-signed")
+        assert instance.verify_ssl is False
+        assert instance.ca_cert is None
+
+    def test_add_instance_with_ca_cert(self):
+        """Test add_instance stores CA cert."""
+        config = AirflowCliConfig()
+        config.add_instance(
+            "corporate",
+            "https://corporate.example.com",
+            token="token",
+            ca_cert="/path/to/ca.pem",
+        )
+        instance = config.get_instance("corporate")
+        assert instance.verify_ssl is True
+        assert instance.ca_cert == "/path/to/ca.pem"
+
+
+class TestConfigManagerSSL:
+    """Tests for ConfigManager SSL field handling."""
+
+    def test_resolve_instance_carries_ssl_fields(self, tmp_path):
+        """Test resolve_instance passes SSL fields to ResolvedConfig."""
+        config_path = tmp_path / "config.yaml"
+        manager = ConfigManager(config_path=config_path)
+
+        config = AirflowCliConfig(
+            instances=[
+                Instance(
+                    name="self-signed",
+                    url="https://self-signed.example.com",
+                    auth=Auth(username="admin", password="admin"),
+                    verify_ssl=False,
+                )
+            ],
+            current_instance="self-signed",
+        )
+        manager.save(config)
+
+        resolved = manager.resolve_instance()
+        assert resolved.verify_ssl is False
+        assert resolved.ca_cert is None
+
+    def test_resolve_instance_with_ca_cert(self, tmp_path):
+        """Test resolve_instance interpolates and passes CA cert."""
+        config_path = tmp_path / "config.yaml"
+        ca_file = tmp_path / "corporate-ca.pem"
+        ca_file.write_text("fake cert")
+
+        manager = ConfigManager(config_path=config_path)
+
+        config = AirflowCliConfig(
+            instances=[
+                Instance(
+                    name="corporate",
+                    url="https://corporate.example.com",
+                    auth=Auth(token="token"),
+                    ca_cert=str(ca_file),
+                )
+            ],
+            current_instance="corporate",
+        )
+        manager.save(config)
+
+        resolved = manager.resolve_instance()
+        assert resolved.ca_cert == str(ca_file)
+        assert resolved.verify_ssl is True
+
+    def test_resolve_instance_ca_cert_interpolation(self, tmp_path):
+        """Test ca_cert supports env var interpolation."""
+        config_path = tmp_path / "config.yaml"
+        ca_file = tmp_path / "resolved-ca.pem"
+        ca_file.write_text("fake cert")
+
+        manager = ConfigManager(config_path=config_path)
+
+        config = AirflowCliConfig(
+            instances=[
+                Instance(
+                    name="test",
+                    url="https://example.com",
+                    auth=Auth(token="token"),
+                    ca_cert="${CA_CERT_PATH}",
+                )
+            ],
+            current_instance="test",
+        )
+        manager.save(config)
+
+        with patch.dict(os.environ, {"CA_CERT_PATH": str(ca_file)}):
+            resolved = manager.resolve_instance()
+            assert resolved.ca_cert == str(ca_file)
+
+    def test_save_omits_default_ssl_values(self, tmp_path):
+        """Test save omits default SSL values for clean YAML."""
+        config_path = tmp_path / "config.yaml"
+        manager = ConfigManager(config_path=config_path)
+
+        config = AirflowCliConfig(
+            instances=[
+                Instance(
+                    name="default-ssl",
+                    url="http://localhost:8080",
+                )
+            ],
+        )
+        manager.save(config)
+
+        with open(config_path) as f:
+            raw = yaml.safe_load(f)
+
+        inst = raw["instances"][0]
+        assert "verify-ssl" not in inst
+        assert "ca-cert" not in inst
+
+    def test_save_persists_non_default_ssl(self, tmp_path):
+        """Test save persists non-default SSL values."""
+        config_path = tmp_path / "config.yaml"
+        manager = ConfigManager(config_path=config_path)
+
+        config = AirflowCliConfig(
+            instances=[
+                Instance(
+                    name="custom-ssl",
+                    url="https://example.com",
+                    verify_ssl=False,
+                    ca_cert="/path/to/ca.pem",
+                )
+            ],
+        )
+        manager.save(config)
+
+        with open(config_path) as f:
+            raw = yaml.safe_load(f)
+
+        inst = raw["instances"][0]
+        assert inst["verify-ssl"] is False
+        assert inst["ca-cert"] == "/path/to/ca.pem"
+
+    def test_add_instance_with_ssl_persists(self, tmp_path):
+        """Test ConfigManager.add_instance persists SSL fields."""
+        config_path = tmp_path / "config.yaml"
+        manager = ConfigManager(config_path=config_path)
+
+        manager.add_instance(
+            "test",
+            "https://example.com",
+            token="tok",
+            verify_ssl=False,
+            ca_cert="/ca.pem",
+        )
+
+        config = manager.load()
+        instance = config.get_instance("test")
+        assert instance.verify_ssl is False
+        assert instance.ca_cert == "/ca.pem"
+
+    def test_resolve_instance_ca_cert_not_found_raises(self, tmp_path):
+        """Test resolve_instance raises when ca_cert file doesn't exist."""
+        config_path = tmp_path / "config.yaml"
+        manager = ConfigManager(config_path=config_path)
+
+        config = AirflowCliConfig(
+            instances=[
+                Instance(
+                    name="test",
+                    url="https://example.com",
+                    auth=Auth(token="token"),
+                    ca_cert="/nonexistent/ca.pem",
+                )
+            ],
+            current_instance="test",
+        )
+        manager.save(config)
+
+        with pytest.raises(ConfigError, match="CA certificate file not found"):
+            manager.resolve_instance()
+
+    def test_resolve_instance_ca_cert_valid_file(self, tmp_path):
+        """Test resolve_instance succeeds when ca_cert file exists."""
+        config_path = tmp_path / "config.yaml"
+        ca_file = tmp_path / "ca.pem"
+        ca_file.write_text("fake cert")
+
+        manager = ConfigManager(config_path=config_path)
+        config = AirflowCliConfig(
+            instances=[
+                Instance(
+                    name="test",
+                    url="https://example.com",
+                    auth=Auth(token="token"),
+                    ca_cert=str(ca_file),
+                )
+            ],
+            current_instance="test",
+        )
+        manager.save(config)
+
+        resolved = manager.resolve_instance()
+        assert resolved.ca_cert == str(ca_file)
+
+
+class TestCLIContextSSL:
+    """Tests for CLIContext SSL env var override logic."""
+
+    def _make_context(self):
+        """Create a fresh CLIContext (bypass singleton)."""
+        from astro_airflow_mcp.cli.context import CLIContext
+
+        ctx = CLIContext.__new__(CLIContext)
+        ctx._manager = __import__(
+            "astro_airflow_mcp.adapter_manager", fromlist=["AdapterManager"]
+        ).AdapterManager()
+        ctx._initialized = False
+        return ctx
+
+    def test_env_var_disables_ssl(self):
+        """Test AIRFLOW_VERIFY_SSL=false disables SSL verification."""
+        ctx = self._make_context()
+        env = {
+            "AIRFLOW_VERIFY_SSL": "false",
+            "AIRFLOW_API_URL": "http://localhost:8080",
+        }
+        with patch.dict(os.environ, env, clear=False):
+            ctx.init()
+        assert ctx._manager._verify is False
+
+    def test_env_var_true_overrides_config_false(self, tmp_path):
+        """Test AIRFLOW_VERIFY_SSL=true overrides config verify_ssl=False."""
+        ctx = self._make_context()
+        env = {
+            "AIRFLOW_VERIFY_SSL": "true",
+            "AIRFLOW_API_URL": "http://localhost:8080",
+        }
+        # Mock _load_from_config to return verify_ssl=False
+        mock_config = ResolvedConfig(
+            url="http://localhost:8080",
+            verify_ssl=False,
+            instance_name="test",
+        )
+        with (
+            patch.object(ctx, "_load_from_config", return_value=mock_config),
+            patch.dict(os.environ, env, clear=False),
+        ):
+            ctx.init()
+        assert ctx._manager._verify is True
+
+    def test_env_ca_cert_overrides_config(self, tmp_path):
+        """Test AIRFLOW_CA_CERT env var overrides config ca_cert."""
+        ctx = self._make_context()
+        env = {
+            "AIRFLOW_CA_CERT": "/env/ca.pem",
+            "AIRFLOW_API_URL": "http://localhost:8080",
+        }
+        mock_config = ResolvedConfig(
+            url="http://localhost:8080",
+            ca_cert="/config/ca.pem",
+            instance_name="test",
+        )
+        with (
+            patch.object(ctx, "_load_from_config", return_value=mock_config),
+            patch.dict(os.environ, env, clear=False),
+        ):
+            ctx.init()
+        assert ctx._manager._verify == "/env/ca.pem"
+
+    def test_config_verify_ssl_false_no_env(self):
+        """Test config verify_ssl=False is used when no env var set."""
+        ctx = self._make_context()
+        mock_config = ResolvedConfig(
+            url="http://localhost:8080",
+            verify_ssl=False,
+            instance_name="test",
+        )
+        with patch.object(ctx, "_load_from_config", return_value=mock_config):
+            # Ensure no SSL env vars are set
+            env_clear = {
+                k: v
+                for k, v in os.environ.items()
+                if k not in ("AIRFLOW_VERIFY_SSL", "AIRFLOW_CA_CERT")
+            }
+            with patch.dict(os.environ, env_clear, clear=True):
+                ctx.init()
+        assert ctx._manager._verify is False
+
+    def test_config_ca_cert_used_no_env(self):
+        """Test config ca_cert is used when no env var set."""
+        ctx = self._make_context()
+        mock_config = ResolvedConfig(
+            url="http://localhost:8080",
+            ca_cert="/config/ca.pem",
+            instance_name="test",
+        )
+        with patch.object(ctx, "_load_from_config", return_value=mock_config):
+            env_clear = {
+                k: v
+                for k, v in os.environ.items()
+                if k not in ("AIRFLOW_VERIFY_SSL", "AIRFLOW_CA_CERT")
+            }
+            with patch.dict(os.environ, env_clear, clear=True):
+                ctx.init()
+        assert ctx._manager._verify == "/config/ca.pem"
+
+    def test_default_verify_true(self):
+        """Test default verify is True when no config or env vars."""
+        ctx = self._make_context()
+        with patch.object(ctx, "_load_from_config", return_value=None):
+            env_clear = {
+                k: v
+                for k, v in os.environ.items()
+                if k not in ("AIRFLOW_VERIFY_SSL", "AIRFLOW_CA_CERT")
+            }
+            with patch.dict(os.environ, env_clear, clear=True):
+                ctx.init()
+        assert ctx._manager._verify is True

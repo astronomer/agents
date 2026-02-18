@@ -112,8 +112,32 @@ def main():
         default=os.getenv("AIRFLOW_PROJECT_DIR") or os.getenv("PWD") or os.getcwd(),
         help="Astro project directory for auto-discovering Airflow URL from .astro/config.yaml (default: $PWD)",
     )
+    ssl_group = parser.add_mutually_exclusive_group()
+    ssl_group.add_argument(
+        "--no-verify-ssl",
+        action="store_true",
+        default=False,
+        help="Disable SSL certificate verification",
+    )
+    ssl_group.add_argument(
+        "--ca-cert",
+        type=str,
+        default=None,
+        help="Path to custom CA certificate bundle for SSL verification",
+    )
 
     args = parser.parse_args()
+
+    # Env var fallbacks for SSL (only when CLI flags not provided)
+    if not args.no_verify_ssl and args.ca_cert is None:
+        env_verify = os.getenv("AIRFLOW_VERIFY_SSL")
+        if env_verify is not None and env_verify.lower() in ("false", "0", "no"):
+            args.no_verify_ssl = True
+
+    if args.ca_cert is None and not args.no_verify_ssl:
+        env_ca_cert = os.getenv("AIRFLOW_CA_CERT")
+        if env_ca_cert:
+            args.ca_cert = env_ca_cert
 
     # Configure logging - use stderr in stdio mode to avoid corrupting JSON-RPC
     stdio_mode = args.transport == "stdio"
@@ -131,6 +155,17 @@ def main():
             airflow_url = DEFAULT_AIRFLOW_URL
             url_source = "default"
 
+    # Validate ca_cert path if provided
+    if args.ca_cert and not Path(args.ca_cert).is_file():
+        parser.error(f"CA certificate file not found: {args.ca_cert}")
+
+    # Compute verify value: ca_cert path > no_verify_ssl=False > True
+    verify: bool | str = True
+    if args.ca_cert:
+        verify = args.ca_cert
+    elif args.no_verify_ssl:
+        verify = False
+
     # Configure Airflow connection settings
     configure(
         url=airflow_url,
@@ -138,6 +173,7 @@ def main():
         username=args.username,
         password=args.password,
         project_dir=args.airflow_project_dir,
+        verify=verify,
     )
 
     # Log configuration
@@ -149,6 +185,8 @@ def main():
         logger.info("Authentication: Token manager (username: %s)", args.username)
     else:
         logger.info("Authentication: Token manager (credential-less mode)")
+    if verify is not True:
+        logger.info("SSL verification: %s", verify)
 
     # Run the server with specified transport
     if args.transport == "http":
