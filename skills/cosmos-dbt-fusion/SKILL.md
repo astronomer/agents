@@ -90,10 +90,6 @@ _render_config = RenderConfig(
 
 > **Reference**: See **[reference/cosmos-config.md](reference/cosmos-config.md#profileconfig-warehouse-connection)** for full ProfileConfig options and examples.
 
-| Warehouse | ProfileMapping Class |
-|-----------|----------------------|
-| Snowflake | `SnowflakeUserPasswordProfileMapping` |
-| Databricks | `DatabricksTokenProfileMapping` |
 
 ```python
 from cosmos import ProfileConfig
@@ -116,20 +112,14 @@ _profile_config = ProfileConfig(
 
 ```python
 from cosmos import ExecutionConfig
+from cosmos.constants import InvocationMode
 
 _execution_config = ExecutionConfig(
+    invocation_mode=InvocationMode.SUBPROCESS,
     dbt_executable_path="/home/astro/.local/bin/dbt",  # REQUIRED: path to Fusion binary
     # execution_mode is LOCAL by default - do not change
 )
 ```
-
-### What "Local-Only" Means
-
-| Allowed | Not Allowed |
-|---------|-------------|
-| ✅ Install Fusion binary into Airflow image/runtime | ❌ `ExecutionMode.DOCKER` / `KUBERNETES` |
-| ✅ `ExecutionMode.LOCAL` (default) | ❌ `ExecutionMode.AIRFLOW_ASYNC` |
-| | ❌ `ExecutionMode.VIRTUALENV` (Fusion is a binary, not a Python package) |
 
 ---
 
@@ -227,9 +217,8 @@ my_dag()
 Before finalizing, verify:
 
 - [ ] **Cosmos version**: ≥1.11.0
-- [ ] **Execution mode**: LOCAL only
 - [ ] **Fusion binary installed**: Path exists and is executable
-- [ ] **Warehouse supported**: Snowflake or Databricks only
+- [ ] **Warehouse supported**: Snowflake, Databricks, Bigquery or Redshift only
 - [ ] **Secrets handling**: Airflow connections or env vars, NOT plaintext
 
 ### Troubleshooting
