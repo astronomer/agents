@@ -11,17 +11,15 @@ Execute steps in order. This skill covers Fusion-specific constraints only.
 >
 > **Reference**: See **[reference/cosmos-config.md](reference/cosmos-config.md)** for ProfileConfig, operator_args, and Airflow 3 compatibility details.
 
-> **Before starting**, confirm: (1) dbt engine = Fusion (not Core → use **cosmos-dbt-core**), (2) warehouse = Snowflake or Databricks only, (3) `ExecutionMode.LOCAL` is acceptable (no containerized/async/virtualenv).
+> **Before starting**, confirm: (1) dbt engine = Fusion (not Core → use **cosmos-dbt-core**), (2) warehouse = Snowflake, Databricks, Bigquery and Redshift only.
 
 ### Fusion-Specific Constraints
 
 | Constraint | Details |
 |------------|---------|
-| Execution mode | `ExecutionMode.LOCAL` only |
 | No async | `AIRFLOW_ASYNC` not supported |
-| No containerized | `DOCKER` / `KUBERNETES` / etc. not supported |
 | No virtualenv | Fusion is a binary, not a Python package |
-| Warehouse support | Snowflake + Databricks only (public beta) |
+| Warehouse support | Snowflake, Databricks, Bigquery and Redshift support [while in preview](https://github.com/dbt-labs/dbt-fusion) |
 
 ---
 
@@ -92,10 +90,6 @@ _render_config = RenderConfig(
 
 > **Reference**: See **[reference/cosmos-config.md](reference/cosmos-config.md#profileconfig-warehouse-connection)** for full ProfileConfig options and examples.
 
-| Warehouse | ProfileMapping Class |
-|-----------|----------------------|
-| Snowflake | `SnowflakeUserPasswordProfileMapping` |
-| Databricks | `DatabricksTokenProfileMapping` |
 
 ```python
 from cosmos import ProfileConfig
@@ -118,20 +112,14 @@ _profile_config = ProfileConfig(
 
 ```python
 from cosmos import ExecutionConfig
+from cosmos.constants import InvocationMode
 
 _execution_config = ExecutionConfig(
+    invocation_mode=InvocationMode.SUBPROCESS,
     dbt_executable_path="/home/astro/.local/bin/dbt",  # REQUIRED: path to Fusion binary
     # execution_mode is LOCAL by default - do not change
 )
 ```
-
-### What "Local-Only" Means
-
-| Allowed | Not Allowed |
-|---------|-------------|
-| ✅ Install Fusion binary into Airflow image/runtime | ❌ `ExecutionMode.DOCKER` / `KUBERNETES` |
-| ✅ `ExecutionMode.LOCAL` (default) | ❌ `ExecutionMode.AIRFLOW_ASYNC` |
-| | ❌ `ExecutionMode.VIRTUALENV` (Fusion is a binary, not a Python package) |
 
 ---
 
@@ -229,9 +217,8 @@ my_dag()
 Before finalizing, verify:
 
 - [ ] **Cosmos version**: ≥1.11.0
-- [ ] **Execution mode**: LOCAL only
 - [ ] **Fusion binary installed**: Path exists and is executable
-- [ ] **Warehouse supported**: Snowflake or Databricks only
+- [ ] **Warehouse supported**: Snowflake, Databricks, Bigquery or Redshift only
 - [ ] **Secrets handling**: Airflow connections or env vars, NOT plaintext
 
 ### Troubleshooting
