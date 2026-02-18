@@ -19,12 +19,34 @@ Throughout this document, `af` is shorthand for `uvx --from astro-airflow-mcp af
 
 ---
 
-## FIRST ACTION: Just Trigger the DAG
+## FIRST ACTION: Ensure DAG is Unpaused, Then Trigger
 
-When the user asks to test a DAG, your **FIRST AND ONLY action** should be:
+When the user asks to test a DAG, your **FIRST action** should be to ensure the DAG is unpaused before triggering it.
+
+### Why This Matters
+
+**CRITICAL:** Paused DAGs will accept manual triggers but **will never execute**. The DAG run will remain stuck in `queued` state indefinitely, causing `af runs trigger-wait` to timeout. This is because Airflow's `dags_are_paused_at_creation` config defaults to `True`, meaning newly created DAGs start paused.
+
+### Step 1: Unpause the DAG (if needed)
+
+```bash
+af dags unpause <dag_id>
+```
+
+This command is **idempotent** - it's safe to run even if the DAG is already unpaused. It ensures the DAG is active and ready to execute.
+
+### Step 2: Trigger and Wait
 
 ```bash
 af runs trigger-wait <dag_id>
+```
+
+### Complete Testing Command Pattern
+
+Run these two commands together:
+
+```bash
+af dags unpause <dag_id> && af runs trigger-wait <dag_id>
 ```
 
 **DO NOT:**
@@ -33,8 +55,9 @@ af runs trigger-wait <dag_id>
 - Call `af dags errors` first
 - Use `grep` or `ls` or any other bash command
 - Do any "pre-flight checks"
+- Skip the unpause step
 
-**Just trigger the DAG.** If it fails, THEN debug.
+**Always unpause, then trigger.** If it fails, THEN debug.
 
 ---
 
@@ -42,7 +65,12 @@ af runs trigger-wait <dag_id>
 
 ```
 ┌─────────────────────────────────────┐
-│ 1. TRIGGER AND WAIT                 │
+│ 1. UNPAUSE (always)                 │
+│    Ensure DAG is active             │
+└─────────────────────────────────────┘
+                 ↓
+┌─────────────────────────────────────┐
+│ 2. TRIGGER AND WAIT                 │
 │    Run DAG, wait for completion     │
 └─────────────────────────────────────┘
                  ↓
@@ -54,37 +82,43 @@ af runs trigger-wait <dag_id>
    └─────────┘    └──────────┘
                        ↓
         ┌─────────────────────────────────────┐
-        │ 2. DEBUG (only if failed)           │
+        │ 3. DEBUG (only if failed)           │
         │    Get logs, identify root cause    │
         └─────────────────────────────────────┘
                        ↓
         ┌─────────────────────────────────────┐
-        │ 3. FIX AND RETEST                   │
+        │ 4. FIX AND RETEST                   │
         │    Apply fix, restart from step 1   │
         └─────────────────────────────────────┘
 ```
 
-**Philosophy: Try first, debug on failure.** Don't waste time on pre-flight checks — just run the DAG and diagnose if something goes wrong.
+**Philosophy: Unpause first, then try.** Always ensure the DAG is active before triggering to avoid infinite waits on paused DAGs. Debug on failure.
 
 ---
 
-## Phase 1: Trigger and Wait
+## Phase 1: Unpause and Trigger
 
-Use `af runs trigger-wait` to test the DAG:
+Always unpause the DAG before triggering to ensure it can execute.
 
-### Primary Method: Trigger and Wait
+### Primary Method: Unpause + Trigger and Wait
 
 ```bash
-af runs trigger-wait <dag_id> --timeout 300
+af dags unpause <dag_id> && af runs trigger-wait <dag_id> --timeout 300
 ```
 
 **Example:**
 
 ```bash
-af runs trigger-wait my_dag --timeout 300
+af dags unpause my_dag && af runs trigger-wait my_dag --timeout 300
 ```
 
-**Why this is the preferred method:**
+**Why unpause is required:**
+- Paused DAGs accept triggers but **never execute** (stuck in `queued` state)
+- `dags_are_paused_at_creation` defaults to `True` in Airflow
+- Newly created DAGs are paused by default
+- `af dags unpause` is idempotent (safe to run multiple times)
+
+**Why trigger-wait is the preferred method:**
 - Single command handles trigger + monitoring
 - Returns immediately when DAG completes (success or failure)
 - Includes failed task details if run fails
@@ -137,16 +171,19 @@ af runs trigger-wait my_dag --timeout 300
 }
 ```
 
-### Alternative: Trigger and Monitor Separately
+### Alternative: Unpause + Trigger and Monitor Separately
 
 Use this only when you need more control:
 
 ```bash
-# Step 1: Trigger
+# Step 1: Unpause
+af dags unpause my_dag
+
+# Step 2: Trigger
 af runs trigger my_dag
 # Returns: {"dag_run_id": "manual__...", "state": "queued"}
 
-# Step 2: Check status
+# Step 3: Check status
 af runs get my_dag manual__2025-01-14T...
 # Returns current state
 ```
@@ -252,7 +289,7 @@ Once you identify the issue:
 ### After Fixing
 
 1. Save the file
-2. **Retest:** `af runs trigger-wait <dag_id>`
+2. **Retest:** `af runs trigger-wait <dag_id>` (already unpaused from initial test)
 
 **Repeat the test → debug → fix loop until the DAG succeeds.**
 
@@ -262,13 +299,15 @@ Once you identify the issue:
 
 | Phase | Command | Purpose |
 |-------|---------|---------|
-| Test | `af runs trigger-wait <dag_id>` | **Primary test method — start here** |
+| Test | `af dags unpause <dag_id>` | **Always run first — ensure DAG is active** |
+| Test | `af runs trigger-wait <dag_id>` | Trigger and wait for completion |
+| Test | `af dags unpause <dag_id> && af runs trigger-wait <dag_id>` | **Combined: unpause + test (recommended)** |
 | Test | `af runs trigger <dag_id>` | Start run (alternative) |
 | Test | `af runs get <dag_id> <run_id>` | Check run status |
 | Debug | `af runs diagnose <dag_id> <run_id>` | Comprehensive failure diagnosis |
 | Debug | `af tasks logs <dag_id> <run_id> <task_id>` | Get task output/errors |
 | Debug | `af dags errors` | Check for parse errors (if DAG won't load) |
-| Debug | `af dags get <dag_id>` | Verify DAG config |
+| Debug | `af dags get <dag_id>` | Verify DAG config (includes `is_paused` status) |
 | Debug | `af dags explore <dag_id>` | Full DAG inspection |
 | Config | `af config connections` | List connections |
 | Config | `af config variables` | List variables |
@@ -280,15 +319,15 @@ Once you identify the issue:
 ### Scenario 1: Test a DAG (Happy Path)
 
 ```bash
-af runs trigger-wait my_dag
+af dags unpause my_dag && af runs trigger-wait my_dag
 # Success! Done.
 ```
 
 ### Scenario 2: Test a DAG (With Failure)
 
 ```bash
-# 1. Run and wait
-af runs trigger-wait my_dag
+# 1. Unpause and run
+af dags unpause my_dag && af runs trigger-wait my_dag
 # Failed...
 
 # 2. Find failed tasks
@@ -299,7 +338,7 @@ af tasks logs my_dag manual__2025-01-14T... extract_data
 
 # 4. [Fix the issue in DAG code]
 
-# 5. Retest
+# 5. Retest (already unpaused from step 1)
 af runs trigger-wait my_dag
 ```
 
@@ -307,7 +346,7 @@ af runs trigger-wait my_dag
 
 ```bash
 # 1. Trigger fails - DAG not found
-af runs trigger-wait my_dag
+af dags unpause my_dag && af runs trigger-wait my_dag
 # Error: DAG not found
 
 # 2. Find parse error
@@ -315,7 +354,7 @@ af dags errors
 
 # 3. [Fix the issue in DAG code]
 
-# 4. Retest
+# 4. Retest (already unpaused from step 1)
 af runs trigger-wait my_dag
 ```
 
@@ -330,24 +369,42 @@ af tasks logs my_dag scheduled__2025-01-14T... failed_task_id
 
 # 3. [Fix the issue]
 
-# 4. Retest
-af runs trigger-wait my_dag
+# 4. Retest (unpause first since this was a scheduled run, not a manual test)
+af dags unpause my_dag && af runs trigger-wait my_dag
 ```
 
 ### Scenario 5: Test with Custom Configuration
 
 ```bash
-af runs trigger-wait my_dag --conf '{"env": "staging", "batch_size": 100}' --timeout 600
+af dags unpause my_dag && af runs trigger-wait my_dag --conf '{"env": "staging", "batch_size": 100}' --timeout 600
 ```
 
 ### Scenario 6: Long-Running DAG
 
 ```bash
 # Wait up to 1 hour
-af runs trigger-wait my_dag --timeout 3600
+af dags unpause my_dag && af runs trigger-wait my_dag --timeout 3600
 
 # If timed out, check current state
 af runs get my_dag manual__2025-01-14T...
+```
+
+### Scenario 7: Test a Paused DAG (Troubleshooting)
+
+If you forget to unpause and the DAG run times out:
+
+```bash
+# 1. Check if run is stuck in queued state
+af runs get my_dag manual__2025-01-14T...
+# Shows: "state": "queued"
+
+# 2. Check if DAG is paused
+af dags get my_dag
+# Shows: "is_paused": true
+
+# 3. Unpause and the run should proceed
+af dags unpause my_dag
+# The queued run will now be picked up by the scheduler
 ```
 
 ---
@@ -355,6 +412,12 @@ af runs get my_dag manual__2025-01-14T...
 ## Debugging Tips
 
 ### Common Error Patterns
+
+**DAG Run Stuck in Queued State / Timeout:**
+- **Most likely cause:** DAG is paused
+- Check with: `af dags get <dag_id>` and look for `"is_paused": true`
+- Fix with: `af dags unpause <dag_id>`
+- Prevention: Always unpause before triggering
 
 **Connection Refused / Timeout:**
 - Check `af config connections` for correct host/port
