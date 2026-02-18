@@ -147,6 +147,8 @@ By default, the server connects to `http://localhost:8080` (Astro CLI default). 
 | `AIRFLOW_USERNAME` | Username (Airflow 3.x uses OAuth2 token exchange) |
 | `AIRFLOW_PASSWORD` | Password |
 | `AIRFLOW_AUTH_TOKEN` | Bearer token (alternative to username/password) |
+| `AIRFLOW_VERIFY_SSL` | Set to `false` to disable SSL certificate verification |
+| `AIRFLOW_CA_CERT` | Path to custom CA certificate bundle |
 
 Example with auth (Claude Code):
 
@@ -305,6 +307,10 @@ af instance add local --url http://localhost:8080
 af instance add staging --url https://staging.example.com --username admin --password secret
 af instance add prod --url https://prod.example.com --token '${AIRFLOW_PROD_TOKEN}'
 
+# SSL options for self-signed or corporate CA certificates
+af instance add corp --url https://airflow.corp.example.com --no-verify-ssl --username admin --password secret
+af instance add corp --url https://airflow.corp.example.com --ca-cert /path/to/ca-bundle.pem --token '${TOKEN}'
+
 # List and switch instances
 af instance list      # Shows all instances in a table
 af instance use prod  # Switch to prod instance
@@ -365,6 +371,13 @@ instances:
   url: https://prod.example.com
   auth:
     token: ${AIRFLOW_PROD_TOKEN}  # Environment variable interpolation
+- name: corporate
+  url: https://airflow.corp.example.com
+  auth:
+    username: admin
+    password: secret
+  verify-ssl: false               # Disable SSL verification (self-signed certs)
+  # ca-cert: /path/to/ca.pem     # Or provide a custom CA bundle
 current-instance: local
 ```
 
@@ -425,6 +438,8 @@ echo astro-airflow-mcp >> requirements.txt
 | `--host` | `MCP_HOST` | `localhost` | Host to bind to (HTTP mode only) |
 | `--port` | `MCP_PORT` | `8000` | Port to bind to (HTTP mode only) |
 | `--airflow-project-dir` | `AIRFLOW_PROJECT_DIR` | `$PWD` | Astro project directory for auto-discovering Airflow URL |
+| `--no-verify-ssl` | `AIRFLOW_VERIFY_SSL=false` | off | Disable SSL certificate verification |
+| `--ca-cert` | `AIRFLOW_CA_CERT` | `None` | Path to custom CA certificate bundle |
 
 **Airflow Connection (Environment Variables):**
 
@@ -434,6 +449,8 @@ echo astro-airflow-mcp >> requirements.txt
 | `AIRFLOW_AUTH_TOKEN` | `None` | Bearer token for authentication |
 | `AIRFLOW_USERNAME` | `None` | Username for authentication |
 | `AIRFLOW_PASSWORD` | `None` | Password for authentication |
+| `AIRFLOW_VERIFY_SSL` | `true` | Set to `false` to disable SSL verification |
+| `AIRFLOW_CA_CERT` | `None` | Path to custom CA certificate bundle |
 
 **af CLI Options:**
 

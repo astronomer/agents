@@ -67,6 +67,7 @@ def configure(
     username: str | None = None,
     password: str | None = None,
     project_dir: str | None = None,
+    verify: bool | str = True,
 ) -> None:
     """Configure global Airflow connection settings.
 
@@ -76,6 +77,8 @@ def configure(
         username: Username for token-based authentication
         password: Password for token-based authentication
         project_dir: Project directory where Claude Code is running
+        verify: SSL verification setting. True (default) enables verification,
+                False disables it, or a string path to a CA bundle file.
 
     Note:
         If auth_token is provided, it will be used directly.
@@ -92,6 +95,7 @@ def configure(
         auth_token=auth_token,
         username=username,
         password=password,
+        verify=verify,
     )
 
 

@@ -24,19 +24,20 @@ class AirflowV3Adapter(AirflowAdapter):
         version: str,
         token_getter: Callable[[], str | None] | None = None,
         basic_auth_getter: Callable[[], tuple[str, str] | None] | None = None,
+        verify: bool | str = True,
     ):
         """Initialize V3 adapter, exchanging basic auth for JWT if needed."""
         # If we have basic auth but no token, exchange for JWT
         if basic_auth_getter and not token_getter:
             creds = basic_auth_getter()
             if creds:
-                jwt_token = self._exchange_for_token(airflow_url, creds[0], creds[1])
+                jwt_token = self._exchange_for_token(airflow_url, creds[0], creds[1], verify=verify)
                 if jwt_token:
                     # Create a token getter that returns the JWT
                     token_getter = self._make_token_getter(jwt_token)
                     basic_auth_getter = None  # Don't use basic auth
 
-        super().__init__(airflow_url, version, token_getter, basic_auth_getter)
+        super().__init__(airflow_url, version, token_getter, basic_auth_getter, verify=verify)
 
     @staticmethod
     def _make_token_getter(token: str) -> Callable[[], str | None]:
@@ -48,13 +49,18 @@ class AirflowV3Adapter(AirflowAdapter):
         return getter
 
     @staticmethod
-    def _exchange_for_token(airflow_url: str, username: str, password: str) -> str | None:
+    def _exchange_for_token(
+        airflow_url: str,
+        username: str,
+        password: str,
+        verify: bool | str = True,
+    ) -> str | None:
         """Exchange username/password for JWT token via OAuth2 flow.
 
         Airflow 3.x uses /auth/token endpoint for OAuth2 password grant.
         """
         try:
-            with httpx.Client(timeout=10.0) as client:
+            with httpx.Client(timeout=10.0, verify=verify) as client:
                 response = client.post(
                     f"{airflow_url}/auth/token",
                     data={"username": username, "password": password},

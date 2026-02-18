@@ -31,6 +31,8 @@ class ResolvedConfig:
     token: str | None = None
     instance_name: str | None = None
     sources: dict[str, str] = field(default_factory=dict)
+    verify_ssl: bool = True
+    ca_cert: str | None = None
 
 
 class ConfigManager:
@@ -111,6 +113,13 @@ class ConfigManager:
             if not data.get("tracking-disabled"):
                 data.pop("tracking-disabled", None)
 
+            # Clean up default SSL values per instance for cleaner YAML
+            for inst in data.get("instances", []):
+                if inst.get("verify-ssl") is True:
+                    del inst["verify-ssl"]
+                if inst.get("ca-cert") is None:
+                    del inst["ca-cert"]
+
             with open(self.config_path, "w") as f:
                 yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)
 
@@ -139,6 +148,12 @@ class ConfigManager:
 
         # Interpolate environment variables in sensitive fields
         try:
+            resolved_ca_cert = interpolate_config_value(instance.ca_cert)
+            if resolved_ca_cert and not Path(resolved_ca_cert).is_file():
+                raise ConfigError(
+                    f"CA certificate file not found: {resolved_ca_cert} "
+                    f"(configured in instance '{name}')"
+                )
             if instance.auth:
                 return ResolvedConfig(
                     url=instance.url,
@@ -150,11 +165,15 @@ class ConfigManager:
                         "url": f"instance:{name}",
                         "auth": f"instance:{name}",
                     },
+                    verify_ssl=instance.verify_ssl,
+                    ca_cert=resolved_ca_cert,
                 )
             return ResolvedConfig(
                 url=instance.url,
                 instance_name=name,
                 sources={"url": f"instance:{name}"},
+                verify_ssl=instance.verify_ssl,
+                ca_cert=resolved_ca_cert,
             )
         except ValueError as e:
             raise ConfigError(f"Error resolving instance '{name}': {e}") from e
@@ -169,11 +188,20 @@ class ConfigManager:
         password: str | None = None,
         token: str | None = None,
         source: str | None = None,
+        verify_ssl: bool = True,
+        ca_cert: str | None = None,
     ) -> None:
         """Add or update an instance."""
         config = self.load()
         config.add_instance(
-            name, url, username=username, password=password, token=token, source=source
+            name,
+            url,
+            username=username,
+            password=password,
+            token=token,
+            source=source,
+            verify_ssl=verify_ssl,
+            ca_cert=ca_cert,
         )
         self.save(config)
 

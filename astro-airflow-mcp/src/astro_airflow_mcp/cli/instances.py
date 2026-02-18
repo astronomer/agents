@@ -156,6 +156,14 @@ def add_instance(
         str | None,
         typer.Option("--token", "-t", help="Bearer token (can use ${ENV_VAR} syntax)"),
     ] = None,
+    no_verify_ssl: Annotated[
+        bool,
+        typer.Option("--no-verify-ssl", help="Disable SSL certificate verification"),
+    ] = False,
+    ca_cert: Annotated[
+        str | None,
+        typer.Option("--ca-cert", help="Path to custom CA certificate bundle"),
+    ] = None,
 ) -> None:
     """Add or update an Airflow instance.
 
@@ -174,11 +182,22 @@ def add_instance(
         output_error("Cannot provide both username/password and token")
         return
 
+    if no_verify_ssl and ca_cert:
+        output_error("Cannot provide both --no-verify-ssl and --ca-cert")
+        return
+
     try:
         manager = ConfigManager()
         is_update = manager.load().get_instance(name) is not None
         manager.add_instance(
-            name, url, username=username, password=password, token=token, source="manual"
+            name,
+            url,
+            username=username,
+            password=password,
+            token=token,
+            source="manual",
+            verify_ssl=not no_verify_ssl,
+            ca_cert=ca_cert,
         )
 
         action = "Updated" if is_update else "Added"
@@ -191,6 +210,10 @@ def add_instance(
         console.print(f"{action} instance [bold]{name}[/bold]")
         console.print(f"URL: {url}")
         console.print(f"Auth: {auth_type}")
+        if no_verify_ssl:
+            console.print("SSL verification: [yellow]disabled[/yellow]")
+        if ca_cert:
+            console.print(f"CA cert: {ca_cert}")
     except (ConfigError, ValueError) as e:
         output_error(str(e))
 

@@ -101,12 +101,44 @@ class CLIContext:
         else:
             final_password = None
 
+        # SSL verification priority: env > config > default
+        verify_ssl = True
+        ca_cert: str | None = None
+
+        env_verify = os.environ.get("AIRFLOW_VERIFY_SSL")
+        if env_verify is not None:
+            verify_ssl = env_verify.lower() not in ("false", "0", "no")
+        elif config_values:
+            verify_ssl = config_values.verify_ssl
+
+        env_ca_cert = os.environ.get("AIRFLOW_CA_CERT")
+        if env_ca_cert:
+            ca_cert = env_ca_cert
+        elif config_values:
+            ca_cert = config_values.ca_cert
+
+        # Conflict: ca_cert wins over verify_ssl=False (ca_cert implies custom verification)
+        if ca_cert and not verify_ssl:
+            print(
+                "Warning: Both ca_cert and verify_ssl=False are set. "
+                "Using ca_cert for SSL verification.",
+                file=sys.stderr,
+            )
+
+        # Compute final verify value for httpx: ca_cert path > False > True
+        verify: bool | str = True
+        if ca_cert:
+            verify = ca_cert
+        elif not verify_ssl:
+            verify = False
+
         # Configure the underlying adapter manager
         self._manager.configure(
             url=final_url,
             auth_token=final_token,
             username=final_username,
             password=final_password,
+            verify=verify,
         )
         self._initialized = True
 

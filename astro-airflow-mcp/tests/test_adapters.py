@@ -2,6 +2,7 @@
 
 import pytest
 
+from astro_airflow_mcp.adapter_manager import AdapterManager
 from astro_airflow_mcp.adapters import (
     AirflowV2Adapter,
     AirflowV3Adapter,
@@ -9,6 +10,7 @@ from astro_airflow_mcp.adapters import (
     create_adapter,
     detect_version,
 )
+from astro_airflow_mcp.auth import TokenManager
 
 
 class TestNotFoundError:
@@ -983,3 +985,302 @@ class TestClearTaskInstances:
 
         assert result["available"] is False
         assert "alternative" in result
+
+
+class TestSSLVerification:
+    """Tests for SSL verification parameter threading."""
+
+    def test_base_adapter_stores_verify(self):
+        """Test base adapter stores verify parameter."""
+        adapter = AirflowV2Adapter("http://localhost:8080", "2.9.0", verify=False)
+        assert adapter._verify is False
+
+        adapter2 = AirflowV2Adapter("http://localhost:8080", "2.9.0", verify="/path/to/ca.pem")
+        assert adapter2._verify == "/path/to/ca.pem"
+
+    def test_v3_adapter_passes_verify(self):
+        """Test V3 adapter passes verify to base."""
+        adapter = AirflowV3Adapter("http://localhost:8080", "3.0.0", verify=False)
+        assert adapter._verify is False
+
+    def test_adapter_passes_verify_to_httpx(self, mocker):
+        """Test adapter passes verify to httpx.Client on GET."""
+        adapter = AirflowV2Adapter("http://localhost:8080", "2.9.0", verify=False)
+
+        mock_response = mocker.Mock()
+        mock_response.json.return_value = {"dags": []}
+        mock_response.status_code = 200
+        mock_response.raise_for_status = mocker.Mock()
+
+        mock_client = mocker.Mock()
+        mock_client.get.return_value = mock_response
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+
+        mock_httpx = mocker.patch("httpx.Client", return_value=mock_client)
+
+        adapter.list_dags()
+
+        mock_httpx.assert_called_once_with(timeout=30.0, verify=False)
+
+    def test_adapter_passes_verify_to_httpx_post(self, mocker):
+        """Test adapter passes verify to httpx.Client on POST."""
+        adapter = AirflowV3Adapter(
+            "http://localhost:8080",
+            "3.0.0",
+            token_getter=lambda: "tok",
+            verify="/path/to/ca.pem",
+        )
+
+        mock_response = mocker.Mock()
+        mock_response.json.return_value = {"dag_run_id": "run1"}
+        mock_response.status_code = 200
+        mock_response.raise_for_status = mocker.Mock()
+
+        mock_client = mocker.Mock()
+        mock_client.post.return_value = mock_response
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+
+        mock_httpx = mocker.patch("httpx.Client", return_value=mock_client)
+
+        adapter.trigger_dag_run("test_dag")
+
+        mock_httpx.assert_called_once_with(timeout=30.0, verify="/path/to/ca.pem")
+
+    def test_adapter_passes_verify_to_httpx_patch(self, mocker):
+        """Test adapter passes verify to httpx.Client on PATCH."""
+        adapter = AirflowV2Adapter("http://localhost:8080", "2.9.0", verify=False)
+
+        mock_response = mocker.Mock()
+        mock_response.json.return_value = {"dag_id": "d", "is_paused": True}
+        mock_response.status_code = 200
+        mock_response.raise_for_status = mocker.Mock()
+
+        mock_client = mocker.Mock()
+        mock_client.patch.return_value = mock_response
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+
+        mock_httpx = mocker.patch("httpx.Client", return_value=mock_client)
+
+        adapter.pause_dag("d")
+
+        mock_httpx.assert_called_once_with(timeout=30.0, verify=False)
+
+    def test_adapter_passes_verify_to_httpx_delete(self, mocker):
+        """Test adapter passes verify to httpx.Client on DELETE."""
+        adapter = AirflowV3Adapter(
+            "http://localhost:8080",
+            "3.0.0",
+            token_getter=lambda: "tok",
+            verify="/ca.pem",
+        )
+
+        mock_response = mocker.Mock()
+        mock_response.status_code = 204
+        mock_response.raise_for_status = mocker.Mock()
+
+        mock_client = mocker.Mock()
+        mock_client.delete.return_value = mock_response
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+
+        mock_httpx = mocker.patch("httpx.Client", return_value=mock_client)
+
+        adapter._delete("dags/test_dag")
+
+        mock_httpx.assert_called_once_with(timeout=30.0, verify="/ca.pem")
+
+    def test_adapter_passes_verify_to_httpx_raw_request(self, mocker):
+        """Test adapter passes verify to httpx.Client on raw_request."""
+        adapter = AirflowV2Adapter("http://localhost:8080", "2.9.0", verify=False)
+
+        mock_response = mocker.Mock()
+        mock_response.status_code = 200
+        mock_response.text = "openapi: 3.0.0"
+        mock_response.headers = {"content-type": "text/yaml"}
+
+        mock_client = mocker.Mock()
+        mock_client.request.return_value = mock_response
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+
+        mock_httpx = mocker.patch("httpx.Client", return_value=mock_client)
+
+        adapter.raw_request("GET", "openapi.yaml")
+
+        mock_httpx.assert_called_once_with(timeout=30.0, verify=False)
+
+    def test_v3_exchange_for_token_passes_verify(self, mocker):
+        """Test V3 _exchange_for_token passes verify to httpx.Client."""
+        mock_response = mocker.Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"access_token": "jwt123"}
+
+        mock_client = mocker.Mock()
+        mock_client.post.return_value = mock_response
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+
+        mock_httpx = mocker.patch("httpx.Client", return_value=mock_client)
+
+        # Create V3 adapter with basic_auth_getter - triggers _exchange_for_token
+        AirflowV3Adapter(
+            "http://localhost:8080",
+            "3.0.0",
+            basic_auth_getter=lambda: ("admin", "admin"),
+            verify=False,
+        )
+
+        mock_httpx.assert_called_once_with(timeout=10.0, verify=False)
+
+    def test_adapter_default_verify_true(self):
+        """Test adapter defaults verify to True."""
+        adapter = AirflowV2Adapter("http://localhost:8080", "2.9.0")
+        assert adapter._verify is True
+
+    def test_detect_version_passes_verify(self, mocker):
+        """Test detect_version passes verify to httpx.Client."""
+        mock_response = mocker.Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"version": "3.0.0"}
+
+        mock_client = mocker.Mock()
+        mock_client.get.return_value = mock_response
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+
+        mock_httpx = mocker.patch("httpx.Client", return_value=mock_client)
+
+        detect_version("http://localhost:8080", verify=False)
+
+        mock_httpx.assert_called_with(timeout=10.0, verify=False)
+
+    def test_create_adapter_passes_verify(self, mocker):
+        """Test create_adapter passes verify to adapter."""
+        mocker.patch(
+            "astro_airflow_mcp.adapters.detect_version",
+            return_value=(3, "3.0.0"),
+        )
+
+        adapter = create_adapter("http://localhost:8080", verify=False)
+
+        assert isinstance(adapter, AirflowV3Adapter)
+        assert adapter._verify is False
+
+    def test_create_adapter_v2_passes_verify(self, mocker):
+        """Test create_adapter passes verify to V2 adapter."""
+        mocker.patch(
+            "astro_airflow_mcp.adapters.detect_version",
+            return_value=(2, "2.9.0"),
+        )
+
+        adapter = create_adapter("http://localhost:8080", verify="/ca.pem")
+
+        assert isinstance(adapter, AirflowV2Adapter)
+        assert adapter._verify == "/ca.pem"
+
+
+class TestTokenManagerSSL:
+    """Tests for TokenManager SSL verification."""
+
+    def test_token_manager_stores_verify(self):
+        """Test TokenManager stores verify parameter."""
+        tm = TokenManager("http://localhost:8080", verify=False)
+        assert tm._verify is False
+
+    def test_token_manager_default_verify(self):
+        """Test TokenManager defaults verify to True."""
+        tm = TokenManager("http://localhost:8080")
+        assert tm._verify is True
+
+    def test_token_manager_passes_verify_to_httpx(self, mocker):
+        """Test TokenManager passes verify to httpx.Client during fetch."""
+        tm = TokenManager(
+            "http://localhost:8080",
+            username="admin",
+            password="admin",
+            verify=False,
+        )
+
+        mock_response = mocker.Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"access_token": "jwt123"}
+        mock_response.raise_for_status = mocker.Mock()
+
+        mock_client = mocker.Mock()
+        mock_client.post.return_value = mock_response
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+
+        mock_httpx = mocker.patch("httpx.Client", return_value=mock_client)
+
+        tm.get_token()
+
+        mock_httpx.assert_called_once_with(timeout=30.0, verify=False)
+
+    def test_token_manager_with_ca_cert(self, mocker):
+        """Test TokenManager passes CA cert path to httpx.Client."""
+        tm = TokenManager(
+            "http://localhost:8080",
+            verify="/path/to/ca.pem",
+        )
+
+        mock_response = mocker.Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"access_token": "jwt123"}
+        mock_response.raise_for_status = mocker.Mock()
+
+        mock_client = mocker.Mock()
+        mock_client.get.return_value = mock_response
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+
+        mock_httpx = mocker.patch("httpx.Client", return_value=mock_client)
+
+        tm.get_token()
+
+        mock_httpx.assert_called_once_with(timeout=30.0, verify="/path/to/ca.pem")
+
+
+class TestAdapterManagerSSL:
+    """Tests for AdapterManager SSL verification."""
+
+    def test_adapter_manager_passes_verify(self, mocker):
+        """Test AdapterManager passes verify to create_adapter."""
+        mock_create = mocker.patch(
+            "astro_airflow_mcp.adapter_manager.create_adapter",
+            return_value=mocker.Mock(version="3.0.0"),
+        )
+
+        mgr = AdapterManager()
+        mgr.configure(url="http://localhost:8080", verify=False)
+        mgr.get_adapter()
+
+        mock_create.assert_called_once()
+        assert mock_create.call_args[1]["verify"] is False
+
+    def test_adapter_manager_passes_verify_to_token_manager(self):
+        """Test AdapterManager passes verify to TokenManager."""
+        mgr = AdapterManager()
+        mgr.configure(
+            url="http://localhost:8080",
+            username="admin",
+            password="admin",
+            verify="/ca.pem",
+        )
+        assert mgr._token_manager._verify == "/ca.pem"
+
+    def test_adapter_manager_default_verify(self, mocker):
+        """Test AdapterManager defaults verify to True."""
+        mock_create = mocker.patch(
+            "astro_airflow_mcp.adapter_manager.create_adapter",
+            return_value=mocker.Mock(version="3.0.0"),
+        )
+
+        mgr = AdapterManager()
+        mgr.configure(url="http://localhost:8080")
+        mgr.get_adapter()
+
+        assert mock_create.call_args[1]["verify"] is True
