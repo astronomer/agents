@@ -20,7 +20,7 @@ Execute steps in order. Prefer the simplest configuration that meets the user's 
 | Approach | When to use | Required param |
 |----------|-------------|----------------|
 | Project path | Files available locally | `dbt_project_path` |
-| Manifest only | `dbt_manifest` load; containerized | `manifest_path` + `project_name` |
+| Manifest only | `dbt_manifest` load | `manifest_path` + `project_name` |
 
 ```python
 from cosmos import ProjectConfig
@@ -40,11 +40,11 @@ Pick ONE load mode based on constraints:
 | Load mode | When to use | Required inputs | Constraints |
 |-----------|-------------|-----------------|-------------|
 | `dbt_manifest` | Large projects; containerized execution; fastest | `ProjectConfig.manifest_path` | Remote manifest needs `manifest_conn_id` |
-| `dbt_ls` | Complex selectors; need dbt-native selection | dbt installed OR `dbt_executable_path` | Cannot use with containerized execution |
+| `dbt_ls` | Complex selectors; need dbt-native selection | dbt installed OR `dbt_executable_path` | Can also be used with containerized execution |
 | `dbt_ls_file` | dbt_ls selection without running dbt_ls every parse | `RenderConfig.dbt_ls_path` | `select`/`exclude` won't work |
 | `automatic` (default) | Simple setups; let Cosmos pick | (none) | Falls back: manifest → dbt_ls → custom |
 
-> **CRITICAL**: Containerized execution (`DOCKER`/`KUBERNETES`/etc.) → MUST use `dbt_manifest` load mode.
+> **CRITICAL**: Containerized execution (`DOCKER`/`KUBERNETES`/etc.)
 
 ```python
 from cosmos import RenderConfig, LoadMode
