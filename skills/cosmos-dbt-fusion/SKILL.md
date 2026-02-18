@@ -11,17 +11,15 @@ Execute steps in order. This skill covers Fusion-specific constraints only.
 >
 > **Reference**: See **[reference/cosmos-config.md](reference/cosmos-config.md)** for ProfileConfig, operator_args, and Airflow 3 compatibility details.
 
-> **Before starting**, confirm: (1) dbt engine = Fusion (not Core → use **cosmos-dbt-core**), (2) warehouse = Snowflake or Databricks only, (3) `ExecutionMode.LOCAL` is acceptable (no containerized/async/virtualenv).
+> **Before starting**, confirm: (1) dbt engine = Fusion (not Core → use **cosmos-dbt-core**), (2) warehouse = Snowflake, Databricks, Bigquery and Redshift only.
 
 ### Fusion-Specific Constraints
 
 | Constraint | Details |
 |------------|---------|
-| Execution mode | `ExecutionMode.LOCAL` only |
 | No async | `AIRFLOW_ASYNC` not supported |
-| No containerized | `DOCKER` / `KUBERNETES` / etc. not supported |
 | No virtualenv | Fusion is a binary, not a Python package |
-| Warehouse support | Snowflake + Databricks only (public beta) |
+| Warehouse support | Snowflake, Databricks, Bigquery and Redshift support [while in preview](https://github.com/dbt-labs/dbt-fusion) |
 
 ---
 
