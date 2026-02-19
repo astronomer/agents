@@ -1,4 +1,4 @@
-"""Segment analytics tracking for af CLI."""
+"""Telemetry for af CLI."""
 
 from __future__ import annotations
 
@@ -11,39 +11,14 @@ import sys
 import uuid
 from pathlib import Path
 
-# Segment write keys
-SEGMENT_WRITE_KEY_DEV = "Aeudw5dvteD7FmGkZXvYGXWm896bx32V"
-SEGMENT_WRITE_KEY_PROD = "E8HOxt5Mg033HsQ32fnOnttOLoDeFdzl"
+# Telemetry API configuration
+TELEMETRY_API_URL = "https://pr36805.api.astronomer-dev.io/v1alpha1/telemetry"
+TELEMETRY_SOURCE = "af-cli"
+TELEMETRY_TIMEOUT_SECONDS = 3
 
-
-def _is_dev_install() -> bool:
-    """Check if running from a local development install."""
-    with contextlib.suppress(Exception):
-        # Check if the package source lives inside a git repo,
-        # which indicates a local dev environment (uv run, uv sync, uv tool install -e)
-        source_dir = Path(__file__).resolve().parent
-        for parent in source_dir.parents:
-            if (parent / ".git").exists():
-                return True
-    return False
-
-
-def _get_write_key() -> str:
-    """Get the Segment write key, using dev key for local development."""
-    # Env var override takes precedence
-    if env_key := os.environ.get("AF_SEGMENT_WRITE_KEY"):
-        return env_key
-
-    if _is_dev_install():
-        return SEGMENT_WRITE_KEY_DEV
-
-    return SEGMENT_WRITE_KEY_PROD
-
-
-SEGMENT_WRITE_KEY = _get_write_key()
-
-# Environment variable to disable tracking
+# Environment variables
 TRACKING_DISABLED_ENV = "AF_TRACKING_DISABLED"
+TELEMETRY_DEBUG_ENV = "AF_TELEMETRY_DEBUG"
 
 # File to store anonymous user ID
 ANONYMOUS_ID_FILE = Path.home() / ".af" / ".anonymous_id"
@@ -179,9 +154,6 @@ def track_command() -> None:
     if _is_tracking_disabled():
         return
 
-    if not SEGMENT_WRITE_KEY:
-        return
-
     # Gather data in main process
     anonymous_id = _get_anonymous_id()
     command_path = _get_command_from_argv()
@@ -200,31 +172,71 @@ def track_command() -> None:
     if agent:
         properties["agent"] = agent
 
-    payload = json.dumps(
-        {
-            "write_key": SEGMENT_WRITE_KEY,
-            "anonymous_id": anonymous_id,
-            "event": "CLI Command",
-            "properties": properties,
-        }
-    )
+    api_url = os.environ.get("AF_TELEMETRY_API_URL", TELEMETRY_API_URL)
+    debug = os.environ.get(TELEMETRY_DEBUG_ENV, "").lower() in ("1", "true", "yes")
 
-    # Spawn a detached subprocess that sends the event and exits.
-    # This way the CLI process exits immediately with no delay.
-    script = (
-        "import json, sys, analytics;"
-        "d = json.loads(sys.stdin.read());"
-        "c = analytics.Client(write_key=d['write_key'], sync_mode=True, send=True);"
-        "c.track(anonymous_id=d['anonymous_id'], event=d['event'], properties=d['properties'])"
-    )
+    body = {
+        "source": TELEMETRY_SOURCE,
+        "event": "CLI Command",
+        "anonymousId": anonymous_id,
+        "properties": properties,
+    }
+
+    _send(api_url, body, debug=debug)
+
+
+_SEND_SCRIPT = """\
+import json, sys
+from urllib import request, error
+
+d = json.loads(sys.stdin.read())
+data = json.dumps(d["body"]).encode("utf-8")
+req = request.Request(
+    d["api_url"], data=data,
+    headers={{"Content-Type": "application/json"}}, method="POST",
+)
+debug = d.get("debug", False)
+try:
+    resp = request.urlopen(req, timeout={timeout})
+    body = resp.read().decode("utf-8", errors="replace")
+    if debug:
+        print(f"[telemetry] response: {{resp.status}} {{body}}", file=sys.stderr)
+except error.HTTPError as e:
+    body = e.read().decode("utf-8", errors="replace")
+    if debug:
+        print(f"[telemetry] error: {{e.code}} {{body}}", file=sys.stderr)
+except Exception as e:
+    if debug:
+        print(f"[telemetry] error: {{e}}", file=sys.stderr)
+"""
+
+
+def _send(api_url: str, body: dict, *, debug: bool = False) -> None:
+    """Send telemetry event in a detached subprocess.
+
+    When debug=True, logs request/response details to stderr and waits for
+    the subprocess to finish. Otherwise fire-and-forget.
+    """
+    payload = json.dumps({"api_url": api_url, "body": body, "debug": debug})
+
+    if debug:
+        sys.stderr.write(f"[telemetry] POST {api_url}\n")
+        sys.stderr.write(f"[telemetry] body: {json.dumps(body, indent=2)}\n")
+
+    # Uses only stdlib (urllib) - no external dependencies needed.
+    # In debug mode the subprocess prints request/response info to stderr,
+    # which we pass through to the parent process.
+    script = _SEND_SCRIPT.format(timeout=TELEMETRY_TIMEOUT_SECONDS)
 
     with contextlib.suppress(Exception):
         proc = subprocess.Popen(  # nosec B603 - no untrusted input, script and args are hardcoded
             [sys.executable, "-c", script],
             stdin=subprocess.PIPE,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True,
+            stderr=None if debug else subprocess.DEVNULL,
+            start_new_session=not debug,
         )
         proc.stdin.write(payload.encode())
         proc.stdin.close()
+        if debug:
+            proc.wait()

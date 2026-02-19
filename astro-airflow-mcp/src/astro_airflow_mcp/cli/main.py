@@ -1,10 +1,5 @@
 """Main CLI application with Typer."""
 
-# Suppress SyntaxWarning from analytics-python before any imports trigger it
-import warnings
-
-warnings.filterwarnings("ignore", category=SyntaxWarning, module="analytics")
-
 import os
 from typing import Annotated, Any
 
