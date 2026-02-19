@@ -12,7 +12,7 @@ import uuid
 from pathlib import Path
 
 # Telemetry API configuration
-TELEMETRY_API_URL = "https://pr36805.api.astronomer-dev.io/v1alpha1/telemetry"
+TELEMETRY_API_URL = "https://api.astronomer.io/v1alpha1/telemetry"
 TELEMETRY_SOURCE = "af-cli"
 TELEMETRY_TIMEOUT_SECONDS = 3
 
