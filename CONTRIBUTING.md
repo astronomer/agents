@@ -34,9 +34,9 @@ This project adheres to the [Contributor Covenant Code of Conduct](./CODE_OF_CON
 git clone https://github.com/astronomer/agents.git
 cd agents
 
-# Install pre-commit hooks
-pip install pre-commit
-pre-commit install
+# Install prek hooks
+pip install prek
+prek install
 
 # Test with local plugin
 claude --plugin-dir .
@@ -90,12 +90,12 @@ The Airflow MCP server is in `astro-airflow-mcp/`. See its [README](./astro-airf
 1. **Create a focused PR**: Each PR should address a single concern (bug fix, feature, etc.)
 2. **Write descriptive commits**: Use clear commit messages that explain the "why"
 3. **Update documentation**: If your change affects user-facing behavior, update relevant docs
-4. **Ensure tests pass**: All pre-commit hooks and tests must pass
+4. **Ensure tests pass**: All prek hooks and tests must pass
 5. **Request review**: Tag maintainers for review
 
 ### PR Checklist
 
-- [ ] Pre-commit hooks pass (`pre-commit run --all-files`)
+- [ ] Prek hooks pass (`prek run --all-files`)
 - [ ] Changes are documented (if applicable)
 - [ ] Commit messages are clear and descriptive
 - [ ] Branch is up to date with `main`
@@ -104,9 +104,9 @@ The Airflow MCP server is in `astro-airflow-mcp/`. See its [README](./astro-airf
 
 This project uses automated tooling to enforce code style:
 
-### Pre-commit Hooks
+### Prek Hooks
 
-The following checks run automatically on commit:
+The following checks run automatically on commit (using prek, a fast alternative to pre-commit):
 
 - **Ruff**: Python linting and formatting
 - **Trailing whitespace**: Removes trailing whitespace
@@ -118,7 +118,7 @@ The following checks run automatically on commit:
 Run hooks manually:
 
 ```bash
-pre-commit run --all-files
+prek run --all-files
 ```
 
 ### Python Style
@@ -138,8 +138,8 @@ pre-commit run --all-files
 ### Running Tests
 
 ```bash
-# Run pre-commit hooks
-pre-commit run --all-files
+# Run prek hooks
+prek run --all-files
 
 # Test plugin locally
 claude --plugin-dir .
