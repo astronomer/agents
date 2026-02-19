@@ -161,6 +161,7 @@ claude mcp add airflow -e AIRFLOW_API_URL=https://your-airflow.example.com -e AI
 - **Airflow 2.x and 3.x Support**: Automatic version detection with adapter pattern
 - **MCP Tools** for accessing Airflow data:
   - DAG management (list, get details, get source code, stats, warnings, import errors, trigger, pause/unpause)
+  - DAG run management (list, get, trigger, trigger and wait, delete, clear)
   - Task management (list, get details, get task instances, get logs)
   - Pool management (list, get details)
   - Variable management (list, get specific variables)
@@ -206,6 +207,9 @@ claude mcp add airflow -e AIRFLOW_API_URL=https://your-airflow.example.com -e AI
 | `list_dag_runs` | Get DAG run history |
 | `get_dag_run` | Get specific DAG run details |
 | `trigger_dag` | Trigger a new DAG run (start a workflow execution) |
+| `trigger_dag_and_wait` | Trigger a DAG run and wait for completion |
+| `delete_dag_run` | Permanently delete a specific DAG run |
+| `clear_dag_run` | Clear a DAG run to allow re-execution of all its tasks |
 | `pause_dag` | Pause a DAG to prevent new scheduled runs |
 | `unpause_dag` | Unpause a DAG to resume scheduled runs |
 | `list_tasks` | Get all tasks in a DAG |
@@ -275,6 +279,8 @@ af runs list --dag-id <dag_id>
 af runs get <dag_id> <run_id>
 af runs trigger <dag_id>
 af runs trigger-wait <dag_id>  # Trigger and wait for completion
+af runs delete <dag_id> <run_id>   # Permanently delete a run
+af runs clear <dag_id> <run_id>    # Clear a run for re-execution
 af runs diagnose <dag_id> <run_id>
 
 # Task operations

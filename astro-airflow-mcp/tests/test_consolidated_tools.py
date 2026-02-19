@@ -3,6 +3,7 @@
 import json
 from unittest.mock import MagicMock
 
+import astro_airflow_mcp.tools.dag_run as dag_run_module
 import astro_airflow_mcp.tools.diagnostic as diagnostic_module
 
 
@@ -116,6 +117,93 @@ class TestDiagnoseDagRun:
         data = json.loads(result)
 
         assert "error" in data["run_info"]
+
+
+class TestDeleteDagRunTool:
+    """Tests for delete_dag_run MCP tool."""
+
+    def test_delete_dag_run_success(self, mocker):
+        """Test delete_dag_run returns confirmation."""
+        mock_adapter = MagicMock()
+        mock_adapter.delete_dag_run.return_value = {}
+
+        mocker.patch("astro_airflow_mcp.tools.dag_run._get_adapter", return_value=mock_adapter)
+
+        result = dag_run_module._delete_dag_run_impl("example_dag", "manual__2024-01-01")
+        data = json.loads(result)
+
+        assert data["dag_id"] == "example_dag"
+        assert "deleted" in data["message"]
+        mock_adapter.delete_dag_run.assert_called_once_with("example_dag", "manual__2024-01-01")
+
+    def test_delete_dag_run_not_found(self, mocker):
+        """Test delete_dag_run handles missing run."""
+        mock_adapter = MagicMock()
+        mock_adapter.delete_dag_run.side_effect = Exception("DAG Run not found")
+
+        mocker.patch("astro_airflow_mcp.tools.dag_run._get_adapter", return_value=mock_adapter)
+
+        result = dag_run_module._delete_dag_run_impl("example_dag", "nonexistent")
+
+        assert "not found" in result
+
+
+class TestClearDagRunTool:
+    """Tests for clear_dag_run MCP tool."""
+
+    def test_clear_dag_run_dry_run(self, mocker):
+        """Test clear_dag_run in dry_run mode."""
+        mock_adapter = MagicMock()
+        mock_adapter.clear_dag_run.return_value = {
+            "task_instances": [
+                {"task_id": "task1", "state": "failed"},
+                {"task_id": "task2", "state": "success"},
+            ]
+        }
+
+        mocker.patch("astro_airflow_mcp.tools.dag_run._get_adapter", return_value=mock_adapter)
+
+        result = dag_run_module._clear_dag_run_impl(
+            "example_dag", "manual__2024-01-01", dry_run=True
+        )
+        data = json.loads(result)
+
+        assert len(data["task_instances"]) == 2
+        mock_adapter.clear_dag_run.assert_called_once_with(
+            "example_dag", "manual__2024-01-01", dry_run=True
+        )
+
+    def test_clear_dag_run_execute(self, mocker):
+        """Test clear_dag_run with dry_run=False."""
+        mock_adapter = MagicMock()
+        mock_adapter.clear_dag_run.return_value = {
+            "task_instances": [
+                {"task_id": "task1", "state": "cleared"},
+            ]
+        }
+
+        mocker.patch("astro_airflow_mcp.tools.dag_run._get_adapter", return_value=mock_adapter)
+
+        result = dag_run_module._clear_dag_run_impl(
+            "example_dag", "manual__2024-01-01", dry_run=False
+        )
+        data = json.loads(result)
+
+        assert data["task_instances"][0]["state"] == "cleared"
+        mock_adapter.clear_dag_run.assert_called_once_with(
+            "example_dag", "manual__2024-01-01", dry_run=False
+        )
+
+    def test_clear_dag_run_error(self, mocker):
+        """Test clear_dag_run handles errors."""
+        mock_adapter = MagicMock()
+        mock_adapter.clear_dag_run.side_effect = Exception("Server error")
+
+        mocker.patch("astro_airflow_mcp.tools.dag_run._get_adapter", return_value=mock_adapter)
+
+        result = dag_run_module._clear_dag_run_impl("example_dag", "run_123")
+
+        assert "Server error" in result
 
 
 class TestGetSystemHealth:

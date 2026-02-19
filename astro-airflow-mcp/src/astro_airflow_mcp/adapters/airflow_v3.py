@@ -404,6 +404,39 @@ class AirflowV3Adapter(AirflowAdapter):
                 "task logs", alternative="Check if the task instance exists and has been executed"
             )
 
+    def delete_dag_run(self, dag_id: str, dag_run_id: str) -> dict[str, Any]:
+        """Delete a specific DAG run.
+
+        Args:
+            dag_id: The ID of the DAG
+            dag_run_id: The ID of the DAG run to delete
+
+        Returns:
+            Empty dict on success (HTTP 204)
+        """
+        return self._delete(f"dags/{dag_id}/dagRuns/{dag_run_id}")
+
+    def clear_dag_run(
+        self,
+        dag_id: str,
+        dag_run_id: str,
+        dry_run: bool = True,
+    ) -> dict[str, Any]:
+        """Clear a DAG run to allow re-execution of all its tasks.
+
+        Args:
+            dag_id: The ID of the DAG
+            dag_run_id: The ID of the DAG run to clear
+            dry_run: If True, return what would be cleared without clearing
+
+        Returns:
+            Dict with list of task instances that were (or would be) cleared
+        """
+        json_body: dict[str, Any] = {
+            "dry_run": dry_run,
+        }
+        return self._post(f"dags/{dag_id}/dagRuns/{dag_run_id}/clear", json_data=json_body)
+
     def clear_task_instances(
         self,
         dag_id: str,

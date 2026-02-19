@@ -89,6 +89,8 @@ Or CLI flags: `af --airflow-url http://localhost:8080 --token "$TOKEN" <command>
 | `af runs get <dag_id> <run_id>` | Get run details |
 | `af runs trigger <dag_id>` | Trigger a DAG run |
 | `af runs trigger-wait <dag_id>` | Trigger and wait for completion |
+| `af runs delete <dag_id> <run_id>` | Permanently delete a DAG run |
+| `af runs clear <dag_id> <run_id>` | Clear a run for re-execution |
 | `af runs diagnose <dag_id> <run_id>` | Diagnose failed run |
 | `af tasks list <dag_id>` | List tasks in DAG |
 | `af tasks get <dag_id> <task_id>` | Get task definition |
@@ -125,6 +127,8 @@ Or CLI flags: `af --airflow-url http://localhost:8080 --token "$TOKEN" <command>
 - "Run DAG X" / "Trigger the pipeline" -> `af runs trigger <dag_id>`
 - "Run DAG X and wait" -> `af runs trigger-wait <dag_id>`
 - "Why did this run fail?" -> `af runs diagnose <dag_id> <run_id>`
+- "Delete this run" / "Remove stuck run" -> `af runs delete <dag_id> <run_id>`
+- "Clear this run" / "Retry this run" / "Re-run this" -> `af runs clear <dag_id> <run_id>`
 - "Test this DAG and fix if it fails" -> use the **testing-dags** skill
 
 ### Task Operations
@@ -164,6 +168,9 @@ af runs diagnose my_dag manual__2024-01-15T10:00:00+00:00
 
 # 3. Get logs for failed task (from diagnose output)
 af tasks logs my_dag manual__2024-01-15T10:00:00+00:00 extract_data
+
+# 4. After fixing, clear the run to retry all tasks
+af runs clear my_dag manual__2024-01-15T10:00:00+00:00
 ```
 
 ### Morning Health Check

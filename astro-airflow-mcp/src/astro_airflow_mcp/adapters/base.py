@@ -536,6 +536,40 @@ class AirflowAdapter(ABC):
             Parsed OpenAPI spec as a dict with 'openapi', 'paths', etc.
         """
 
+    # DAG Run Mutation Operations
+    @abstractmethod
+    def delete_dag_run(self, dag_id: str, dag_run_id: str) -> dict[str, Any]:
+        """Delete a specific DAG run.
+
+        Args:
+            dag_id: The ID of the DAG
+            dag_run_id: The ID of the DAG run to delete
+
+        Returns:
+            Empty dict on success (HTTP 204)
+        """
+
+    @abstractmethod
+    def clear_dag_run(
+        self,
+        dag_id: str,
+        dag_run_id: str,
+        dry_run: bool = True,
+    ) -> dict[str, Any]:
+        """Clear a DAG run to allow re-execution of all its tasks.
+
+        This resets the DAG run and its task instances so they can be
+        re-executed by the scheduler.
+
+        Args:
+            dag_id: The ID of the DAG
+            dag_run_id: The ID of the DAG run to clear
+            dry_run: If True, return what would be cleared without clearing
+
+        Returns:
+            Dict with list of task instances that were (or would be) cleared
+        """
+
     # Task Instance Operations
     @abstractmethod
     def clear_task_instances(

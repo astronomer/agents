@@ -82,4 +82,6 @@ How to prevent this from happening again:
 
 ### Quick Commands
 Provide ready-to-use commands:
-- To clear and rerun failed tasks: `af tasks clear <dag_id> <run_id> <task_ids> -D`
+- To clear and rerun the entire DAG run: `af runs clear <dag_id> <run_id>`
+- To clear and rerun specific failed tasks: `af tasks clear <dag_id> <run_id> <task_ids> -D`
+- To delete a stuck or unwanted run: `af runs delete <dag_id> <run_id>`

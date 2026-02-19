@@ -215,6 +215,65 @@ def _get_failed_task_instances(
         return []
 
 
+@app.command("delete")
+def delete_dag_run(
+    dag_id: Annotated[str, typer.Argument(help="The DAG ID")],
+    dag_run_id: Annotated[str, typer.Argument(help="The DAG run ID to delete")],
+    yes: Annotated[
+        bool,
+        typer.Option("--yes", "-y", help="Skip confirmation prompt"),
+    ] = False,
+) -> None:
+    """Delete a specific DAG run.
+
+    Permanently removes a DAG run and its associated metadata. This cannot be undone.
+    """
+    if not yes:
+        typer.confirm(f"Delete DAG run '{dag_run_id}' for DAG '{dag_id}'?", abort=True)
+
+    try:
+        adapter = get_adapter()
+        adapter.delete_dag_run(dag_id, dag_run_id)
+        output_json({"message": f"DAG run '{dag_run_id}' deleted", "dag_id": dag_id})
+    except Exception as e:
+        output_error(str(e))
+
+
+@app.command("clear")
+def clear_dag_run(
+    dag_id: Annotated[str, typer.Argument(help="The DAG ID")],
+    dag_run_id: Annotated[str, typer.Argument(help="The DAG run ID to clear")],
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Show what would be cleared without clearing"),
+    ] = False,
+    yes: Annotated[
+        bool,
+        typer.Option("--yes", "-y", help="Skip confirmation prompt"),
+    ] = False,
+) -> None:
+    """Clear a DAG run to allow re-execution of all its tasks.
+
+    Resets the DAG run and its task instances so they can be re-executed by
+    the scheduler. Use --dry-run to preview what would be cleared.
+    """
+    try:
+        adapter = get_adapter()
+
+        if dry_run:
+            data = adapter.clear_dag_run(dag_id, dag_run_id, dry_run=True)
+            output_json({"dry_run": True, "dag_id": dag_id, "dag_run_id": dag_run_id, **data})
+            return
+
+        if not yes:
+            typer.confirm(f"Clear DAG run '{dag_run_id}' for DAG '{dag_id}'?", abort=True)
+
+        data = adapter.clear_dag_run(dag_id, dag_run_id, dry_run=False)
+        output_json(data)
+    except Exception as e:
+        output_error(str(e))
+
+
 @app.command("diagnose")
 def diagnose_dag_run(
     dag_id: Annotated[str, typer.Argument(help="The DAG ID")],
