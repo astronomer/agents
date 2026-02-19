@@ -93,7 +93,7 @@ def telemetry(
     With no argument, shows the current telemetry status.
     Use 'enable' or 'disable' to change the setting.
 
-    Telemetry can also be disabled via the AF_TRACKING_DISABLED=1 environment variable.
+    Telemetry can also be disabled via the AF_TELEMETRY_DISABLED=1 environment variable.
     """
     try:
         manager = ConfigManager()

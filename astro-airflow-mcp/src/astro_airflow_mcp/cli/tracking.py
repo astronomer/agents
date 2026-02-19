@@ -17,7 +17,7 @@ TELEMETRY_SOURCE = "af-cli"
 TELEMETRY_TIMEOUT_SECONDS = 3
 
 # Environment variables
-TRACKING_DISABLED_ENV = "AF_TRACKING_DISABLED"
+TELEMETRY_DISABLED_ENV = "AF_TELEMETRY_DISABLED"
 TELEMETRY_DEBUG_ENV = "AF_TELEMETRY_DEBUG"
 
 # File to store anonymous user ID
@@ -55,7 +55,7 @@ def _get_anonymous_id() -> str:
 def _is_tracking_disabled() -> bool:
     """Check if tracking is disabled via environment variable or config file."""
     # Environment variable takes precedence
-    disabled = os.environ.get(TRACKING_DISABLED_ENV, "").lower()
+    disabled = os.environ.get(TELEMETRY_DISABLED_ENV, "").lower()
     if disabled in ("1", "true", "yes"):
         return True
 
