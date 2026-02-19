@@ -1049,6 +1049,7 @@ class TestDeleteDagRun:
         adapter = AirflowV3Adapter(
             "http://localhost:8080",
             "3.0.0",
+            token_getter=lambda: "test_token",
         )
 
         mock_response = mocker.Mock()

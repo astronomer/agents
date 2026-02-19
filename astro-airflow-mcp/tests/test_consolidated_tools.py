@@ -123,8 +123,13 @@ class TestDeleteDagRunTool:
     """Tests for delete_dag_run MCP tool."""
 
     def test_delete_dag_run_success(self, mocker):
-        """Test delete_dag_run returns confirmation."""
+        """Test delete_dag_run returns confirmation with run details."""
         mock_adapter = MagicMock()
+        mock_adapter.get_dag_run.return_value = {
+            "dag_run_id": "manual__2024-01-01",
+            "state": "failed",
+            "dag_id": "example_dag",
+        }
         mock_adapter.delete_dag_run.return_value = {}
 
         mocker.patch("astro_airflow_mcp.tools.dag_run._get_adapter", return_value=mock_adapter)
@@ -134,6 +139,8 @@ class TestDeleteDagRunTool:
 
         assert data["dag_id"] == "example_dag"
         assert "deleted" in data["message"]
+        assert data["deleted_run"]["state"] == "failed"
+        mock_adapter.get_dag_run.assert_called_once_with("example_dag", "manual__2024-01-01")
         mock_adapter.delete_dag_run.assert_called_once_with("example_dag", "manual__2024-01-01")
 
     def test_delete_dag_run_not_found(self, mocker):

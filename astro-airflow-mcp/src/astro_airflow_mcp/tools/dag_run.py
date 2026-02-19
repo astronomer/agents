@@ -383,20 +383,33 @@ def trigger_dag_and_wait(
 def _delete_dag_run_impl(dag_id: str, dag_run_id: str) -> str:
     """Internal implementation for deleting a DAG run.
 
+    Fetches run details before deleting so the caller can see what was removed.
+
     Args:
         dag_id: The ID of the DAG
         dag_run_id: The ID of the DAG run to delete
 
     Returns:
-        JSON string confirming the deletion
+        JSON string with the deleted run details
     """
     try:
         adapter = _get_adapter()
+
+        # Fetch run details before deleting so the agent can show what was removed
+        try:
+            run_details = adapter.get_dag_run(dag_id, dag_run_id)
+        except Exception:
+            run_details = None
+
         adapter.delete_dag_run(dag_id, dag_run_id)
-        return json.dumps(
-            {"message": f"DAG run '{dag_run_id}' deleted", "dag_id": dag_id},
-            indent=2,
-        )
+
+        result: dict[str, Any] = {
+            "message": f"DAG run '{dag_run_id}' deleted",
+            "dag_id": dag_id,
+        }
+        if run_details:
+            result["deleted_run"] = run_details
+        return json.dumps(result, indent=2)
     except Exception as e:
         return str(e)
 
@@ -435,15 +448,17 @@ def delete_dag_run(dag_id: str, dag_run_id: str) -> str:
 
     This permanently removes the DAG run and its metadata. This cannot be undone.
 
-    IMPORTANT: This is a destructive write operation. The DAG run and its
-    metadata will be permanently deleted.
+    IMPORTANT: This is a destructive, irreversible operation. Always confirm
+    with the user before calling this tool. Show them the dag_id and dag_run_id
+    you intend to delete and get explicit approval first. The response includes
+    details of the deleted run for confirmation.
 
     Args:
         dag_id: The ID of the DAG (e.g., "example_dag")
         dag_run_id: The ID of the DAG run to delete (e.g., "manual__2024-01-01T00:00:00+00:00")
 
     Returns:
-        JSON confirming the deletion
+        JSON with deletion confirmation and details of the deleted run
     """
     return _delete_dag_run_impl(dag_id=dag_id, dag_run_id=dag_run_id)
 

@@ -256,6 +256,9 @@ def clear_dag_run(
 
     Resets the DAG run and its task instances so they can be re-executed by
     the scheduler. Use --dry-run to preview what would be cleared.
+
+    Note: The CLI clears immediately (with confirmation prompt) by default.
+    The MCP tool defaults to dry_run=True for safety when called by AI agents.
     """
     try:
         adapter = get_adapter()
