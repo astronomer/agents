@@ -273,10 +273,13 @@ my_warehouse:
     - RAW
 ```
 
+> [!NOTE]
+> The `account` field requires your Snowflake **account identifier** (e.g., `orgname-accountname` or `xy12345.us-east-1`), not your account name. Find this in your Snowflake console under Admin > Accounts.
+
 Store credentials in `~/.astro/agents/.env`:
 
 ```bash
-SNOWFLAKE_ACCOUNT=xyz12345
+SNOWFLAKE_ACCOUNT=myorg-myaccount  # Use your Snowflake account identifier (format: orgname-accountname or accountname.region)
 SNOWFLAKE_USER=myuser
 SNOWFLAKE_PRIVATE_KEY_PASSPHRASE=your-passphrase-here  # Only required if using an encrypted private key
 ```
