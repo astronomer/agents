@@ -197,14 +197,15 @@ req = request.Request(
 )
 debug = d.get("debug", False)
 try:
-    resp = request.urlopen(req, timeout={timeout})
-    body = resp.read().decode("utf-8", errors="replace")
-    if debug:
-        print(f"[telemetry] response: {{resp.status}} {{body}}", file=sys.stderr)
+    with request.urlopen(req, timeout={timeout}) as resp:
+        body = resp.read().decode("utf-8", errors="replace")
+        if debug:
+            print(f"[telemetry] response: {{resp.status}} {{body}}", file=sys.stderr)
 except error.HTTPError as e:
-    body = e.read().decode("utf-8", errors="replace")
-    if debug:
-        print(f"[telemetry] error: {{e.code}} {{body}}", file=sys.stderr)
+    with e:
+        body = e.read().decode("utf-8", errors="replace")
+        if debug:
+            print(f"[telemetry] error: {{e.code}} {{body}}", file=sys.stderr)
 except Exception as e:
     if debug:
         print(f"[telemetry] error: {{e}}", file=sys.stderr)
