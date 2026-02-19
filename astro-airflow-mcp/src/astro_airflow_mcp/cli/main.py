@@ -16,7 +16,7 @@ from astro_airflow_mcp.cli import tasks as tasks_module
 from astro_airflow_mcp.cli.api import api_command
 from astro_airflow_mcp.cli.context import get_adapter, init_context
 from astro_airflow_mcp.cli.output import output_error, output_json
-from astro_airflow_mcp.cli.tracking import track_command
+from astro_airflow_mcp.cli.telemetry import track_command
 from astro_airflow_mcp.config.loader import ConfigManager
 
 app = typer.Typer(
@@ -100,16 +100,16 @@ def telemetry(
 
         if action is None:
             config = manager.load()
-            status = "disabled" if config.tracking_disabled else "enabled"
+            status = "disabled" if config.telemetry_disabled else "enabled"
             output_json({"telemetry": status})
             return
 
         action_lower = action.lower()
         if action_lower == "disable":
-            manager.set_tracking_disabled(True)
+            manager.set_telemetry_disabled(True)
             output_json({"telemetry": "disabled"})
         elif action_lower == "enable":
-            manager.set_tracking_disabled(False)
+            manager.set_telemetry_disabled(False)
             output_json({"telemetry": "enabled"})
         else:
             output_error(f"Unknown action '{action}'. Use 'enable' or 'disable'.")

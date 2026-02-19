@@ -52,8 +52,8 @@ def _get_anonymous_id() -> str:
     return anonymous_id
 
 
-def _is_tracking_disabled() -> bool:
-    """Check if tracking is disabled via environment variable or config file."""
+def _is_telemetry_disabled() -> bool:
+    """Check if telemetry is disabled via environment variable or config file."""
     # Environment variable takes precedence
     disabled = os.environ.get(TELEMETRY_DISABLED_ENV, "").lower()
     if disabled in ("1", "true", "yes"):
@@ -64,7 +64,7 @@ def _is_tracking_disabled() -> bool:
         from astro_airflow_mcp.config.loader import ConfigManager
 
         config = ConfigManager().load()
-        if config.tracking_disabled:
+        if config.telemetry_disabled:
             return True
 
     return False
@@ -151,7 +151,7 @@ def track_command() -> None:
         return
     _tracked = True
 
-    if _is_tracking_disabled():
+    if _is_telemetry_disabled():
         return
 
     # Gather data in main process
