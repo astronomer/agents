@@ -73,6 +73,14 @@ def _trigger_dag_impl(
     """
     try:
         adapter = _get_adapter()
+
+        # Check if DAG is paused and unpause if needed
+        dag_details = adapter.get_dag(dag_id)
+        if dag_details.get("is_paused", False):
+            # DAG is paused, unpause it
+            adapter.unpause_dag(dag_id)
+
+        # Trigger the DAG run
         data = adapter.trigger_dag_run(dag_id=dag_id, conf=conf)
         return json.dumps(data, indent=2)
     except Exception as e:
@@ -282,6 +290,9 @@ def trigger_dag(dag_id: str, conf: dict | None = None) -> str:
     You can optionally pass configuration parameters that will be available to the
     DAG during execution via the `conf` context variable.
 
+    NOTE: This tool automatically unpauses the DAG if it is paused before triggering.
+    This ensures the DAG run will execute and not get stuck in a queued state.
+
     IMPORTANT: This is a write operation that modifies Airflow state by creating
     a new DAG run. Use with caution.
 
@@ -324,10 +335,14 @@ def trigger_dag_and_wait(
     - "Run DAG X and show me if it succeeds or fails"
 
     This is a BLOCKING operation that will:
-    1. Trigger the specified DAG
-    2. Poll for status automatically (interval scales with timeout)
-    3. Return once the DAG run reaches a terminal state (success, failed, upstream_failed)
-    4. Include details about any failed tasks if the run was not successful
+    1. Automatically unpause the DAG if it is paused
+    2. Trigger the specified DAG
+    3. Poll for status automatically (interval scales with timeout)
+    4. Return once the DAG run reaches a terminal state (success, failed, upstream_failed)
+    5. Include details about any failed tasks if the run was not successful
+
+    NOTE: This tool automatically unpauses the DAG if it is paused before triggering.
+    This ensures the DAG run will execute and not get stuck in a queued state.
 
     IMPORTANT: This tool blocks until the DAG completes or times out. For long-running
     DAGs, consider using `trigger_dag` instead and checking status separately with
