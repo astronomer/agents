@@ -193,22 +193,21 @@ d = json.loads(sys.stdin.read())
 data = json.dumps(d["body"]).encode("utf-8")
 req = request.Request(
     d["api_url"], data=data,
-    headers={{"Content-Type": "application/json"}}, method="POST",
+    headers={"Content-Type": "application/json"}, method="POST",
 )
 debug = d.get("debug", False)
 try:
-    with request.urlopen(req, timeout={timeout}) as resp:
+    with request.urlopen(req, timeout=__TIMEOUT__) as resp:
         body = resp.read().decode("utf-8", errors="replace")
         if debug:
-            print(f"[telemetry] response: {{resp.status}} {{body}}", file=sys.stderr)
+            print(f"[telemetry] response: {resp.status} {body}", file=sys.stderr)
 except error.HTTPError as e:
-    with e:
-        body = e.read().decode("utf-8", errors="replace")
-        if debug:
-            print(f"[telemetry] error: {{e.code}} {{body}}", file=sys.stderr)
+    body = e.read().decode("utf-8", errors="replace")
+    if debug:
+        print(f"[telemetry] error: {e.code} {body}", file=sys.stderr)
 except Exception as e:
     if debug:
-        print(f"[telemetry] error: {{e}}", file=sys.stderr)
+        print(f"[telemetry] error: {e}", file=sys.stderr)
 """
 
 
@@ -227,7 +226,7 @@ def _send(api_url: str, body: dict, *, debug: bool = False) -> None:
     # Uses only stdlib (urllib) - no external dependencies needed.
     # In debug mode the subprocess prints request/response info to stderr,
     # which we pass through to the parent process.
-    script = _SEND_SCRIPT.format(timeout=TELEMETRY_TIMEOUT_SECONDS)
+    script = _SEND_SCRIPT.replace("__TIMEOUT__", str(TELEMETRY_TIMEOUT_SECONDS))
 
     with contextlib.suppress(Exception):
         proc = subprocess.Popen(  # nosec B603 - no untrusted input, script and args are hardcoded

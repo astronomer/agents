@@ -237,7 +237,9 @@ class TestSendScript:
 
     def test_script_posts_to_api(self):
         """Test the subprocess script sends correct HTTP request."""
-        script = telemetry._SEND_SCRIPT.format(timeout=telemetry.TELEMETRY_TIMEOUT_SECONDS)
+        script = telemetry._SEND_SCRIPT.replace(
+            "__TIMEOUT__", str(telemetry.TELEMETRY_TIMEOUT_SECONDS)
+        )
         payload = json.dumps(
             {
                 "api_url": "http://localhost:9999/telemetry",
@@ -261,12 +263,14 @@ class TestSendScript:
 
     def test_script_is_valid_python(self):
         """Test the subprocess script compiles without syntax errors."""
-        script = telemetry._SEND_SCRIPT.format(timeout=3)
+        script = telemetry._SEND_SCRIPT.replace("__TIMEOUT__", "3")
         compile(script, "<send_script>", "exec")
 
     def test_script_silent_without_debug(self):
         """Test the subprocess script produces no output when debug is off."""
-        script = telemetry._SEND_SCRIPT.format(timeout=telemetry.TELEMETRY_TIMEOUT_SECONDS)
+        script = telemetry._SEND_SCRIPT.replace(
+            "__TIMEOUT__", str(telemetry.TELEMETRY_TIMEOUT_SECONDS)
+        )
         payload = json.dumps(
             {
                 "api_url": "http://localhost:9999/telemetry",
