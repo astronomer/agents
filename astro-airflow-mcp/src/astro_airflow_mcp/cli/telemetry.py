@@ -236,7 +236,8 @@ def _send(api_url: str, body: dict, *, debug: bool = False) -> None:
             stderr=None if debug else subprocess.DEVNULL,
             start_new_session=not debug,
         )
-        proc.stdin.write(payload.encode())
-        proc.stdin.close()
+        # stdin is guaranteed to be non-None since we pass stdin=subprocess.PIPE
+        proc.stdin.write(payload.encode())  # type: ignore[union-attr]
+        proc.stdin.close()  # type: ignore[union-attr]
         if debug:
             proc.wait()

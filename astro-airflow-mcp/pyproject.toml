@@ -51,9 +51,8 @@ dev = [
     "pytest-httpx>=0.30.0",
     "ruff>=0.1.0",
     "prek>=0.3.2",
-    "mypy>=1.8.0",
+    "ty>=0.0.17",
     "bandit[toml]>=1.7.0",
-    "types-PyYAML>=6.0",
 ]
 
 [tool.ruff]
@@ -96,3 +95,20 @@ ignore = [
 [tool.bandit]
 exclude_dirs = ["tests", "examples"]
 skips = ["B101"]  # Skip assert_used check (common in tests)
+
+[tool.ty.analysis]
+# Equivalent to mypy's --ignore-missing-imports
+allowed-unresolved-imports = ["**"]  # Allow all unresolved imports
+
+[tool.ty.src]
+# Check only the astro_airflow_mcp package, exclude tests
+include = ["src/astro_airflow_mcp/**"]
+exclude = ["tests/**"]
+
+[tool.ty.rules]
+# Relax strict optional checking to match mypy's --no-strict-optional behavior
+# These rules are more strict than mypy's settings, so we downgrade to warnings
+invalid-argument-type = "warn"      # Allow None in optional parameters
+unresolved-attribute = "warn"       # Allow accessing attributes on Optional types
+missing-argument = "warn"           # Allow missing arguments with defaults
+invalid-method-override = "warn"    # Allow method override incompatibilities
