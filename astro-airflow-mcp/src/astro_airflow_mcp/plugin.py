@@ -57,8 +57,8 @@ class AirflowMCPPlugin(AirflowPlugin):
     name = "astro_airflow_mcp"
     fastapi_apps = fastapi_apps_config
 
-    @staticmethod
-    def on_load(*_args: Any, **_kwargs: Any) -> None:
+    @classmethod
+    def on_load(cls, *_args: Any, **_kwargs: Any) -> None:
         """Called when the plugin is loaded."""
         logger.info("Airflow MCP Plugin loaded")
 

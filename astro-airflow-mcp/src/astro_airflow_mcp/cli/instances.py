@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, cast
 
 import typer
 from rich.console import Console
@@ -132,7 +132,9 @@ def use_instance(
                 console.print("Cancelled.", style="dim")
                 return
 
-            name = instance_names[choice_index]
+            # TerminalMenu defaults to single-select (multi_select=False)
+            # In single-select mode, show() returns int; multi-select returns tuple[int, ...]
+            name = instance_names[cast("int", choice_index)]
 
         manager.use_instance(name)
         console.print(f"Switched to instance [bold]{name}[/bold]", highlight=False)
