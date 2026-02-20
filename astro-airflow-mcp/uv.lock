@@ -57,22 +57,6 @@ wheels = [
 ]
 
 [[package]]
-name = "analytics-python"
-version = "1.4.post1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "backoff" },
-    { name = "monotonic" },
-    { name = "python-dateutil" },
-    { name = "requests" },
-    { name = "six" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/52/f2/6e06e01b5ed7806286e301287ebc0fda39e8b1da47a3cfa50eb62174d233/analytics-python-1.4.post1.tar.gz", hash = "sha256:b083e69c149c39e7ad17067f0e5c1742fbd15fdc469ade36c4d1ad5edf31ee5e", size = 15902, upload-time = "2023-03-22T21:24:31.335Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/67/84/d41972eeddd7299bd2e2246a9be78abba46f2d255c0c435c64748cd99088/analytics_python-1.4.post1-py2.py3-none-any.whl", hash = "sha256:33ab660150d0f37bb2fefc93fd19c9e7bd85e5b17db44df5e7e1139f63c14246", size = 23914, upload-time = "2023-03-22T21:24:26.702Z" },
-]
-
-[[package]]
 name = "annotated-types"
 version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -306,7 +290,6 @@ wheels = [
 name = "astro-airflow-mcp"
 source = { editable = "." }
 dependencies = [
-    { name = "analytics-python" },
     { name = "fastmcp" },
     { name = "filelock" },
     { name = "httpx" },
@@ -337,7 +320,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "analytics-python", specifier = ">=1.4.0" },
     { name = "apache-airflow", marker = "extra == 'plugin'", specifier = ">=3.0.0" },
     { name = "fastapi", marker = "extra == 'plugin'", specifier = ">=0.100.0" },
     { name = "fastmcp", specifier = ">=0.1.0" },
@@ -400,15 +382,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/7d/6b/d52e42361e1aa00709585ecc30b3f9684b3ab62530771402248b1b1d6240/babel-2.17.0.tar.gz", hash = "sha256:0c54cffb19f690cdcc52a3b50bcbf71e07a808d1c80d549f2459b9d2cf0afb9d", size = 9951852, upload-time = "2025-02-01T15:17:41.026Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b7/b8/3fe70c75fe32afc4bb507f75563d39bc5642255d1d94f1f23604725780bf/babel-2.17.0-py3-none-any.whl", hash = "sha256:4d0b53093fdfb4b21c92b5213dba5a1b23885afa8383709427046b21c366e5f2", size = 10182537, upload-time = "2025-02-01T15:17:37.39Z" },
-]
-
-[[package]]
-name = "backoff"
-version = "1.10.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/55/52/5c209d0e9f1ad857573be96b285626d5e081d86dd50d7617ff0874685dd4/backoff-1.10.0.tar.gz", hash = "sha256:b8fba021fac74055ac05eb7c7bfce4723aedde6cd0a504e5326bcb0bdd6d19a4", size = 13652, upload-time = "2019-12-07T21:07:25.377Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f0/32/c5dd4f4b0746e9ec05ace2a5045c1fc375ae67ee94355344ad6c7005fd87/backoff-1.10.0-py2.py3-none-any.whl", hash = "sha256:5e73e2cbe780e1915a204799dba0a01896f45f4385e636bcca7a0614d879d0cd", size = 31022, upload-time = "2019-12-07T21:07:23.304Z" },
 ]
 
 [[package]]
@@ -1825,15 +1798,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/13/3b/c21b74ac17befdf17b286494b02221b7a84affb1d410ff86e38ba0e14b13/methodtools-0.4.7.tar.gz", hash = "sha256:e213439dd64cfe60213f7015da6efe5dd4003fd89376db3baa09fe13ec2bb0ba", size = 3586, upload-time = "2023-02-05T13:17:54.473Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b6/4b/6497ffb463b1b75e04b348ef31070606d43e3c503fa295383538ded999c9/methodtools-0.4.7-py2.py3-none-any.whl", hash = "sha256:5e188c780b236adc12e75b5f078c5afb419ef99eb648569fc6d7071f053a1f11", size = 4038, upload-time = "2024-08-23T09:18:03.631Z" },
-]
-
-[[package]]
-name = "monotonic"
-version = "1.6"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/ea/ca/8e91948b782ddfbd194f323e7e7d9ba12e5877addf04fb2bf8fca38e86ac/monotonic-1.6.tar.gz", hash = "sha256:3a55207bcfed53ddd5c5bae174524062935efed17792e9de2ad0205ce9ad63f7", size = 7615, upload-time = "2021-08-11T14:37:28.79Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/9a/67/7e8406a29b6c45be7af7740456f7f37025f0506ae2e05fb9009a53946860/monotonic-1.6-py2.py3-none-any.whl", hash = "sha256:68687e19a14f11f26d140dd5c86f3dba4bf5df58003000ed467e0e2a69bca96c", size = 8154, upload-time = "2021-04-09T21:58:05.122Z" },
 ]
 
 [[package]]

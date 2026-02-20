@@ -1,0 +1,39 @@
+{
+  "name": "data",
+  "displayName": "Astronomer Data Engineering",
+  "version": "0.1.0",
+  "description": "Data engineering plugin - warehouse exploration, pipeline authoring, Airflow integration",
+  "author": {
+    "name": "Astronomer",
+    "email": "support@astronomer.io"
+  },
+  "homepage": "https://github.com/astronomer/agents",
+  "repository": "https://github.com/astronomer/agents",
+  "license": "Apache-2.0",
+  "keywords": [
+    "data-engineering",
+    "airflow",
+    "snowflake",
+    "bigquery",
+    "jupyter",
+    "astronomer",
+    "dbt",
+    "cosmos",
+    "openlineage"
+  ],
+  "logo": "https://www.astronomer.io/logo/astronomer-dark.svg",
+  "hooks": {
+    "hooks": {
+      "beforeSubmitPrompt": [
+        {
+          "command": "./skills/airflow/hooks/airflow-skill-suggester.sh"
+        }
+      ],
+      "stop": [
+        {
+          "command": "uv run ./skills/analyzing-data/scripts/cli.py stop"
+        }
+      ]
+    }
+  }
+}

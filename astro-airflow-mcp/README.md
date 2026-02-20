@@ -475,7 +475,7 @@ To opt out:
 af telemetry disable
 ```
 
-You can also disable telemetry by setting the `AF_TRACKING_DISABLED=1` environment variable.
+You can also disable telemetry by setting the `AF_TELEMETRY_DISABLED=1` environment variable.
 
 ## Architecture
 
