@@ -15,6 +15,7 @@ from fastmcp.server.middleware.logging import LoggingMiddleware
 from astro_airflow_mcp.adapter_manager import AdapterManager
 from astro_airflow_mcp.adapters import AirflowAdapter
 from astro_airflow_mcp.logging import get_logger
+from astro_airflow_mcp.telemetry import TelemetryMiddleware
 from astro_airflow_mcp.utils import wrap_list_response
 
 logger = get_logger(__name__)
@@ -40,8 +41,9 @@ mcp = FastMCP(
     """,
 )
 
-# Add logging middleware to log all MCP tool calls
+# Add middleware
 mcp.add_middleware(LoggingMiddleware(include_payloads=True))
+mcp.add_middleware(TelemetryMiddleware())
 
 
 # Global adapter manager and project directory

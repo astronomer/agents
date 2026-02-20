@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from astro_airflow_mcp import telemetry as shared_telemetry
 from astro_airflow_mcp.cli import telemetry
 
 
@@ -18,7 +19,7 @@ class TestGetAnonymousId:
     def test_creates_new_id(self, tmp_path):
         """Test generates a new UUID when no file exists."""
         id_file = tmp_path / ".anonymous_id"
-        with patch.object(telemetry, "ANONYMOUS_ID_FILE", id_file):
+        with patch.object(shared_telemetry, "ANONYMOUS_ID_FILE", id_file):
             result = telemetry._get_anonymous_id()
 
         assert len(result) == 36
@@ -30,7 +31,7 @@ class TestGetAnonymousId:
         existing_id = "12345678-1234-1234-1234-123456789abc"
         id_file.write_text(existing_id)
 
-        with patch.object(telemetry, "ANONYMOUS_ID_FILE", id_file):
+        with patch.object(shared_telemetry, "ANONYMOUS_ID_FILE", id_file):
             result = telemetry._get_anonymous_id()
 
         assert result == existing_id
@@ -40,7 +41,7 @@ class TestGetAnonymousId:
         id_file = tmp_path / ".anonymous_id"
         id_file.write_text("not-a-uuid")
 
-        with patch.object(telemetry, "ANONYMOUS_ID_FILE", id_file):
+        with patch.object(shared_telemetry, "ANONYMOUS_ID_FILE", id_file):
             result = telemetry._get_anonymous_id()
 
         assert len(result) == 36
@@ -237,8 +238,8 @@ class TestSendScript:
 
     def test_script_posts_to_api(self):
         """Test the subprocess script sends correct HTTP request."""
-        script = telemetry._SEND_SCRIPT.replace(
-            "__TIMEOUT__", str(telemetry.TELEMETRY_TIMEOUT_SECONDS)
+        script = shared_telemetry._SEND_SCRIPT.replace(
+            "__TIMEOUT__", str(shared_telemetry.TELEMETRY_TIMEOUT_SECONDS)
         )
         payload = json.dumps(
             {
@@ -263,13 +264,13 @@ class TestSendScript:
 
     def test_script_is_valid_python(self):
         """Test the subprocess script compiles without syntax errors."""
-        script = telemetry._SEND_SCRIPT.replace("__TIMEOUT__", "3")
+        script = shared_telemetry._SEND_SCRIPT.replace("__TIMEOUT__", "3")
         compile(script, "<send_script>", "exec")
 
     def test_script_silent_without_debug(self):
         """Test the subprocess script produces no output when debug is off."""
-        script = telemetry._SEND_SCRIPT.replace(
-            "__TIMEOUT__", str(telemetry.TELEMETRY_TIMEOUT_SECONDS)
+        script = shared_telemetry._SEND_SCRIPT.replace(
+            "__TIMEOUT__", str(shared_telemetry.TELEMETRY_TIMEOUT_SECONDS)
         )
         payload = json.dumps(
             {
