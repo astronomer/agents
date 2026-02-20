@@ -439,6 +439,70 @@ class TestConfigEndpoint:
             print(f"Config access returned: {result}")
 
 
+class TestDeleteDagRunEndpoint:
+    """Test DAG run delete operation."""
+
+    @pytest.fixture
+    def adapter(self, airflow_url: str, airflow_username: str, airflow_password: str):
+        """Create adapter for tests."""
+        return create_adapter(
+            airflow_url,
+            basic_auth_getter=lambda: (airflow_username, airflow_password),
+        )
+
+    def test_delete_dag_run(self, adapter):
+        """Should delete a DAG run that was just triggered."""
+        # Trigger a run to have something to delete
+        triggered = adapter.trigger_dag_run(dag_id=TEST_DAG_ID)
+        dag_run_id = triggered["dag_run_id"]
+
+        # Delete it
+        result = adapter.delete_dag_run(TEST_DAG_ID, dag_run_id)
+        assert result == {}
+
+        # Verify it's gone
+        from astro_airflow_mcp.adapters.base import NotFoundError
+
+        with pytest.raises((NotFoundError, Exception)):
+            adapter.get_dag_run(TEST_DAG_ID, dag_run_id)
+        print(f"Deleted run {dag_run_id} for DAG {TEST_DAG_ID}")
+
+
+class TestClearDagRunEndpoint:
+    """Test DAG run clear operation."""
+
+    @pytest.fixture
+    def adapter(self, airflow_url: str, airflow_username: str, airflow_password: str):
+        """Create adapter for tests."""
+        return create_adapter(
+            airflow_url,
+            basic_auth_getter=lambda: (airflow_username, airflow_password),
+        )
+
+    def test_clear_dag_run_dry_run(self, adapter, completed_dag_run):
+        """Should return task instances that would be cleared without clearing."""
+        dag_id, dag_run_id = completed_dag_run
+
+        result = adapter.clear_dag_run(dag_id, dag_run_id, dry_run=True)
+        assert "task_instances" in result
+        assert isinstance(result["task_instances"], list)
+        print(
+            f"Dry-run clear for {dag_run_id}: {len(result['task_instances'])} tasks would be cleared"
+        )
+
+    def test_clear_dag_run(self, adapter):
+        """Should clear a triggered DAG run."""
+        # Trigger a fresh run
+        triggered = adapter.trigger_dag_run(dag_id=TEST_DAG_ID)
+        dag_run_id = triggered["dag_run_id"]
+
+        # dry_run=False returns the cleared DAG run object, not task_instances
+        result = adapter.clear_dag_run(TEST_DAG_ID, dag_run_id, dry_run=False)
+        assert "dag_id" in result
+        assert result["dag_id"] == TEST_DAG_ID
+        print(f"Cleared run {dag_run_id}: state={result.get('state')}")
+
+
 class TestPauseUnpauseEndpoints:
     """Test pause and unpause DAG operations."""
 

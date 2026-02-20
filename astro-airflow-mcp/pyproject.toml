@@ -5,7 +5,6 @@ description = "A FastMCP server for Airflow integration that can run standalone 
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "analytics-python>=1.4.0",
     "fastmcp>=0.1.0",
     "filelock>=3.0.0",
     "httpx>=0.27.0",
@@ -93,7 +92,6 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]  # Allow unused imports in __init__.py
 "tests/**/*.py" = ["ARG001", "ARG002", "PT011"]  # Allow unused arguments and broad pytest.raises in tests
-"src/astro_airflow_mcp/cli/main.py" = ["E402"]  # Warning filter must run before imports
 
 [tool.bandit]
 exclude_dirs = ["tests", "examples"]

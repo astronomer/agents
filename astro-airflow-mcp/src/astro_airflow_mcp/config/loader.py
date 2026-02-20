@@ -110,8 +110,8 @@ class ConfigManager:
             # Clean up default values at top level for cleaner YAML
             if data.get("current-instance") is None:
                 del data["current-instance"]
-            if not data.get("tracking-disabled"):
-                data.pop("tracking-disabled", None)
+            if not data.get("telemetry-disabled"):
+                data.pop("telemetry-disabled", None)
 
             # Clean up default SSL values per instance for cleaner YAML
             for inst in data.get("instances", []):
@@ -222,10 +222,10 @@ class ConfigManager:
         config = self.load()
         return config.current_instance
 
-    def set_tracking_disabled(self, disabled: bool) -> None:
-        """Enable or disable anonymous usage tracking."""
+    def set_telemetry_disabled(self, disabled: bool) -> None:
+        """Enable or disable anonymous usage telemetry."""
         config = self.load()
-        config.tracking_disabled = disabled
+        config.telemetry_disabled = disabled
         self.save(config)
 
     def list_instances(self) -> list[Instance]:

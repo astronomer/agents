@@ -378,3 +378,123 @@ def trigger_dag_and_wait(
         poll_interval=poll_interval,
         timeout=timeout,
     )
+
+
+def _delete_dag_run_impl(dag_id: str, dag_run_id: str) -> str:
+    """Internal implementation for deleting a DAG run.
+
+    Fetches run details before deleting so the caller can see what was removed.
+
+    Args:
+        dag_id: The ID of the DAG
+        dag_run_id: The ID of the DAG run to delete
+
+    Returns:
+        JSON string with the deleted run details
+    """
+    try:
+        adapter = _get_adapter()
+
+        # Fetch run details before deleting so the agent can show what was removed
+        try:
+            run_details = adapter.get_dag_run(dag_id, dag_run_id)
+        except Exception:
+            run_details = None
+
+        adapter.delete_dag_run(dag_id, dag_run_id)
+
+        result: dict[str, Any] = {
+            "message": f"DAG run '{dag_run_id}' deleted",
+            "dag_id": dag_id,
+        }
+        if run_details:
+            result["deleted_run"] = run_details
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        return str(e)
+
+
+def _clear_dag_run_impl(
+    dag_id: str,
+    dag_run_id: str,
+    dry_run: bool = True,
+) -> str:
+    """Internal implementation for clearing a DAG run.
+
+    Args:
+        dag_id: The ID of the DAG
+        dag_run_id: The ID of the DAG run to clear
+        dry_run: If True, return what would be cleared without clearing
+
+    Returns:
+        JSON string with the cleared (or would-be-cleared) task instances
+    """
+    try:
+        adapter = _get_adapter()
+        data = adapter.clear_dag_run(dag_id, dag_run_id, dry_run=dry_run)
+        return json.dumps(data, indent=2)
+    except Exception as e:
+        return str(e)
+
+
+@mcp.tool()
+def delete_dag_run(dag_id: str, dag_run_id: str) -> str:
+    """Delete a specific DAG run permanently.
+
+    Use this tool when the user asks to:
+    - "Delete DAG run X" or "Remove DAG run Y"
+    - "Clean up old DAG runs" or "Delete stuck runs"
+    - "Remove this run" or "Get rid of this DAG run"
+
+    This permanently removes the DAG run and its metadata. This cannot be undone.
+
+    IMPORTANT: This is a destructive, irreversible operation. Always confirm
+    with the user before calling this tool. Show them the dag_id and dag_run_id
+    you intend to delete and get explicit approval first. The response includes
+    details of the deleted run for confirmation.
+
+    Args:
+        dag_id: The ID of the DAG (e.g., "example_dag")
+        dag_run_id: The ID of the DAG run to delete (e.g., "manual__2024-01-01T00:00:00+00:00")
+
+    Returns:
+        JSON with deletion confirmation and details of the deleted run
+    """
+    return _delete_dag_run_impl(dag_id=dag_id, dag_run_id=dag_run_id)
+
+
+@mcp.tool()
+def clear_dag_run(
+    dag_id: str,
+    dag_run_id: str,
+    dry_run: bool = True,
+) -> str:
+    """Clear a DAG run to allow re-execution of all its tasks.
+
+    Use this tool when the user asks to:
+    - "Clear DAG run X" or "Retry DAG run Y"
+    - "Re-run this DAG run" or "Reset this run"
+    - "Clear a failed run" or "Restart this execution"
+
+    This resets the DAG run and its task instances so they can be re-executed
+    by the scheduler. Unlike deleting, this preserves the run but resets its state.
+
+    Use dry_run=True (default) to preview what would be cleared before committing.
+
+    IMPORTANT: This is a write operation that modifies Airflow state by resetting
+    task instances. Set dry_run=False to actually clear.
+
+    Args:
+        dag_id: The ID of the DAG (e.g., "example_dag")
+        dag_run_id: The ID of the DAG run to clear (e.g., "manual__2024-01-01T00:00:00+00:00")
+        dry_run: If True (default), return what would be cleared without clearing.
+                 Set to False to actually clear and re-execute.
+
+    Returns:
+        JSON with list of task instances that were (or would be) cleared
+    """
+    return _clear_dag_run_impl(
+        dag_id=dag_id,
+        dag_run_id=dag_run_id,
+        dry_run=dry_run,
+    )
