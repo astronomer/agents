@@ -486,7 +486,9 @@ class TestClearDagRunEndpoint:
         result = adapter.clear_dag_run(dag_id, dag_run_id, dry_run=True)
         assert "task_instances" in result
         assert isinstance(result["task_instances"], list)
-        print(f"Dry-run clear for {dag_run_id}: {len(result['task_instances'])} tasks would be cleared")
+        print(
+            f"Dry-run clear for {dag_run_id}: {len(result['task_instances'])} tasks would be cleared"
+        )
 
     def test_clear_dag_run(self, adapter):
         """Should clear a triggered DAG run."""
@@ -494,10 +496,11 @@ class TestClearDagRunEndpoint:
         triggered = adapter.trigger_dag_run(dag_id=TEST_DAG_ID)
         dag_run_id = triggered["dag_run_id"]
 
+        # dry_run=False returns the cleared DAG run object, not task_instances
         result = adapter.clear_dag_run(TEST_DAG_ID, dag_run_id, dry_run=False)
-        assert "task_instances" in result
-        assert isinstance(result["task_instances"], list)
-        print(f"Cleared run {dag_run_id}: {len(result['task_instances'])} tasks cleared")
+        assert "dag_id" in result
+        assert result["dag_id"] == TEST_DAG_ID
+        print(f"Cleared run {dag_run_id}: state={result.get('state')}")
 
 
 class TestPauseUnpauseEndpoints:
