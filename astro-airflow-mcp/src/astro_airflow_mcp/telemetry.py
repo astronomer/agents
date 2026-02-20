@@ -10,12 +10,9 @@ import subprocess  # nosec B404 - subprocess is needed for fire-and-forget telem
 import sys
 import uuid
 from pathlib import Path
+from typing import Any
 
 from fastmcp.server.middleware import Middleware
-
-from astro_airflow_mcp.logging import get_logger
-
-logger = get_logger(__name__)
 
 # Telemetry API configuration
 TELEMETRY_API_URL = "https://api.astronomer.io/v1alpha1/telemetry"
@@ -222,7 +219,7 @@ class TelemetryMiddleware(Middleware):
     event with the tool name and success/failure status.
     """
 
-    async def on_call_tool(self, context, call_next):
+    async def on_call_tool(self, context: Any, call_next: Any) -> Any:
         tool_name = context.message.name
         try:
             result = await call_next(context)
