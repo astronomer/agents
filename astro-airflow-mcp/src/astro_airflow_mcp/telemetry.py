@@ -21,8 +21,9 @@ logger = get_logger(__name__)
 TELEMETRY_API_URL = "https://api.astronomer.io/v1alpha1/telemetry"
 TELEMETRY_TIMEOUT_SECONDS = 3
 
-# Source identifier
-TELEMETRY_SOURCE = "astro-airflow-mcp"
+# Source identifiers
+CLI_TELEMETRY_SOURCE = "af-cli"
+MCP_TELEMETRY_SOURCE = "astro-airflow-mcp"
 
 # Environment variables
 TELEMETRY_DISABLED_ENV = "AF_TELEMETRY_DISABLED"
@@ -205,7 +206,7 @@ def track_tool_call(tool_name: str, *, success: bool = True) -> None:
     debug = os.environ.get(TELEMETRY_DEBUG_ENV, "").lower() in ("1", "true", "yes")
 
     body = {
-        "source": TELEMETRY_SOURCE,
+        "source": MCP_TELEMETRY_SOURCE,
         "event": "MCP Tool Call",
         "anonymousId": anonymous_id,
         "properties": properties,

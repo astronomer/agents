@@ -7,9 +7,11 @@ import platform
 import sys
 
 from astro_airflow_mcp.telemetry import (
+    CLI_TELEMETRY_SOURCE as TELEMETRY_SOURCE,
+)
+from astro_airflow_mcp.telemetry import (
     TELEMETRY_API_URL,
     TELEMETRY_DEBUG_ENV,
-    TELEMETRY_SOURCE,
     _detect_invocation_context,
     _get_anonymous_id,
     _is_telemetry_disabled,
