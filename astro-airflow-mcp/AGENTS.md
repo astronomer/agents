@@ -29,7 +29,7 @@ src/astro_airflow_mcp/
 ├── tools/             # MCP tool implementations (grouped by domain)
 │   ├── dag.py         # DAG management (get, list, source, stats, pause, unpause)
 │   ├── task.py        # Task management (get, list, instance, logs, clear)
-│   ├── dag_run.py     # DAG run management (list, get, trigger, trigger_and_wait)
+│   ├── dag_run.py     # DAG run management (list, get, trigger, trigger_and_wait, delete, clear)
 │   ├── asset.py       # Asset/dataset tools (list, events, upstream events)
 │   ├── admin.py       # Admin tools (connections, variables, pools, plugins, providers, config, version)
 │   └── diagnostic.py  # Diagnostic tools (warnings, errors, explore, diagnose, health)
