@@ -185,10 +185,11 @@ def track_tool_call(tool_name: str, *, success: bool = True) -> None:
     properties: dict[str, object] = {
         "tool": tool_name,
         "success": success,
-        "af_version": __version__,
+        "cli_version": __version__,
         "python_version": f"{sys.version_info.major}.{sys.version_info.minor}",
         "os": platform.system().lower(),
         "os_version": platform.release(),
+        "architecture": platform.machine(),
         "context": context,
     }
     if agent:
