@@ -64,21 +64,21 @@ class TestIsTelemetryDisabled:
     def test_disabled_by_env_var(self, monkeypatch, value):
         """Test telemetry disabled via environment variable."""
         monkeypatch.setenv("AF_TELEMETRY_DISABLED", value)
-        assert telemetry._is_telemetry_disabled() is True
+        assert shared_telemetry._is_telemetry_disabled() is True
 
     def test_enabled_by_default(self, monkeypatch):
         """Test telemetry enabled when env var is not set."""
         monkeypatch.delenv("AF_TELEMETRY_DISABLED", raising=False)
         with patch("astro_airflow_mcp.config.loader.ConfigManager") as mock_cm:
             mock_cm.return_value.load.return_value.telemetry = Telemetry(enabled=True)
-            assert telemetry._is_telemetry_disabled() is False
+            assert shared_telemetry._is_telemetry_disabled() is False
 
     def test_disabled_by_config(self, monkeypatch):
         """Test telemetry disabled via config file."""
         monkeypatch.delenv("AF_TELEMETRY_DISABLED", raising=False)
         with patch("astro_airflow_mcp.config.loader.ConfigManager") as mock_cm:
             mock_cm.return_value.load.return_value.telemetry = Telemetry(enabled=False)
-            assert telemetry._is_telemetry_disabled() is True
+            assert shared_telemetry._is_telemetry_disabled() is True
 
 
 class TestDetectInvocationContext:
