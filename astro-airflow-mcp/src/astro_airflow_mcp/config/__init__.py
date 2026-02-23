@@ -1,7 +1,7 @@
 """Configuration management for af CLI."""
 
 from astro_airflow_mcp.config.loader import ConfigError, ConfigManager, ResolvedConfig
-from astro_airflow_mcp.config.models import AirflowCliConfig, Auth, Instance
+from astro_airflow_mcp.config.models import AirflowCliConfig, Auth, Instance, Telemetry
 
 __all__ = [
     "AirflowCliConfig",
@@ -10,4 +10,5 @@ __all__ = [
     "ConfigManager",
     "Instance",
     "ResolvedConfig",
+    "Telemetry",
 ]

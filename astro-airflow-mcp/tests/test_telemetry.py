@@ -11,41 +11,50 @@ import pytest
 
 from astro_airflow_mcp import telemetry as shared_telemetry
 from astro_airflow_mcp.cli import telemetry
+from astro_airflow_mcp.config import ConfigManager
+from astro_airflow_mcp.config.models import Telemetry
 
 
 class TestGetAnonymousId:
     """Tests for _get_anonymous_id."""
 
-    def test_creates_new_id(self, tmp_path):
-        """Test generates a new UUID when no file exists."""
-        id_file = tmp_path / ".anonymous_id"
-        with patch.object(shared_telemetry, "ANONYMOUS_ID_FILE", id_file):
-            result = telemetry._get_anonymous_id()
+    def test_creates_new_id_in_config(self, tmp_path):
+        """Test generates a new UUID and persists to config."""
+        config_path = tmp_path / "config.yaml"
+        manager = ConfigManager(config_path=config_path)
+        manager.save(manager.load())  # create default config
+
+        with patch("astro_airflow_mcp.config.loader.ConfigManager", return_value=manager):
+            result = shared_telemetry._get_anonymous_id()
 
         assert len(result) == 36
-        assert id_file.read_text() == result
+        # Verify it was saved to config
+        config = manager.load()
+        assert config.telemetry.anonymous_id == result
 
-    def test_reads_existing_id(self, tmp_path):
-        """Test returns existing UUID from file."""
-        id_file = tmp_path / ".anonymous_id"
+    def test_reads_existing_id_from_config(self, tmp_path):
+        """Test returns existing UUID from config."""
         existing_id = "12345678-1234-1234-1234-123456789abc"
-        id_file.write_text(existing_id)
+        config_path = tmp_path / "config.yaml"
+        manager = ConfigManager(config_path=config_path)
+        config = manager.load()
+        config.telemetry.anonymous_id = existing_id
+        manager.save(config)
 
-        with patch.object(shared_telemetry, "ANONYMOUS_ID_FILE", id_file):
-            result = telemetry._get_anonymous_id()
+        with patch("astro_airflow_mcp.config.loader.ConfigManager", return_value=manager):
+            result = shared_telemetry._get_anonymous_id()
 
         assert result == existing_id
 
-    def test_regenerates_invalid_id(self, tmp_path):
-        """Test regenerates UUID when file contains invalid data."""
-        id_file = tmp_path / ".anonymous_id"
-        id_file.write_text("not-a-uuid")
-
-        with patch.object(shared_telemetry, "ANONYMOUS_ID_FILE", id_file):
-            result = telemetry._get_anonymous_id()
+    def test_fallback_on_config_error(self):
+        """Test returns a UUID even if config operations fail."""
+        with patch(
+            "astro_airflow_mcp.config.loader.ConfigManager",
+            side_effect=Exception("config broken"),
+        ):
+            result = shared_telemetry._get_anonymous_id()
 
         assert len(result) == 36
-        assert result != "not-a-uuid"
 
 
 class TestIsTelemetryDisabled:
@@ -55,21 +64,21 @@ class TestIsTelemetryDisabled:
     def test_disabled_by_env_var(self, monkeypatch, value):
         """Test telemetry disabled via environment variable."""
         monkeypatch.setenv("AF_TELEMETRY_DISABLED", value)
-        assert telemetry._is_telemetry_disabled() is True
+        assert shared_telemetry._is_telemetry_disabled() is True
 
     def test_enabled_by_default(self, monkeypatch):
         """Test telemetry enabled when env var is not set."""
         monkeypatch.delenv("AF_TELEMETRY_DISABLED", raising=False)
         with patch("astro_airflow_mcp.config.loader.ConfigManager") as mock_cm:
-            mock_cm.return_value.load.return_value.telemetry_disabled = False
-            assert telemetry._is_telemetry_disabled() is False
+            mock_cm.return_value.load.return_value.telemetry = Telemetry(enabled=True)
+            assert shared_telemetry._is_telemetry_disabled() is False
 
     def test_disabled_by_config(self, monkeypatch):
         """Test telemetry disabled via config file."""
         monkeypatch.delenv("AF_TELEMETRY_DISABLED", raising=False)
         with patch("astro_airflow_mcp.config.loader.ConfigManager") as mock_cm:
-            mock_cm.return_value.load.return_value.telemetry_disabled = True
-            assert telemetry._is_telemetry_disabled() is True
+            mock_cm.return_value.load.return_value.telemetry = Telemetry(enabled=False)
+            assert shared_telemetry._is_telemetry_disabled() is True
 
 
 class TestDetectInvocationContext:

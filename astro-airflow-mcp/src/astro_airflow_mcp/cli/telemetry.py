@@ -76,10 +76,11 @@ def track_command() -> None:
 
     properties = {
         "command": command_path,
-        "af_version": __version__,
+        "cli_version": __version__,
         "python_version": f"{sys.version_info.major}.{sys.version_info.minor}",
         "os": platform.system().lower(),
         "os_version": platform.release(),
+        "architecture": platform.machine(),
         "context": context,
     }
     if agent:

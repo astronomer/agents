@@ -9,7 +9,6 @@ import platform
 import subprocess  # nosec B404 - subprocess is needed for fire-and-forget telemetry
 import sys
 import uuid
-from pathlib import Path
 from typing import Any
 
 from fastmcp.server.middleware import Middleware
@@ -26,33 +25,29 @@ MCP_TELEMETRY_SOURCE = "astro-airflow-mcp"
 TELEMETRY_DISABLED_ENV = "AF_TELEMETRY_DISABLED"
 TELEMETRY_DEBUG_ENV = "AF_TELEMETRY_DEBUG"
 
-# File to store anonymous user ID
-ANONYMOUS_ID_FILE = Path.home() / ".af" / ".anonymous_id"
-
 
 def _get_anonymous_id() -> str:
-    """Get or create a persistent anonymous user ID."""
-    try:
-        if ANONYMOUS_ID_FILE.exists():
-            value = ANONYMOUS_ID_FILE.read_text().strip()
-            # Validate it looks like a UUID (36 chars: 8-4-4-4-12)
-            if len(value) == 36:
-                uuid.UUID(value)
-                return value
-    except (OSError, ValueError):
-        pass
+    """Get or create a persistent anonymous user ID.
 
-    # Generate new ID (also regenerates if existing file was invalid)
-    anonymous_id = str(uuid.uuid4())
+    Reads from the ``telemetry.anonymous_id`` field in config.yaml.
+    If not present, generates a new UUID and persists it to config.
+    """
+    with contextlib.suppress(Exception):
+        from astro_airflow_mcp.config.loader import ConfigManager
 
-    # Persist it
-    try:
-        ANONYMOUS_ID_FILE.parent.mkdir(parents=True, exist_ok=True)
-        ANONYMOUS_ID_FILE.write_text(anonymous_id)
-    except OSError:
-        pass  # Continue even if we can't persist
+        cm = ConfigManager()
+        config = cm.load()
 
-    return anonymous_id
+        if config.telemetry.anonymous_id:
+            return config.telemetry.anonymous_id
+
+        anonymous_id = str(uuid.uuid4())
+        config.telemetry.anonymous_id = anonymous_id
+        cm.save(config)
+        return anonymous_id
+
+    # Fallback if config operations fail
+    return str(uuid.uuid4())
 
 
 def _is_telemetry_disabled() -> bool:
@@ -67,7 +62,7 @@ def _is_telemetry_disabled() -> bool:
         from astro_airflow_mcp.config.loader import ConfigManager
 
         config = ConfigManager().load()
-        if config.telemetry_disabled:
+        if not config.telemetry.enabled:
             return True
 
     return False
@@ -190,10 +185,11 @@ def track_tool_call(tool_name: str, *, success: bool = True) -> None:
     properties: dict[str, object] = {
         "tool": tool_name,
         "success": success,
-        "af_version": __version__,
+        "cli_version": __version__,
         "python_version": f"{sys.version_info.major}.{sys.version_info.minor}",
         "os": platform.system().lower(),
         "os_version": platform.release(),
+        "architecture": platform.machine(),
         "context": context,
     }
     if agent:
