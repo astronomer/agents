@@ -46,6 +46,7 @@ npx skills add astronomer/agents --skill '*'
 
 This installs all Astronomer skills into your project via [skills.sh](https://skills.sh). You'll be prompted to select which agents to install to. To also select skills individually, omit the `--skill` flag.
 
+> [!IMPORTANT]
 > **Claude Code users:** We recommend using the plugin instead (see [Claude Code](#claude-code) section below) for better integration with MCP servers and hooks.
 
 ### Compatibility
