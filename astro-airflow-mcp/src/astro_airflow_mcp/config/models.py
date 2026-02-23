@@ -51,14 +51,23 @@ class Instance(BaseModel):
     ]
 
 
+class Telemetry(BaseModel):
+    """Telemetry configuration."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = Field(default=True, description="Whether anonymous telemetry is enabled")
+    anonymous_id: str | None = Field(default=None, description="Anonymous user ID for telemetry")
+
+
 class AirflowCliConfig(BaseModel):
     """Root configuration model for af CLI."""
 
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
     instances: Annotated[list[Instance], Field(default_factory=list)]
     current_instance: Annotated[str | None, Field(default=None, alias="current-instance")]
-    telemetry_disabled: Annotated[bool, Field(default=False, alias="telemetry-disabled")]
+    telemetry: Telemetry = Field(default_factory=Telemetry)
 
     def get_instance(self, name: str) -> Instance | None:
         """Get an instance by name."""

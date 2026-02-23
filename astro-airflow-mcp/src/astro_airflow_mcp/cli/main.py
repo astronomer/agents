@@ -100,7 +100,7 @@ def telemetry(
 
         if action is None:
             config = manager.load()
-            status = "disabled" if config.telemetry_disabled else "enabled"
+            status = "enabled" if config.telemetry.enabled else "disabled"
             output_json({"telemetry": status})
             return
 
