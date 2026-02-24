@@ -82,7 +82,9 @@ class TestEndToEnd:
 
         result = _trigger_dag_impl("my_dag")
         assert "read-only mode" in result
-        assert "POST" in result
+        # _trigger_dag_impl unpause the DAG (PATCH) before triggering (POST),
+        # so PATCH is the first write operation to be blocked.
+        assert "PATCH" in result
 
     def test_clear_task_instances_blocked(self, monkeypatch, mocker):
         from astro_airflow_mcp.tools.task import _clear_task_instances_impl
