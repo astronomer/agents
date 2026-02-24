@@ -18,6 +18,7 @@ Built by [Astronomer](https://www.astronomer.io/). [Apache 2.0 licensed](https:/
 - [Features](#features)
   - [MCP Server](#mcp-server)
   - [Skills](#skills)
+- [Why Astro?](#why-astro)
   - [User Journeys](#user-journeys)
   - [Airflow CLI (`af`)](#airflow-cli-af)
 - [Configuration](#configuration)
