@@ -29,7 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run ${CLAUDE_PLUGIN_ROOT}/skills/analyzing-data/scripts/cli.py stop"
+            "command": "uv run --project ${CLAUDE_PLUGIN_ROOT}/skills/analyzing-data/scripts ${CLAUDE_PLUGIN_ROOT}/skills/analyzing-data/scripts/cli.py stop"
           }
         ]
       }
