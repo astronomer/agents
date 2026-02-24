@@ -31,6 +31,7 @@ class TokenManager:
         username: str | None = None,
         password: str | None = None,
         timeout: float = 30.0,
+        verify: bool | str = True,
     ):
         """Initialize the token manager.
 
@@ -39,11 +40,14 @@ class TokenManager:
             username: Optional username for token authentication
             password: Optional password for token authentication
             timeout: HTTP request timeout in seconds (default 30.0)
+            verify: SSL verification setting. True (default) enables verification,
+                    False disables it, or a string path to a CA bundle file.
         """
         self.airflow_url = airflow_url
         self.username = username
         self.password = password
         self._timeout = timeout
+        self._verify: bool | str = verify
         self._token: str | None = None
         self._token_fetched_at: float | None = None
         # Default token lifetime of 30 minutes if not provided by server
@@ -114,7 +118,7 @@ class TokenManager:
         token_url = f"{self.airflow_url}/auth/token"
 
         try:
-            with httpx.Client(timeout=self._timeout) as client:
+            with httpx.Client(timeout=self._timeout, verify=self._verify) as client:
                 if self.username and self.password:
                     # Use credentials to fetch token
                     logger.debug("Fetching token with username/password credentials")

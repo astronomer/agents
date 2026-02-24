@@ -30,9 +30,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from lib.kernel import KernelManager
-from lib.warehouse import WarehouseConfig
-from lib import cache
+from kernel import KernelManager
+from warehouse import WarehouseConfig
+import cache
 
 
 def check_uv_installed():
@@ -123,14 +123,28 @@ def start(warehouse: str | None):
 @click.argument("code")
 @click.option("--timeout", "-t", default=30.0, help="Timeout in seconds")
 def execute(code: str, timeout: float):
-    """Execute Python code in the kernel."""
+    """Execute Python code in the kernel. Auto-starts kernel if not running."""
     km = KernelManager()
 
     if not km.is_running:
-        click.echo(
-            "Kernel not running. Start with: uv run scripts/cli.py start", err=True
-        )
-        sys.exit(1)
+        check_uv_installed()
+        try:
+            config = WarehouseConfig.load()
+            wh_name, wh_config = config.get_default()
+            click.echo(f"Starting kernel with: {wh_name}", err=True)
+            env_vars = wh_config.get_env_vars_for_kernel()
+            extra_packages = wh_config.get_required_packages()
+            km.start(env_vars=env_vars, extra_packages=extra_packages)
+            result = km.execute(wh_config.to_python_prelude(), timeout=60.0)
+            if result.output:
+                click.echo(result.output, err=True)
+            if not result.success:
+                click.echo(f"Connection error:\n{result.error}", err=True)
+                km.stop()
+                sys.exit(1)
+        except Exception as e:
+            click.echo(f"Error starting kernel: {e}", err=True)
+            sys.exit(1)
 
     result = km.execute(code, timeout=timeout)
     if result.output:

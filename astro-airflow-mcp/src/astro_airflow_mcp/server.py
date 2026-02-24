@@ -15,6 +15,7 @@ from fastmcp.server.middleware.logging import LoggingMiddleware
 from astro_airflow_mcp.adapter_manager import AdapterManager
 from astro_airflow_mcp.adapters import AirflowAdapter
 from astro_airflow_mcp.logging import get_logger
+from astro_airflow_mcp.telemetry import TelemetryMiddleware
 from astro_airflow_mcp.utils import wrap_list_response
 
 logger = get_logger(__name__)
@@ -40,8 +41,9 @@ mcp = FastMCP(
     """,
 )
 
-# Add logging middleware to log all MCP tool calls
+# Add middleware
 mcp.add_middleware(LoggingMiddleware(include_payloads=True))
+mcp.add_middleware(TelemetryMiddleware())
 
 
 # Global adapter manager and project directory
@@ -67,6 +69,7 @@ def configure(
     username: str | None = None,
     password: str | None = None,
     project_dir: str | None = None,
+    verify: bool | str = True,
 ) -> None:
     """Configure global Airflow connection settings.
 
@@ -76,6 +79,8 @@ def configure(
         username: Username for token-based authentication
         password: Password for token-based authentication
         project_dir: Project directory where Claude Code is running
+        verify: SSL verification setting. True (default) enables verification,
+                False disables it, or a string path to a CA bundle file.
 
     Note:
         If auth_token is provided, it will be used directly.
@@ -92,6 +97,7 @@ def configure(
         auth_token=auth_token,
         username=username,
         password=password,
+        verify=verify,
     )
 
 

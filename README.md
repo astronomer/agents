@@ -46,6 +46,7 @@ npx skills add astronomer/agents --skill '*'
 
 This installs all Astronomer skills into your project via [skills.sh](https://skills.sh). You'll be prompted to select which agents to install to. To also select skills individually, omit the `--skill` flag.
 
+> [!IMPORTANT]
 > **Claude Code users:** We recommend using the plugin instead (see [Claude Code](#claude-code) section below) for better integration with MCP servers and hooks.
 
 ### Compatibility
@@ -160,7 +161,7 @@ The `data` plugin bundles an MCP server and skills into a single installable pac
 
 | Skill | Description |
 |-------|-------------|
-| [init](./skills/init/) | Initialize schema discovery - generates `.astro/warehouse.md` for instant lookups |
+| [warehouse-init](./skills/warehouse-init/) | Initialize schema discovery - generates `.astro/warehouse.md` for instant lookups |
 | [analyzing-data](./skills/analyzing-data/) | SQL-based analysis to answer business questions (uses background Jupyter kernel) |
 | [checking-freshness](./skills/checking-freshness/) | Check how current your data is |
 | [profiling-tables](./skills/profiling-tables/) | Comprehensive table profiling and quality assessment |
@@ -205,12 +206,12 @@ The `data` plugin bundles an MCP server and skills into a single installable pac
 
 ```mermaid
 flowchart LR
-    init["/data:init"] --> analyzing["/data:analyzing-data"]
+    init["/data:warehouse-init"] --> analyzing["/data:analyzing-data"]
     analyzing --> profiling["/data:profiling-tables"]
     analyzing --> freshness["/data:checking-freshness"]
 ```
 
-1. **Initialize** (`/data:init`) - One-time setup to generate `warehouse.md` with schema metadata
+1. **Initialize** (`/data:warehouse-init`) - One-time setup to generate `warehouse.md` with schema metadata
 2. **Analyze** (`/data:analyzing-data`) - Answer business questions with SQL
 3. **Profile** (`/data:profiling-tables`) - Deep dive into specific tables for statistics and quality
 4. **Check freshness** (`/data:checking-freshness`) - Verify data is up to date before using
@@ -267,15 +268,19 @@ my_warehouse:
   private_key_passphrase: ${SNOWFLAKE_PRIVATE_KEY_PASSPHRASE}
   warehouse: COMPUTE_WH
   role: ANALYST
+  query_tag: claude-code
   databases:
     - ANALYTICS
     - RAW
 ```
 
+> [!NOTE]
+> The `account` field requires your Snowflake **account identifier** (e.g., `orgname-accountname` or `xy12345.us-east-1`), not your account name. Find this in your Snowflake console under Admin > Accounts.
+
 Store credentials in `~/.astro/agents/.env`:
 
 ```bash
-SNOWFLAKE_ACCOUNT=xyz12345
+SNOWFLAKE_ACCOUNT=myorg-myaccount  # Use your Snowflake account identifier (format: orgname-accountname or accountname.region)
 SNOWFLAKE_USER=myuser
 SNOWFLAKE_PRIVATE_KEY_PASSPHRASE=your-passphrase-here  # Only required if using an encrypted private key
 ```
@@ -333,18 +338,31 @@ my_postgres:
   user: analyst
   password: ${POSTGRES_PASSWORD}
   database: analytics
+  application_name: claude-code
 
 # BigQuery
 my_bigquery:
   type: bigquery
   project: my-gcp-project
   credentials_path: ~/.config/gcloud/service_account.json
+  location: US
+  labels:
+    team: data-eng
+    env: prod
 
 # SQLAlchemy (any supported database)
 my_duckdb:
   type: sqlalchemy
   url: duckdb:///path/to/analytics.duckdb
   databases: [main]
+
+# SQLAlchemy with connect_args (passed to the DBAPI driver)
+my_pg_sqlalchemy:
+  type: sqlalchemy
+  url: postgresql://${PG_USER}:${PG_PASSWORD}@localhost/analytics
+  databases: [analytics]
+  connect_args:
+    application_name: claude-code
 
 # Redshift (via SQLAlchemy)
 my_redshift:
@@ -376,7 +394,7 @@ Skills are invoked automatically based on what you ask. You can also invoke them
 
 1. **Initialize your warehouse** (recommended first step):
    ```
-   /data:init
+   /data:warehouse-init
    ```
    This generates `.astro/warehouse.md` with schema metadata for faster queries.
 

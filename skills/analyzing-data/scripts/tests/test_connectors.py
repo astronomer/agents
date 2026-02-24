@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from lib.connectors import (
+from connectors import (
     BigQueryConnector,
     PostgresConnector,
     SnowflakeConnector,
@@ -116,6 +116,76 @@ class TestSnowflakeConnector:
         assert "account='test-account'" in prelude
         assert "def run_sql" in prelude
 
+    @pytest.mark.parametrize(
+        "data,expected_tag",
+        [
+            (
+                {
+                    "account": "a",
+                    "user": "u",
+                    "password": "p",
+                    "query_tag": "team=data-eng",
+                },
+                "team=data-eng",
+            ),
+            ({"account": "a", "user": "u", "password": "p"}, ""),
+        ],
+        ids=["with_query_tag", "without_query_tag"],
+    )
+    def test_from_dict_query_tag(self, data, expected_tag):
+        conn = SnowflakeConnector.from_dict(data)
+        assert conn.query_tag == expected_tag
+
+    @pytest.mark.parametrize(
+        "query_tag",
+        [
+            "team=data-eng",
+            "x" * 2000,
+            "",
+        ],
+        ids=["typical_tag", "max_length", "empty"],
+    )
+    def test_validate_valid_query_tag(self, query_tag):
+        conn = SnowflakeConnector(
+            account="a", user="u", password="p", databases=[], query_tag=query_tag
+        )
+        conn.validate("test")  # Should not raise
+
+    def test_validate_invalid_query_tag(self):
+        conn = SnowflakeConnector(
+            account="a",
+            user="u",
+            password="p",
+            databases=[],
+            query_tag="x" * 2001,
+        )
+        with pytest.raises(ValueError, match="2000 character limit"):
+            conn.validate("test")
+
+    def test_to_python_prelude_with_query_tag(self):
+        conn = SnowflakeConnector(
+            account="a",
+            user="u",
+            password="p",
+            databases=["DB"],
+            query_tag="team=data-eng",
+        )
+        prelude = conn.to_python_prelude()
+        assert "session_parameters" in prelude
+        assert "QUERY_TAG" in prelude
+        assert "team=data-eng" in prelude
+
+    def test_to_python_prelude_query_tag_in_status(self):
+        conn = SnowflakeConnector(
+            account="a",
+            user="u",
+            password="p",
+            databases=["DB"],
+            query_tag="team=data-eng",
+        )
+        prelude = conn.to_python_prelude()
+        assert "Query Tag:" in prelude
+
 
 class TestPostgresConnector:
     def test_connector_type(self):
@@ -167,6 +237,48 @@ class TestPostgresConnector:
         assert "host='localhost'" in prelude
         assert "def run_sql" in prelude
 
+    @pytest.mark.parametrize(
+        "data,expected_name",
+        [
+            (
+                {
+                    "host": "h",
+                    "user": "u",
+                    "database": "d",
+                    "application_name": "claude-code",
+                },
+                "claude-code",
+            ),
+            ({"host": "h", "user": "u", "database": "d"}, ""),
+        ],
+        ids=["with_application_name", "without_application_name"],
+    )
+    def test_from_dict_application_name(self, data, expected_name):
+        conn = PostgresConnector.from_dict(data)
+        assert conn.application_name == expected_name
+
+    def test_to_python_prelude_with_application_name(self):
+        conn = PostgresConnector(
+            host="h",
+            user="u",
+            database="db",
+            databases=["db"],
+            application_name="claude-code",
+        )
+        prelude = conn.to_python_prelude()
+        assert "application_name='claude-code'" in prelude
+
+    def test_to_python_prelude_application_name_in_status(self):
+        conn = PostgresConnector(
+            host="h",
+            user="u",
+            database="db",
+            databases=["db"],
+            application_name="claude-code",
+        )
+        prelude = conn.to_python_prelude()
+        assert "Application:" in prelude
+
 
 class TestBigQueryConnector:
     def test_connector_type(self):
@@ -210,6 +322,95 @@ class TestBigQueryConnector:
         prelude = conn.to_python_prelude()
         assert "service_account" in prelude
         assert "from_service_account_file" in prelude
+
+    @pytest.mark.parametrize(
+        "data,expected_labels",
+        [
+            (
+                {"project": "p", "labels": {"team": "data-eng", "env": "prod"}},
+                {"team": "data-eng", "env": "prod"},
+            ),
+            ({"project": "p"}, {}),
+        ],
+        ids=["with_labels", "without_labels"],
+    )
+    def test_from_dict_labels(self, data, expected_labels):
+        conn = BigQueryConnector.from_dict(data)
+        assert conn.labels == expected_labels
+
+    @pytest.mark.parametrize(
+        "labels",
+        [
+            {"team": "data-eng", "env": "prod", "tool": "claude-code"},
+            {"team": ""},
+        ],
+        ids=["typical_labels", "empty_value"],
+    )
+    def test_validate_valid_labels(self, labels):
+        conn = BigQueryConnector(project="p", databases=[], labels=labels)
+        conn.validate("test")  # Should not raise
+
+    @pytest.mark.parametrize(
+        "labels,error_match",
+        [
+            ({"Team": "eng"}, "invalid BigQuery label key"),
+            ({"1team": "eng"}, "invalid BigQuery label key"),
+            ({"team": "Eng"}, "invalid BigQuery label value"),
+            ({f"key{i}": f"val{i}" for i in range(65)}, "at most 64 labels"),
+            ({"team": 12345}, "must be a string"),
+        ],
+        ids=[
+            "uppercase_key",
+            "key_starts_with_number",
+            "uppercase_value",
+            "too_many_labels",
+            "non_string_value",
+        ],
+    )
+    def test_validate_invalid_labels(self, labels, error_match):
+        conn = BigQueryConnector(project="p", databases=[], labels=labels)
+        with pytest.raises(ValueError, match=error_match):
+            conn.validate("test")
+
+    def test_to_python_prelude_with_labels(self):
+        conn = BigQueryConnector(
+            project="p",
+            databases=["p"],
+            labels={"team": "data-eng", "env": "prod"},
+        )
+        prelude = conn.to_python_prelude()
+        assert "labels=" in prelude
+        assert "'team': 'data-eng'" in prelude
+        assert "'env': 'prod'" in prelude
+
+    def test_to_python_prelude_location_in_query_call(self):
+        conn = BigQueryConnector(project="p", location="US", databases=["p"])
+        prelude = conn.to_python_prelude()
+        assert "location='US'" in prelude
+        # location should be in _client.query(), not QueryJobConfig()
+        assert "_client.query(query, job_config=job_config, location='US')" in prelude
+
+    def test_to_python_prelude_location_and_labels(self):
+        conn = BigQueryConnector(
+            project="p",
+            location="EU",
+            databases=["p"],
+            labels={"team": "eng"},
+        )
+        prelude = conn.to_python_prelude()
+        compile(prelude, "<string>", "exec")
+        assert "labels={'team': 'eng'}" in prelude
+        assert "location='EU'" in prelude
+        assert "_client.query(query, job_config=job_config, location='EU')" in prelude
+
+    def test_to_python_prelude_labels_in_status(self):
+        conn = BigQueryConnector(
+            project="p",
+            databases=["p"],
+            labels={"team": "data-eng"},
+        )
+        prelude = conn.to_python_prelude()
+        assert "Labels:" in prelude
 
 
 class TestSQLAlchemyConnector:
@@ -266,6 +467,53 @@ class TestSQLAlchemyConnector:
         assert "from sqlalchemy import create_engine" in prelude
         assert "create_engine" in prelude
         assert "def run_sql" in prelude
+
+    @pytest.mark.parametrize(
+        "data,expected_args",
+        [
+            (
+                {
+                    "url": "postgresql://u:p@h/d",
+                    "databases": ["d"],
+                    "connect_args": {"application_name": "claude-code"},
+                },
+                {"application_name": "claude-code"},
+            ),
+            (
+                {"url": "postgresql://u:p@h/d", "databases": ["d"]},
+                {},
+            ),
+        ],
+        ids=["with_connect_args", "without_connect_args"],
+    )
+    def test_from_dict_connect_args(self, data, expected_args):
+        conn = SQLAlchemyConnector.from_dict(data)
+        assert conn.connect_args == expected_args
+
+    def test_to_python_prelude_with_connect_args(self):
+        conn = SQLAlchemyConnector(
+            url="postgresql://u:p@h/d",
+            databases=["d"],
+            connect_args={"application_name": "claude-code"},
+        )
+        prelude = conn.to_python_prelude()
+        assert "connect_args={'application_name': 'claude-code'}" in prelude
+
+    def test_to_python_prelude_without_connect_args(self):
+        conn = SQLAlchemyConnector(url="sqlite:///t.db", databases=["t"])
+        prelude = conn.to_python_prelude()
+        assert "connect_args" not in prelude
+
+    def test_to_python_prelude_nested_connect_args(self):
+        conn = SQLAlchemyConnector(
+            url="snowflake://u:p@a/d",
+            databases=["d"],
+            connect_args={"session_parameters": {"QUERY_TAG": "team=data-eng"}},
+        )
+        prelude = conn.to_python_prelude()
+        assert "connect_args=" in prelude
+        assert "QUERY_TAG" in prelude
+        assert "team=data-eng" in prelude
 
 
 class TestEnvVarSubstitution:
@@ -701,6 +949,13 @@ class TestPreludeCompilation:
                 private_key_path="/k.pem",
                 databases=[],
             ),
+            SnowflakeConnector(
+                account="a",
+                user="u",
+                password="p",
+                query_tag="team=data-eng",
+                databases=[],
+            ),
             PostgresConnector(
                 host="h", port=5432, user="u", database="db", databases=["db"]
             ),
@@ -712,24 +967,59 @@ class TestPreludeCompilation:
                 sslmode="require",
                 databases=[],
             ),
+            PostgresConnector(
+                host="h",
+                user="u",
+                password="p",
+                database="db",
+                databases=[],
+                application_name="claude-code",
+            ),
             BigQueryConnector(project="p", databases=["p"]),
             BigQueryConnector(project="p", location="US", databases=["p"]),
             BigQueryConnector(
                 project="p", credentials_path="/creds.json", databases=["p"]
             ),
+            BigQueryConnector(
+                project="p",
+                databases=["p"],
+                labels={"team": "data-eng", "env": "prod"},
+            ),
+            BigQueryConnector(
+                project="p",
+                location="EU",
+                databases=["p"],
+                labels={"tool": "claude-code"},
+            ),
             SQLAlchemyConnector(url="sqlite:///test.db", databases=["test"]),
             SQLAlchemyConnector(url="postgresql://u:p@h/d", databases=["d"]),
+            SQLAlchemyConnector(
+                url="postgresql://u:p@h/d",
+                databases=["d"],
+                connect_args={"application_name": "claude-code"},
+            ),
+            SQLAlchemyConnector(
+                url="snowflake://u:p@a/d",
+                databases=["d"],
+                connect_args={"session_parameters": {"QUERY_TAG": "team=data-eng"}},
+            ),
         ],
         ids=[
             "snowflake_password",
             "snowflake_private_key",
+            "snowflake_query_tag",
             "postgres_basic",
             "postgres_ssl",
+            "postgres_application_name",
             "bigquery_basic",
             "bigquery_location",
             "bigquery_credentials",
+            "bigquery_labels",
+            "bigquery_location_and_labels",
             "sqlalchemy_sqlite",
             "sqlalchemy_postgres",
+            "sqlalchemy_connect_args",
+            "sqlalchemy_nested_connect_args",
         ],
     )
     def test_prelude_compiles(self, connector):

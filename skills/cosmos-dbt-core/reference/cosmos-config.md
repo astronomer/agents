@@ -4,12 +4,60 @@ This reference covers detailed Cosmos configuration for **dbt Core** projects.
 
 ## Table of Contents
 
+- [ProjectConfig Options](#projectconfig-options)
 - [Execution Modes (ExecutionConfig)](#execution-modes-executionconfig)
 - [ProfileConfig: Warehouse Connection](#profileconfig-warehouse-connection)
 - [Testing Behavior (RenderConfig)](#testing-behavior-renderconfig)
 - [operator_args Configuration](#operator_args-configuration)
-- [ProjectConfig Options](#projectconfig-options)
 - [Airflow 3 Compatibility](#airflow-3-compatibility)
+
+--
+
+## ProjectConfig Options
+
+### Required Parameters
+
+| Approach | When to use | Required param |
+|----------|-------------|----------------|
+| Project path | Project files available locally | `dbt_project_path` |
+| Manifest only | Using `dbt_manifest` load mode; containerized execution | `manifest_path` + `project_name` |
+
+### Optional Parameters
+
+| Parameter | Purpose | Constraint |
+|-----------|---------|------------|
+| `dbt_project_path` | The path to the dbt project directory.  Defaults to `None` | Mandatory if using `LoadMode.DBT_LS` |
+| `manifest_path` | Path to precomputed `manifest.json` (local or remote URI). Defaults to `None` |  Mandatory if using `LoadMode.DBT_MANIFEST`. Remote URIs require `manifest_conn_id` |
+| `manifest_conn_id` | Airflow connection for remote manifest (S3/GCS/Azure) | — |
+| `install_dbt_deps` | Run `dbt deps` during parsing/execution | Set `False` if deps are precomputed in CI |
+| `copy_dbt_packages` | Copy `dbt_packages` directory, if it exists, instead of creating a symbolic link (`False` by default) | Use in case user pre-computes dependencies, but they may change after the deployment was made. |
+| `env_vars` | Dict of env vars for parsing + execution | Requires `dbt_ls` load mode |
+| `dbt_vars` | Dict of dbt vars (passed to `--vars`) | Requires `dbt_ls` or `custom` load mode |
+| `partial_parse` | Enable dbt partial parsing | Requires `dbt_ls` load mode + `local` or `virtualenv` execution + `profiles_yml_filepath` |
+| `models_relative_path` | The relative path to the dbt models directory within the project. Defaults to `models` | — |
+| `seeds_relative_path` | The relative path to the dbt seeds directory within the project. Defaults to `seeds` | — |
+| `snapshots_relative_path` | The relative path to the dbt snapshots directory within the project. Defaults to `snapshots` | - |
+
+> **WARNING**: If using `dbt_vars` with Airflow templates like `ti`, `task_instance`, or `params` → use `operator_args["vars"]` instead. Those cannot be set via `ProjectConfig` because it is used during DAG parsing.
+
+```python
+from cosmos import ProjectConfig
+
+_project_config = ProjectConfig(
+    dbt_project_path="/path/to/dbt/project",
+    # manifest_path="/path/to/manifest.json",
+    # project_name="my_project",
+    # manifest_conn_id="aws_default",
+    # install_dbt_deps=False,
+    # copy_dbt_packages=False,
+    # dbt_vars={"my_var": "value"},  # static vars only
+    # env_vars={"MY_ENV": "value"},
+    # partial_parse=True,
+    # models_relative_path="custom_models_path",
+    # seeds_relative_path="custom_seeds_path",
+    # snapshots_relative_path="custom_snapshots_path",
+)
+```
 
 ---
 
@@ -18,10 +66,11 @@ This reference covers detailed Cosmos configuration for **dbt Core** projects.
 ### WATCHER Mode (Experimental, Fastest)
 
 Known limitations:
-- Only `DbtSeedWatcherOperator`, `DbtSnapshotWatcherOperator`, `DbtRunWatcherOperator` supported
-- `TestBehavior.AFTER_EACH` NOT supported
-- Retrying `DbtProducerWatcherOperator` NOT supported
-- Sensors run synchronously (occupy worker slot)
+- Implements `DbtSeedWatcherOperator`, `DbtSnapshotWatcherOperator` and `DbtRunWatcherOperator` - not other operators
+- Built on top of `ExecutionMode.LOCAL` and `ExecutionMode.KUBERNETES` - not available for other execution modes
+- Tests with `TestBehavior.AFTER_EACH`, which is the default test behavior, are still being rendered as EmptyOperators.
+- May not work as expected when using `RenderConfig.node_converters`
+- Airflow assets or datasets are emitted by the `DbtProducerWatcherOperator` instead by the actual tasks related to the correspondent dbt models.
 
 ```python
 from cosmos import ExecutionConfig, ExecutionMode
@@ -326,45 +375,6 @@ models:
         operator_kwargs:
           retries: 10
           pool: "high_priority_pool"
-```
-
----
-
-## ProjectConfig Options
-
-### Required Parameters
-
-| Approach | When to use | Required param |
-|----------|-------------|----------------|
-| Project path | Project files available locally | `dbt_project_path` |
-| Manifest only | Using `dbt_manifest` load mode; containerized execution | `manifest_path` + `project_name` |
-
-### Optional Parameters
-
-| Parameter | Purpose | Constraint |
-|-----------|---------|------------|
-| `manifest_path` | Path to precomputed `manifest.json` (local or remote URI) | Remote URIs require `manifest_conn_id` |
-| `manifest_conn_id` | Airflow connection for remote manifest (S3/GCS/Azure) | — |
-| `install_dbt_deps` | Run `dbt deps` during parsing/execution | Set `False` if deps are precomputed in CI |
-| `env_vars` | Dict of env vars for parsing + execution | Requires `dbt_ls` load mode |
-| `dbt_vars` | Dict of dbt vars (passed to `--vars`) | Requires `dbt_ls` or `custom` load mode |
-| `partial_parse` | Enable dbt partial parsing | Requires `dbt_ls` load mode + `local` or `virtualenv` execution + `profiles_yml_filepath` |
-
-> **WARNING**: If using `dbt_vars` with Airflow templates like `ti`, `task_instance`, or `params` → use `operator_args["vars"]` instead.
-
-```python
-from cosmos import ProjectConfig
-
-_project_config = ProjectConfig(
-    dbt_project_path="/path/to/dbt/project",
-    # manifest_path="/path/to/manifest.json",
-    # project_name="my_project",
-    # manifest_conn_id="aws_default",
-    # install_dbt_deps=False,
-    # dbt_vars={"my_var": "value"},  # static vars only
-    # env_vars={"MY_ENV": "value"},
-    # partial_parse=True,
-)
 ```
 
 ---

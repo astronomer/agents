@@ -10,7 +10,7 @@ import pytest
 @pytest.fixture(autouse=True)
 def mock_cache_dir(tmp_path):
     """Use a temporary directory for all cache tests."""
-    with mock.patch("lib.cache.CACHE_DIR", tmp_path):
+    with mock.patch("cache.CACHE_DIR", tmp_path):
         yield tmp_path
 
 
@@ -18,13 +18,13 @@ class TestConceptCache:
     """Tests for concept caching functions."""
 
     def test_lookup_concept_not_found(self, mock_cache_dir):
-        from lib import cache
+        import cache
 
         result = cache.lookup_concept("nonexistent")
         assert result is None
 
     def test_learn_and_lookup_concept(self, mock_cache_dir):
-        from lib import cache
+        import cache
 
         # Learn a concept
         result = cache.learn_concept(
@@ -45,14 +45,14 @@ class TestConceptCache:
         assert found["table"] == "HQ.MART.CUSTOMERS"
 
     def test_concept_case_insensitive(self, mock_cache_dir):
-        from lib import cache
+        import cache
 
         cache.learn_concept("Customers", "HQ.MART.CUSTOMERS")
         assert cache.lookup_concept("customers") is not None
         assert cache.lookup_concept("CUSTOMERS") is not None
 
     def test_list_concepts(self, mock_cache_dir):
-        from lib import cache
+        import cache
 
         cache.learn_concept("customers", "TABLE1")
         cache.learn_concept("orders", "TABLE2")
@@ -67,13 +67,13 @@ class TestPatternCache:
     """Tests for pattern caching functions."""
 
     def test_lookup_pattern_no_match(self, mock_cache_dir):
-        from lib import cache
+        import cache
 
         result = cache.lookup_pattern("some random question")
         assert result == []
 
     def test_learn_and_lookup_pattern(self, mock_cache_dir):
-        from lib import cache
+        import cache
 
         cache.learn_pattern(
             name="customer_count",
@@ -93,7 +93,7 @@ class TestPatternCache:
         assert len(matches) == 1
 
     def test_record_pattern_outcome(self, mock_cache_dir):
-        from lib import cache
+        import cache
 
         cache.learn_pattern(
             name="test_pattern",
@@ -119,7 +119,7 @@ class TestPatternCache:
         assert patterns["test_pattern"]["failure_count"] == 1
 
     def test_delete_pattern(self, mock_cache_dir):
-        from lib import cache
+        import cache
 
         cache.learn_pattern(
             name="to_delete",
@@ -138,13 +138,13 @@ class TestTableCache:
     """Tests for table schema caching."""
 
     def test_get_table_not_found(self, mock_cache_dir):
-        from lib import cache
+        import cache
 
         result = cache.get_table("NONEXISTENT.TABLE")
         assert result is None
 
     def test_set_and_get_table(self, mock_cache_dir):
-        from lib import cache
+        import cache
 
         columns = [
             {"name": "ID", "type": "INT"},
@@ -168,13 +168,13 @@ class TestTableCache:
         assert found["row_count"] == 1000
 
     def test_table_name_case_insensitive(self, mock_cache_dir):
-        from lib import cache
+        import cache
 
         cache.set_table("db.schema.table", [])
         assert cache.get_table("DB.SCHEMA.TABLE") is not None
 
     def test_delete_table(self, mock_cache_dir):
-        from lib import cache
+        import cache
 
         cache.set_table("DB.SCHEMA.TABLE", [])
         assert cache.delete_table("DB.SCHEMA.TABLE") is True
@@ -186,7 +186,7 @@ class TestCacheManagement:
     """Tests for cache statistics and clearing."""
 
     def test_cache_stats(self, mock_cache_dir):
-        from lib import cache
+        import cache
 
         cache.learn_concept("c1", "T1")
         cache.learn_concept("c2", "T2")
@@ -198,7 +198,7 @@ class TestCacheManagement:
         assert stats["cache_dir"] == str(mock_cache_dir)
 
     def test_clear_cache_all(self, mock_cache_dir):
-        from lib import cache
+        import cache
 
         cache.learn_concept("c1", "T1")
         cache.learn_pattern("p1", ["q"], ["s"], ["t"], [])
@@ -210,7 +210,7 @@ class TestCacheManagement:
         assert cache.list_patterns() == {}
 
     def test_clear_cache_concepts_only(self, mock_cache_dir):
-        from lib import cache
+        import cache
 
         cache.learn_concept("c1", "T1")
         cache.learn_pattern("p1", ["q"], ["s"], ["t"], [])
@@ -226,7 +226,7 @@ class TestBulkImport:
     """Tests for loading concepts from warehouse.md."""
 
     def test_load_concepts_from_warehouse_md(self, mock_cache_dir, tmp_path):
-        from lib import cache
+        import cache
 
         # Create a test warehouse.md
         warehouse_md = tmp_path / "warehouse.md"
@@ -249,7 +249,7 @@ class TestBulkImport:
         assert "orders" in concepts
 
     def test_load_concepts_file_not_found(self, mock_cache_dir):
-        from lib import cache
+        import cache
 
         count = cache.load_concepts_from_warehouse_md(Path("/nonexistent/file.md"))
         assert count == 0

@@ -6,8 +6,8 @@ from pathlib import Path
 import yaml
 from dotenv import load_dotenv
 
-from .config import get_config_dir
-from .connectors import DatabaseConnector, create_connector
+from config import get_config_dir
+from connectors import DatabaseConnector, create_connector
 
 
 def get_warehouse_config_path() -> Path:

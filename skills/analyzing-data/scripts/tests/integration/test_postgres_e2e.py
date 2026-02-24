@@ -2,7 +2,7 @@
 
 import pytest
 
-from lib.connectors import PostgresConnector
+from connectors import PostgresConnector
 
 
 class TestPostgresEndToEnd:

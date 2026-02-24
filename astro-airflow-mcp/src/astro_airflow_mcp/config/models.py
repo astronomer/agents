@@ -33,7 +33,7 @@ class Auth(BaseModel):
 class Instance(BaseModel):
     """An Airflow instance with its URL and authentication."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     name: str = Field(..., description="Unique name for this instance")
     url: str = Field(..., description="Base URL of the Airflow webserver")
@@ -41,16 +41,33 @@ class Instance(BaseModel):
     source: str | None = Field(
         default=None, description="Discovery source (e.g., astro, local, manual)"
     )
+    verify_ssl: Annotated[
+        bool,
+        Field(default=True, alias="verify-ssl", description="Whether to verify SSL certificates"),
+    ]
+    ca_cert: Annotated[
+        str | None,
+        Field(default=None, alias="ca-cert", description="Path to custom CA certificate bundle"),
+    ]
+
+
+class Telemetry(BaseModel):
+    """Telemetry configuration."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = Field(default=True, description="Whether anonymous telemetry is enabled")
+    anonymous_id: str | None = Field(default=None, description="Anonymous user ID for telemetry")
 
 
 class AirflowCliConfig(BaseModel):
     """Root configuration model for af CLI."""
 
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
     instances: Annotated[list[Instance], Field(default_factory=list)]
     current_instance: Annotated[str | None, Field(default=None, alias="current-instance")]
-    tracking_disabled: Annotated[bool, Field(default=False, alias="tracking-disabled")]
+    telemetry: Telemetry = Field(default_factory=Telemetry)
 
     def get_instance(self, name: str) -> Instance | None:
         """Get an instance by name."""
@@ -76,6 +93,8 @@ class AirflowCliConfig(BaseModel):
         password: str | None = None,
         token: str | None = None,
         source: str | None = None,
+        verify_ssl: bool = True,
+        ca_cert: str | None = None,
     ) -> None:
         """Add or update an instance."""
         # Only create Auth if credentials provided
@@ -87,13 +106,21 @@ class AirflowCliConfig(BaseModel):
             else None
         )
 
+        instance = Instance(
+            name=name,
+            url=url,
+            auth=auth,
+            source=source,
+            verify_ssl=verify_ssl,
+            ca_cert=ca_cert,
+        )
         existing = self.get_instance(name)
         if existing:
             # Update existing instance
             idx = self.instances.index(existing)
-            self.instances[idx] = Instance(name=name, url=url, auth=auth, source=source)
+            self.instances[idx] = instance
         else:
-            self.instances.append(Instance(name=name, url=url, auth=auth, source=source))
+            self.instances.append(instance)
 
     def delete_instance(self, name: str) -> None:
         """Delete an instance by name."""

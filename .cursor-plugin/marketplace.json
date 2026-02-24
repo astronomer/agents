@@ -1,0 +1,17 @@
+{
+  "name": "astronomer",
+  "owner": {
+    "name": "Astronomer",
+    "email": "support@astronomer.io"
+  },
+  "metadata": {
+    "description": "Data engineering plugins by Astronomer"
+  },
+  "plugins": [
+    {
+      "name": "data",
+      "source": "./",
+      "description": "Data engineering plugin - warehouse exploration, pipeline authoring, Airflow integration"
+    }
+  ]
+}

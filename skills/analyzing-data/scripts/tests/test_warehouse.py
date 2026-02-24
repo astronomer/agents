@@ -2,8 +2,8 @@
 
 import pytest
 
-from lib.connectors import PostgresConnector, SnowflakeConnector
-from lib.warehouse import WarehouseConfig
+from connectors import PostgresConnector, SnowflakeConnector
+from warehouse import WarehouseConfig
 
 
 class TestWarehouseConfigLoad:

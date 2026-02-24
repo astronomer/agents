@@ -363,6 +363,28 @@ def read_triggering_assets(**context):
 
 ## DAG Bundles & File Paths
 
+On Astro Runtime, Airflow 3 uses a versioned DAG bundle, so file paths and imports behave differently.
+
+### Shared utility imports
+
+If you import shared utility code from `dags/common/` or similar directories, **bare imports no longer work** in Airflow 3 on Astro. This is because DAG bundles place the bundle root on `sys.path`, but not `<bundle_root>/dags`. Additionally, bare imports are unsafe with DAG bundles due to Python's global import cache conflicting with concurrent bundle versions.
+
+Use fully qualified imports instead:
+
+```python
+# Airflow 2 (no longer works)
+import common
+from common.utils import helper_function
+
+# Airflow 3
+import dags.common
+from dags.common.utils import helper_function
+```
+
+Each bundle has its own `dags` package rooted at its bundle directory, which keeps imports scoped to the correct bundle version.
+
+### File path handling
+
 On Astro Runtime, Airflow 3 uses a versioned DAG bundle, so file paths behave differently:
 
 **For files inside `dags/` folder:**

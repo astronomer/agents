@@ -147,6 +147,8 @@ By default, the server connects to `http://localhost:8080` (Astro CLI default). 
 | `AIRFLOW_USERNAME` | Username (Airflow 3.x uses OAuth2 token exchange) |
 | `AIRFLOW_PASSWORD` | Password |
 | `AIRFLOW_AUTH_TOKEN` | Bearer token (alternative to username/password) |
+| `AIRFLOW_VERIFY_SSL` | Set to `false` to disable SSL certificate verification |
+| `AIRFLOW_CA_CERT` | Path to custom CA certificate bundle |
 
 Example with auth (Claude Code):
 
@@ -159,6 +161,7 @@ claude mcp add airflow -e AIRFLOW_API_URL=https://your-airflow.example.com -e AI
 - **Airflow 2.x and 3.x Support**: Automatic version detection with adapter pattern
 - **MCP Tools** for accessing Airflow data:
   - DAG management (list, get details, get source code, stats, warnings, import errors, trigger, pause/unpause)
+  - DAG run management (list, get, trigger, trigger and wait, delete, clear)
   - Task management (list, get details, get task instances, get logs)
   - Pool management (list, get details)
   - Variable management (list, get specific variables)
@@ -204,6 +207,9 @@ claude mcp add airflow -e AIRFLOW_API_URL=https://your-airflow.example.com -e AI
 | `list_dag_runs` | Get DAG run history |
 | `get_dag_run` | Get specific DAG run details |
 | `trigger_dag` | Trigger a new DAG run (start a workflow execution) |
+| `trigger_dag_and_wait` | Trigger a DAG run and wait for completion |
+| `delete_dag_run` | Permanently delete a specific DAG run |
+| `clear_dag_run` | Clear a DAG run to allow re-execution of all its tasks |
 | `pause_dag` | Pause a DAG to prevent new scheduled runs |
 | `unpause_dag` | Unpause a DAG to resume scheduled runs |
 | `list_tasks` | Get all tasks in a DAG |
@@ -273,6 +279,8 @@ af runs list --dag-id <dag_id>
 af runs get <dag_id> <run_id>
 af runs trigger <dag_id>
 af runs trigger-wait <dag_id>  # Trigger and wait for completion
+af runs delete <dag_id> <run_id>   # Permanently delete a run
+af runs clear <dag_id> <run_id>    # Clear a run for re-execution
 af runs diagnose <dag_id> <run_id>
 
 # Task operations
@@ -304,6 +312,10 @@ Manage multiple Airflow instances with persistent configuration:
 af instance add local --url http://localhost:8080
 af instance add staging --url https://staging.example.com --username admin --password secret
 af instance add prod --url https://prod.example.com --token '${AIRFLOW_PROD_TOKEN}'
+
+# SSL options for self-signed or corporate CA certificates
+af instance add corp --url https://airflow.corp.example.com --no-verify-ssl --username admin --password secret
+af instance add corp --url https://airflow.corp.example.com --ca-cert /path/to/ca-bundle.pem --token '${TOKEN}'
 
 # List and switch instances
 af instance list      # Shows all instances in a table
@@ -365,6 +377,13 @@ instances:
   url: https://prod.example.com
   auth:
     token: ${AIRFLOW_PROD_TOKEN}  # Environment variable interpolation
+- name: corporate
+  url: https://airflow.corp.example.com
+  auth:
+    username: admin
+    password: secret
+  verify-ssl: false               # Disable SSL verification (self-signed certs)
+  # ca-cert: /path/to/ca.pem     # Or provide a custom CA bundle
 current-instance: local
 ```
 
@@ -425,6 +444,8 @@ echo astro-airflow-mcp >> requirements.txt
 | `--host` | `MCP_HOST` | `localhost` | Host to bind to (HTTP mode only) |
 | `--port` | `MCP_PORT` | `8000` | Port to bind to (HTTP mode only) |
 | `--airflow-project-dir` | `AIRFLOW_PROJECT_DIR` | `$PWD` | Astro project directory for auto-discovering Airflow URL |
+| `--no-verify-ssl` | `AIRFLOW_VERIFY_SSL=false` | off | Disable SSL certificate verification |
+| `--ca-cert` | `AIRFLOW_CA_CERT` | `None` | Path to custom CA certificate bundle |
 
 **Airflow Connection (Environment Variables):**
 
@@ -434,6 +455,8 @@ echo astro-airflow-mcp >> requirements.txt
 | `AIRFLOW_AUTH_TOKEN` | `None` | Bearer token for authentication |
 | `AIRFLOW_USERNAME` | `None` | Username for authentication |
 | `AIRFLOW_PASSWORD` | `None` | Password for authentication |
+| `AIRFLOW_VERIFY_SSL` | `true` | Set to `false` to disable SSL verification |
+| `AIRFLOW_CA_CERT` | `None` | Path to custom CA certificate bundle |
 
 **af CLI Options:**
 
@@ -452,7 +475,7 @@ To opt out:
 af telemetry disable
 ```
 
-You can also disable telemetry by setting the `AF_TRACKING_DISABLED=1` environment variable.
+You can also disable telemetry by setting the `AF_TELEMETRY_DISABLED=1` environment variable.
 
 ## Architecture
 
