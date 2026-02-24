@@ -112,8 +112,17 @@ class ConfigManager:
             # Clean up default values at top level for cleaner YAML
             if data.get("current-instance") is None:
                 del data["current-instance"]
-            if not data.get("telemetry-disabled"):
-                data.pop("telemetry-disabled", None)
+
+            # Clean up telemetry section: omit when all defaults
+            telemetry_data = data.get("telemetry", {})
+            has_id = telemetry_data.get("anonymous_id") is not None
+            is_disabled = telemetry_data.get("enabled") is False
+            if has_id or is_disabled:
+                # Keep section but remove None values
+                if telemetry_data.get("anonymous_id") is None:
+                    telemetry_data.pop("anonymous_id", None)
+            else:
+                data.pop("telemetry", None)
 
             # Clean up default SSL values per instance for cleaner YAML
             for inst in data.get("instances", []):
@@ -227,7 +236,7 @@ class ConfigManager:
     def set_telemetry_disabled(self, disabled: bool) -> None:
         """Enable or disable anonymous usage telemetry."""
         config = self.load()
-        config.telemetry_disabled = disabled
+        config.telemetry.enabled = not disabled
         self.save(config)
 
     def list_instances(self) -> list[Instance]:
