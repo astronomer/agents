@@ -19,6 +19,22 @@ Throughout this document, `af` is shorthand for `uvx --from astro-airflow-mcp af
 
 ---
 
+## Quick Validation with Astro CLI
+
+If the user has the Astro CLI available, these commands provide fast feedback without needing a running Airflow instance:
+
+```bash
+# Parse DAGs to catch import errors, syntax issues, and DAG-level problems
+astro dev parse
+
+# Run pytest against DAGs (runs tests in tests/ directory)
+astro dev pytest
+```
+
+Use these for quick validation during development. For full end-to-end testing against a live Airflow instance, continue to the trigger-and-wait workflow below.
+
+---
+
 ## FIRST ACTION: Just Trigger the DAG
 
 When the user asks to test a DAG, your **FIRST AND ONLY action** should be:
@@ -385,9 +401,19 @@ Task logs typically show:
 
 **Focus on the exception at the bottom of failed task logs.**
 
+### On Astro
+
+Astro deployments support environment promotion, which helps structure your testing workflow:
+
+- **Dev deployment**: Test DAGs freely with `astro deploy --dags` for fast iteration
+- **Staging deployment**: Run integration tests against production-like data
+- **Production deployment**: Deploy only after validation in lower environments
+- Use separate Astro deployments for each environment and promote code through them
+
 ---
 
 ## Related Skills
 
 - **authoring-dags**: For creating new DAGs (includes validation before testing)
 - **debugging-dags**: For general Airflow troubleshooting
+- **deploying-airflow**: For deploying DAGs to production after testing

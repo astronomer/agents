@@ -9,6 +9,7 @@ This skill helps you initialize and configure Airflow projects using the Astro C
 
 > **To run the local environment**, see the **managing-astro-local-env** skill.
 > **To write DAGs**, see the **authoring-dags** skill.
+> **Open-source alternative:** If the user isn't on Astro, guide them to Apache Airflow's Docker Compose quickstart for local dev and the Helm chart for production. For deployment strategies, use the `deploying-airflow` skill.
 
 ---
 
@@ -117,3 +118,4 @@ astro dev parse
 - **managing-astro-local-env**: Start, stop, and troubleshoot the local environment
 - **authoring-dags**: Write and validate DAGs (uses MCP tools)
 - **testing-dags**: Test DAGs (uses MCP tools)
+- **deploying-airflow**: Deploy DAGs to production (Astro, Docker Compose, Kubernetes)

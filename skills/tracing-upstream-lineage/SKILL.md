@@ -30,6 +30,14 @@ Tables are typically populated by Airflow DAGs. Find the connection:
 
 3. **Check DAG tasks**: Use `af tasks list <dag_id>` to see what operations the DAG performs
 
+### On Astro
+
+If you're running on Astro, the **Lineage tab** in the Astro UI provides visual lineage exploration across DAGs and datasets. Use it to quickly trace upstream dependencies without manually searching DAG source code.
+
+### On OSS Airflow
+
+Use DAG source code and task logs to trace lineage (no built-in cross-DAG UI).
+
 ### Step 3: Trace Data Sources
 
 From the DAG code, identify source tables and systems:
