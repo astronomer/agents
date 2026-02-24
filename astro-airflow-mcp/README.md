@@ -149,6 +149,7 @@ By default, the server connects to `http://localhost:8080` (Astro CLI default). 
 | `AIRFLOW_AUTH_TOKEN` | Bearer token (alternative to username/password) |
 | `AIRFLOW_VERIFY_SSL` | Set to `false` to disable SSL certificate verification |
 | `AIRFLOW_CA_CERT` | Path to custom CA certificate bundle |
+| `AF_READ_ONLY` | Set to `1`, `true`, or `yes` to block all write operations |
 
 Example with auth (Claude Code):
 
@@ -457,6 +458,7 @@ echo astro-airflow-mcp >> requirements.txt
 | `AIRFLOW_PASSWORD` | `None` | Password for authentication |
 | `AIRFLOW_VERIFY_SSL` | `true` | Set to `false` to disable SSL verification |
 | `AIRFLOW_CA_CERT` | `None` | Path to custom CA certificate bundle |
+| `AF_READ_ONLY` | `None` | Set to `1`, `true`, or `yes` to block all write operations |
 
 **af CLI Options:**
 
