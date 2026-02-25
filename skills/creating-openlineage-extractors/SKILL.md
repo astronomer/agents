@@ -21,6 +21,10 @@ This skill guides you through creating custom OpenLineage extractors to capture 
 
 > **Important:** Always prefer OpenLineage methods over custom extractors when possible. Extractors are harder to write, easier to diverge from operator behavior after changes, and harder to debug.
 
+### On Astro
+
+Astro includes built-in OpenLineage integration — no additional transport configuration is needed. Lineage events are automatically collected and displayed in the Astro UI's **Lineage tab**. Custom extractors deployed to an Astro project are automatically picked up, so you only need to register them in `airflow.cfg` or via environment variable and deploy.
+
 ---
 
 ## Two Approaches

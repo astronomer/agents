@@ -9,6 +9,10 @@ This skill guides you through adding manual lineage annotations to Airflow tasks
 
 > **Reference:** See the [OpenLineage provider developer guide](https://airflow.apache.org/docs/apache-airflow-providers-openlineage/stable/guides/developer.html) for the latest supported operators and patterns.
 
+### On Astro
+
+Lineage annotations defined with inlets and outlets are visualized in Astro's enhanced **Lineage tab**, which provides cross-DAG and cross-deployment lineage views. This means your annotations are immediately visible in the Astro UI, giving you a unified view of data flow across your entire Astro organization.
+
 ## When to Use This Approach
 
 | Scenario | Use Inlets/Outlets? |

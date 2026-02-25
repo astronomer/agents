@@ -18,6 +18,7 @@ Built by [Astronomer](https://www.astronomer.io/). [Apache 2.0 licensed](https:/
 - [Features](#features)
   - [MCP Server](#mcp-server)
   - [Skills](#skills)
+- [Why Astro?](#why-astro)
   - [User Journeys](#user-journeys)
   - [Airflow CLI (`af`)](#airflow-cli-af)
 - [Configuration](#configuration)
@@ -54,6 +55,9 @@ This installs all Astronomer skills into your project via [skills.sh](https://sk
 **Skills:** Works with [25+ AI coding agents](https://github.com/vercel-labs/add-skill?tab=readme-ov-file#available-agents) including Claude Code, Cursor, VS Code (GitHub Copilot), Windsurf, Cline, and more.
 
 **MCP Server:** Works with any [MCP-compatible client](https://modelcontextprotocol.io/clients) including Claude Desktop, VS Code, and others.
+
+> [!NOTE]
+> **Open-source Airflow users:** The MCP server works with any Airflow 2.x/3.x REST API. Set `AIRFLOW_API_URL` to your self-hosted instance. Skills are tool-agnostic and work with any Airflow deployment.
 
 ### Claude Code
 
@@ -180,11 +184,12 @@ The `data` plugin bundles an MCP server and skills into a single installable pac
 | Skill | Description |
 |-------|-------------|
 | [airflow](./skills/airflow/) | Main entrypoint - routes to specialized Airflow skills |
-| [setting-up-astro-project](./skills/setting-up-astro-project/) | Initialize and configure new Astro/Airflow projects |
-| [managing-astro-local-env](./skills/managing-astro-local-env/) | Manage local Airflow environment (start, stop, logs, troubleshoot) |
+| [setting-up-astro-project](./skills/setting-up-astro-project/) (Astro) | Initialize and configure new Astro/Airflow projects |
+| [managing-astro-local-env](./skills/managing-astro-local-env/) (Astro) | Manage local Airflow environment (start, stop, logs, troubleshoot) |
 | [authoring-dags](./skills/authoring-dags/) | Create and validate Airflow DAGs with best practices |
 | [testing-dags](./skills/testing-dags/) | Test and debug Airflow DAGs locally |
 | [debugging-dags](./skills/debugging-dags/) | Deep failure diagnosis and root cause analysis |
+| [deploying-airflow](./skills/deploying-airflow/) | Deploy Airflow DAGs and projects (Astro, Docker Compose, Kubernetes) |
 | [airflow-hitl](./skills/airflow-hitl/) | Human-in-the-loop workflows: approval gates, form input, branching (Airflow 3.1+) |
 
 #### dbt Integration
@@ -199,6 +204,10 @@ The `data` plugin bundles an MCP server and skills into a single installable pac
 | Skill | Description |
 |-------|-------------|
 | [migrating-airflow-2-to-3](./skills/migrating-airflow-2-to-3/) | Migrate DAGs from Airflow 2.x to 3.x |
+
+## Why Astro?
+
+Astro is Astronomer's managed Airflow platform. It's optional, but a good fit if you want managed deployments, built-in alerting, and centralized observability across environments. If you run open-source Airflow, everything in this repo still applies—you'll just configure your own Airflow URL and infrastructure.
 
 ### User Journeys
 
@@ -217,6 +226,8 @@ flowchart LR
 4. **Check freshness** (`/data:checking-freshness`) - Verify data is up to date before using
 
 #### DAG Development Flow
+
+For open-source Airflow, use Docker Compose for local dev and the Helm chart for production (see `deploying-airflow`) instead of Astro setup skills.
 
 ```mermaid
 flowchart LR

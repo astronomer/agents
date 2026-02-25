@@ -55,6 +55,18 @@ Gather additional context to understand WHY this happened:
 
 Use `af runs get <dag_id> <dag_run_id>` to compare the failed run against recent successful runs.
 
+### On Astro
+
+If you're running on Astro, these additional tools can help with diagnosis:
+
+- **Deployment activity log**: Check the Astro UI for recent deploys — a failed deploy or recent code change is often the cause of sudden failures
+- **Astro alerts**: Configure alerts in the Astro UI for proactive failure monitoring (DAG failure, task duration, SLA miss)
+- **Observability**: Use the Astro [observability dashboard](https://www.astronomer.io/docs/astro/airflow-alerts) to track DAG health trends and spot recurring issues
+
+### On OSS Airflow
+
+- **Airflow UI**: Use the DAGs page, Graph view, and task logs to inspect recent runs and failures
+
 ## Step 4: Provide Actionable Output
 
 Structure your diagnosis as:

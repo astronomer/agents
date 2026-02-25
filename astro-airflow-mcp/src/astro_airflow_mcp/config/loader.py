@@ -64,7 +64,7 @@ class ConfigManager:
 
     def _create_default_config(self) -> AirflowCliConfig:
         """Create default config with localhost:8080 instance."""
-        config = AirflowCliConfig()
+        config = AirflowCliConfig.model_validate({})
         config.add_instance("localhost:8080", "http://localhost:8080", source="local")
         config.use_instance("localhost:8080")
         return config
@@ -89,7 +89,7 @@ class ConfigManager:
                     data = yaml.safe_load(f)
 
                 if data is None:
-                    return AirflowCliConfig()
+                    return AirflowCliConfig.model_validate({})
 
                 return AirflowCliConfig.model_validate(data)
             except yaml.YAMLError as e:

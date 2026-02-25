@@ -17,6 +17,7 @@
     - [MCP Prompts](#mcp-prompts)
   - [Airflow CLI Tool](#af-tool)
     - [Instance Management](#instance-management)
+    - [Instance Discovery](#instance-discovery)
   - [Advanced Usage](#advanced-usage)
     - [Running as Standalone Server](#running-as-standalone-server)
     - [Airflow Plugin Mode](#airflow-plugin-mode)
@@ -139,7 +140,7 @@ Or connect to a running HTTP server: `"url": "http://localhost:8000/mcp"`
 
 ### Configuration
 
-By default, the server connects to `http://localhost:8080` (Astro CLI default). Set environment variables for custom Airflow instances:
+By default, the server connects to `http://localhost:8080` (Airflow default; also used by Astro CLI). Set environment variables for custom Airflow instances:
 
 | Variable | Description |
 |----------|-------------|
@@ -149,7 +150,6 @@ By default, the server connects to `http://localhost:8080` (Astro CLI default). 
 | `AIRFLOW_AUTH_TOKEN` | Bearer token (alternative to username/password) |
 | `AIRFLOW_VERIFY_SSL` | Set to `false` to disable SSL certificate verification |
 | `AIRFLOW_CA_CERT` | Path to custom CA certificate bundle |
-| `AF_READ_ONLY` | Set to `true` to block all write operations |
 
 Example with auth (Claude Code):
 
@@ -163,7 +163,7 @@ claude mcp add airflow -e AIRFLOW_API_URL=https://your-airflow.example.com -e AI
 - **MCP Tools** for accessing Airflow data:
   - DAG management (list, get details, get source code, stats, warnings, import errors, trigger, pause/unpause)
   - DAG run management (list, get, trigger, trigger and wait, delete, clear)
-  - Task management (list, get details, get task instances, get logs)
+  - Task management (list, get details, get task instances, get logs, clear task instances)
   - Pool management (list, get details)
   - Variable management (list, get specific variables)
   - Connection management (list connections with credentials excluded)
@@ -217,12 +217,15 @@ claude mcp add airflow -e AIRFLOW_API_URL=https://your-airflow.example.com -e AI
 | `get_task` | Get details about a specific task |
 | `get_task_instance` | Get task instance execution details |
 | `get_task_logs` | Get logs for a specific task instance execution |
+| `clear_task_instances` | Clear task instances to allow re-execution |
 | `list_pools` | Get all resource pools |
 | `get_pool` | Get details about a specific pool |
 | `list_variables` | Get all Airflow variables |
 | `get_variable` | Get a specific variable by key |
 | `list_connections` | Get all connections (credentials excluded for security) |
 | `list_assets` | Get assets/datasets (unified naming across versions) |
+| `list_asset_events` | Get asset/dataset events |
+| `get_upstream_asset_events` | Get asset events that triggered a specific DAG run |
 | `list_plugins` | Get installed Airflow plugins |
 | `list_providers` | Get installed provider packages |
 | `get_airflow_config` | Get Airflow configuration |
@@ -270,6 +273,7 @@ af dags list
 af dags get <dag_id>
 af dags explore <dag_id>      # Full investigation (metadata + tasks + source)
 af dags source <dag_id>
+af dags stats                  # DAG run statistics by state
 af dags pause <dag_id>
 af dags unpause <dag_id>
 af dags errors                 # Import errors
@@ -287,13 +291,24 @@ af runs diagnose <dag_id> <run_id>
 # Task operations
 af tasks list <dag_id>
 af tasks get <dag_id> <task_id>
+af tasks instance <dag_id> <run_id> <task_id>  # Task execution details
 af tasks logs <dag_id> <run_id> <task_id>
+af tasks clear <dag_id> <run_id> <task_ids>    # Clear task instances
+
+# Asset operations
+af assets list                 # List assets/datasets
+af assets events               # List asset events
 
 # Config operations
+af config show                 # Full Airflow configuration
 af config version
 af config connections
 af config variables
+af config variable <key>       # Get specific variable
 af config pools
+af config pool <name>          # Get specific pool
+af config plugins              # List installed plugins
+af config providers            # List installed providers
 
 # Direct API access (any endpoint)
 af api ls                             # List all available endpoints
@@ -323,7 +338,34 @@ af instance list      # Shows all instances in a table
 af instance use prod  # Switch to prod instance
 af instance current   # Show current instance
 af instance delete old-instance
+af instance reset     # Reset to default configuration
 ```
+
+### Instance Discovery
+
+Auto-discover Airflow instances from Astro Cloud or local Docker environments:
+
+```bash
+# Preview discoverable instances (safe, read-only)
+af instance discover --dry-run
+
+# Discover from all backends (Astro Cloud + local)
+af instance discover
+
+# Discover Astro deployments only
+af instance discover astro
+
+# Include all accessible workspaces
+af instance discover astro --all-workspaces
+
+# Discover local Airflow instances (scans common ports)
+af instance discover local
+
+# Deep scan all ports for local instances
+af instance discover local --scan
+```
+
+> **Note:** Always run with `--dry-run` first. The Astro discovery backend creates API tokens in Astro Cloud, so review the list before confirming.
 
 Config file location: `~/.af/config.yaml` (override with `--config` or `AF_CONFIG` env var)
 
@@ -431,7 +473,7 @@ Connect MCP clients to: `http://localhost:8000/mcp`
 Install into your Airflow 3.x environment to expose MCP at `http://your-airflow:8080/mcp/v1`:
 
 ```bash
-# Add to your Astro project
+# Add to your Airflow project (Astro Runtime or open-source Airflow 3.x)
 echo astro-airflow-mcp >> requirements.txt
 ```
 
@@ -458,7 +500,6 @@ echo astro-airflow-mcp >> requirements.txt
 | `AIRFLOW_PASSWORD` | `None` | Password for authentication |
 | `AIRFLOW_VERIFY_SSL` | `true` | Set to `false` to disable SSL verification |
 | `AIRFLOW_CA_CERT` | `None` | Path to custom CA certificate bundle |
-| `AF_READ_ONLY` | `None` | Set to `true` to block all write operations |
 
 **af CLI Options:**
 

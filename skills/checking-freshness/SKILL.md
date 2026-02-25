@@ -70,6 +70,17 @@ Check Airflow for the source pipeline:
 
 3. **Diagnose if needed**: If the DAG failed, use the **debugging-dags** skill to investigate.
 
+### On Astro
+
+If you're running on Astro, you can also:
+
+- **DAG history in the Astro UI**: Check the deployment's DAG run history for a visual timeline of recent runs and their outcomes
+- **Astro alerts for SLA monitoring**: Configure alerts to get notified when DAGs miss their expected completion windows, catching staleness before users report it
+
+### On OSS Airflow
+
+- **Airflow UI**: Use the DAGs view and task logs to verify last successful runs and SLA misses
+
 ## Output Format
 
 Provide a clear, scannable report:

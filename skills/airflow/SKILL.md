@@ -7,6 +7,35 @@ description: Manages Apache Airflow operations including listing, testing, runni
 
 Use `af` commands to query, manage, and troubleshoot Airflow workflows.
 
+## Astro CLI
+
+The [Astro CLI](https://www.astronomer.io/docs/astro/cli/overview) is the recommended way to run Airflow locally and deploy to production. It provides a containerized Airflow environment that works out of the box:
+
+```bash
+# Initialize a new project
+astro dev init
+
+# Start local Airflow (webserver at http://localhost:8080)
+astro dev start
+
+# Parse DAGs to catch errors quickly (no need to start Airflow)
+astro dev parse
+
+# Run pytest against your DAGs
+astro dev pytest
+
+# Deploy to production
+astro deploy            # Full deploy (image + DAGs)
+astro deploy --dags     # DAG-only deploy (fast, no image build)
+```
+
+For more details:
+- **New project?** See the **setting-up-astro-project** skill
+- **Local environment?** See the **managing-astro-local-env** skill
+- **Deploying?** See the **deploying-airflow** skill
+
+---
+
 ## Running the CLI
 
 Run all `af` commands using uvx (no installation required):
@@ -112,6 +141,11 @@ Or CLI flags: `af --airflow-url http://localhost:8080 --token "$TOKEN" <command>
 
 ## User Intent Patterns
 
+### Getting Started
+- "How do I run Airflow locally?" / "Set up Airflow" -> use the **managing-astro-local-env** skill (uses Astro CLI)
+- "Create a new Airflow project" / "Initialize project" -> use the **setting-up-astro-project** skill (uses Astro CLI)
+- "How do I install Airflow?" / "Get started with Airflow" -> use the **setting-up-astro-project** skill
+
 ### DAG Operations
 - "What DAGs exist?" / "List all DAGs" -> `af dags list`
 - "Tell me about DAG X" / "What is DAG Y?" -> `af dags explore <dag_id>`
@@ -141,6 +175,12 @@ Or CLI flags: `af --airflow-url http://localhost:8080 --token "$TOKEN" <command>
 - "Where does this data come from?" -> use the **tracing-upstream-lineage** skill
 - "What depends on this table?" / "What breaks if I change this?" -> use the **tracing-downstream-lineage** skill
 
+### Deployment Operations
+- "Deploy my DAGs" / "Push to production" -> use the **deploying-airflow** skill
+- "Set up CI/CD" / "Automate deploys" -> use the **deploying-airflow** skill
+- "Deploy to Kubernetes" / "Set up Helm" -> use the **deploying-airflow** skill
+- "astro deploy" / "DAG-only deploy" -> use the **deploying-airflow** skill
+
 ### System Operations
 - "What version of Airflow?" -> `af config version`
 - "What connections exist?" -> `af config connections`
@@ -156,6 +196,25 @@ Or CLI flags: `af --airflow-url http://localhost:8080 --token "$TOKEN" <command>
 - "Create variable via API" -> `af api variables -X POST -F key=name -f value=val`
 
 ## Common Workflows
+
+### Validate DAGs Before Deploying
+
+If you're using the Astro CLI, you can validate DAGs without a running Airflow instance:
+
+```bash
+# Parse DAGs to catch import errors and syntax issues
+astro dev parse
+
+# Run unit tests
+astro dev pytest
+```
+
+Otherwise, validate against a running instance:
+
+```bash
+af dags errors     # Check for parse/import errors
+af dags warnings   # Check for deprecation warnings
+```
 
 ### Investigate a Failed Run
 
@@ -283,6 +342,7 @@ af api variables/old_var -X DELETE
 | **checking-freshness** | Checking if data is up to date or stale |
 | **tracing-upstream-lineage** | Finding where data comes from |
 | **tracing-downstream-lineage** | Impact analysis -- what breaks if something changes |
+| **deploying-airflow** | Deploying DAGs to production (Astro, Docker Compose, Kubernetes) |
 | **migrating-airflow-2-to-3** | Upgrading DAGs from Airflow 2.x to 3.x |
 | **managing-astro-local-env** | Starting, stopping, or troubleshooting local Airflow |
 | **setting-up-astro-project** | Initializing a new Astro/Airflow project |

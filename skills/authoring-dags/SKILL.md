@@ -160,6 +160,13 @@ af dags explore <dag_id>
 
 Returns in one call: metadata, tasks, dependencies, source code.
 
+### On Astro
+
+If you're running on Astro, you can also validate locally before deploying:
+
+- **Parse check**: Run `astro dev parse` to catch import errors and DAG-level issues without starting a full Airflow environment
+- **DAG-only deploy**: Once validated, use `astro deploy --dags` for fast DAG-only deploys that skip the Docker image build — ideal for iterating on DAG code
+
 ---
 
 ## Phase 5: Test
@@ -223,4 +230,5 @@ For code patterns and anti-patterns, see **[reference/best-practices.md](referen
 
 - **testing-dags**: For testing DAGs, debugging failures, and the test -> fix -> retest loop
 - **debugging-dags**: For troubleshooting failed DAGs
+- **deploying-airflow**: For deploying DAGs to production (Astro or open-source)
 - **migrating-airflow-2-to-3**: For migrating DAGs to Airflow 3

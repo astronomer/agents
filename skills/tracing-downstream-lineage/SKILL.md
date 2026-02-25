@@ -35,6 +35,10 @@ Find everything that reads from this target:
    - Dashboards often query tables directly
    - Check for common BI patterns in table naming (rpt_, dashboard_)
 
+### On Astro
+
+If you're running on Astro, the **Lineage tab** in the Astro UI provides visual dependency graphs across DAGs and datasets, making downstream impact analysis faster. It shows which DAGs consume a given dataset and their current status, reducing the need for manual source code searches.
+
 **For DAGs:**
 
 1. **Check what the DAG produces**: Use `af dags source <dag_id>` to find output tables
