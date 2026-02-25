@@ -139,7 +139,8 @@ class AirflowAdapter(ABC):
         url = f"{self.airflow_url}{self.api_base_path}/{endpoint}"
 
         with httpx.Client(timeout=30.0, verify=self._verify) as client:
-            response = client.post(url, json=json_data, headers=headers, auth=auth)
+            # httpx accepts auth=None, but ty doesn't recognize it in the union type
+            response = client.post(url, json=json_data, headers=headers, auth=auth)  # type: ignore[arg-type]
 
             if response.status_code == 404:
                 raise NotFoundError(endpoint)
@@ -171,7 +172,8 @@ class AirflowAdapter(ABC):
         url = f"{self.airflow_url}{self.api_base_path}/{endpoint}"
 
         with httpx.Client(timeout=30.0, verify=self._verify) as client:
-            response = client.patch(url, json=json_data, headers=headers, auth=auth)
+            # httpx accepts auth=None, but ty doesn't recognize it in the union type
+            response = client.patch(url, json=json_data, headers=headers, auth=auth)  # type: ignore[arg-type]
 
             if response.status_code == 404:
                 raise NotFoundError(endpoint)
@@ -200,7 +202,8 @@ class AirflowAdapter(ABC):
         url = f"{self.airflow_url}{self.api_base_path}/{endpoint}"
 
         with httpx.Client(timeout=30.0, verify=self._verify) as client:
-            response = client.delete(url, headers=headers, auth=auth)
+            # httpx accepts auth=None, but ty doesn't recognize it in the union type
+            response = client.delete(url, headers=headers, auth=auth)  # type: ignore[arg-type]
 
             if response.status_code == 404:
                 raise NotFoundError(endpoint)

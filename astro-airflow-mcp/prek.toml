@@ -33,18 +33,23 @@ hooks = [
   { id = "check-docstring-first" },
 ]
 
-# Type checking with mypy
+# Type checking with ty (local hook until official pre-commit support)
 [[repos]]
-repo = "https://github.com/pre-commit/mirrors-mypy"
-rev = "v1.19.1"
-hooks = [
-  { id = "mypy", additional_dependencies = ["types-requests", "types-PyYAML"], args = ["--ignore-missing-imports", "--no-strict-optional"], exclude = "^tests/" },
-]
+repo = "local"
+[[repos.hooks]]
+id = "ty"
+name = "ty check"
+entry = "uv run ty check"
+language = "system"
+types = ["python"]
+pass_filenames = false
 
 # Security checks
 [[repos]]
 repo = "https://github.com/PyCQA/bandit"
 rev = "1.9.3"
-hooks = [
-  { id = "bandit", args = ["-c", "pyproject.toml"], additional_dependencies = ["bandit[toml]"], exclude = "^tests/" },
-]
+[[repos.hooks]]
+id = "bandit"
+args = ["-c", "pyproject.toml"]
+additional_dependencies = ["bandit[toml]"]
+exclude = "^tests/"

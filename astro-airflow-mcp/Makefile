@@ -86,8 +86,8 @@ format:  ## Format code with ruff - auto-fixes issues
 	uv run ruff format src/ tests/
 	uv run ruff check --fix src/ tests/
 
-type-check:  ## Run type checking (mypy) - excludes tests
-	uv run mypy src/astro_airflow_mcp/ --ignore-missing-imports --no-strict-optional
+type-check:  ## Run type checking (ty) - excludes tests
+	uv run ty check
 
 security:  ## Run security checks (bandit) - excludes tests
 	uv run bandit -c pyproject.toml -r src/astro_airflow_mcp/
@@ -106,7 +106,6 @@ clean:  ## Clean up build artifacts and cache files
 	rm -rf dist/
 	rm -rf *.egg-info
 	rm -rf .pytest_cache/
-	rm -rf .mypy_cache/
 	rm -rf .ruff_cache/
 	find . -type d -name __pycache__ -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
