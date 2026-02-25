@@ -107,7 +107,10 @@ class AirflowAdapter(ABC):
         all_params = {k: v for k, v in all_params.items() if v is not None}
 
         with httpx.Client(timeout=30.0, verify=self._verify) as client:
-            response = client.get(url, params=all_params, headers=headers, auth=auth)
+            if auth:
+                response = client.get(url, params=all_params, headers=headers, auth=auth)
+            else:
+                response = client.get(url, params=all_params, headers=headers)
 
             if response.status_code == 404:
                 raise NotFoundError(endpoint)
@@ -139,8 +142,10 @@ class AirflowAdapter(ABC):
         url = f"{self.airflow_url}{self.api_base_path}/{endpoint}"
 
         with httpx.Client(timeout=30.0, verify=self._verify) as client:
-            # httpx accepts auth=None, but ty doesn't recognize it in the union type
-            response = client.post(url, json=json_data, headers=headers, auth=auth)  # type: ignore[arg-type]
+            if auth:
+                response = client.post(url, json=json_data, headers=headers, auth=auth)
+            else:
+                response = client.post(url, json=json_data, headers=headers)
 
             if response.status_code == 404:
                 raise NotFoundError(endpoint)
@@ -172,8 +177,10 @@ class AirflowAdapter(ABC):
         url = f"{self.airflow_url}{self.api_base_path}/{endpoint}"
 
         with httpx.Client(timeout=30.0, verify=self._verify) as client:
-            # httpx accepts auth=None, but ty doesn't recognize it in the union type
-            response = client.patch(url, json=json_data, headers=headers, auth=auth)  # type: ignore[arg-type]
+            if auth:
+                response = client.patch(url, json=json_data, headers=headers, auth=auth)
+            else:
+                response = client.patch(url, json=json_data, headers=headers)
 
             if response.status_code == 404:
                 raise NotFoundError(endpoint)
@@ -202,8 +209,10 @@ class AirflowAdapter(ABC):
         url = f"{self.airflow_url}{self.api_base_path}/{endpoint}"
 
         with httpx.Client(timeout=30.0, verify=self._verify) as client:
-            # httpx accepts auth=None, but ty doesn't recognize it in the union type
-            response = client.delete(url, headers=headers, auth=auth)  # type: ignore[arg-type]
+            if auth:
+                response = client.delete(url, headers=headers, auth=auth)
+            else:
+                response = client.delete(url, headers=headers)
 
             if response.status_code == 404:
                 raise NotFoundError(endpoint)
