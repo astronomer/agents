@@ -22,7 +22,7 @@ class ReadOnlyError(Exception):
 
 def _assert_writable(operation: str) -> None:
     """Raise ReadOnlyError if AF_READ_ONLY is set to a truthy value."""
-    if os.environ.get(READ_ONLY_ENV_VAR, "").strip().lower() in ("1", "true", "yes"):
+    if os.environ.get(READ_ONLY_ENV_VAR, "").strip().lower() == "true":
         raise ReadOnlyError(operation)
 
 
