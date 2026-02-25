@@ -64,8 +64,7 @@ class ConfigManager:
 
     def _create_default_config(self) -> AirflowCliConfig:
         """Create default config with localhost:8080 instance."""
-        # ty doesn't recognize Pydantic Field defaults: https://github.com/astral-sh/ty/issues/2130
-        config = AirflowCliConfig()  # type: ignore[call-arg]
+        config = AirflowCliConfig.model_validate({})
         config.add_instance("localhost:8080", "http://localhost:8080", source="local")
         config.use_instance("localhost:8080")
         return config
@@ -90,8 +89,7 @@ class ConfigManager:
                     data = yaml.safe_load(f)
 
                 if data is None:
-                    # ty doesn't recognize Pydantic Field defaults: https://github.com/astral-sh/ty/issues/2130
-                    return AirflowCliConfig()  # type: ignore[call-arg]
+                    return AirflowCliConfig.model_validate({})
 
                 return AirflowCliConfig.model_validate(data)
             except yaml.YAMLError as e:
