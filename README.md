@@ -199,6 +199,21 @@ The `data` plugin bundles an MCP server and skills into a single installable pac
 | [cosmos-dbt-core](./skills/cosmos-dbt-core/) | Run dbt Core projects as Airflow DAGs using [Astronomer Cosmos](https://github.com/astronomer/astronomer-cosmos) |
 | [cosmos-dbt-fusion](./skills/cosmos-dbt-fusion/) | Run dbt Fusion projects with Cosmos (Snowflake/Databricks only) |
 
+**dbt skills by [dbt Labs](https://github.com/dbt-labs/dbt-agent-skills)** — analytics engineering, semantic layer, and dbt platform operations:
+
+| Skill | Description |
+|-------|-------------|
+| [using-dbt-for-analytics-engineering](./skills/using-dbt-for-analytics-engineering/) | Build and modify dbt models, write SQL transformations, create tests, and validate results |
+| [running-dbt-commands](./skills/running-dbt-commands/) | Format and execute dbt CLI commands with the correct executable and parameters |
+| [building-dbt-semantic-layer](./skills/building-dbt-semantic-layer/) | Create semantic models, metrics, dimensions, entities, and measures with MetricFlow |
+| [adding-dbt-unit-test](./skills/adding-dbt-unit-test/) | Create unit test YAML definitions that mock inputs and validate expected outputs |
+| [answering-natural-language-questions-with-dbt](./skills/answering-natural-language-questions-with-dbt/) | Query the data warehouse using dbt's Semantic Layer to answer business questions |
+| [troubleshooting-dbt-job-errors](./skills/troubleshooting-dbt-job-errors/) | Diagnose dbt Cloud job failures by analyzing run logs and the Admin API |
+| [configuring-dbt-mcp-server](./skills/configuring-dbt-mcp-server/) | Set up and troubleshoot the dbt MCP server for AI tools |
+| [fetching-dbt-docs](./skills/fetching-dbt-docs/) | Retrieve dbt documentation pages in LLM-friendly markdown format |
+| [migrating-dbt-core-to-fusion](./skills/migrating-dbt-core-to-fusion/) | Migrate a dbt project from dbt Core to the Fusion engine |
+| [migrating-dbt-project-across-platforms](./skills/migrating-dbt-project-across-platforms/) | Migrate a dbt project between data platforms (e.g., Snowflake to Databricks) |
+
 #### Migration
 
 | Skill | Description |
