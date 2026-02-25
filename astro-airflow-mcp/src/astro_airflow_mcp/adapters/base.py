@@ -16,12 +16,12 @@ class ReadOnlyError(Exception):
     def __init__(self, operation: str):
         super().__init__(
             f"Operation '{operation}' is blocked: running in read-only mode "
-            f"(${READ_ONLY_ENV_VAR}=1). Only read operations are allowed."
+            f"(${READ_ONLY_ENV_VAR}=true). Only read operations are allowed."
         )
 
 
 def _assert_writable(operation: str) -> None:
-    """Raise ReadOnlyError if AF_READ_ONLY is set to a truthy value."""
+    """Raise ReadOnlyError if AF_READ_ONLY is set to 'true' (case-insensitive)."""
     if os.environ.get(READ_ONLY_ENV_VAR, "").strip().lower() == "true":
         raise ReadOnlyError(operation)
 

@@ -1,6 +1,6 @@
 """Tests for read-only mode (AF_READ_ONLY environment variable).
 
-Verifies that all write operations are blocked when AF_READ_ONLY=1,
+Verifies that all write operations are blocked when AF_READ_ONLY=true,
 while read operations continue to work normally.
 """
 
@@ -19,19 +19,19 @@ class TestAssertWritable:
         monkeypatch.delenv("AF_READ_ONLY", raising=False)
         _assert_writable("POST dags/test/dagRuns")  # should not raise
 
-    @pytest.mark.parametrize("value", ["1", "true", "True", "TRUE", "yes", "Yes"])
-    def test_blocked_with_truthy_values(self, monkeypatch, value):
+    @pytest.mark.parametrize("value", ["true", "True", "TRUE", " true ", "TRUE "])
+    def test_blocked_with_true_values(self, monkeypatch, value):
         monkeypatch.setenv("AF_READ_ONLY", value)
         with pytest.raises(ReadOnlyError, match="read-only mode"):
             _assert_writable("POST dags/test/dagRuns")
 
-    @pytest.mark.parametrize("value", ["0", "false", "no", "", "off"])
-    def test_allowed_with_falsy_values(self, monkeypatch, value):
+    @pytest.mark.parametrize("value", ["0", "1", "false", "no", "yes", "", "off"])
+    def test_allowed_with_non_true_values(self, monkeypatch, value):
         monkeypatch.setenv("AF_READ_ONLY", value)
         _assert_writable("POST dags/test/dagRuns")  # should not raise
 
     def test_error_message_includes_operation_and_env_var(self, monkeypatch):
-        monkeypatch.setenv("AF_READ_ONLY", "1")
+        monkeypatch.setenv("AF_READ_ONLY", "true")
         with pytest.raises(ReadOnlyError, match="PATCH dags/my_dag") as exc_info:
             _assert_writable("PATCH dags/my_dag")
         assert "AF_READ_ONLY" in str(exc_info.value)
@@ -52,7 +52,7 @@ class TestEndToEnd:
     def test_pause_dag_blocked(self, monkeypatch, mocker):
         from astro_airflow_mcp.tools.dag import _pause_dag_impl
 
-        monkeypatch.setenv("AF_READ_ONLY", "1")
+        monkeypatch.setenv("AF_READ_ONLY", "true")
         mocker.patch(
             "astro_airflow_mcp.tools.dag._get_adapter", return_value=self._real_adapter(mocker)
         )
@@ -64,7 +64,7 @@ class TestEndToEnd:
     def test_unpause_dag_blocked(self, monkeypatch, mocker):
         from astro_airflow_mcp.tools.dag import _unpause_dag_impl
 
-        monkeypatch.setenv("AF_READ_ONLY", "1")
+        monkeypatch.setenv("AF_READ_ONLY", "true")
         mocker.patch(
             "astro_airflow_mcp.tools.dag._get_adapter", return_value=self._real_adapter(mocker)
         )
@@ -75,7 +75,7 @@ class TestEndToEnd:
     def test_trigger_dag_blocked(self, monkeypatch, mocker):
         from astro_airflow_mcp.tools.dag_run import _trigger_dag_impl
 
-        monkeypatch.setenv("AF_READ_ONLY", "1")
+        monkeypatch.setenv("AF_READ_ONLY", "true")
         mocker.patch(
             "astro_airflow_mcp.tools.dag_run._get_adapter", return_value=self._real_adapter(mocker)
         )
@@ -89,7 +89,7 @@ class TestEndToEnd:
     def test_clear_task_instances_blocked(self, monkeypatch, mocker):
         from astro_airflow_mcp.tools.task import _clear_task_instances_impl
 
-        monkeypatch.setenv("AF_READ_ONLY", "1")
+        monkeypatch.setenv("AF_READ_ONLY", "true")
         mocker.patch(
             "astro_airflow_mcp.tools.task._get_adapter", return_value=self._real_adapter(mocker)
         )
@@ -101,7 +101,7 @@ class TestEndToEnd:
 
     def test_raw_request_non_get_blocked(self, monkeypatch, mocker):
         """Covers `af api -X POST/PUT/DELETE` path."""
-        monkeypatch.setenv("AF_READ_ONLY", "1")
+        monkeypatch.setenv("AF_READ_ONLY", "true")
         adapter = self._real_adapter(mocker)
 
         for method in ("POST", "PUT", "PATCH", "DELETE"):
@@ -109,10 +109,10 @@ class TestEndToEnd:
                 adapter.raw_request(method, "variables")
 
     def test_read_operations_still_work(self, monkeypatch, mocker):
-        """list_dags (GET) works even with AF_READ_ONLY=1."""
+        """list_dags (GET) works even with AF_READ_ONLY=true."""
         from astro_airflow_mcp.tools.dag import _list_dags_impl
 
-        monkeypatch.setenv("AF_READ_ONLY", "1")
+        monkeypatch.setenv("AF_READ_ONLY", "true")
         adapter = self._real_adapter(mocker)
         mocker.patch("astro_airflow_mcp.tools.dag._get_adapter", return_value=adapter)
 
