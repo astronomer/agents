@@ -1,10 +1,29 @@
 """Base adapter interface for Airflow API clients."""
 
+import os
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import Any
 
 import httpx
+
+from astro_airflow_mcp.constants import READ_ONLY_ENV_VAR
+
+
+class ReadOnlyError(Exception):
+    """Raised when a write operation is attempted in read-only mode."""
+
+    def __init__(self, operation: str):
+        super().__init__(
+            f"Operation '{operation}' is blocked: running in read-only mode "
+            f"(${READ_ONLY_ENV_VAR}=true). Only read operations are allowed."
+        )
+
+
+def _assert_writable(operation: str) -> None:
+    """Raise ReadOnlyError if AF_READ_ONLY is set to 'true' (case-insensitive)."""
+    if os.environ.get(READ_ONLY_ENV_VAR, "").strip().lower() == "true":
+        raise ReadOnlyError(operation)
 
 
 class NotFoundError(Exception):
@@ -134,8 +153,10 @@ class AirflowAdapter(ABC):
 
         Raises:
             NotFoundError: If endpoint returns 404
+            ReadOnlyError: If AF_READ_ONLY is set
             Exception: For other HTTP errors
         """
+        _assert_writable(f"POST {endpoint}")
         headers, auth = self._setup_auth()
         headers["Accept"] = "application/json"
         headers["Content-Type"] = "application/json"
@@ -169,8 +190,10 @@ class AirflowAdapter(ABC):
 
         Raises:
             NotFoundError: If endpoint returns 404
+            ReadOnlyError: If AF_READ_ONLY is set
             Exception: For other HTTP errors
         """
+        _assert_writable(f"PATCH {endpoint}")
         headers, auth = self._setup_auth()
         headers["Accept"] = "application/json"
         headers["Content-Type"] = "application/json"
@@ -202,8 +225,10 @@ class AirflowAdapter(ABC):
 
         Raises:
             NotFoundError: If endpoint returns 404
+            ReadOnlyError: If AF_READ_ONLY is set
             Exception: For other HTTP errors
         """
+        _assert_writable(f"DELETE {endpoint}")
         headers, auth = self._setup_auth()
         headers["Accept"] = "application/json"
         url = f"{self.airflow_url}{self.api_base_path}/{endpoint}"
@@ -260,6 +285,9 @@ class AirflowAdapter(ABC):
             # POST with JSON body
             adapter.raw_request("POST", "variables", json_data={"key": "x", "value": "y"})
         """
+        if method.upper() != "GET":
+            _assert_writable(f"{method.upper()} {endpoint}")
+
         auth_headers, auth = self._setup_auth()
         all_headers = {**auth_headers, **(headers or {})}
 

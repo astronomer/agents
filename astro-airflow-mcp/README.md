@@ -150,6 +150,7 @@ By default, the server connects to `http://localhost:8080` (Airflow default; als
 | `AIRFLOW_AUTH_TOKEN` | Bearer token (alternative to username/password) |
 | `AIRFLOW_VERIFY_SSL` | Set to `false` to disable SSL certificate verification |
 | `AIRFLOW_CA_CERT` | Path to custom CA certificate bundle |
+| `AF_READ_ONLY` | Set to `true` to block all write operations |
 
 Example with auth (Claude Code):
 
