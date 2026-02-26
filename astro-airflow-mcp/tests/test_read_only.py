@@ -5,6 +5,7 @@ while read operations continue to work normally.
 """
 
 import json
+from contextlib import nullcontext as does_not_raise
 from unittest.mock import MagicMock
 
 import pytest
@@ -17,7 +18,8 @@ class TestAssertWritable:
 
     def test_allowed_when_env_not_set(self, monkeypatch):
         monkeypatch.delenv("AF_READ_ONLY", raising=False)
-        _assert_writable("POST dags/test/dagRuns")  # should not raise
+        with does_not_raise():
+            _assert_writable("POST dags/test/dagRuns")
 
     @pytest.mark.parametrize("value", ["true", "True", "TRUE", " true ", "TRUE "])
     def test_blocked_with_true_values(self, monkeypatch, value):
@@ -28,7 +30,8 @@ class TestAssertWritable:
     @pytest.mark.parametrize("value", ["0", "1", "false", "no", "yes", "", "off"])
     def test_allowed_with_non_true_values(self, monkeypatch, value):
         monkeypatch.setenv("AF_READ_ONLY", value)
-        _assert_writable("POST dags/test/dagRuns")  # should not raise
+        with does_not_raise():
+            _assert_writable("POST dags/test/dagRuns")
 
     def test_error_message_includes_operation_and_env_var(self, monkeypatch):
         monkeypatch.setenv("AF_READ_ONLY", "true")
