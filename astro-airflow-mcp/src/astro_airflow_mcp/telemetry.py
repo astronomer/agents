@@ -81,8 +81,13 @@ def _detect_invocation_context() -> tuple[str, str | None]:
         "CLAUDECODE": "claude-code",
         "CLAUDE_CODE_ENTRYPOINT": "claude-code",
         "CURSOR_TRACE_ID": "cursor",
+        "CURSOR_AGENT": "cursor",
         "AIDER_MODEL": "aider",
         "CONTINUE_GLOBAL_DIR": "continue",
+        "CORTEX_SESSION_ID": "snowflake-cortex",
+        "GEMINI_CLI": "gemini-cli",
+        "OPENCODE": "opencode",
+        "CODEX_API_KEY": "codex",
     }
     for var, agent_name in agent_env_vars.items():
         if os.environ.get(var):
@@ -93,7 +98,15 @@ def _detect_invocation_context() -> tuple[str, str | None]:
         "GITHUB_ACTIONS": "github-actions",
         "GITLAB_CI": "gitlab-ci",
         "JENKINS_URL": "jenkins",
+        "HUDSON_URL": "jenkins",
         "CIRCLECI": "circleci",
+        "TF_BUILD": "azure-devops",
+        "BITBUCKET_BUILD_NUMBER": "bitbucket-pipelines",
+        "CODEBUILD_BUILD_ID": "aws-codebuild",
+        "TEAMCITY_VERSION": "teamcity",
+        "BUILDKITE": "buildkite",
+        "CF_BUILD_ID": "codefresh",
+        "TRAVIS": "travis-ci",
         "CI": "ci-unknown",  # Generic CI flag, check last
     }
     for var, ci_name in ci_env_vars.items():
@@ -158,8 +171,10 @@ def _send(api_url: str, body: dict, *, debug: bool = False) -> None:
             stderr=None if debug else subprocess.DEVNULL,
             start_new_session=not debug,
         )
-        proc.stdin.write(payload.encode())
-        proc.stdin.close()
+        stdin = proc.stdin  # Always set when stdin=subprocess.PIPE
+        if stdin is not None:
+            stdin.write(payload.encode())
+            stdin.close()
         if debug:
             proc.wait()
 

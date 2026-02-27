@@ -39,7 +39,7 @@ fallback-version = "0.0.0+dev"
 [tool.hatch.version.raw-options]
 root = ".."
 tag_regex = "^astro-airflow-mcp-(?P<version>[vV]?\\d+(?:\\.\\d+)*(?:[._-]?\\w+)*)$"
-git_describe_command = ["git", "describe", "--tags", "--match", "astro-airflow-mcp-*"]
+git_describe_command = ["git", "describe", "--tags", "--long", "--match", "astro-airflow-mcp-*"]
 
 [tool.hatchling.build.targets.wheel]
 packages = ["src/astro_airflow_mcp"]
@@ -112,3 +112,4 @@ invalid-argument-type = "warn"      # Allow None in optional parameters
 unresolved-attribute = "warn"       # Allow accessing attributes on Optional types
 missing-argument = "warn"           # Allow missing arguments with defaults
 invalid-method-override = "warn"    # Allow method override incompatibilities
+invalid-assignment = "warn"         # Allow fallback base class pattern (plugin.py)
