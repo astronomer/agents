@@ -93,6 +93,7 @@ class TestDetectInvocationContext:
             "CURSOR_TRACE_ID",
             "AIDER_MODEL",
             "CONTINUE_GLOBAL_DIR",
+            "CORTEX_SESSION_ID",
             "GITHUB_ACTIONS",
             "GITLAB_CI",
             "JENKINS_URL",
@@ -110,6 +111,11 @@ class TestDetectInvocationContext:
         """Test detects Cursor agent."""
         monkeypatch.setenv("CURSOR_TRACE_ID", "abc")
         assert telemetry._detect_invocation_context() == ("agent", "cursor")
+
+    def test_detects_snowflake_cortex(self, monkeypatch):
+        """Test detects Snowflake Cortex agent."""
+        monkeypatch.setenv("CORTEX_SESSION_ID", "session-123")
+        assert telemetry._detect_invocation_context() == ("agent", "snowflake-cortex")
 
     def test_detects_github_actions(self, monkeypatch):
         """Test detects GitHub Actions CI."""

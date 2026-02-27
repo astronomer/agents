@@ -83,6 +83,7 @@ def _detect_invocation_context() -> tuple[str, str | None]:
         "CURSOR_TRACE_ID": "cursor",
         "AIDER_MODEL": "aider",
         "CONTINUE_GLOBAL_DIR": "continue",
+        "CORTEX_SESSION_ID": "snowflake-cortex",
     }
     for var, agent_name in agent_env_vars.items():
         if os.environ.get(var):
