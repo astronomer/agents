@@ -91,13 +91,25 @@ class TestDetectInvocationContext:
             "CLAUDECODE",
             "CLAUDE_CODE_ENTRYPOINT",
             "CURSOR_TRACE_ID",
+            "CURSOR_AGENT",
             "AIDER_MODEL",
             "CONTINUE_GLOBAL_DIR",
             "CORTEX_SESSION_ID",
+            "GEMINI_CLI",
+            "OPENCODE",
+            "CODEX_API_KEY",
             "GITHUB_ACTIONS",
             "GITLAB_CI",
             "JENKINS_URL",
+            "HUDSON_URL",
             "CIRCLECI",
+            "TF_BUILD",
+            "BITBUCKET_BUILD_NUMBER",
+            "CODEBUILD_BUILD_ID",
+            "TEAMCITY_VERSION",
+            "BUILDKITE",
+            "CF_BUILD_ID",
+            "TRAVIS",
             "CI",
         ):
             monkeypatch.delenv(var, raising=False)
@@ -117,10 +129,40 @@ class TestDetectInvocationContext:
         monkeypatch.setenv("CORTEX_SESSION_ID", "session-123")
         assert telemetry._detect_invocation_context() == ("agent", "snowflake-cortex")
 
+    def test_detects_gemini_cli(self, monkeypatch):
+        """Test detects Gemini CLI agent."""
+        monkeypatch.setenv("GEMINI_CLI", "1")
+        assert telemetry._detect_invocation_context() == ("agent", "gemini-cli")
+
+    def test_detects_opencode(self, monkeypatch):
+        """Test detects OpenCode agent."""
+        monkeypatch.setenv("OPENCODE", "1")
+        assert telemetry._detect_invocation_context() == ("agent", "opencode")
+
+    def test_detects_codex(self, monkeypatch):
+        """Test detects Codex agent."""
+        monkeypatch.setenv("CODEX_API_KEY", "sk-test")
+        assert telemetry._detect_invocation_context() == ("agent", "codex")
+
     def test_detects_github_actions(self, monkeypatch):
         """Test detects GitHub Actions CI."""
         monkeypatch.setenv("GITHUB_ACTIONS", "true")
         assert telemetry._detect_invocation_context() == ("ci", "github-actions")
+
+    def test_detects_azure_devops(self, monkeypatch):
+        """Test detects Azure DevOps CI."""
+        monkeypatch.setenv("TF_BUILD", "True")
+        assert telemetry._detect_invocation_context() == ("ci", "azure-devops")
+
+    def test_detects_buildkite(self, monkeypatch):
+        """Test detects Buildkite CI."""
+        monkeypatch.setenv("BUILDKITE", "true")
+        assert telemetry._detect_invocation_context() == ("ci", "buildkite")
+
+    def test_detects_travis_ci(self, monkeypatch):
+        """Test detects Travis CI."""
+        monkeypatch.setenv("TRAVIS", "true")
+        assert telemetry._detect_invocation_context() == ("ci", "travis-ci")
 
     def test_interactive_tty(self):
         """Test detects interactive terminal."""
