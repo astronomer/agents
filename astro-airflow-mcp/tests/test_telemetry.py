@@ -178,7 +178,8 @@ class TestDetectInvocationContext:
         """Test detects both agent and CI system simultaneously."""
         monkeypatch.setenv("CLAUDECODE", "1")
         monkeypatch.setenv("GITHUB_ACTIONS", "true")
-        context, agent, ci_system = telemetry._detect_invocation_context()
+        with patch.object(sys.stdin, "isatty", return_value=False):
+            context, agent, ci_system = telemetry._detect_invocation_context()
         assert agent == "claude-code"
         assert ci_system == "github-actions"
         assert context == "non-interactive"
