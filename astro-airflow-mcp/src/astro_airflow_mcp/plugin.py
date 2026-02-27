@@ -17,7 +17,7 @@ try:
     AIRFLOW_AVAILABLE = True
 except ImportError:
     AIRFLOW_AVAILABLE = False
-    AirflowPlugin = object  # type: ignore
+    AirflowPlugin = object
     logger.warning("Airflow not available, plugin disabled")
 
 

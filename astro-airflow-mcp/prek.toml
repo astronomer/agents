@@ -39,7 +39,7 @@ repo = "local"
 [[repos.hooks]]
 id = "ty"
 name = "ty check"
-entry = "uv run ty check"
+entry = "uv run --frozen ty check"
 language = "system"
 types = ["python"]
 pass_filenames = false

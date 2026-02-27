@@ -159,6 +159,7 @@ def _send(api_url: str, body: dict, *, debug: bool = False) -> None:
             stderr=None if debug else subprocess.DEVNULL,
             start_new_session=not debug,
         )
+        assert proc.stdin is not None
         proc.stdin.write(payload.encode())
         proc.stdin.close()
         if debug:
