@@ -5,6 +5,9 @@ import time
 
 import pytest
 
+# Disable telemetry during integration tests to avoid spurious events
+os.environ["AF_TELEMETRY_DISABLED"] = "1"
+
 from astro_airflow_mcp.adapters import create_adapter
 
 # Skip integration tests if AIRFLOW_URL is not set

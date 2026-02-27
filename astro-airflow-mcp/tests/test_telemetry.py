@@ -206,6 +206,16 @@ class TestGetCommandFromArgv:
         with patch.object(sys, "argv", ["af", "--config=/path", "dags", "list"]):
             assert telemetry._get_command_from_argv() == "dags list"
 
+    def test_filters_file_paths(self):
+        """Test filters out file path arguments."""
+        with patch.object(sys, "argv", ["af", "tests/integration/"]):
+            assert telemetry._get_command_from_argv() == "root"
+
+    def test_filters_dotted_args(self):
+        """Test filters out arguments containing dots (filenames, IDs)."""
+        with patch.object(sys, "argv", ["af", "dags", "trigger", "my_dag.v2"]):
+            assert telemetry._get_command_from_argv() == "dags trigger"
+
 
 class TestSend:
     """Tests for _send subprocess dispatch."""

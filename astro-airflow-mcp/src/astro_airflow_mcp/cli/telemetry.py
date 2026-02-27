@@ -26,7 +26,9 @@ def _get_command_from_argv() -> str:
     """Extract the command path from sys.argv.
 
     For 'af dags list --limit 10', returns 'dags list'.
-    Filters out options (args starting with -) and their values.
+    Filters out options (args starting with -), their values, and
+    positional arguments that look like values (file paths, IDs, etc.)
+    rather than subcommands.
     """
     args = sys.argv[1:]  # Skip the program name
     command_parts: list[str] = []
@@ -42,6 +44,11 @@ def _get_command_from_argv() -> str:
             # Options with = are self-contained (--config=FILE)
             if "=" not in arg and arg in ("--config", "-c"):
                 skip_next = True
+            continue
+
+        # Skip positional values that aren't subcommands:
+        # file paths, UUIDs, or anything with path separators/dots
+        if "/" in arg or "\\" in arg or "." in arg:
             continue
 
         # This is a command/subcommand
