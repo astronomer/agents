@@ -68,14 +68,18 @@ def _is_telemetry_disabled() -> bool:
     return False
 
 
-def _detect_invocation_context() -> tuple[str, str | None]:
+def _detect_invocation_context() -> tuple[str, str | None, str | None]:
     """Detect if running interactively or via an agent/automation.
 
     Returns:
-        Tuple of (context, agent_name):
+        Tuple of (context, agent_name, ci_system):
         - context: 'agent', 'ci', 'interactive', or 'non-interactive'
-        - agent_name: specific agent/CI name if detected, None otherwise
+        - agent_name: specific AI agent name if detected, None otherwise
+        - ci_system: specific CI/CD system name if detected, None otherwise
     """
+    agent_name: str | None = None
+    ci_system: str | None = None
+
     # Check for known AI agent environment variables
     agent_env_vars = {
         "CLAUDECODE": "claude-code",
@@ -89,9 +93,10 @@ def _detect_invocation_context() -> tuple[str, str | None]:
         "OPENCODE": "opencode",
         "CODEX_API_KEY": "codex",
     }
-    for var, agent_name in agent_env_vars.items():
+    for var, name in agent_env_vars.items():
         if os.environ.get(var):
-            return ("agent", agent_name)
+            agent_name = name
+            break
 
     # Check for CI/CD environments
     ci_env_vars = {
@@ -109,15 +114,22 @@ def _detect_invocation_context() -> tuple[str, str | None]:
         "TRAVIS": "travis-ci",
         "CI": "ci-unknown",  # Generic CI flag, check last
     }
-    for var, ci_name in ci_env_vars.items():
+    for var, name in ci_env_vars.items():
         if os.environ.get(var):
-            return ("ci", ci_name)
+            ci_system = name
+            break
 
-    # Check if running in an interactive terminal
-    if sys.stdin.isatty() and sys.stdout.isatty():
-        return ("interactive", None)
+    # Determine primary context
+    if agent_name:
+        context = "agent"
+    elif ci_system:
+        context = "ci"
+    elif sys.stdin.isatty() and sys.stdout.isatty():
+        context = "interactive"
+    else:
+        context = "non-interactive"
 
-    return ("non-interactive", None)
+    return (context, agent_name, ci_system)
 
 
 _SEND_SCRIPT = """\
@@ -193,7 +205,7 @@ def track_tool_call(tool_name: str, *, success: bool = True) -> None:
         return
 
     anonymous_id = _get_anonymous_id()
-    context, agent = _detect_invocation_context()
+    context, agent, ci_system = _detect_invocation_context()
 
     from astro_airflow_mcp import __version__
 
@@ -209,6 +221,8 @@ def track_tool_call(tool_name: str, *, success: bool = True) -> None:
     }
     if agent:
         properties["agent"] = agent
+    if ci_system:
+        properties["ci_system"] = ci_system
 
     api_url = os.environ.get("AF_TELEMETRY_API_URL", TELEMETRY_API_URL)
     debug = os.environ.get(TELEMETRY_DEBUG_ENV, "").lower() in ("1", "true", "yes")

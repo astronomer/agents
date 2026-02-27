@@ -77,7 +77,7 @@ def track_command() -> None:
     # Gather data in main process
     anonymous_id = _get_anonymous_id()
     command_path = _get_command_from_argv()
-    context, agent = _detect_invocation_context()
+    context, agent, ci_system = _detect_invocation_context()
 
     from astro_airflow_mcp import __version__
 
@@ -92,6 +92,8 @@ def track_command() -> None:
     }
     if agent:
         properties["agent"] = agent
+    if ci_system:
+        properties["ci_system"] = ci_system
 
     api_url = os.environ.get("AF_TELEMETRY_API_URL", TELEMETRY_API_URL)
     debug = os.environ.get(TELEMETRY_DEBUG_ENV, "").lower() in ("1", "true", "yes")
