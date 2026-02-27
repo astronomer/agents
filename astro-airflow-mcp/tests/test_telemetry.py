@@ -117,58 +117,71 @@ class TestDetectInvocationContext:
     def test_detects_claude_code(self, monkeypatch):
         """Test detects Claude Code agent."""
         monkeypatch.setenv("CLAUDECODE", "1")
-        assert telemetry._detect_invocation_context() == ("agent", "claude-code", None)
+        _, agent, _ = telemetry._detect_invocation_context()
+        assert agent == "claude-code"
 
     def test_detects_cursor(self, monkeypatch):
         """Test detects Cursor agent."""
         monkeypatch.setenv("CURSOR_TRACE_ID", "abc")
-        assert telemetry._detect_invocation_context() == ("agent", "cursor", None)
+        _, agent, _ = telemetry._detect_invocation_context()
+        assert agent == "cursor"
 
     def test_detects_snowflake_cortex(self, monkeypatch):
         """Test detects Snowflake Cortex agent."""
         monkeypatch.setenv("CORTEX_SESSION_ID", "session-123")
-        assert telemetry._detect_invocation_context() == ("agent", "snowflake-cortex", None)
+        _, agent, _ = telemetry._detect_invocation_context()
+        assert agent == "snowflake-cortex"
 
     def test_detects_gemini_cli(self, monkeypatch):
         """Test detects Gemini CLI agent."""
         monkeypatch.setenv("GEMINI_CLI", "1")
-        assert telemetry._detect_invocation_context() == ("agent", "gemini-cli", None)
+        _, agent, _ = telemetry._detect_invocation_context()
+        assert agent == "gemini-cli"
 
     def test_detects_opencode(self, monkeypatch):
         """Test detects OpenCode agent."""
         monkeypatch.setenv("OPENCODE", "1")
-        assert telemetry._detect_invocation_context() == ("agent", "opencode", None)
+        _, agent, _ = telemetry._detect_invocation_context()
+        assert agent == "opencode"
 
     def test_detects_codex(self, monkeypatch):
         """Test detects Codex agent."""
         monkeypatch.setenv("CODEX_API_KEY", "sk-test")
-        assert telemetry._detect_invocation_context() == ("agent", "codex", None)
+        _, agent, _ = telemetry._detect_invocation_context()
+        assert agent == "codex"
 
     def test_detects_github_actions(self, monkeypatch):
         """Test detects GitHub Actions CI."""
         monkeypatch.setenv("GITHUB_ACTIONS", "true")
-        assert telemetry._detect_invocation_context() == ("ci", None, "github-actions")
+        _, _, ci_system = telemetry._detect_invocation_context()
+        assert ci_system == "github-actions"
 
     def test_detects_azure_devops(self, monkeypatch):
         """Test detects Azure DevOps CI."""
         monkeypatch.setenv("TF_BUILD", "True")
-        assert telemetry._detect_invocation_context() == ("ci", None, "azure-devops")
+        _, _, ci_system = telemetry._detect_invocation_context()
+        assert ci_system == "azure-devops"
 
     def test_detects_buildkite(self, monkeypatch):
         """Test detects Buildkite CI."""
         monkeypatch.setenv("BUILDKITE", "true")
-        assert telemetry._detect_invocation_context() == ("ci", None, "buildkite")
+        _, _, ci_system = telemetry._detect_invocation_context()
+        assert ci_system == "buildkite"
 
     def test_detects_travis_ci(self, monkeypatch):
         """Test detects Travis CI."""
         monkeypatch.setenv("TRAVIS", "true")
-        assert telemetry._detect_invocation_context() == ("ci", None, "travis-ci")
+        _, _, ci_system = telemetry._detect_invocation_context()
+        assert ci_system == "travis-ci"
 
     def test_agent_in_ci(self, monkeypatch):
         """Test detects both agent and CI system simultaneously."""
         monkeypatch.setenv("CLAUDECODE", "1")
         monkeypatch.setenv("GITHUB_ACTIONS", "true")
-        assert telemetry._detect_invocation_context() == ("agent", "claude-code", "github-actions")
+        context, agent, ci_system = telemetry._detect_invocation_context()
+        assert agent == "claude-code"
+        assert ci_system == "github-actions"
+        assert context == "non-interactive"
 
     def test_interactive_tty(self):
         """Test detects interactive terminal."""
@@ -176,12 +189,16 @@ class TestDetectInvocationContext:
             patch.object(sys.stdin, "isatty", return_value=True),
             patch.object(sys.stdout, "isatty", return_value=True),
         ):
-            assert telemetry._detect_invocation_context() == ("interactive", None, None)
+            context, agent, ci_system = telemetry._detect_invocation_context()
+            assert context == "interactive"
+            assert agent is None
+            assert ci_system is None
 
     def test_non_interactive(self):
         """Test detects non-interactive context."""
         with patch.object(sys.stdin, "isatty", return_value=False):
-            assert telemetry._detect_invocation_context() == ("non-interactive", None, None)
+            context, _, _ = telemetry._detect_invocation_context()
+            assert context == "non-interactive"
 
 
 class TestGetCommandFromArgv:
@@ -414,7 +431,7 @@ class TestTrackCommand:
         )
         mocker.patch(
             "astro_airflow_mcp.cli.telemetry._detect_invocation_context",
-            return_value=("agent", "claude-code", "github-actions"),
+            return_value=("non-interactive", "claude-code", "github-actions"),
         )
 
         telemetry.track_command()
@@ -427,7 +444,7 @@ class TestTrackCommand:
         assert body["properties"]["command"] == "dags list"
         assert body["properties"]["agent"] == "claude-code"
         assert body["properties"]["ci_system"] == "github-actions"
-        assert body["properties"]["context"] == "agent"
+        assert body["properties"]["context"] == "non-interactive"
 
     def test_api_url_override(self, mocker, monkeypatch):
         """Test API URL can be overridden via env var."""

@@ -69,11 +69,11 @@ def _is_telemetry_disabled() -> bool:
 
 
 def _detect_invocation_context() -> tuple[str, str | None, str | None]:
-    """Detect if running interactively or via an agent/automation.
+    """Detect the execution environment: terminal type, AI agent, and CI system.
 
     Returns:
         Tuple of (context, agent_name, ci_system):
-        - context: 'agent', 'ci', 'interactive', or 'non-interactive'
+        - context: 'interactive' or 'non-interactive' (terminal type)
         - agent_name: specific AI agent name if detected, None otherwise
         - ci_system: specific CI/CD system name if detected, None otherwise
     """
@@ -119,15 +119,8 @@ def _detect_invocation_context() -> tuple[str, str | None, str | None]:
             ci_system = name
             break
 
-    # Determine primary context
-    if agent_name:
-        context = "agent"
-    elif ci_system:
-        context = "ci"
-    elif sys.stdin.isatty() and sys.stdout.isatty():
-        context = "interactive"
-    else:
-        context = "non-interactive"
+    # Determine terminal type
+    context = "interactive" if sys.stdin.isatty() and sys.stdout.isatty() else "non-interactive"
 
     return (context, agent_name, ci_system)
 

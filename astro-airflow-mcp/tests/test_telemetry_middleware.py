@@ -39,7 +39,7 @@ class TestTrackToolCall:
         mocker.patch("astro_airflow_mcp.telemetry._get_anonymous_id", return_value="test-id")
         mocker.patch(
             "astro_airflow_mcp.telemetry._detect_invocation_context",
-            return_value=("agent", "claude-code"),
+            return_value=("non-interactive", "claude-code", None),
         )
 
         telemetry.track_tool_call("list_dags", success=True)
@@ -52,7 +52,7 @@ class TestTrackToolCall:
         assert body["anonymousId"] == "test-id"
         assert body["properties"]["tool"] == "list_dags"
         assert body["properties"]["success"] is True
-        assert body["properties"]["context"] == "agent"
+        assert body["properties"]["context"] == "non-interactive"
         assert body["properties"]["agent"] == "claude-code"
 
     def test_tracks_failure(self, mocker, monkeypatch):
@@ -65,7 +65,7 @@ class TestTrackToolCall:
         mocker.patch("astro_airflow_mcp.telemetry._get_anonymous_id", return_value="test-id")
         mocker.patch(
             "astro_airflow_mcp.telemetry._detect_invocation_context",
-            return_value=("non-interactive", None),
+            return_value=("non-interactive", None, None),
         )
 
         telemetry.track_tool_call("get_dag_details", success=False)
@@ -95,7 +95,7 @@ class TestTrackToolCall:
         mocker.patch("astro_airflow_mcp.telemetry._get_anonymous_id", return_value="test-id")
         mocker.patch(
             "astro_airflow_mcp.telemetry._detect_invocation_context",
-            return_value=("interactive", None),
+            return_value=("interactive", None, None),
         )
 
         telemetry.track_tool_call("list_dags")
@@ -113,7 +113,7 @@ class TestTrackToolCall:
         mocker.patch("astro_airflow_mcp.telemetry._get_anonymous_id", return_value="test-id")
         mocker.patch(
             "astro_airflow_mcp.telemetry._detect_invocation_context",
-            return_value=("agent", "claude-code"),
+            return_value=("non-interactive", "claude-code", None),
         )
 
         telemetry.track_tool_call("list_dags")
