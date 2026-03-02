@@ -317,6 +317,7 @@ af registry modules amazon                    # Operators, hooks, sensors
 af registry modules amazon --version 9.22.0   # Pinned version
 af registry parameters ftp                    # Constructor parameters
 af registry connections amazon                # Connection types
+af registry modules amazon --no-cache         # Bypass cache, fetch fresh
 
 # Direct API access (any endpoint)
 af api ls                             # List all available endpoints
@@ -463,6 +464,19 @@ af dags list | jq '.dags[].dag_id'
 
 # List all hooks in the amazon provider
 af registry modules amazon | jq '.modules[] | select(.type == "hook") | .name'
+```
+
+### Registry Caching
+
+Registry responses are cached locally in `~/.af/.registry_cache/` to avoid repeated network calls:
+
+- **Unversioned requests** (e.g. `af registry modules amazon`) — cached for **1 hour**, since they point to the latest version which changes on new releases.
+- **Versioned requests** (e.g. `af registry modules amazon --version 9.22.0`) — cached for **30 days**, since version snapshots are immutable.
+
+Use `--no-cache` to bypass the cache and fetch fresh data. To clear all cached data, delete the cache directory:
+
+```bash
+rm -rf ~/.af/.registry_cache/
 ```
 
 ## Advanced Usage
