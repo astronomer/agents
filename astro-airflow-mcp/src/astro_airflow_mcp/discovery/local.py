@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import socket
-import subprocess
+import subprocess  # nosec B404 - subprocess is needed for Docker CLI
 from pathlib import Path
 from typing import Any
 
@@ -158,7 +158,7 @@ class LocalDiscoveryBackend:
 
         try:
             # Query Docker for containers in this project using JSON format
-            result = subprocess.run(
+            result = subprocess.run(  # nosec B603 B607 - docker cmd is hardcoded, project_dir is validated Path
                 [
                     "docker",
                     "ps",

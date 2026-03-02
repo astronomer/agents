@@ -549,57 +549,69 @@ class TestLocalDiscoveryBackend:
 
         assert result is None
 
-    def test_get_astro_project_port_webserver(self, tmp_path):
-        """Test _get_astro_project_port reads webserver.port (Airflow 2)."""
-        astro_dir = tmp_path / ".astro"
-        astro_dir.mkdir()
-        config_file = astro_dir / "config.yaml"
-        config_file.write_text("webserver:\n  port: 8081\n")
-
+    def test_parse_docker_json_output_extracts_port_from_webserver(self):
+        """Test _parse_docker_json_output extracts port from webserver container."""
         backend = LocalDiscoveryBackend()
-        port = backend._get_astro_project_port(tmp_path)
-
+        output = '{"Names":"myproject-webserver-1","Ports":"0.0.0.0:8081->8080/tcp","State":"running"}\n{"Names":"myproject-scheduler-1","Ports":"","State":"running"}'
+        port = backend._parse_docker_json_output(output)
         assert port == 8081
 
-    def test_get_astro_project_port_api_server(self, tmp_path):
-        """Test _get_astro_project_port reads api-server.port (Airflow 3)."""
-        astro_dir = tmp_path / ".astro"
-        astro_dir.mkdir()
-        config_file = astro_dir / "config.yaml"
-        config_file.write_text("api-server:\n  port: 8082\n")
-
+    def test_parse_docker_json_output_handles_api_server(self):
+        """Test _parse_docker_json_output handles api-server containers (AF 3.x)."""
         backend = LocalDiscoveryBackend()
-        port = backend._get_astro_project_port(tmp_path)
-
+        output = (
+            '{"Names":"myproject-api-server-1","Ports":"0.0.0.0:8082->8081/tcp","State":"running"}'
+        )
+        port = backend._parse_docker_json_output(output)
         assert port == 8082
 
-    def test_get_astro_project_port_prefers_api_server(self, tmp_path):
-        """Test _get_astro_project_port prefers api-server over webserver."""
-        astro_dir = tmp_path / ".astro"
-        astro_dir.mkdir()
-        config_file = astro_dir / "config.yaml"
-        config_file.write_text("api-server:\n  port: 8082\nwebserver:\n  port: 8081\n")
-
+    def test_parse_docker_json_output_returns_none_when_not_found(self):
+        """Test _parse_docker_json_output returns None when no webserver/api-server found."""
         backend = LocalDiscoveryBackend()
-        port = backend._get_astro_project_port(tmp_path)
-
-        assert port == 8082
-
-    def test_get_astro_project_port_no_config(self, tmp_path):
-        """Test _get_astro_project_port returns None when no config."""
-        backend = LocalDiscoveryBackend()
-        port = backend._get_astro_project_port(tmp_path)
-
+        output = '{"Names":"myproject-scheduler-1","Ports":"","State":"running"}'
+        port = backend._parse_docker_json_output(output)
         assert port is None
 
-    def test_get_astro_project_port_no_port_in_config(self, tmp_path):
-        """Test _get_astro_project_port returns None when no port in config."""
-        astro_dir = tmp_path / ".astro"
-        astro_dir.mkdir()
-        config_file = astro_dir / "config.yaml"
-        config_file.write_text("project:\n  name: test\n")
-
+    def test_parse_docker_json_output_handles_empty_output(self):
+        """Test _parse_docker_json_output handles empty output."""
         backend = LocalDiscoveryBackend()
-        port = backend._get_astro_project_port(tmp_path)
+        port = backend._parse_docker_json_output("")
+        assert port is None
 
+    def test_parse_docker_json_output_handles_invalid_json(self):
+        """Test _parse_docker_json_output handles invalid JSON gracefully."""
+        backend = LocalDiscoveryBackend()
+        output = "not valid json"
+        port = backend._parse_docker_json_output(output)
+        assert port is None
+
+    def test_parse_docker_port_mapping_ipv4(self):
+        """Test _parse_docker_port_mapping parses IPv4 format."""
+        backend = LocalDiscoveryBackend()
+        port = backend._parse_docker_port_mapping("0.0.0.0:8081->8080/tcp")
+        assert port == 8081
+
+    def test_parse_docker_port_mapping_ipv6(self):
+        """Test _parse_docker_port_mapping parses IPv6 format."""
+        backend = LocalDiscoveryBackend()
+        port = backend._parse_docker_port_mapping(":::8082->8081/tcp")
+        assert port == 8082
+
+    def test_parse_docker_port_mapping_multiple_bindings(self):
+        """Test _parse_docker_port_mapping handles multiple bindings (IPv4 and IPv6)."""
+        backend = LocalDiscoveryBackend()
+        # Takes first binding (IPv4)
+        port = backend._parse_docker_port_mapping("0.0.0.0:8081->8080/tcp, :::8081->8080/tcp")
+        assert port == 8081
+
+    def test_parse_docker_port_mapping_no_arrow(self):
+        """Test _parse_docker_port_mapping returns None when no port mapping."""
+        backend = LocalDiscoveryBackend()
+        port = backend._parse_docker_port_mapping("5432/tcp")
+        assert port is None
+
+    def test_parse_docker_port_mapping_empty(self):
+        """Test _parse_docker_port_mapping handles empty string."""
+        backend = LocalDiscoveryBackend()
+        port = backend._parse_docker_port_mapping("")
         assert port is None
