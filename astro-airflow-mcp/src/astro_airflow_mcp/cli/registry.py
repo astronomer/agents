@@ -14,7 +14,10 @@ import typer
 
 from astro_airflow_mcp.cli.output import output_error, output_json
 
-app = typer.Typer(help="Query the Airflow Provider Registry", no_args_is_help=True)
+app = typer.Typer(
+    help="Query the Airflow Provider Registry (public, no auth required).",
+    no_args_is_help=True,
+)
 
 DEFAULT_REGISTRY_URL = "https://airflow.apache.org/registry"
 CACHE_TTL_LATEST = 3600  # 1 hour for unversioned ("latest") requests
@@ -137,7 +140,15 @@ def list_providers(
     registry_url: RegistryUrlOption = None,
     no_cache: NoCacheOption = False,
 ) -> None:
-    """List all providers in the Airflow Provider Registry."""
+    """List all providers in the Airflow Provider Registry.
+
+    Returns JSON with id, name, version, lifecycle, and description for each
+    provider. Use the provider id with other registry commands.
+
+    Examples:
+        af registry providers
+        af registry providers | jq '.providers[] | .id'
+    """
     base = _get_registry_url(registry_url)
     url = _build_url(base, None, None, "providers.json")
     data = _fetch(url, no_cache)
@@ -169,7 +180,16 @@ def list_modules(
     registry_url: RegistryUrlOption = None,
     no_cache: NoCacheOption = False,
 ) -> None:
-    """List modules (operators, hooks, sensors, etc.) for a provider."""
+    """List modules (operators, hooks, sensors, transfers) for a provider.
+
+    Each module includes name, type, import_path, short_description,
+    docs_url, and source_url. Use --version to pin to a specific release.
+
+    Examples:
+        af registry modules amazon
+        af registry modules amazon --version 9.22.0
+        af registry modules amazon | jq '.modules[] | select(.type == "hook") | .name'
+    """
     base = _get_registry_url(registry_url)
     url = _build_url(base, provider_id, version, "modules.json")
     data = _fetch(url, no_cache, versioned=version is not None)
@@ -194,7 +214,17 @@ def list_parameters(
     registry_url: RegistryUrlOption = None,
     no_cache: NoCacheOption = False,
 ) -> None:
-    """Show constructor parameters for a provider's classes."""
+    """Show constructor parameters for a provider's classes.
+
+    Returns classes keyed by full import path, each with name, type, MRO,
+    and parameter list (name, type, default). Useful for building operator
+    or hook invocations programmatically.
+
+    Examples:
+        af registry parameters ftp
+        af registry parameters amazon --version 9.22.0
+        af registry parameters ftp | jq '.classes | keys[]'
+    """
     base = _get_registry_url(registry_url)
     url = _build_url(base, provider_id, version, "parameters.json")
     data = _fetch(url, no_cache, versioned=version is not None)
@@ -218,7 +248,15 @@ def list_connections(
     registry_url: RegistryUrlOption = None,
     no_cache: NoCacheOption = False,
 ) -> None:
-    """Show connection types provided by a provider."""
+    """Show connection types provided by a provider.
+
+    Returns connection_type, hook_class, standard_fields, and custom_fields
+    for each connection type. Useful for setting up Airflow connections.
+
+    Examples:
+        af registry connections amazon
+        af registry connections amazon --version 9.22.0
+    """
     base = _get_registry_url(registry_url)
     url = _build_url(base, provider_id, version, "connections.json")
     data = _fetch(url, no_cache, versioned=version is not None)
