@@ -11,6 +11,7 @@ from astro_airflow_mcp.cli import assets as assets_module
 from astro_airflow_mcp.cli import config as config_module
 from astro_airflow_mcp.cli import dags as dags_module
 from astro_airflow_mcp.cli import instances
+from astro_airflow_mcp.cli import registry as registry_module
 from astro_airflow_mcp.cli import runs as runs_module
 from astro_airflow_mcp.cli import tasks as tasks_module
 from astro_airflow_mcp.cli.api import api_command
@@ -188,6 +189,7 @@ app.add_typer(config_module.app, name="config", help="Configuration and system c
 app.add_typer(instances.app, name="instance", help="Instance management commands")
 app.add_typer(instances.app, name="instances", hidden=True)  # Alias for "instance"
 app.add_typer(instances.app, name="inst", hidden=True)  # Short alias for "instance"
+app.add_typer(registry_module.app, name="registry", help="Query the Airflow Provider Registry")
 
 
 def cli_main() -> None:
