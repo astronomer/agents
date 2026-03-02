@@ -17,7 +17,8 @@ from astro_airflow_mcp.cli.output import output_error, output_json
 app = typer.Typer(help="Query the Airflow Provider Registry", no_args_is_help=True)
 
 DEFAULT_REGISTRY_URL = "https://airflow.apache.org/registry"
-CACHE_TTL_SECONDS = 3600  # 1 hour
+CACHE_TTL_LATEST = 3600  # 1 hour for unversioned ("latest") requests
+CACHE_TTL_VERSIONED = 86400 * 30  # 30 days for pinned-version requests (immutable snapshots)
 
 
 def _get_registry_url(registry_url: str | None) -> str:
@@ -35,7 +36,7 @@ def _cache_dir() -> Path:
     return Path.home() / ".af" / ".registry_cache"
 
 
-def _read_cache(url: str) -> dict | None:
+def _read_cache(url: str, ttl: int) -> dict | None:
     """Read cached response for a URL if it exists and hasn't expired."""
     cache_key = hashlib.sha256(url.encode()).hexdigest()
     cache_file = _cache_dir() / f"{cache_key}.json"
@@ -44,7 +45,7 @@ def _read_cache(url: str) -> dict | None:
             return None
         data = json.loads(cache_file.read_text())
         age = time.time() - data.get("_cached_at", 0)
-        if age < 0 or age > CACHE_TTL_SECONDS:
+        if age < 0 or age > ttl:
             return None
         return data.get("_payload")
     except (OSError, json.JSONDecodeError, KeyError):
@@ -65,10 +66,16 @@ def _write_cache(url: str, payload: dict) -> None:
         pass
 
 
-def _fetch(url: str, no_cache: bool) -> dict:
-    """Fetch JSON from the registry, using cache unless bypassed."""
+def _fetch(url: str, no_cache: bool, versioned: bool = False) -> dict:
+    """Fetch JSON from the registry, using cache unless bypassed.
+
+    Versioned requests (pinned to a specific provider version) are immutable
+    snapshots, so they use a 30-day TTL. Unversioned requests ("latest") use
+    a 1-hour TTL since the underlying data changes on new releases.
+    """
+    ttl = CACHE_TTL_VERSIONED if versioned else CACHE_TTL_LATEST
     if not no_cache:
-        cached = _read_cache(url)
+        cached = _read_cache(url, ttl)
         if cached is not None:
             return cached
 
@@ -165,7 +172,7 @@ def list_modules(
     """List modules (operators, hooks, sensors, etc.) for a provider."""
     base = _get_registry_url(registry_url)
     url = _build_url(base, provider_id, version, "modules.json")
-    data = _fetch(url, no_cache)
+    data = _fetch(url, no_cache, versioned=version is not None)
 
     modules = data.get("modules", [])
     result = {
@@ -190,7 +197,7 @@ def list_parameters(
     """Show constructor parameters for a provider's classes."""
     base = _get_registry_url(registry_url)
     url = _build_url(base, provider_id, version, "parameters.json")
-    data = _fetch(url, no_cache)
+    data = _fetch(url, no_cache, versioned=version is not None)
 
     classes = data.get("classes", {})
     result = {
@@ -214,7 +221,7 @@ def list_connections(
     """Show connection types provided by a provider."""
     base = _get_registry_url(registry_url)
     url = _build_url(base, provider_id, version, "connections.json")
-    data = _fetch(url, no_cache)
+    data = _fetch(url, no_cache, versioned=version is not None)
 
     connection_types = data.get("connection_types", [])
     result = {

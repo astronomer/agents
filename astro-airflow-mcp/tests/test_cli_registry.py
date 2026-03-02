@@ -8,7 +8,8 @@ from typer.testing import CliRunner
 
 from astro_airflow_mcp.cli.main import app
 from astro_airflow_mcp.cli.registry import (
-    CACHE_TTL_SECONDS,
+    CACHE_TTL_LATEST,
+    CACHE_TTL_VERSIONED,
     _read_cache,
     _write_cache,
 )
@@ -289,34 +290,58 @@ class TestCaching:
 
         url = "https://example.com/api/providers.json"
         _write_cache(url, PROVIDERS_RESPONSE)
-        result = _read_cache(url)
+        result = _read_cache(url, CACHE_TTL_LATEST)
 
         assert result == PROVIDERS_RESPONSE
 
-    def test_cache_expired(self, tmp_path, mocker):
-        """Test expired cache returns None."""
+    def test_cache_expired_latest(self, tmp_path, mocker):
+        """Test unversioned cache expires after CACHE_TTL_LATEST."""
         mocker.patch("astro_airflow_mcp.cli.registry._cache_dir", return_value=tmp_path)
 
         url = "https://example.com/api/providers.json"
         _write_cache(url, PROVIDERS_RESPONSE)
 
-        # Backdate the cached_at timestamp
+        # Backdate the cached_at timestamp past the latest TTL
         import hashlib
 
         cache_key = hashlib.sha256(url.encode()).hexdigest()
         cache_file = tmp_path / f"{cache_key}.json"
         data = json.loads(cache_file.read_text())
-        data["_cached_at"] = time.time() - CACHE_TTL_SECONDS - 1
+        data["_cached_at"] = time.time() - CACHE_TTL_LATEST - 1
         cache_file.write_text(json.dumps(data))
 
-        result = _read_cache(url)
+        result = _read_cache(url, CACHE_TTL_LATEST)
+        assert result is None
+
+    def test_versioned_cache_survives_latest_ttl(self, tmp_path, mocker):
+        """Test versioned cache still valid after the latest TTL expires."""
+        mocker.patch("astro_airflow_mcp.cli.registry._cache_dir", return_value=tmp_path)
+
+        url = "https://example.com/api/providers/ftp/3.14.1/modules.json"
+        _write_cache(url, MODULES_RESPONSE)
+
+        # Backdate past the latest TTL but within versioned TTL
+        import hashlib
+
+        cache_key = hashlib.sha256(url.encode()).hexdigest()
+        cache_file = tmp_path / f"{cache_key}.json"
+        data = json.loads(cache_file.read_text())
+        data["_cached_at"] = time.time() - CACHE_TTL_LATEST - 100
+        cache_file.write_text(json.dumps(data))
+
+        # With versioned TTL: still valid
+        result = _read_cache(url, CACHE_TTL_VERSIONED)
+        assert result == MODULES_RESPONSE
+
+        # With latest TTL: expired
+        result = _read_cache(url, CACHE_TTL_LATEST)
         assert result is None
 
     def test_cache_miss(self, tmp_path, mocker):
         """Test reading a non-existent cache entry returns None."""
         mocker.patch("astro_airflow_mcp.cli.registry._cache_dir", return_value=tmp_path)
 
-        result = _read_cache("https://example.com/api/nonexistent.json")
+        result = _read_cache("https://example.com/api/nonexistent.json", CACHE_TTL_LATEST)
         assert result is None
 
     def test_no_cache_flag_bypasses_cache(self, tmp_path, mocker):
