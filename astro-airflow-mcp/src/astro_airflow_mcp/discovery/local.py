@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import socket
+import subprocess
 from pathlib import Path
 from typing import Any
 
 import httpx
-import yaml
 
 from astro_airflow_mcp.discovery.base import DiscoveredInstance, DiscoveryError
 
@@ -57,12 +58,94 @@ class LocalDiscoveryBackend:
         """Local discovery is always available."""
         return True
 
-    def _get_astro_project_port(self, project_dir: Path | None = None) -> int | None:
-        """Check for .astro/config.yaml and extract the configured port.
+    def _parse_docker_port_mapping(self, ports: str) -> int | None:
+        """Parse Docker port mapping string to extract host port.
 
-        Looks for:
-        - webserver.port (Airflow 2.x via Astro CLI)
-        - api-server.port (Airflow 3.x via Astro CLI)
+        Port mapping formats:
+        - "0.0.0.0:8081->8080/tcp"
+        - ":::8082->8081/tcp"
+        - "0.0.0.0:8081->8080/tcp, :::8081->8080/tcp" (multiple bindings)
+
+        Args:
+            ports: Port mapping string from Docker
+
+        Returns:
+            Host port number if found, None otherwise
+        """
+        if not ports or "->" not in ports:
+            return None
+
+        # Split by comma in case of multiple bindings (IPv4 and IPv6)
+        # Take the first binding
+        first_mapping = ports.split(",")[0].strip()
+
+        # Extract the host portion (before ->)
+        host_part = first_mapping.split("->")[0]
+
+        # Extract port number after last colon
+        if ":" not in host_part:
+            return None
+
+        port_str = host_part.split(":")[-1]
+
+        try:
+            return int(port_str)
+        except ValueError:
+            return None
+
+    def _parse_docker_json_output(self, output: str) -> int | None:
+        """Parse docker ps JSON output to extract webserver/api-server port.
+
+        Docker outputs one JSON object per line when using --format json.
+
+        Example JSON object:
+        {
+            "Names": "myproject-webserver-1",
+            "Ports": "0.0.0.0:8081->8080/tcp",
+            "State": "running",
+            ...
+        }
+
+        Args:
+            output: JSON output from docker ps command
+
+        Returns:
+            Host port number if found, None otherwise
+        """
+        if not output.strip():
+            return None
+
+        # Target container types for Airflow web interface (api-server used in AF 3.x)
+        target_containers = {"webserver", "api-server"}
+
+        # Docker outputs one JSON object per line
+        for line in output.strip().split("\n"):
+            try:
+                container = json.loads(line)
+                name = container.get("Names", "").lower()
+
+                # Check if this is a webserver/api-server container
+                if not any(container_type in name for container_type in target_containers):
+                    continue
+
+                # Parse the Ports field
+                ports = container.get("Ports", "")
+                if ports:
+                    return self._parse_docker_port_mapping(ports)
+
+            except (json.JSONDecodeError, KeyError):
+                continue
+
+        return None
+
+    def _get_running_astro_port(self, project_dir: Path | None = None) -> int | None:
+        """Check what port Astro containers are actually using at runtime.
+
+        Uses Docker's JSON output format to query containers by project directory.
+        This is more reliable than reading .astro/config.yaml when:
+        - Ports are dynamically assigned at startup
+        - Multiple Astro projects are running in parallel
+        - Config file doesn't reflect actual running state
 
         Args:
             project_dir: Directory to check (default: current working directory)
@@ -73,28 +156,73 @@ class LocalDiscoveryBackend:
         if project_dir is None:
             project_dir = Path.cwd()
 
-        config_path = project_dir / ".astro" / "config.yaml"
-        if not config_path.exists():
-            return None
-
         try:
-            with open(config_path) as f:
-                config = yaml.safe_load(f)
+            # Query Docker for containers in this project using JSON format
+            result = subprocess.run(
+                [
+                    "docker",
+                    "ps",
+                    "--filter",
+                    f"label=com.docker.compose.project.working_dir={project_dir}",
+                    "--format",
+                    "json",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
 
-            if not config:
+            if result.returncode != 0:
                 return None
 
-            # Check for Airflow 3.x api-server.port
-            if "api-server" in config and "port" in config["api-server"]:
-                return int(config["api-server"]["port"])
+            return self._parse_docker_json_output(result.stdout)
 
-            # Check for Airflow 2.x webserver.port
-            if "webserver" in config and "port" in config["webserver"]:
-                return int(config["webserver"]["port"])
+        except (subprocess.SubprocessError, FileNotFoundError):
+            return None
 
-            return None
-        except (OSError, yaml.YAMLError, ValueError, TypeError):
-            return None
+    def _build_port_scan_list(self, explicit_ports: list[int] | None) -> list[int]:
+        """Build list of ports to scan with smart detection.
+
+        Priority:
+        1. Use explicitly provided ports if available
+        2. Check actual running Astro containers (handles dynamic ports)
+        3. Fall back to default common ports
+
+        Args:
+            explicit_ports: Explicitly provided ports to scan
+
+        Returns:
+            List of ports to scan
+        """
+        if explicit_ports:
+            return explicit_ports
+
+        # Try to detect running Astro container port
+        running_port = self._get_running_astro_port()
+        if running_port:
+            # Prioritize detected port, then scan other defaults
+            return [running_port] + [p for p in self.DEFAULT_PORTS if p != running_port]
+
+        return self.DEFAULT_PORTS
+
+    def _is_unique_url(self, url: str, seen_urls: set[str]) -> bool:
+        """Check if URL is unique, treating localhost and 127.0.0.1 as equivalent.
+
+        Args:
+            url: URL to check
+            seen_urls: Set of already seen URLs (will be updated)
+
+        Returns:
+            True if URL is unique and was added to seen_urls
+        """
+        # Normalize localhost to 127.0.0.1 for comparison
+        normalized_url = url.replace("localhost", "127.0.0.1")
+
+        if normalized_url in seen_urls:
+            return False
+
+        seen_urls.add(normalized_url)
+        return True
 
     def discover(
         self,
@@ -105,11 +233,12 @@ class LocalDiscoveryBackend:
     ) -> list[DiscoveredInstance]:
         """Discover local Airflow instances by scanning ports.
 
-        First checks for .astro/config.yaml in the current directory to find
-        the configured port. Falls back to scanning common ports if not found.
+        Port detection priority (when ports not explicitly provided):
+        1. Runtime detection via Docker JSON output (most reliable for dynamic ports)
+        2. Default common ports
 
         Args:
-            ports: Ports to scan (default: check .astro/config.yaml, then common ports)
+            ports: Ports to scan (default: auto-detect from running containers)
             hosts: Hosts to scan (default: localhost, 127.0.0.1)
             timeout: Connection timeout in seconds
             **kwargs: Additional options (ignored)
@@ -120,16 +249,8 @@ class LocalDiscoveryBackend:
         if timeout is None:
             timeout = self.DEFAULT_HTTP_TIMEOUT
 
-        # Build port list: check .astro/config.yaml first, then fallback to defaults
-        if ports:
-            scan_ports = ports
-        else:
-            astro_port = self._get_astro_project_port()
-            if astro_port:
-                # Prioritize Astro project port, then check other common ports
-                scan_ports = [astro_port] + [p for p in self.DEFAULT_PORTS if p != astro_port]
-            else:
-                scan_ports = self.DEFAULT_PORTS
+        # Build port list with smart detection
+        scan_ports = self._build_port_scan_list(ports)
 
         scan_hosts = hosts if hosts else self.DEFAULT_HOSTS
 
@@ -142,14 +263,11 @@ class LocalDiscoveryBackend:
                 if not self._is_port_open(host, port, timeout):
                     continue
 
-                # Try to detect Airflow
                 url = f"http://{host}:{port}"
 
-                # Avoid duplicates (localhost and 127.0.0.1 are the same)
-                normalized_url = url.replace("localhost", "127.0.0.1")
-                if normalized_url in seen_urls:
+                # Skip duplicate URLs (localhost and 127.0.0.1 are equivalent)
+                if not self._is_unique_url(url, seen_urls):
                     continue
-                seen_urls.add(normalized_url)
 
                 airflow_info = self._detect_airflow(url, timeout)
                 if airflow_info:
