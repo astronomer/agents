@@ -8,3 +8,5 @@
 
 # Project-level AI instructions
 CLAUDE.md @astronomer/agents-approvers
+.cursor/ @astronomer/agents-approvers
+.cursorrules @astronomer/agents-approvers
