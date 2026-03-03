@@ -4,6 +4,9 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Build distribution packages
@@ -36,10 +39,11 @@ jobs:
 
       - name: Extract version from tag
         id: version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           # Extract version from tag (e.g., astro-airflow-mcp-0.3.0 -> 0.3.0)
-          VERSION="${{ github.event.release.tag_name }}"
-          VERSION="${VERSION#astro-airflow-mcp-}"
+          VERSION="${RELEASE_TAG#astro-airflow-mcp-}"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Extracted version: $VERSION"
 

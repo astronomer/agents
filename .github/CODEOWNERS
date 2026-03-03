@@ -1,0 +1,10 @@
+# Require approval from agents-approvers for security-sensitive files
+
+# CI/CD workflows
+.github/ @astronomer/agents-approvers
+
+# Plugin configuration
+.claude-plugin/ @astronomer/agents-approvers
+
+# Project-level AI instructions
+CLAUDE.md @astronomer/agents-approvers
