@@ -29,7 +29,7 @@ Confirm with the user:
 | "Validate my YAML" / "Lint blueprint" | Go to **Validation Commands** |
 | "Set up blueprint in my project" | Go to **Project Setup** |
 | "Version my blueprint" | Go to **Versioning** |
-| "Generate schema for IDE" | Go to **Schema Generation** |
+| "Generate schema" / "Astro IDE setup" | Go to **Schema Generation** |
 | Blueprint errors / troubleshooting | Go to **Troubleshooting** |
 
 ---
@@ -85,7 +85,7 @@ from airflow.utils.task_group import TaskGroup
 from blueprint import Blueprint, BaseModel, Field
 
 class MyConfig(BaseModel):
-    # Required field with description (becomes form label in IDE)
+    # Required field with description (used in CLI output and JSON schema)
     source_table: str = Field(description="Source table name")
     # Optional field with default and validation
     batch_size: int = Field(default=1000, ge=1)
@@ -246,18 +246,26 @@ steps:
 
 ## Schema Generation
 
-For Astro IDE integration, generate JSON schemas:
+Generate JSON schemas for editor autocompletion or external tooling:
 
 ```bash
-# Create output directory
-mkdir -p blueprint/generated-schemas
+# Generate schema for a blueprint
+blueprint schema extract > extract.schema.json
+```
 
-# Generate schema for each blueprint
+### Astro Customers Only
+
+Skip this section unless the user is an Astro customer using the Astro IDE.
+
+For Astro IDE's visual Blueprint builder, schemas must be in a specific location:
+
+```bash
+mkdir -p blueprint/generated-schemas
 blueprint schema extract > blueprint/generated-schemas/extract.schema.json
 blueprint schema load > blueprint/generated-schemas/load.schema.json
 ```
 
-The IDE reads `blueprint/generated-schemas/` to render configuration forms.
+The Astro IDE reads `blueprint/generated-schemas/` to render configuration forms.
 
 ---
 
@@ -317,4 +325,7 @@ Before finishing, verify with user:
 
 - GitHub: https://github.com/astronomer/blueprint
 - PyPI: https://pypi.org/project/airflow-blueprint/
-- Astro IDE docs: https://docs.astronomer.io/astro/ide-blueprint
+
+### Astro Customers Only
+
+- Astro IDE Blueprint docs: https://docs.astronomer.io/astro/ide-blueprint
