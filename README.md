@@ -495,5 +495,4 @@ Apache 2.0
 ---
 
 Made with :heart: by Astronomer
-
 <img referrerpolicy="no-referrer-when-downgrade" src="https://static.scarf.sh/a.png?x-pxid=f1c1d270-334e-45ec-b711-77385036cff9" />
