@@ -42,6 +42,10 @@ Answer business questions by querying the data warehouse. The kernel auto-starts
    ```
 
 6. **Present findings** to user.
+7. **Optional visualization** — If the user asks for chart/table visuals and the `analytics-viz` MCP server is available:
+   - Use `render_table(rows=[...], title="...")` for tabular output
+   - Use `render_chart(rows=[...], x_key="...", y_key="...", chart_type="line|bar", title="...", top_n=<int>, sort_desc=<bool>)` for trend/comparison views
+   - The UI has controls to filter/sort/switch chart type within loaded data. Users can ask in chat for a different row count.
 
 ## Kernel Functions
 
@@ -105,3 +109,19 @@ uv run scripts/cli.py cache clear [--stale-only]  # Clear
 
 - [reference/discovery-warehouse.md](reference/discovery-warehouse.md) — Large table handling, warehouse exploration, INFORMATION_SCHEMA queries
 - [reference/common-patterns.md](reference/common-patterns.md) — SQL templates for trends, comparisons, top-N, distributions, cohorts
+
+## MCP App Visualization (Optional)
+
+When an interactive chart/table is more useful than plain text, use the visualization MCP tools after running SQL with this skill's CLI.
+
+Example workflow:
+
+```bash
+# 1) Run query and print JSON rows
+uv run scripts/cli.py exec "import json; df = run_sql('SELECT ...'); print(json.dumps(df.to_dicts(), default=str))"
+```
+
+Then call MCP tool:
+
+- `render_table(rows=<parsed JSON>, title="Query Results")`
+- `render_chart(rows=<parsed JSON>, x_key="<col>", y_key="<metric>", chart_type="line", title="Descriptive Title")`
