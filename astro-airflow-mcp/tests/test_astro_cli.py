@@ -534,6 +534,34 @@ class TestTokenName:
         with patch("astro_airflow_mcp.discovery.astro_cli.Path.home", return_value=tmp_path):
             assert cli._get_user_email() is None
 
+    def test_get_token_name_falls_back_to_unknown_when_getuser_fails(self):
+        """Test token name falls back to 'unknown' when getpass.getuser() raises KeyError."""
+        cli = AstroCli()
+        with (
+            patch.object(cli, "_get_user_email", return_value=None),
+            patch(
+                "astro_airflow_mcp.discovery.astro_cli.getpass.getuser",
+                side_effect=KeyError("no user"),
+            ),
+        ):
+            assert cli.get_token_name() == "af-discover-unknown"
+
+    def test_get_user_email_respects_astro_home(self, tmp_path):
+        """Test _get_user_email uses ASTRO_HOME env var when set."""
+        custom_astro_home = tmp_path / "custom_astro"
+        custom_astro_home.mkdir()
+
+        context_key = "cloud_astronomer_io"
+        config = {
+            "context": "cloud.astronomer.io",
+            "contexts": {context_key: {"user_email": "custom@example.com"}},
+        }
+        (custom_astro_home / "config.yaml").write_text(yaml.dump(config))
+
+        cli = AstroCli()
+        with patch.dict("os.environ", {"ASTRO_HOME": str(custom_astro_home)}):
+            assert cli._get_user_email() == "custom@example.com"
+
 
 class TestInstanceNameGeneration:
     """Tests for instance name generation from deployments."""

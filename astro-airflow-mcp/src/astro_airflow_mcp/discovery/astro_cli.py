@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import getpass
+import os
 import re
 import shutil
 import subprocess  # nosec B404 - subprocess is needed for CLI wrapper
@@ -108,7 +109,10 @@ class AstroCli:
         email = self._get_user_email()
         if email:
             return email.split("@")[0]
-        return getpass.getuser()
+        try:
+            return getpass.getuser()
+        except KeyError:
+            return "unknown"
 
     def _get_user_email(self) -> str | None:
         """Get the user's email from Astro CLI config.
@@ -116,7 +120,8 @@ class AstroCli:
         Returns:
             Email string or None if unavailable
         """
-        config_path = Path.home() / ".astro" / "config.yaml"
+        astro_home = os.environ.get("ASTRO_HOME", Path.home() / ".astro")
+        config_path = Path(astro_home) / "config.yaml"
         if not config_path.exists():
             return None
 
