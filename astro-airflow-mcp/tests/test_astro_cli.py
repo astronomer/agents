@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pytest
+import yaml
 
 from astro_airflow_mcp.discovery.astro_cli import (
     AstroCli,
@@ -460,6 +461,78 @@ class TestAstroCliTokens:
             pytest.raises(AstroCliError, match="Failed to create"),
         ):
             mock_cli.create_deployment_token("dep-123", "my-token")
+
+
+class TestTokenName:
+    """Tests for user-specific token name generation."""
+
+    def _write_astro_config(self, tmp_path, user_email=None, context="cloud.astronomer.io"):
+        """Helper to write a mock ~/.astro/config.yaml."""
+        context_key = context.replace(".", "_")
+        context_data = {}
+        if user_email:
+            context_data["user_email"] = user_email
+
+        config = {
+            "context": context,
+            "contexts": {context_key: context_data},
+        }
+        astro_dir = tmp_path / ".astro"
+        astro_dir.mkdir(exist_ok=True)
+        (astro_dir / "config.yaml").write_text(yaml.dump(config))
+
+    def test_get_token_name_with_email(self):
+        """Test token name includes email local part."""
+        cli = AstroCli()
+        with patch.object(cli, "_get_user_email", return_value="taylor.murphy@astronomer.io"):
+            assert cli.get_token_name() == "af-discover-taylor-murphy"
+
+    def test_get_token_name_falls_back_to_os_username(self):
+        """Test token name falls back to OS username when no email."""
+        cli = AstroCli()
+        with (
+            patch.object(cli, "_get_user_email", return_value=None),
+            patch("astro_airflow_mcp.discovery.astro_cli.getpass.getuser", return_value="jdoe"),
+        ):
+            assert cli.get_token_name() == "af-discover-jdoe"
+
+    def test_get_token_name_normalizes_special_chars(self):
+        """Test token name normalizes special characters in email."""
+        cli = AstroCli()
+        with patch.object(cli, "_get_user_email", return_value="First.Last+tag@example.com"):
+            assert cli.get_token_name() == "af-discover-first-last-tag"
+
+    def test_get_user_email_reads_config(self, tmp_path):
+        """Test _get_user_email reads from astro config."""
+        self._write_astro_config(tmp_path, user_email="user@example.com")
+
+        cli = AstroCli()
+        with patch("astro_airflow_mcp.discovery.astro_cli.Path.home", return_value=tmp_path):
+            assert cli._get_user_email() == "user@example.com"
+
+    def test_get_user_email_returns_none_when_no_config(self, tmp_path):
+        """Test _get_user_email returns None when config doesn't exist."""
+        cli = AstroCli()
+        with patch("astro_airflow_mcp.discovery.astro_cli.Path.home", return_value=tmp_path):
+            assert cli._get_user_email() is None
+
+    def test_get_user_email_returns_none_when_no_context(self, tmp_path):
+        """Test _get_user_email returns None when no context is set."""
+        astro_dir = tmp_path / ".astro"
+        astro_dir.mkdir()
+        (astro_dir / "config.yaml").write_text(yaml.dump({"contexts": {}}))
+
+        cli = AstroCli()
+        with patch("astro_airflow_mcp.discovery.astro_cli.Path.home", return_value=tmp_path):
+            assert cli._get_user_email() is None
+
+    def test_get_user_email_returns_none_when_no_email(self, tmp_path):
+        """Test _get_user_email returns None when email not in config."""
+        self._write_astro_config(tmp_path, user_email=None)
+
+        cli = AstroCli()
+        with patch("astro_airflow_mcp.discovery.astro_cli.Path.home", return_value=tmp_path):
+            assert cli._get_user_email() is None
 
 
 class TestInstanceNameGeneration:

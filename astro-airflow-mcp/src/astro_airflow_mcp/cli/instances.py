@@ -626,7 +626,7 @@ def _create_astro_token(
     """
     if backend.token_exists(deployment_id):
         console.print(
-            f"  [yellow]Warning:[/yellow] Token '{backend.TOKEN_NAME}' already exists.\n"
+            f"  [yellow]Warning:[/yellow] Token '{backend.token_name}' already exists.\n"
             f"  Cannot retrieve existing token value. Either:\n"
             f"  - Delete the token in Astro UI and re-run discover\n"
             f"  - Manually add with: af instance add {instance_name} --url {url} --token <token>"
@@ -634,7 +634,7 @@ def _create_astro_token(
         return None
 
     try:
-        console.print(f"  Creating token '{backend.TOKEN_NAME}'...")
+        console.print(f"  Creating token '{backend.token_name}'...")
         return backend.create_token(deployment_id)
     except AstroDiscoveryError as e:
         console.print(f"  [red]Error:[/red] {e}")

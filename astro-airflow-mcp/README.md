@@ -374,7 +374,7 @@ af instance discover local
 af instance discover local --scan
 ```
 
-> **Note:** Always run with `--dry-run` first. The Astro discovery backend creates API tokens in Astro Cloud, so review the list before confirming.
+> **Note:** Always run with `--dry-run` first. The Astro discovery backend creates API tokens in Astro Cloud, so review the list before confirming. Token names are user-specific (for example, `af-discover-<user>`) to avoid collisions when multiple users discover the same deployment.
 
 Config file location: `~/.af/config.yaml` (override with `--config` or `AF_CONFIG` env var)
 

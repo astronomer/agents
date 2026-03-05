@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import getpass
 import re
 import shutil
 import subprocess  # nosec B404 - subprocess is needed for CLI wrapper
 from dataclasses import dataclass
+from pathlib import Path
 
 import yaml
 
@@ -72,11 +74,69 @@ class AstroCli:
         ]
     )
 
-    TOKEN_NAME = "af-cli-discover"  # nosec B105 - not a password, just a token name
+    TOKEN_NAME_PREFIX = "af-discover"  # nosec B105 - not a password, just a token name prefix
 
     def __init__(self) -> None:
         """Initialize the Astro CLI wrapper."""
         self._astro_path: str | None = None
+
+    def get_token_name(self) -> str:
+        """Get a user-specific token name for discovery.
+
+        Generates a deterministic token name like 'af-discover-taylor-murphy'
+        using the user's Astro email, or OS username as fallback. This avoids
+        collisions when multiple users run discovery on the same deployment.
+
+        Returns:
+            Token name string (e.g., 'af-discover-taylor-murphy')
+        """
+        identifier = self._get_user_identifier()
+        normalized = re.sub(r"[^a-z0-9]+", "-", identifier.lower()).strip("-")
+        if normalized:
+            return f"{self.TOKEN_NAME_PREFIX}-{normalized}"
+        return self.TOKEN_NAME_PREFIX
+
+    def _get_user_identifier(self) -> str:
+        """Get a deterministic user identifier.
+
+        Tries user_email from ~/.astro/config.yaml first (email local part),
+        then falls back to the OS username.
+
+        Returns:
+            A string identifying the current user
+        """
+        email = self._get_user_email()
+        if email:
+            return email.split("@")[0]
+        return getpass.getuser()
+
+    def _get_user_email(self) -> str | None:
+        """Get the user's email from Astro CLI config.
+
+        Returns:
+            Email string or None if unavailable
+        """
+        config_path = Path.home() / ".astro" / "config.yaml"
+        if not config_path.exists():
+            return None
+
+        try:
+            with open(config_path) as f:
+                config = yaml.safe_load(f)
+
+            if not config:
+                return None
+
+            context_name = config.get("context", "")
+            if not context_name:
+                return None
+
+            context_key = context_name.replace(".", "_")
+            contexts = config.get("contexts", {})
+            context_data = contexts.get(context_key, {})
+            return context_data.get("user_email")
+        except (yaml.YAMLError, OSError):
+            return None
 
     def _get_astro_path(self) -> str:
         """Get the path to the astro CLI executable."""

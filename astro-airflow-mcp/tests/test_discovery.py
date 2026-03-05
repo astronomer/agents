@@ -203,7 +203,9 @@ class TestAstroDiscoveryBackend:
     @pytest.fixture
     def mock_cli(self):
         """Create a mock AstroCli."""
-        return MagicMock()
+        cli = MagicMock()
+        cli.get_token_name.return_value = "af-discover-test-user"
+        return cli
 
     def test_name(self, mock_cli):
         """Test backend name."""
@@ -244,6 +246,18 @@ class TestAstroDiscoveryBackend:
         assert instances[0].url == "https://example.com"
         assert instances[0].source == "astro"
         assert instances[0].auth_token == "test-token"
+        mock_cli.token_exists.assert_called_once_with("id1", "af-discover-test-user")
+        mock_cli.create_deployment_token.assert_called_once_with(
+            "id1", "af-discover-test-user"
+        )
+
+    def test_token_name_is_resolved_once_on_init(self, mock_cli):
+        """Test token name is computed once and reused."""
+        backend = AstroDiscoveryBackend(cli=mock_cli)
+
+        assert backend.token_name == "af-discover-test-user"
+        assert backend.token_name == "af-discover-test-user"
+        mock_cli.get_token_name.assert_called_once()
 
     def test_discover_without_tokens(self, mock_cli):
         """Test discover without creating tokens."""

@@ -49,8 +49,6 @@ class AstroDiscoveryBackend:
     deployment tokens for authentication.
     """
 
-    TOKEN_NAME = AstroCli.TOKEN_NAME
-
     def __init__(self, cli: AstroCli | None = None) -> None:
         """Initialize the Astro discovery backend.
 
@@ -58,6 +56,12 @@ class AstroDiscoveryBackend:
             cli: Optional AstroCli instance (creates one if not provided)
         """
         self._cli = cli or AstroCli()
+        self._token_name = self._cli.get_token_name()
+
+    @property
+    def token_name(self) -> str:
+        """Get the user-specific token name for discovery."""
+        return self._token_name
 
     @property
     def name(self) -> str:
@@ -205,9 +209,9 @@ class AstroDiscoveryBackend:
             Token value or None if token already exists or creation fails
         """
         try:
-            if self._cli.token_exists(deployment_id, self.TOKEN_NAME):
+            if self._cli.token_exists(deployment_id, self.token_name):
                 return None
-            return self._cli.create_deployment_token(deployment_id, self.TOKEN_NAME)
+            return self._cli.create_deployment_token(deployment_id, self.token_name)
         except AstroCliError:
             return None
 
@@ -221,7 +225,7 @@ class AstroDiscoveryBackend:
             True if token exists
         """
         try:
-            return self._cli.token_exists(deployment_id, self.TOKEN_NAME)
+            return self._cli.token_exists(deployment_id, self.token_name)
         except AstroCliError:
             return False
 
@@ -238,6 +242,6 @@ class AstroDiscoveryBackend:
             AstroDiscoveryError: If token creation fails
         """
         try:
-            return self._cli.create_deployment_token(deployment_id, self.TOKEN_NAME)
+            return self._cli.create_deployment_token(deployment_id, self.token_name)
         except AstroCliError as e:
             raise AstroDiscoveryError(f"Failed to create token: {e}") from e
