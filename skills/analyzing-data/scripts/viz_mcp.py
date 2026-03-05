@@ -15,7 +15,6 @@ This server is intentionally small:
 
 from __future__ import annotations
 
-import sys
 from collections.abc import Mapping
 from typing import Any, Literal
 
@@ -219,7 +218,4 @@ def render_chart(
 
 
 if __name__ == "__main__":
-    if "--stdio" in sys.argv:
-        mcp.run(transport="stdio")
-    else:
-        mcp.run(transport="stdio")
+    mcp.run(transport="stdio")

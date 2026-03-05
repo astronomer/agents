@@ -42,7 +42,7 @@ Answer business questions by querying the data warehouse. The kernel auto-starts
    ```
 
 6. **Present findings** to user.
-7. **Optional visualization** — If the user asks for chart/table visuals and the `analytics-viz` MCP server is available:
+7. **Optional visualization** — If the user asks for chart/table visuals and `render_table`/`render_chart` tools are in your tool list:
    - Use `render_table(rows=[...], title="...")` for tabular output
    - Use `render_chart(rows=[...], x_key="...", y_key="...", chart_type="line|bar", title="...", top_n=<int>, sort_desc=<bool>)` for trend/comparison views
    - The UI has controls to filter/sort/switch chart type within loaded data. Users can ask in chat for a different row count.
