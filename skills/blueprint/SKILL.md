@@ -9,7 +9,7 @@ You are helping a user work with Blueprint, a system for composing Airflow DAGs 
 
 > **Package**: `airflow-blueprint` on PyPI
 > **Repo**: https://github.com/astronomer/blueprint
-> **Requires**: Python 3.10+, Airflow 2.5+
+> **Requires**: Python 3.10+, Airflow 2.5+, Blueprint 0.11.0+
 
 ## Before Starting
 
@@ -42,7 +42,7 @@ If the user is starting fresh, guide them through setup:
 
 ```bash
 # Add to requirements.txt
-airflow-blueprint>=0.1.1
+airflow-blueprint>=0.11.0
 
 # Or install directly
 pip install airflow-blueprint
@@ -253,19 +253,26 @@ Generate JSON schemas for editor autocompletion or external tooling:
 blueprint schema extract > extract.schema.json
 ```
 
-### Astro Customers Only
+### Astro Project Auto-Detection
 
-Skip this section unless the user is an Astro customer using the Astro IDE.
+After creating or modifying a blueprint, **automatically check** if the project is an Astro project by looking for any of these indicators:
+- An `astro` CLI config file (`.astro/` directory or `astro.yaml`)
+- A `Dockerfile` containing `quay.io/astronomer/astro-runtime`
+- The user confirms they're using Astro
 
-For Astro IDE's visual Blueprint builder, schemas must be in a specific location:
+If the project is an Astro project, **automatically regenerate schemas** without prompting:
 
 ```bash
 mkdir -p blueprint/generated-schemas
-blueprint schema extract > blueprint/generated-schemas/extract.schema.json
-blueprint schema load > blueprint/generated-schemas/load.schema.json
+# Regenerate schemas for all blueprints
+for bp in $(blueprint list --format names 2>/dev/null); do
+  blueprint schema "$bp" > "blueprint/generated-schemas/$bp.schema.json"
+done
 ```
 
-The Astro IDE reads `blueprint/generated-schemas/` to render configuration forms.
+The Astro IDE reads `blueprint/generated-schemas/` to render configuration forms. Keeping schemas in sync ensures the visual builder always reflects the latest blueprint configs.
+
+If you cannot determine whether the project is an Astro project, ask the user once and remember for the rest of the session.
 
 ---
 
@@ -326,6 +333,6 @@ Before finishing, verify with user:
 - GitHub: https://github.com/astronomer/blueprint
 - PyPI: https://pypi.org/project/airflow-blueprint/
 
-### Astro Customers Only
+### Astro IDE
 
 - Astro IDE Blueprint docs: https://docs.astronomer.io/astro/ide-blueprint
