@@ -246,10 +246,11 @@ class TestAstroDiscoveryBackend:
         assert instances[0].url == "https://example.com"
         assert instances[0].source == "astro"
         assert instances[0].auth_token == "test-token"
-        mock_cli.token_exists.assert_called_once_with("id1", "af-discover-test-user")
-        mock_cli.create_deployment_token.assert_called_once_with(
-            "id1", "af-discover-test-user"
-        )
+        # token_exists called for: create_token check + legacy token check
+        assert mock_cli.token_exists.call_count == 2
+        mock_cli.token_exists.assert_any_call("id1", "af-discover-test-user")
+        mock_cli.token_exists.assert_any_call("id1", "af-cli-discover")
+        mock_cli.create_deployment_token.assert_called_once_with("id1", "af-discover-test-user")
 
     def test_token_name_is_resolved_once_on_init(self, mock_cli):
         """Test token name is computed once and reused."""
@@ -276,7 +277,8 @@ class TestAstroDiscoveryBackend:
 
         assert len(instances) == 1
         assert instances[0].auth_token is None
-        mock_cli.token_exists.assert_not_called()
+        # token_exists still called for legacy token check
+        mock_cli.token_exists.assert_called_once_with("id1", "af-cli-discover")
         mock_cli.create_deployment_token.assert_not_called()
 
     def test_discover_handles_auth_error(self, mock_cli):
@@ -298,6 +300,75 @@ class TestAstroDiscoveryBackend:
 
         with pytest.raises(AstroDiscoveryError, match="Failed to list"):
             backend.discover()
+
+    def test_discover_warns_on_legacy_token(self, mock_cli, caplog):
+        """Test discover logs warning when legacy af-cli-discover token is found."""
+        import logging
+
+        mock_cli.list_deployments.return_value = [
+            {"name": "dep1", "deployment_id": "id1"},
+            {"name": "dep2", "deployment_id": "id2"},
+        ]
+
+        dep1 = AstroDeployment(
+            id="id1",
+            name="dep1",
+            workspace_id="ws1",
+            workspace_name="workspace1",
+            airflow_api_url="https://dep1.example.com",
+            status="HEALTHY",
+        )
+        dep2 = AstroDeployment(
+            id="id2",
+            name="dep2",
+            workspace_id="ws1",
+            workspace_name="workspace1",
+            airflow_api_url="https://dep2.example.com",
+            status="HEALTHY",
+        )
+        mock_cli.inspect_deployment.side_effect = lambda dep_id, **_: (
+            dep1 if dep_id == "id1" else dep2
+        )
+
+        def token_exists_side_effect(dep_id, token_name):
+            return token_name == "af-cli-discover" and dep_id == "id1"
+
+        mock_cli.token_exists.side_effect = token_exists_side_effect
+        mock_cli.create_deployment_token.return_value = "new-token"
+
+        backend = AstroDiscoveryBackend(cli=mock_cli)
+
+        with caplog.at_level(logging.WARNING, logger="astro_airflow_mcp.discovery.astro"):
+            instances = backend.discover(create_tokens=False)
+
+        assert len(instances) == 2
+        assert "af-cli-discover" in caplog.text
+        assert "workspace1-dep1" in caplog.text
+        # dep2 should NOT be in the warning
+        assert "workspace1-dep2" not in caplog.text
+
+    def test_discover_no_warning_without_legacy_token(self, mock_cli, caplog):
+        """Test discover does not warn when no legacy tokens exist."""
+        import logging
+
+        mock_cli.list_deployments.return_value = [{"name": "dep1", "deployment_id": "id1"}]
+        mock_cli.inspect_deployment.return_value = AstroDeployment(
+            id="id1",
+            name="dep1",
+            workspace_id="ws1",
+            workspace_name="workspace1",
+            airflow_api_url="https://example.com",
+            status="HEALTHY",
+        )
+        mock_cli.token_exists.return_value = False
+        mock_cli.create_deployment_token.return_value = "test-token"
+
+        backend = AstroDiscoveryBackend(cli=mock_cli)
+
+        with caplog.at_level(logging.WARNING, logger="astro_airflow_mcp.discovery.astro"):
+            backend.discover(create_tokens=True)
+
+        assert "af-cli-discover" not in caplog.text
 
     def test_discover_skips_deployments_without_id(self, mock_cli):
         """Test discover skips deployments without ID."""
