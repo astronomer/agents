@@ -484,8 +484,8 @@ class TestTokenName:
     def test_get_token_name_with_email(self):
         """Test token name includes email local part."""
         cli = AstroCli()
-        with patch.object(cli, "_get_user_email", return_value="taylor.murphy@astronomer.io"):
-            assert cli.get_token_name() == "af-discover-taylor-murphy"
+        with patch.object(cli, "_get_user_email", return_value="jane.doe@example.com"):
+            assert cli.get_token_name() == "af-discover-jane-doe"
 
     def test_get_token_name_falls_back_to_os_username(self):
         """Test token name falls back to OS username when no email."""
