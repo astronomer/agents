@@ -2,6 +2,15 @@
   "name": "data",
   "version": "0.1.0",
   "description": "Data engineering plugin - warehouse exploration, pipeline authoring, Airflow integration",
+  "mcpServers": {
+    "observe": {
+      "type": "http",
+      "url": "http://localhost:8888/v1alpha1/organizations/${ASTRO_ORG_ID}/observe/mcp/",
+      "headers": {
+        "Authorization": "Bearer ${ASTRO_API_TOKEN}"
+      }
+    }
+  },
   "hooks": {
     "SessionStart": [
       {
