@@ -255,10 +255,7 @@ blueprint schema extract > extract.schema.json
 
 ### Astro Project Auto-Detection
 
-After creating or modifying a blueprint, **automatically check** if the project is an Astro project by looking for any of these indicators:
-- An `astro` CLI config file (`.astro/` directory or `astro.yaml`)
-- A `Dockerfile` containing `quay.io/astronomer/astro-runtime`
-- The user confirms they're using Astro
+After creating or modifying a blueprint, **automatically check** if the project is an Astro project by looking for a `.astro/` directory (created by `astro dev init`).
 
 If the project is an Astro project, **automatically regenerate schemas** without prompting:
 
