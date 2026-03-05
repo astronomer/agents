@@ -83,12 +83,12 @@ class AstroCli:
     def get_token_name(self) -> str:
         """Get a user-specific token name for discovery.
 
-        Generates a deterministic token name like 'af-discover-taylor-murphy'
+        Generates a deterministic token name like 'af-discover-firstname-lastname'
         using the user's Astro email, or OS username as fallback. This avoids
         collisions when multiple users run discovery on the same deployment.
 
         Returns:
-            Token name string (e.g., 'af-discover-taylor-murphy')
+            Token name string (e.g., 'af-discover-firstname-lastname')
         """
         identifier = self._get_user_identifier()
         normalized = re.sub(r"[^a-z0-9]+", "-", identifier.lower()).strip("-")
