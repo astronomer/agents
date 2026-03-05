@@ -437,9 +437,12 @@ See [CLAUDE.md](./CLAUDE.md) for plugin development guidelines.
 ### Local Development Setup
 
 ```bash
-# Clone the repo
-git clone https://github.com/astronomer/agents.git
+# Clone the repo (includes submodules for vendored skills)
+git clone --recurse-submodules https://github.com/astronomer/agents.git
 cd agents
+
+# If already cloned without submodules:
+# git submodule update --init
 
 # Test with local plugin
 claude --plugin-dir .
