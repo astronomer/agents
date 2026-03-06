@@ -1,5 +1,5 @@
 {
-  "name": "data",
+  "name": "data-engineering",
   "version": "0.1.0",
   "description": "Data engineering plugin - warehouse exploration, pipeline authoring, Airflow integration",
   "hooks": {
