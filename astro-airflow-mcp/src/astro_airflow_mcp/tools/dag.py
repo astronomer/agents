@@ -160,7 +160,8 @@ def _get_dag_stats_impl(dag_ids: list[str] | None = None) -> str:
     """Internal implementation for getting DAG statistics from Airflow.
 
     Args:
-        dag_ids: Optional list of DAG IDs to get stats for. If None, gets stats for all DAGs.
+        dag_ids: Optional list of DAG IDs to get stats for. Pass a list even for a
+            single DAG, for example ["example_dag"]. If None, gets stats for all DAGs.
 
     Returns:
         JSON string containing DAG run statistics by state
@@ -192,7 +193,9 @@ def get_dag_stats(dag_ids: list[str] | None = None) -> str:
     - And other possible states
 
     Args:
-        dag_ids: Optional list of DAG IDs to filter by. If not provided, returns stats for all DAGs.
+        dag_ids: Optional list of DAG IDs to filter by. Pass a list even for a
+            single DAG, for example ["example_dag"]. If not provided, returns
+            stats for all DAGs.
 
     Returns:
         JSON with DAG run statistics organized by DAG and state
