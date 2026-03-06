@@ -300,6 +300,17 @@ my_warehouse:
     - RAW
 ```
 
+> [!IMPORTANT]
+> **How the `databases` list works:**
+> - **Optional for most connectors** (`snowflake`, `postgres`, `bigquery`) but **required for `sqlalchemy`**
+> - **For schema discovery** (`/data:warehouse-init`): Determines which databases are scanned and included in the generated `.astro/warehouse.md`. Only databases listed here will be discovered. If omitted, no schema discovery will occur.
+> - **For query execution** (`/data:analyzing-data`): The **first database** in the list becomes the default database context for the connection, but does NOT restrict which databases you can query. You can still access any database you have permissions for using fully-qualified table names (e.g., `OTHER_DB.SCHEMA.TABLE`).
+>
+> **Example:** If you configure `databases: [ANALYTICS, RAW]`:
+> - `ANALYTICS` becomes the default database for queries
+> - You can still query `PROD` with `SELECT * FROM PROD.PUBLIC.USERS`
+> - Only `ANALYTICS` and `RAW` will appear in warehouse schema documentation (run `/data:warehouse-init --refresh` after adding `PROD` to include it)
+
 > [!NOTE]
 > The `account` field requires your Snowflake **account identifier** (e.g., `orgname-accountname` or `xy12345.us-east-1`), not your account name. Find this in your Snowflake console under Admin > Accounts.
 
