@@ -14,12 +14,14 @@ from astro_airflow_mcp.utils import extract_failed_tasks
 
 
 def _list_dag_runs_impl(
+    dag_id: str | None = None,
     limit: int = DEFAULT_LIMIT,
     offset: int = DEFAULT_OFFSET,
 ) -> str:
     """Internal implementation for listing DAG runs from Airflow.
 
     Args:
+        dag_id: Optional DAG ID to filter runs for a specific DAG
         limit: Maximum number of DAG runs to return (default: 100)
         offset: Offset for pagination (default: 0)
 
@@ -28,7 +30,7 @@ def _list_dag_runs_impl(
     """
     try:
         adapter = _get_adapter()
-        data = adapter.list_dag_runs(limit=limit, offset=offset)
+        data = adapter.list_dag_runs(dag_id=dag_id, limit=limit, offset=offset)
 
         if "dag_runs" in data:
             return _wrap_list_response(data["dag_runs"], "dag_runs", data)
@@ -211,7 +213,7 @@ def _trigger_dag_and_wait_impl(
 
 
 @mcp.tool()
-def list_dag_runs() -> str:
+def list_dag_runs(dag_id: str | None = None) -> str:
     """Get execution history and status of DAG runs (workflow executions).
 
     Use this tool when the user asks about:
@@ -232,10 +234,14 @@ def list_dag_runs() -> str:
     - run_type: manual, scheduled, or backfill
     - conf: Configuration passed to this run
 
+    Args:
+        dag_id: Optional DAG ID to filter runs for a specific DAG.
+                If not provided, returns runs across all DAGs.
+
     Returns:
-        JSON with list of DAG runs across all DAGs, sorted by most recent
+        JSON with list of DAG runs, sorted by most recent
     """
-    return _list_dag_runs_impl()
+    return _list_dag_runs_impl(dag_id=dag_id)
 
 
 @mcp.tool()
