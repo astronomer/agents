@@ -1,11 +1,13 @@
 ---
 name: profiling-tables
-description: Deep-dive data profiling for a specific table. Use when the user asks to profile a table, wants statistics about a dataset, asks about data quality, or needs to understand a table's structure and content. Requires a table name.
+description: Deep-dive data profiling for a specific table. Calculates null rates, analyzes value distributions, detects cardinality patterns, summarizes column statistics, and assesses data quality across completeness, uniqueness, and freshness. Use when the user asks to profile a table, wants statistics about a dataset, asks about data quality, or needs to understand a table's structure and content. Requires a table name.
 ---
 
 # Data Profile
 
 Generate a comprehensive profile of a table that a new team member could use to understand the data.
+
+> **Large tables (>10M rows):** Use `TABLESAMPLE` or add date filters to avoid query timeouts. Check row count first and adjust sampling accordingly.
 
 ## Step 1: Basic Metadata
 
@@ -84,47 +86,21 @@ ORDER BY frequency DESC
 LIMIT 20
 ```
 
-This reveals:
-- High-cardinality columns (likely IDs or unique values)
-- Low-cardinality columns (likely categories or status fields)
-- Skewed distributions (one value dominates)
-
 ## Step 5: Sample Data
 
-Get representative rows:
-
 ```sql
-SELECT *
-FROM <table>
-LIMIT 10
+SELECT * FROM <table> LIMIT 10
 ```
-
-If the table is large and you want variety, sample from different time periods or categories.
 
 ## Step 6: Data Quality Assessment
 
-Summarize quality across dimensions:
-
-### Completeness
-- Which columns have NULLs? What percentage?
-- Are NULLs expected or problematic?
-
-### Uniqueness
-- Does the apparent primary key have duplicates?
-- Are there unexpected duplicate rows?
-
-### Freshness
-- When was data last updated? (MAX of timestamp columns)
-- Is the update frequency as expected?
-
-### Validity
-- Are there values outside expected ranges?
-- Are there invalid formats (dates, emails, etc.)?
-- Are there orphaned foreign keys?
-
-### Consistency
-- Do related columns make sense together?
-- Are there logical contradictions?
+| Dimension | Check |
+|-----------|-------|
+| Completeness | NULL percentages per column — expected vs problematic? |
+| Uniqueness | Primary key duplicates? Unexpected duplicate rows? |
+| Freshness | MAX of timestamp columns — update frequency as expected? |
+| Validity | Values outside expected ranges? Invalid formats? Orphaned foreign keys? |
+| Consistency | Related columns make sense together? Logical contradictions? |
 
 ## Step 7: Output Summary
 

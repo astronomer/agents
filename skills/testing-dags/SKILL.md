@@ -1,6 +1,6 @@
 ---
 name: testing-dags
-description: Complex DAG testing workflows with debugging and fixing cycles. Use for multi-step testing requests like "test this dag and fix it if it fails", "test and debug", "run the pipeline and troubleshoot issues". For simple test requests ("test dag", "run dag"), the airflow entrypoint skill handles it directly. This skill is for iterative test-debug-fix cycles.
+description: Complex DAG testing workflows with debugging and fixing cycles. Triggers DAG runs, analyzes task failures, retrieves error logs, identifies root causes, and applies fixes in iterative test-debug-fix cycles. Use for multi-step testing requests like "test this dag and fix it if it fails", "test and debug", "run the pipeline and troubleshoot issues". For simple test requests ("test dag", "run dag"), the airflow entrypoint skill handles it directly.
 ---
 
 # DAG Testing Skill
@@ -37,20 +37,13 @@ Use these for quick validation during development. For full end-to-end testing a
 
 ## FIRST ACTION: Just Trigger the DAG
 
-When the user asks to test a DAG, your **FIRST AND ONLY action** should be:
+When the user asks to test a DAG, **immediately run:**
 
 ```bash
 af runs trigger-wait <dag_id>
 ```
 
-**DO NOT:**
-- Call `af dags list` first
-- Call `af dags get` first
-- Call `af dags errors` first
-- Use `grep` or `ls` or any other bash command
-- Do any "pre-flight checks"
-
-**Just trigger the DAG.** If it fails, THEN debug.
+No pre-flight checks — just trigger. If it fails, THEN debug.
 
 ---
 

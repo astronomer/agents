@@ -1,11 +1,9 @@
 ---
 name: troubleshooting-astro-deployments
-description: Troubleshoot Astronomer production deployments with Astro CLI. Use when investigating deployment issues, viewing production logs, analyzing failures, or managing deployment environment variables.
+description: Troubleshoot Astronomer production deployments with Astro CLI. Stream pod logs, check deployment health status, diagnose scheduler and worker failures, and manage environment variables. Use when investigating deployment issues, viewing production logs, analyzing failures, or managing deployment environment variables.
 ---
 
 # Astro Deployment Troubleshooting
-
-This skill helps you diagnose and troubleshoot production Astronomer deployments using the Astro CLI.
 
 > **For deployment management**, see the **managing-astro-deployments** skill.
 > **For local development**, see the **managing-astro-local-env** skill.

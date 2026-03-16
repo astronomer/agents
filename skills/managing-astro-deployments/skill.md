@@ -1,11 +1,9 @@
 ---
 name: managing-astro-deployments
-description: Manage Astronomer production deployments with Astro CLI. Use when the user wants to authenticate, switch workspaces, create/update/delete deployments, or deploy code to production.
+description: Manage Astronomer production deployments with Astro CLI. Use when the user wants to authenticate, switch workspaces, create/update/delete deployments, deploy code to production, run astro deploy, astro login, manage deployment tokens, or promote code between staging and production environments.
 ---
 
 # Astro Deployment Management
-
-This skill helps you manage production Astronomer deployments using the Astro CLI.
 
 > **For local development**, see the **managing-astro-local-env** skill.
 > **For production troubleshooting**, see the **troubleshooting-astro-deployments** skill.
@@ -14,30 +12,18 @@ This skill helps you manage production Astronomer deployments using the Astro CL
 
 ## Authentication
 
-All deployment operations require authentication:
-
 ```bash
-# Login to Astronomer (opens browser for OAuth)
-astro login
+astro login                                  # Login (opens browser for OAuth)
 ```
-
-Authentication tokens are stored locally for subsequent commands. Run this before any deployment operations.
 
 ---
 
 ## Workspace Management
 
-Deployments are organized into workspaces:
-
 ```bash
-# List all accessible workspaces
-astro workspace list
-
-# Switch to a specific workspace
-astro workspace switch <WORKSPACE_ID>
+astro workspace list                         # List all accessible workspaces
+astro workspace switch <WORKSPACE_ID>        # Switch workspace (persists between sessions)
 ```
-
-Workspace context is maintained between sessions. Most deployment commands operate within the current workspace context.
 
 ---
 
@@ -56,19 +42,6 @@ astro deployment inspect <DEPLOYMENT_ID>
 # Inspect by name (alternative to ID)
 astro deployment inspect --deployment-name data-service-stg
 ```
-
-### What `inspect` Shows
-
-- Deployment status (HEALTHY, UNHEALTHY)
-- Runtime version and Airflow version
-- Executor type (CELERY, KUBERNETES, LOCAL)
-- Scheduler configuration (size, count)
-- Worker queue settings (min/max workers, concurrency, worker type)
-- Resource quotas (CPU, memory)
-- Environment variables
-- Last deployment timestamp and current tag
-- Webserver and API URLs
-- High availability status
 
 ---
 
