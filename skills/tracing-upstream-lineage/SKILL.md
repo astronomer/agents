@@ -1,6 +1,6 @@
 ---
 name: tracing-upstream-lineage
-description: Trace upstream data lineage. Use when the user asks where data comes from, what feeds a table, upstream dependencies, data sources, or needs to understand data origins.
+description: Trace upstream data lineage, identify source systems, map data transformations, and document table dependencies. Use when the user asks where data comes from, what feeds a table, upstream dependencies, data sources, or needs to understand data origins.
 ---
 
 # Upstream Lineage: Sources

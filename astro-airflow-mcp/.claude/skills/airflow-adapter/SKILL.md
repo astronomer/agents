@@ -33,3 +33,26 @@ adapter = _get_adapter()
 dags = adapter.list_dags(limit=100)
 run = adapter.trigger_dag_run("my_dag", conf={"key": "value"})
 ```
+
+## Adding a New API Method
+
+1. Add abstract method to `adapters/base.py`:
+
+```python
+@abstractmethod
+def get_dag_stats(self, dag_id: str) -> dict: ...
+```
+
+2. Implement in both adapters — handle endpoint and field differences:
+
+```python
+# airflow_v2.py — _call() prepends /api/v1 automatically
+def get_dag_stats(self, dag_id: str) -> dict:
+    return self._call(f"dags/{dag_id}/dagRuns", params={"limit": 1})
+
+# airflow_v3.py — _call() prepends /api/v2 automatically
+def get_dag_stats(self, dag_id: str) -> dict:
+    return self._call(f"dags/{dag_id}/dagRuns", params={"limit": 1})
+```
+
+3. Use from MCP tools via `adapter = _get_adapter()` — never call the API directly.

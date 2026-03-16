@@ -1,19 +1,15 @@
 ---
 name: deploying-airflow
-description: Deploy Airflow DAGs and projects. Use when the user wants to deploy code, push DAGs, set up CI/CD, deploy to production, or asks about deployment strategies for Airflow.
+description: Deploy Airflow DAGs and projects to production using Astro CLI, Docker Compose, or Kubernetes Helm charts. Configure deployment pipelines, manage DAG-only and full image deploys, and set up git-sync or CI/CD automation. Use when the user wants to deploy code, push DAGs, set up CI/CD, deploy to production, or asks about deployment strategies for Airflow.
 ---
 
 # Deploying Airflow
 
-This skill covers deploying Airflow DAGs and projects to production, whether using Astro (Astronomer's managed platform) or open-source Airflow on Docker Compose or Kubernetes.
-
-**Choosing a path:** Astro is a good fit for managed operations and faster CI/CD. For open-source, use Docker Compose for dev and the Helm chart for production.
+Astro for managed operations and faster CI/CD. Docker Compose for dev. Helm chart for production.
 
 ---
 
 ## Astro (Astronomer)
-
-Astro provides CLI commands and GitHub integration for deploying Airflow projects.
 
 ### Deploy Commands
 
@@ -26,41 +22,21 @@ Astro provides CLI commands and GitHub integration for deploying Airflow project
 
 ### Full Project Deploy
 
-Builds a Docker image from your Astro project and deploys everything (DAGs, plugins, requirements, packages):
-
 ```bash
+# Full project deploy (dependencies, plugins, or Dockerfile changed)
 astro deploy
-```
 
-Use this when you've changed `requirements.txt`, `Dockerfile`, `packages.txt`, plugins, or any non-DAG file.
-
-### DAG-Only Deploy
-
-Pushes only files in the `dags/` directory without rebuilding the Docker image:
-
-```bash
+# DAG-only deploy (only DAG files changed — faster, no image build)
 astro deploy --dags
-```
 
-This is significantly faster than a full deploy since it skips the image build. Use this when you've only changed DAG files and haven't modified dependencies or configuration.
-
-### Image-Only Deploy
-
-Pushes only the Docker image without updating DAGs:
-
-```bash
+# Image-only deploy (dependencies changed, no DAG changes)
 astro deploy --image
-```
 
-This is useful in multi-repo setups where DAGs are deployed separately from the image, or in CI/CD pipelines that manage image and DAG deploys independently.
-
-### dbt Project Deploy
-
-Deploys a dbt project to run with Cosmos on an Astro deployment:
-
-```bash
+# dbt project deploy (Cosmos)
 astro deploy --dbt
 ```
+
+**Verify:** `astro deployment inspect <DEPLOYMENT_ID>` — check status is HEALTHY and deployment timestamp updated.
 
 ### GitHub Integration
 
@@ -205,33 +181,16 @@ volumes:
 ### Common Operations
 
 ```bash
-# Start all services
-docker compose up -d
-
-# Stop all services
-docker compose down
-
-# View logs
-docker compose logs -f airflow-scheduler
-
-# Restart after requirements change
-docker compose down && docker compose up -d --build
-
-# Run a one-off Airflow CLI command
-docker compose exec airflow-apiserver airflow dags list
+docker compose up -d                                          # Start
+docker compose down                                           # Stop
+docker compose logs -f airflow-scheduler                      # View logs
+docker compose down && docker compose up -d --build           # Restart after requirements change
+docker compose exec airflow-apiserver airflow dags list        # Run CLI command
 ```
 
-### Installing Python Packages
+**Verify:** `curl http://localhost:8080/health` — should return healthy status.
 
-Add packages to `requirements.txt` and rebuild:
-
-```bash
-# Add to requirements.txt, then:
-docker compose down
-docker compose up -d --build
-```
-
-Or use a custom Dockerfile:
+### Custom Image and Dependencies
 
 ```dockerfile
 FROM apache/airflow:3  # Pin to a specific version (e.g., 3.1.7) for reproducibility
@@ -239,34 +198,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 ```
 
-Update `docker-compose.yaml` to build from the Dockerfile:
+Update `docker-compose.yaml` to use `build: { context: ., dockerfile: Dockerfile }` instead of `image:`.
 
-```yaml
-x-airflow-common: &airflow-common
-  build:
-    context: .
-    dockerfile: Dockerfile
-  # ... rest of config
-```
-
-### Environment Variables
-
-Configure Airflow settings via environment variables in `docker-compose.yaml`:
-
-```yaml
-environment:
-  # Core settings
-  AIRFLOW__CORE__EXECUTOR: LocalExecutor
-  AIRFLOW__CORE__PARALLELISM: 32
-  AIRFLOW__CORE__MAX_ACTIVE_TASKS_PER_DAG: 16
-
-  # Email
-  AIRFLOW__EMAIL__EMAIL_BACKEND: airflow.utils.email.send_email_smtp
-  AIRFLOW__SMTP__SMTP_HOST: smtp.example.com
-
-  # Connections (as URI)
-  AIRFLOW_CONN_MY_DB: postgresql://user:pass@host:5432/db
-```
+Configure Airflow via environment variables: `AIRFLOW__CORE__EXECUTOR`, `AIRFLOW__CORE__PARALLELISM`, `AIRFLOW_CONN_MY_DB=postgresql://user:pass@host:5432/db`.
 
 ---
 
@@ -413,21 +347,16 @@ helm upgrade airflow apache-airflow/airflow \
 2. **Persistent Volume**: Mount a shared PV containing DAGs
 3. **Baked into image**: Include DAGs in a custom Docker image
 
-### Useful Commands
+### Verify and Operate
 
 ```bash
-# Check pod status
-kubectl get pods -n airflow
-
-# View scheduler logs
-kubectl logs -f deployment/airflow-scheduler -n airflow
-
-# Port-forward the API server
-kubectl port-forward svc/airflow-apiserver 8080:8080 -n airflow
-
-# Run a one-off CLI command
-kubectl exec -it deployment/airflow-scheduler -n airflow -- airflow dags list
+kubectl get pods -n airflow                                                    # Check pod status
+kubectl logs -f deployment/airflow-scheduler -n airflow                        # View scheduler logs
+kubectl port-forward svc/airflow-apiserver 8080:8080 -n airflow                # Port-forward API server
+kubectl exec -it deployment/airflow-scheduler -n airflow -- airflow dags list  # Run CLI command
 ```
+
+**Verify after install/upgrade:** All pods should show `Running` status and `1/1` ready.
 
 ---
 

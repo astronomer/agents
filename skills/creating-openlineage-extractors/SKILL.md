@@ -5,8 +5,6 @@ description: Create custom OpenLineage extractors for Airflow operators. Use whe
 
 # Creating OpenLineage Extractors
 
-This skill guides you through creating custom OpenLineage extractors to capture lineage from Airflow operators that don't have built-in support.
-
 > **Reference:** See the [OpenLineage provider developer guide](https://airflow.apache.org/docs/apache-airflow-providers-openlineage/stable/guides/developer.html) for the latest patterns and list of supported operators/hooks.
 
 ## When to Use Each Approach
@@ -395,6 +393,18 @@ OpenLineage checks for lineage in this order:
 4. **Inlets/Outlets** (lowest priority)
 
 If a custom extractor exists, it overrides built-in extraction and inlets/outlets.
+
+---
+
+## Verification
+
+After registering an extractor:
+
+1. **Check registration:** `airflow plugins` or check logs for "Registered OpenLineage extractor" messages
+2. **Trigger a DAG** using the target operator
+3. **On Astro:** Check the **Lineage tab** for the task — inputs/outputs should appear
+4. **On OSS:** Check OpenLineage transport output (Marquez UI, log events)
+5. **If lineage missing:** Verify the `AIRFLOW__OPENLINEAGE__EXTRACTORS` path is importable from the worker
 
 ---
 

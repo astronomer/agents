@@ -1,21 +1,15 @@
 ---
 name: warehouse-init
-description: Initialize warehouse schema discovery. Generates .astro/warehouse.md with all table metadata for instant lookups. Run once per project, refresh when schema changes. Use when user says "/data:warehouse-init" or asks to set up data discovery.
+description: Initialize warehouse schema discovery. Generates .astro/warehouse.md with all table metadata for instant lookups. Run once per project, refresh when schema changes. Use when user says "/data:warehouse-init", asks to set up data discovery, wants to catalog tables, scan database schema, list all tables, or discover database structure.
 ---
 
 # Initialize Warehouse Schema
 
 Generate a comprehensive, user-editable schema reference file for the data warehouse.
 
-**Scripts:** `../analyzing-data/scripts/` — All CLI commands below are relative to the `analyzing-data` skill's directory. Before running any `scripts/cli.py` command, `cd` to `../analyzing-data/` relative to this file.
+**Scripts:** All CLI commands below use `../analyzing-data/scripts/` — `cd` to `../analyzing-data/` relative to this file before running.
 
-## What This Does
-
-1. Discovers all databases, schemas, tables, and columns from the warehouse
-2. **Enriches with codebase context** (dbt models, gusty SQL, schema docs)
-3. Records row counts and identifies large tables
-4. Generates `.astro/warehouse.md` - a version-controllable, team-shareable reference
-5. Enables instant concept→table lookups without warehouse queries
+Discovers databases, schemas, tables, and columns. Enriches with codebase context (dbt models, gusty SQL, schema docs). Generates `.astro/warehouse.md` for instant concept→table lookups.
 
 ## Process
 
@@ -65,7 +59,6 @@ For each database in configured_databases:
         Discover all metadata for database {DATABASE}.
 
         Use the CLI to run SQL queries:
-        # Scripts are relative to ../analyzing-data/
         uv run scripts/cli.py exec "df = run_sql('...')"
         uv run scripts/cli.py exec "print(df)"
 
@@ -198,7 +191,6 @@ Query downstream first: `reporting` > `mart_*` > `metric_*` > `model_*` > `IN_*`
 After generating warehouse.md, populate the concept cache:
 
 ```bash
-# Scripts are relative to ../analyzing-data/
 uv run cli.py concept import -p .astro/warehouse.md
 uv run cli.py concept learn customers HQ.MART_CUST.CURRENT_ASTRO_CUSTS -k ACCT_ID
 ```
@@ -291,7 +283,6 @@ Watch for these indicators:
 If you suspect cache issues:
 
 ```bash
-# Scripts are relative to ../analyzing-data/
 uv run scripts/cli.py cache status
 uv run scripts/cli.py cache clear --stale-only
 uv run scripts/cli.py cache clear

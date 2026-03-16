@@ -5,13 +5,9 @@ description: Annotate Airflow tasks with data lineage using inlets and outlets. 
 
 # Annotating Task Lineage with Inlets & Outlets
 
-This skill guides you through adding manual lineage annotations to Airflow tasks using `inlets` and `outlets`.
-
 > **Reference:** See the [OpenLineage provider developer guide](https://airflow.apache.org/docs/apache-airflow-providers-openlineage/stable/guides/developer.html) for the latest supported operators and patterns.
-
-### On Astro
-
-Lineage annotations defined with inlets and outlets are visualized in Astro's enhanced **Lineage tab**, which provides cross-DAG and cross-deployment lineage views. This means your annotations are immediately visible in the Astro UI, giving you a unified view of data flow across your entire Astro organization.
+>
+> **On Astro:** Lineage annotations are automatically visualized in Astro's **Lineage tab** with cross-DAG and cross-deployment views.
 
 ## When to Use This Approach
 
@@ -330,6 +326,17 @@ transform = SqlOperator(
 - Include all tables referenced in JOINs as inlets
 - Include all tables written to (including temp tables if relevant)
 - **Outlet-only and inlet-only annotations are valid.** One-sided annotations are encouraged for lineage visibility even without a corresponding inlet or outlet in another DAG.
+
+---
+
+## Verification
+
+After adding inlets/outlets, verify lineage appears:
+
+1. **Trigger the DAG** and wait for successful completion
+2. **On Astro:** Check the **Lineage tab** in the Astro UI for the annotated task
+3. **On OSS Airflow:** Check OpenLineage events via your configured transport (e.g., Marquez UI, log output)
+4. **If lineage doesn't appear:** Confirm no extractor or OL method is overriding inlets/outlets (see precedence rules above)
 
 ---
 

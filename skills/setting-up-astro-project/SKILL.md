@@ -1,11 +1,9 @@
 ---
 name: setting-up-astro-project
-description: Initialize and configure Astro/Airflow projects. Use when the user wants to create a new project, set up dependencies, configure connections/variables, or understand project structure. For running the local environment, see managing-astro-local-env.
+description: Initialize and configure Astro/Airflow projects. Create project scaffolding with astro dev init, add Python dependencies, configure Airflow connections and variables, and set up Dockerfile customizations. Use when the user wants to create a new project, set up dependencies, configure connections/variables, or understand project structure. For running the local environment, see managing-astro-local-env.
 ---
 
 # Astro Project Setup
-
-This skill helps you initialize and configure Airflow projects using the Astro CLI.
 
 > **To run the local environment**, see the **managing-astro-local-env** skill.
 > **To write DAGs**, see the **authoring-dags** skill.
@@ -61,7 +59,7 @@ FROM quay.io/astronomer/astro-runtime:12.4.0
 RUN pip install --extra-index-url https://pypi.example.com/simple my-package
 ```
 
-**After modifying dependencies:** Run `astro dev restart`
+**After modifying dependencies:** Run `astro dev restart`, then verify with `astro dev parse`.
 
 ---
 
@@ -103,12 +101,12 @@ astro dev object import --connections --file connections.yaml
 
 ---
 
-## Validate Before Running
-
-Parse DAGs to catch errors without starting the full environment:
+## Validate Setup
 
 ```bash
-astro dev parse
+astro dev parse                                                 # Parse DAGs — catch errors without starting
+astro dev run airflow connections list                           # Verify connections loaded from airflow_settings.yaml
+astro dev run airflow variables list                             # Verify variables loaded
 ```
 
 ---
