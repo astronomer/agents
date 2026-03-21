@@ -19,7 +19,7 @@ class TestConstants:
 
     def test_terminal_dag_run_states(self):
         """Test terminal DAG run states are defined correctly."""
-        assert {"success", "failed", "upstream_failed"} == TERMINAL_DAG_RUN_STATES
+        assert {"success", "failed"} == TERMINAL_DAG_RUN_STATES
 
     def test_failed_task_states(self):
         """Test failed task states are defined correctly."""
