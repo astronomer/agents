@@ -1,7 +1,7 @@
 """Shared constants for CLI and MCP server."""
 
 # Terminal states for DAG runs (polling stops when reached)
-TERMINAL_DAG_RUN_STATES = {"success", "failed", "upstream_failed"}
+TERMINAL_DAG_RUN_STATES = {"success", "failed"}
 
 # Task states considered as failures
 FAILED_TASK_STATES = {"failed", "upstream_failed"}
