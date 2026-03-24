@@ -1,10 +1,15 @@
+---
+name: airflow-data-aware-scheduling
+description: Implements asset-based data-aware scheduling in Apache Airflow 3.x. Use when the user wants to trigger Dags based on data updates, declare data-driven dependencies between Dags, use asset outlets/inlets, use the @asset decorator, schedule on asset events, combine asset and time-based schedules, pass metadata via asset event extras, use asset aliases, set up event-driven scheduling with message queues, partition Dag runs, use partition key mappers, create asset listeners, query the asset REST API, or debug queued asset events. Covers Assets, asset events, AssetAlias, AssetWatcher, AssetOrTimeSchedule, CronPartitionTimetable, PartitionedAssetTimetable, and partition key mappers.
+---
+
 # Asset-Based Data-Aware Scheduling in Apache Airflow
 
-Assets let Dags declare explicit dependencies on data and schedule runs based on data updates rather than time. A task declares it produces an asset (via `outlets`), and downstream Dags schedule themselves on that asset — running automatically when an asset event is created.
+Assets let Dags declare explicit dependencies on data and schedule runs based on data updates rather than time. An asset can represent anything, concrete data entities like a table in a database, or abstract concepts like a business process having been completed. A task declares its successful completion produces asset events to an asset (via `outlets`), and downstream Dags can be scheduled based on one or a combination of asset events.
 
-> **Airflow version**: This skill covers Airflow 3.x asset-based scheduling. **NEVER use `from airflow.datasets import Dataset`** — that is the Airflow 2.x import. Always use `from airflow.sdk import Asset`. The `Asset` class replaces what was previously called `Dataset` in Airflow 2.x.
+> **Airflow version**: This skill covers Airflow 3.x. **NEVER use `from airflow.datasets import Dataset`** — always use `from airflow.sdk import Asset`.
 >
-> **Airflow is not a data monitor**: Airflow only knows about asset updates that happen through task completions (outlets), API calls, UI actions, or AssetWatchers. It does **not** detect arbitrary external changes (e.g. a file manually added to S3). To react to external events, use [event-driven scheduling](#event-driven-scheduling) with AssetWatchers that poll message queues.
+> **Airflow is not a data monitor**: Airflow assets only detect updates through task completions (outlets), API calls, or UI actions. Assets do **not** detect changes in an external data tool made from outside Airflow. To react to external events, use [event-driven scheduling](#event-driven-scheduling) with AssetWatchers to schedule Dags based on messages in a message queue, or [sensors and deferrable operators](#when-not-to-use-assets) to schedule Dags based on any other condition being true in an external system, for example a file being uploaded to a blob storage or an HTTPS request returning a specified status code.
 >
 > **Partitioned assets** (`CronPartitionTimetable`, `PartitionedAssetTimetable`) require **Airflow 3.2+**.
 
@@ -15,13 +20,13 @@ Assets let Dags declare explicit dependencies on data and schedule runs based on
 | User needs to... | Go to section |
 |---|---|
 | Declare that a task produces or reads a data entity | [Assets, outlets, and inlets](#assets-outlets-and-inlets) |
-| Create a simple one-task-one-asset Dag | [`@asset` decorator](#asset-decorator--shorthand-for-one-task-one-asset-dags) |
+| Create a simple one-task-one-asset Dag | [`@asset` decorator](#asset-decorator) |
 | Trigger a Dag when upstream data is updated | [Asset schedules](#asset-schedules) |
 | Use OR/AND logic across multiple assets | [Conditional asset scheduling](#conditional-asset-scheduling) |
 | Run a Dag on both a cron schedule and asset updates | [Combined asset and time-based scheduling](#combined-asset-and-time-based-scheduling) |
 | Pass metadata between producer and consumer tasks | [Asset event extras](#asset-event-extras) |
-| Determine asset names at runtime (dynamic tasks) | [Asset aliases](#asset-aliases) |
-| Trigger a Dag from messages in an external message queue | [Event-driven scheduling](#event-driven-scheduling) |
+| Determine asset names at runtime (including when using dynamic tasks) | [Asset aliases](#asset-aliases) |
+| Trigger a Dag based on messages in a message queue | [Event-driven scheduling](#event-driven-scheduling) |
 | Partition data processing by time period or segment | [Partitioned Dag runs and asset events](#partitioned-dag-runs-and-asset-events-airflow-32) |
 | Normalize or transform partition keys | [Partition key mappers](#partition-key-mappers-airflow-32) |
 | Run code whenever any asset event occurs globally | [Asset listeners](#asset-listeners) |
@@ -30,20 +35,19 @@ Assets let Dags declare explicit dependencies on data and schedule runs based on
 
 ### When NOT to use assets
 
-Assets do not monitor external systems directly. Airflow only learns about asset updates through task completions (outlets), API calls, UI actions, or AssetWatchers polling message queues. If you need to react to a condition in an external system that isn't published to a message queue (e.g. a file appearing in S3, a row existing in a database), use one of these instead:
+Assets do not monitor external systems directly. If you need to react to a condition in an external system that isn't published to a message queue, use:
 
-- **[Sensors](https://www.astronomer.io/docs/learn/what-is-a-sensor)**: Synchronously poll for a condition. Many sensors have a deferrable mode.
-- **[Async `@task` decorators](https://www.astronomer.io/docs/learn/deferrable-operators)**: Asynchronously check for a condition using `async`/`await`.
-- **[Deferrable operators](https://www.astronomer.io/docs/learn/deferrable-operators)**: Use the triggerer component to asynchronously wait for a condition, releasing the worker slot during long-running checks.
+- **[Sensors](https://www.astronomer.io/docs/learn/what-is-a-sensor)**: Synchronously poll for a condition.
+- **[Deferrable operators](https://www.astronomer.io/docs/learn/deferrable-operators)**: Asynchronously wait, releasing the worker slot.
 
-If the external event *is* published to a message queue (SQS, Kafka, Pub/Sub, etc.), use [event-driven scheduling](#event-driven-scheduling) with AssetWatchers.
+If the external event *is* published to a message queue (SQS, Kafka, Pub/Sub, etc.), use [event-driven scheduling](#event-driven-scheduling).
 
 ---
 
 ## Quick import reference
 
 ```python
-# Core — available in all Airflow 3.x versions
+# Core — all Airflow 3.x versions
 from airflow.sdk import Asset, AssetAlias, Metadata, dag, task
 
 # Combined asset + time scheduling
@@ -71,7 +75,7 @@ from airflow.sdk import (
 
 ## Assets, outlets, and inlets
 
-An asset is identified by a unique **name** string. Optionally attach a URI when it represents a concrete data entity (table, file, etc.). An asset is registered in Airflow's metadata database as soon as it appears in an `outlets`, `inlets`, or `schedule` parameter.
+An asset is identified by a unique **name** string. Optionally attach a URI for a concrete data entity. An asset is registered as soon as it appears in `outlets`, `inlets`, or `schedule`.
 
 ### Outlets — declaring a producer task
 
@@ -103,7 +107,7 @@ A task can produce to multiple assets: `outlets=[Asset("a"), Asset("b")]`.
 
 ### Inlets — reading asset event information
 
-`inlets` give a task access to asset events for a specific asset. Defining inlets does **not** affect the Dag's schedule.
+`inlets` give a task access to asset events. Defining inlets does **not** affect the Dag's schedule.
 
 ```python
 @task(inlets=[Asset("my_asset")])
@@ -115,9 +119,9 @@ def read_asset_info(inlet_events):
 read_asset_info()
 ```
 
-### `@asset` decorator — shorthand for one-task-one-asset Dags
+### `@asset` decorator
 
-The `@asset` decorator creates a Dag with a single task that updates an asset of the same name. It's a concise, asset-oriented alternative to the `@dag` + `@task(outlets=[...])` pattern.
+Creates a Dag with a single task that updates an asset of the same name:
 
 ```python
 from airflow.sdk import asset
@@ -127,9 +131,7 @@ def my_asset():
     pass
 ```
 
-This creates a Dag with ID `my_asset` containing one task `my_asset` that updates an asset named `my_asset`.
-
-You can chain `@asset` Dags by scheduling one on another:
+Chain `@asset` Dags by scheduling one on another:
 
 ```python
 from airflow.sdk import asset
@@ -159,15 +161,13 @@ def my_multi_asset():
     pass
 ```
 
-> Whether you use the `@asset` decorator (asset-oriented) or `@dag` + `@task(outlets=[...])` (task-oriented) is a matter of preference. Both create standard Dags visible in the Airflow UI.
-
 ---
 
 ## Asset schedules
 
-### Basic asset schedule — one or more assets
+### Basic asset schedule
 
-Provide one asset to trigger on every update:
+One asset — triggers on every update:
 
 ```python
 from airflow.sdk import Asset, dag
@@ -179,7 +179,7 @@ def my_consumer_dag():
 my_consumer_dag()
 ```
 
-Provide multiple assets — the Dag runs when **all** have received at least one update each. After a triggered run, the slate resets:
+Multiple assets in a **[]** list — triggers when **all** have received at least one update each (then resets). To create more complex asset-scheduling logic including OR/AND see [Conditional asset scheduling](#conditional-asset-scheduling).
 
 ```python
 @dag(schedule=[Asset("asset_a"), Asset("asset_b")])
@@ -193,31 +193,29 @@ needs_both()
 
 | Rule | Detail |
 |------|--------|
-| Paused Dags ignore updates | Asset events only count while the Dag is unpaused. Unpausing starts with a blank slate. |
-| Each producer completion triggers | If `task1` and `task2` both produce `asset_a`, the consumer runs twice — once per completion. |
-| First outlet wins | A consumer triggers as soon as the first task with the outlet finishes, even if downstream tasks also produce the same asset. |
-| Events coalesce for multi-asset schedules | If a Dag is scheduled on `[Asset("a"), Asset("b")]` and `a` updates 5 times before `b` updates once, the consumer runs **once** when `b` finally fires — not 5 times. Pending events for already-satisfied assets are queued (see [Queued asset events](#queued-asset-events)). |
-| Only successful tasks emit events | Skipped or failed tasks do **not** create asset events, even if they have `outlets` defined. Only successful completion triggers downstream consumers. |
-| No data interval | Asset-triggered runs have no data interval. Use partitioned asset schedules to pass time-based info. |
+| Paused Dags ignore updates | Asset events only count while unpaused. Unpausing starts with a blank slate. |
+| Each producer completion triggers | If `task1` and `task2` both produce `asset_a`, the consumer runs twice. |
+| First outlet wins | Consumer triggers as soon as the first task with the outlet finishes. |
+| Events coalesce for multi-asset schedules | If `a` updates 5 times before `b` updates once, the consumer runs **once** when `b` fires. |
+| Only successful tasks emit events | Skipped or failed tasks do **not** create asset events. |
+| No data interval | Asset-triggered runs have no data interval. Use the partition_key passed by partitioned asset schedules for time-based segmentation. |
 
 ### Queued asset events
 
-When a Dag is scheduled on multiple assets (e.g. `[Asset("a"), Asset("b")]`), asset events that arrive before the full condition is met are **queued**. Once all required assets have at least one event, the Dag run is triggered and the queue resets.
+When a Dag is scheduled on multiple assets, events that arrive before the full condition is met are **queued**. Once all required assets have at least one event, the Dag run triggers and the queue resets.
 
-Queued events are useful for debugging why a multi-asset Dag hasn't triggered yet. You can inspect them via the Airflow UI (click the Dag's schedule) or the REST API:
+Inspect queued events via the Airflow UI (click the Dag's schedule) or the REST API:
 
 - `GET /api/v2/dags/{dag_id}/assets/queuedEvents` — all queued events for a Dag
 - `GET /api/v2/dags/{dag_id}/assets/{asset_id}/queuedEvents` — queued events for a specific asset/Dag pair
 - `GET /api/v2/assets/{asset_id}/queuedEvents` — all queued events for an asset across all Dags
 - `DELETE` variants of the above to clear queued events
 
-See [REST API endpoints](#rest-api-endpoints) for the full list of asset-related API operations.
-
 ---
 
 ## Conditional asset scheduling
 
-Use `|` (OR) and `&` (AND) operators inside `()` (not `[]`) for complex expressions:
+Use `|` (OR) and `&` (AND) operators inside **`()`** (not `[]`) for complex expressions:
 
 ```python
 from airflow.sdk import Asset, dag
@@ -245,13 +243,13 @@ def run_on_one_from_each_group():
 run_on_one_from_each_group()
 ```
 
-> **`()` not `[]`**: Use parentheses for conditional expressions. Square brackets `[]` mean "all must update" (AND-only). Parentheses let you use `|` and `&`.
+> **`()` not `[]`**: Square brackets `[]` mean "all must update" (AND-only). Parentheses let you use `|` and `&`.
 
 ---
 
 ## Combined asset and time-based scheduling
 
-Use `AssetOrTimeSchedule` to run a Dag on **either** a cron schedule **or** asset updates — whichever fires first:
+Use `AssetOrTimeSchedule` to run a Dag on **either** a cron schedule **or** asset updates:
 
 ```python
 from airflow.sdk import Asset, dag
@@ -309,11 +307,11 @@ def produce_with_context(outlet_events):
 produce_with_context()
 ```
 
-Both approaches require the asset to also be in the task's `outlets`.
+Both approaches require the asset to be in the task's `outlets`.
 
 ### Retrieve extra information (consumer side)
 
-**From triggering events** (only available in asset-triggered runs):
+**From triggering events** (only in asset-triggered Dag runs):
 
 ```python
 from airflow.sdk import task
@@ -327,7 +325,7 @@ def consume_triggering(triggering_asset_events):
 consume_triggering()
 ```
 
-**From inlets** (works in any Dag, regardless of schedule):
+**From inlets** (works in any Dag run type, inlets do not affect the Dag's schedule):
 
 ```python
 from airflow.sdk import Asset, task
@@ -424,9 +422,7 @@ BashOperator(
 
 ## Event-driven scheduling
 
-Event-driven scheduling is a sub-type of asset-based scheduling where a Dag is triggered by messages posted to an external message queue. This is the way to make Airflow react to events outside of its own task execution — such as data delivery notifications, IoT sensor events, or inference requests.
-
-An `AssetWatcher` watches a `MessageQueueTrigger` that polls a message queue. When a message arrives, the trigger fires a `TriggerEvent`, and the AssetWatcher creates an asset event for the associated asset. The message payload is attached to the asset event's `extra` dictionary.
+Event-driven scheduling triggers a Dag from messages in an external message queue. An `AssetWatcher` polls a `MessageQueueTrigger`; when a message arrives, it creates an asset event with the message payload in `extra`.
 
 ### Pattern
 
@@ -466,15 +462,15 @@ event_driven_dag()
 |----------|---------|-----------------|
 | Amazon SQS | `apache-airflow-providers-amazon` | `>=9.7.0` |
 | Apache Kafka | `apache-airflow-providers-apache-kafka` | `>=1.9.0` |
-| Google Pub/Sub | `apache-airflow-providers-google` | Check latest docs |
-| Azure Service Bus | `apache-airflow-providers-microsoft-azure` | Check latest docs |
-| Redis Pub/Sub | `apache-airflow-providers-redis` | Check latest docs |
+| Google Pub/Sub | `apache-airflow-providers-google` | `>=19.5.0` |
+| Azure Service Bus | `apache-airflow-providers-microsoft-azure` | `>=12.9.0` |
+| Redis Pub/Sub | `apache-airflow-providers-redis` | `>=4.3.0` |
 
 All providers also require `apache-airflow-providers-common-messaging>=1.0.2`.
 
-For Kafka, the `MessageQueueTrigger` accepts an `apply_function` parameter (a dotted Python path to a callable in your project's `include/` folder) that transforms the raw message before it reaches the asset event.
+For Kafka, `MessageQueueTrigger` accepts an `apply_function` parameter (a dotted Python path to a callable in your project's `include/` folder) that transforms the raw message before it reaches the asset event.
 
-You can also create custom triggers for unsupported message queues by inheriting from `BaseEventTrigger`.
+You can create custom triggers for unsupported message queues by inheriting from `BaseEventTrigger`.
 
 ---
 
@@ -482,9 +478,9 @@ You can also create custom triggers for unsupported message queues by inheriting
 
 Partitioned runs attach a `partition_key` string to Dag runs and asset events, enabling time- or segment-based data processing.
 
-### Create partitioned runs with CronPartitionTimetable
+### CronPartitionTimetable — producing partitioned events
 
-`CronPartitionTimetable` creates scheduled runs with an automatic `partition_key` based on the `run_after` timestamp:
+Creates scheduled runs with an automatic `partition_key` based on the `run_after` timestamp:
 
 ```python
 from airflow.sdk import dag, task, Asset, CronPartitionTimetable
@@ -512,9 +508,9 @@ Use `run_offset` to shift the partition key relative to the cron expression:
 CronPartitionTimetable("0 * * * *", timezone="UTC", run_offset=-12)
 ```
 
-> **Important**: Partitioned asset events created by `CronPartitionTimetable` tasks do **not** trigger non-partition-aware Dags. They only trigger Dags using `PartitionedAssetTimetable`.
+> **Important**: Partitioned asset events do **not** trigger non-partition-aware Dags. They only trigger Dags using `PartitionedAssetTimetable`.
 
-### Schedule on partitioned asset events
+### PartitionedAssetTimetable — consuming partitioned events
 
 ```python
 from airflow.sdk import dag, task, PartitionedAssetTimetable, Asset
@@ -550,7 +546,7 @@ def needs_both_partitioned():
 needs_both_partitioned()
 ```
 
-This Dag triggers only when both assets receive partitioned events with the **same** partition key.
+Triggers only when both assets receive partitioned events with the **same** partition key.
 
 ### Accessing the partition key in tasks
 
@@ -610,7 +606,7 @@ asset_b = Asset("weekly_reports")
 
 @dag(
     schedule=PartitionedAssetTimetable(
-        assets=(asset_a & asset_b),
+        assets=(asset_a | asset_b),
         partition_mapper_config={
             asset_a: ToDailyMapper(),
             asset_b: ToWeeklyMapper(),
@@ -646,7 +642,7 @@ from airflow.sdk import (
 
 @dag(
     schedule=PartitionedAssetTimetable(
-        assets=Asset("segmented_data"),
+        assets=Asset("segmented_data"),  # with a partition key like "Finance|2026-03-16T09:00:00|Revenue"
         partition_mapper_config={
             Asset("segmented_data"): ProductMapper(
                 IdentityMapper(),
@@ -683,39 +679,37 @@ from airflow.plugins_manager import AirflowPlugin
 from airflow.listeners.types import AssetEvent
 from airflow.serialization.definitions.assets import SerializedAsset, SerializedAssetAlias
 from airflow.listeners import hookimpl
+import sys
 
 
 @hookimpl
 def on_asset_created(asset: SerializedAsset):
     """Runs when a new asset is registered."""
+    pass
 
 
 @hookimpl
 def on_asset_alias_created(asset_alias: SerializedAssetAlias):
     """Runs when a new asset alias is registered."""
+    pass
 
 
 @hookimpl
 def on_asset_changed(asset: SerializedAsset):
     """Runs when any asset change occurs."""
-
+    pass
 
 @hookimpl
 def on_asset_event_emitted(asset_event: AssetEvent):
     """Runs when an asset event is emitted."""
-
+    pass
 
 class AssetListenerPlugin(AirflowPlugin):
     name = "asset_listener_plugin"
-    listeners = [
-        on_asset_created,
-        on_asset_alias_created,
-        on_asset_changed,
-        on_asset_event_emitted,
-    ]
+    listeners = [sys.modules[__name__]]
 ```
 
-Place this file in `plugins/`. Restart required after changes.
+Place this file in `plugins/` choose the relevant function(s) and the code that should execute when the event occurs. Restart required after changes.
 
 ---
 
@@ -779,23 +773,23 @@ The `GET /api/v2/dags` endpoint supports `has_asset_schedule` (boolean) and `ass
 
 | Problem | Cause | Fix |
 |---------|-------|-----|
-| Consumer Dag never triggers | Dag is paused | Unpause the Dag — paused Dags ignore all asset events |
+| Consumer Dag never triggers | Dag is paused | Unpause the Dag |
 | Consumer fires too often | Multiple tasks produce same asset | Each producer completion triggers independently — consolidate if needed |
-| `triggering_asset_events` is empty | Dag was triggered manually, not by asset | Guard with `for asset, events in triggering_asset_events.items()` — loop won't execute on manual runs |
+| `triggering_asset_events` is empty | Dag was triggered manually | Guard with `for asset, events in triggering_asset_events.items()` |
 | Using `from airflow.datasets import Dataset` | Airflow 2.x import | Use `from airflow.sdk import Asset` |
-| `[]` with `\|` operator fails | Square brackets don't support conditional expressions | Use `()` for conditional asset scheduling |
-| Partitioned events don't trigger consumer | Consumer uses `schedule=[Asset(...)]` | Use `PartitionedAssetTimetable` for partition-aware scheduling |
+| `[]` with `\|` operator fails | Square brackets don't support conditional expressions | Use `()` for conditional scheduling |
+| Partitioned events don't trigger consumer | Consumer uses `schedule=[Asset(...)]` | Use `PartitionedAssetTimetable` |
 | Regular events don't trigger partitioned consumer | Consumer uses `PartitionedAssetTimetable` | Partitioned consumers only react to partitioned events |
-| Partition key mapper mismatch in chain | Downstream Dag uses different mapper than upstream | Keep mappers identical for all Dags after the first in the chain |
-| Manual Dag run has no partition key | `CronPartitionTimetable` only sets keys for scheduled/backfill runs | Provide `partition_key` in trigger config or API request for manual runs |
+| Partition key mapper mismatch in chain | Downstream Dag uses different mapper | Keep mappers identical for all Dags after the first |
+| Manual Dag run has no partition key | `CronPartitionTimetable` only sets keys for scheduled/backfill runs | Provide `partition_key` in trigger config or API |
 
 ---
 
 ## References
 
-- [Basic asset-based scheduling](https://www.astronomer.io/docs/learn/airflow-datasets) — full guide on basic asset scheduling
-- [Advanced asset-based scheduling](https://www.astronomer.io/docs/learn/airflow-advanced-asset-scheduling) — conditional schedules, combined time+asset, extras, aliases, listeners
-- [Partitioned Dag runs and asset events](https://www.astronomer.io/docs/learn/airflow-partitioned-runs) — CronPartitionTimetable, PartitionedAssetTimetable, partition key mappers
+- [Basic asset-based scheduling](https://www.astronomer.io/docs/learn/airflow-datasets)
+- [Advanced asset-based scheduling](https://www.astronomer.io/docs/learn/airflow-advanced-asset-scheduling)
+- [Partitioned Dag runs and asset events](https://www.astronomer.io/docs/learn/airflow-partitioned-runs)
 
 ## Related skills
 
