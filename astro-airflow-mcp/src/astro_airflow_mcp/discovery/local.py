@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import socket
 from pathlib import Path
 from typing import Any
@@ -10,6 +11,11 @@ from typing import Any
 import httpx
 import yaml
 
+from astro_airflow_mcp.constants import (
+    DEFAULT_PROXY_PORT,
+    get_astro_global_config_path,
+    get_proxy_routes_path,
+)
 from astro_airflow_mcp.discovery.base import DiscoveredInstance, DiscoveryError
 
 
@@ -57,7 +63,7 @@ class LocalDiscoveryBackend:
         """Local discovery is always available."""
         return True
 
-    def _get_astro_project_port(self, project_dir: Path | None = None) -> int | None:
+    def get_astro_project_port(self, project_dir: Path | None = None) -> int | None:
         """Check for .astro/config.yaml and extract the configured port.
 
         Looks for:
@@ -96,35 +102,147 @@ class LocalDiscoveryBackend:
         except (OSError, yaml.YAMLError, ValueError, TypeError):
             return None
 
+    def _get_proxy_port(self, global_config_path: Path | None = None) -> int:
+        """Read the proxy port from the global Astro CLI config.
+
+        Args:
+            global_config_path: Path to ~/.astro/config.yaml (for testing)
+
+        Returns:
+            Proxy port number (default: DEFAULT_PROXY_PORT)
+        """
+        if global_config_path is None:
+            global_config_path = get_astro_global_config_path()
+
+        try:
+            with open(global_config_path) as f:
+                config = yaml.safe_load(f)
+            if (
+                config
+                and "proxy" in config
+                and isinstance(config["proxy"], dict)
+                and (port := config["proxy"].get("port")) is not None
+            ):
+                return int(port)
+        except (OSError, yaml.YAMLError, ValueError, TypeError):
+            pass
+
+        return DEFAULT_PROXY_PORT
+
+    def _read_proxy_routes(self, routes_path: Path | None = None) -> list[dict]:
+        """Read proxy routes from ~/.astro/proxy/routes.json.
+
+        Args:
+            routes_path: Path to routes.json (for testing)
+
+        Returns:
+            List of route dicts, or empty list if unavailable
+        """
+        if routes_path is None:
+            routes_path = get_proxy_routes_path()
+
+        try:
+            with open(routes_path) as f:
+                data = json.load(f)
+            if isinstance(data, list):
+                return data
+        except (OSError, json.JSONDecodeError, TypeError):
+            pass
+
+        return []
+
+    def find_proxy_url_for_project(
+        self,
+        project_dir: str,
+        routes_path: Path | None = None,
+        global_config_path: Path | None = None,
+    ) -> str | None:
+        """Find the proxy URL for a specific project directory.
+
+        Args:
+            project_dir: The project directory to match
+            routes_path: Path to routes.json (for testing)
+            global_config_path: Path to global astro config (for testing)
+
+        Returns:
+            Proxy URL if a matching route is found, None otherwise
+        """
+        routes = self._read_proxy_routes(routes_path=routes_path)
+        if not routes:
+            return None
+
+        project_path = str(Path(project_dir).resolve())
+        for route in routes:
+            if not (route_dir := route.get("projectDir")):
+                continue
+            if str(Path(route_dir).resolve()) != project_path:
+                continue
+            if not (hostname := route.get("hostname")):
+                continue
+            proxy_port = self._get_proxy_port(global_config_path=global_config_path)
+            return f"http://{hostname}.localhost:{proxy_port}"
+
+        return None
+
     def discover(
         self,
         ports: list[int] | None = None,
         hosts: list[str] | None = None,
         timeout: float | None = None,
+        proxy_routes_path: Path | None = None,
+        proxy_global_config_path: Path | None = None,
         **kwargs: Any,
     ) -> list[DiscoveredInstance]:
-        """Discover local Airflow instances by scanning ports.
+        """Discover local Airflow instances.
 
-        First checks for .astro/config.yaml in the current directory to find
-        the configured port. Falls back to scanning common ports if not found.
+        Checks proxy routes first (for Astro CLI reverse proxy), then falls
+        back to scanning ports for running Airflow instances.
 
         Args:
             ports: Ports to scan (default: check .astro/config.yaml, then common ports)
             hosts: Hosts to scan (default: localhost, 127.0.0.1)
             timeout: Connection timeout in seconds
+            proxy_routes_path: Path to proxy routes.json (for testing)
+            proxy_global_config_path: Path to global astro config (for testing)
             **kwargs: Additional options (ignored)
 
         Returns:
-            List of discovered instances
+            List of discovered instances (proxy routes first, then port-scanned)
         """
         if timeout is None:
             timeout = self.DEFAULT_HTTP_TIMEOUT
 
+        instances: list[DiscoveredInstance] = []
+
+        # Step 1: Check proxy routes (Astro CLI reverse proxy)
+        if proxy_routes := self._read_proxy_routes(routes_path=proxy_routes_path):
+            proxy_port = self._get_proxy_port(global_config_path=proxy_global_config_path)
+            for route in proxy_routes:
+                if not (hostname := route.get("hostname")):
+                    continue
+                proxy_url = f"http://{hostname}.localhost:{proxy_port}"
+                instance_name = f"{hostname}.localhost:{proxy_port}"
+                instances.append(
+                    DiscoveredInstance(
+                        name=instance_name,
+                        url=proxy_url,
+                        source=self.name,
+                        auth_token=None,
+                        metadata={
+                            "proxy": True,
+                            "project_dir": route.get("projectDir", ""),
+                            "mode": route.get("mode", ""),
+                            "backend_port": route.get("port", ""),
+                        },
+                    )
+                )
+
+        # Step 2: Port scanning
         # Build port list: check .astro/config.yaml first, then fallback to defaults
         if ports:
             scan_ports = ports
         else:
-            astro_port = self._get_astro_project_port()
+            astro_port = self.get_astro_project_port()
             if astro_port:
                 # Prioritize Astro project port, then check other common ports
                 scan_ports = [astro_port] + [p for p in self.DEFAULT_PORTS if p != astro_port]
@@ -133,7 +251,6 @@ class LocalDiscoveryBackend:
 
         scan_hosts = hosts if hosts else self.DEFAULT_HOSTS
 
-        instances: list[DiscoveredInstance] = []
         seen_urls: set[str] = set()
 
         for host in scan_hosts:

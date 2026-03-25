@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -635,56 +637,278 @@ class TestLocalDiscoveryBackend:
         assert result is None
 
     def test_get_astro_project_port_webserver(self, tmp_path):
-        """Test _get_astro_project_port reads webserver.port (Airflow 2)."""
+        """Test get_astro_project_port reads webserver.port (Airflow 2)."""
         astro_dir = tmp_path / ".astro"
         astro_dir.mkdir()
         config_file = astro_dir / "config.yaml"
         config_file.write_text("webserver:\n  port: 8081\n")
 
         backend = LocalDiscoveryBackend()
-        port = backend._get_astro_project_port(tmp_path)
+        port = backend.get_astro_project_port(tmp_path)
 
         assert port == 8081
 
     def test_get_astro_project_port_api_server(self, tmp_path):
-        """Test _get_astro_project_port reads api-server.port (Airflow 3)."""
+        """Test get_astro_project_port reads api-server.port (Airflow 3)."""
         astro_dir = tmp_path / ".astro"
         astro_dir.mkdir()
         config_file = astro_dir / "config.yaml"
         config_file.write_text("api-server:\n  port: 8082\n")
 
         backend = LocalDiscoveryBackend()
-        port = backend._get_astro_project_port(tmp_path)
+        port = backend.get_astro_project_port(tmp_path)
 
         assert port == 8082
 
     def test_get_astro_project_port_prefers_api_server(self, tmp_path):
-        """Test _get_astro_project_port prefers api-server over webserver."""
+        """Test get_astro_project_port prefers api-server over webserver."""
         astro_dir = tmp_path / ".astro"
         astro_dir.mkdir()
         config_file = astro_dir / "config.yaml"
         config_file.write_text("api-server:\n  port: 8082\nwebserver:\n  port: 8081\n")
 
         backend = LocalDiscoveryBackend()
-        port = backend._get_astro_project_port(tmp_path)
+        port = backend.get_astro_project_port(tmp_path)
 
         assert port == 8082
 
     def test_get_astro_project_port_no_config(self, tmp_path):
-        """Test _get_astro_project_port returns None when no config."""
+        """Test get_astro_project_port returns None when no config."""
         backend = LocalDiscoveryBackend()
-        port = backend._get_astro_project_port(tmp_path)
+        port = backend.get_astro_project_port(tmp_path)
 
         assert port is None
 
     def test_get_astro_project_port_no_port_in_config(self, tmp_path):
-        """Test _get_astro_project_port returns None when no port in config."""
+        """Test get_astro_project_port returns None when no port in config."""
         astro_dir = tmp_path / ".astro"
         astro_dir.mkdir()
         config_file = astro_dir / "config.yaml"
         config_file.write_text("project:\n  name: test\n")
 
         backend = LocalDiscoveryBackend()
-        port = backend._get_astro_project_port(tmp_path)
+        port = backend.get_astro_project_port(tmp_path)
 
         assert port is None
+
+
+@pytest.fixture
+def sample_proxy_route():
+    """A sample proxy route entry from routes.json."""
+    return {
+        "hostname": "myproject",
+        "port": "8080",
+        "projectDir": "/projects/myproject",
+        "pid": 0,
+        "mode": "docker",
+    }
+
+
+@pytest.fixture
+def proxy_env(tmp_path):
+    """Set up proxy routes.json and global config for testing."""
+    routes_file = tmp_path / "routes.json"
+    global_config = tmp_path / "config.yaml"
+    global_config.write_text("")
+    return routes_file, global_config
+
+
+class TestLocalDiscoveryProxyRoutes:
+    """Tests for proxy route discovery in LocalDiscoveryBackend."""
+
+    def test_get_proxy_port_default(self):
+        """Returns default port when config doesn't exist."""
+        backend = LocalDiscoveryBackend()
+        assert backend._get_proxy_port(global_config_path=Path("/nonexistent")) == 6563
+
+    def test_get_proxy_port_from_config(self, tmp_path):
+        """Reads proxy.port from global config."""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("proxy:\n  port: 7000\n")
+
+        backend = LocalDiscoveryBackend()
+        assert backend._get_proxy_port(global_config_path=config_file) == 7000
+
+    def test_read_proxy_routes_no_file(self):
+        """Returns empty list when routes.json doesn't exist."""
+        backend = LocalDiscoveryBackend()
+        assert backend._read_proxy_routes(routes_path=Path("/nonexistent")) == []
+
+    def test_read_proxy_routes_valid(self, tmp_path, sample_proxy_route):
+        """Reads valid routes.json."""
+        routes_file = tmp_path / "routes.json"
+        routes_file.write_text(json.dumps([sample_proxy_route]))
+
+        backend = LocalDiscoveryBackend()
+        routes = backend._read_proxy_routes(routes_path=routes_file)
+        assert len(routes) == 1
+        assert routes[0]["hostname"] == "myproject"
+
+    def test_read_proxy_routes_invalid_json(self, tmp_path):
+        """Returns empty list for malformed JSON."""
+        routes_file = tmp_path / "routes.json"
+        routes_file.write_text("not json")
+
+        backend = LocalDiscoveryBackend()
+        assert backend._read_proxy_routes(routes_path=routes_file) == []
+
+    @pytest.mark.parametrize(
+        argnames=("config_yaml", "hostname", "expected_url"),
+        argvalues=[
+            pytest.param("", "myproject", "http://myproject.localhost:6563", id="default-port"),
+            pytest.param(
+                "proxy:\n  port: 7000\n", "alpha", "http://alpha.localhost:7000", id="custom-port"
+            ),
+        ],
+    )
+    def test_discover_yields_proxy_routes(
+        self,
+        proxy_env,
+        sample_proxy_route,
+        config_yaml,
+        hostname,
+        expected_url,
+    ):
+        """discover() yields proxy instances with correct URL and metadata."""
+        routes_file, global_config = proxy_env
+        routes_file.write_text(json.dumps([{**sample_proxy_route, "hostname": hostname}]))
+        global_config.write_text(config_yaml)
+
+        backend = LocalDiscoveryBackend()
+        with patch.object(backend, "_is_port_open", return_value=False):
+            instances = backend.discover(
+                ports=[8080],
+                proxy_routes_path=routes_file,
+                proxy_global_config_path=global_config,
+            )
+
+        assert len(instances) == 1
+        assert instances[0].url == expected_url
+        assert instances[0].source == "local"
+        assert instances[0].metadata["proxy"] is True
+
+    def test_discover_no_proxy_falls_through(self):
+        """discover() falls through to port scan when no proxy routes."""
+        backend = LocalDiscoveryBackend()
+
+        with (
+            patch.object(backend, "_is_port_open", return_value=True),
+            patch.object(
+                backend,
+                "_detect_airflow",
+                return_value={"detected_from": "/api/v1/health", "api_version": "v1"},
+            ),
+        ):
+            instances = backend.discover(
+                ports=[8080],
+                hosts=["localhost"],
+                proxy_routes_path=Path("/nonexistent"),
+            )
+
+        assert len(instances) == 1
+        assert instances[0].url == "http://localhost:8080"
+        assert "proxy" not in instances[0].metadata
+
+    def test_discover_proxy_and_port_scan_coexist(self, proxy_env, sample_proxy_route):
+        """Proxy and port-scanned instances are both returned."""
+        routes_file, global_config = proxy_env
+        routes_file.write_text(json.dumps([sample_proxy_route]))
+
+        backend = LocalDiscoveryBackend()
+
+        with (
+            patch.object(backend, "_is_port_open", return_value=True),
+            patch.object(
+                backend,
+                "_detect_airflow",
+                return_value={"detected_from": "/api/v1/health", "api_version": "v1"},
+            ),
+        ):
+            instances = backend.discover(
+                ports=[8080],
+                hosts=["localhost"],
+                proxy_routes_path=routes_file,
+                proxy_global_config_path=global_config,
+            )
+
+        proxy_instances = [i for i in instances if i.metadata.get("proxy")]
+        port_scan_instances = [i for i in instances if not i.metadata.get("proxy")]
+        assert len(proxy_instances) == 1
+        assert len(port_scan_instances) == 1
+
+
+class TestDiscoverAirflowUrl:
+    """Tests for discover_airflow_url() in __main__.py."""
+
+    @pytest.mark.parametrize(
+        argnames=("config_yaml", "hostname", "expected_url"),
+        argvalues=[
+            pytest.param("", "myproject", "http://myproject.localhost:6563", id="default-port"),
+            pytest.param(
+                "proxy:\n  port: 7000\n", "alpha", "http://alpha.localhost:7000", id="custom-port"
+            ),
+        ],
+    )
+    def test_proxy_route_match(
+        self,
+        tmp_path,
+        sample_proxy_route,
+        config_yaml,
+        hostname,
+        expected_url,
+    ):
+        """Returns proxy URL with is_proxy=True when route matches project dir."""
+        from astro_airflow_mcp.__main__ import discover_airflow_url
+
+        routes_file = tmp_path / "routes.json"
+        routes_file.write_text(
+            json.dumps(
+                [
+                    {**sample_proxy_route, "hostname": hostname, "projectDir": str(tmp_path)},
+                ]
+            )
+        )
+        global_config = tmp_path / "config.yaml"
+        global_config.write_text(config_yaml)
+
+        result = discover_airflow_url(
+            str(tmp_path),
+            proxy_routes_path=routes_file,
+            proxy_global_config_path=global_config,
+        )
+        assert result == (expected_url, True)
+
+    @pytest.mark.parametrize(
+        argnames=("routes_json", "routes_exist"),
+        argvalues=[
+            pytest.param('[{"hostname": "other", "projectDir": "/other"}]', True, id="no-match"),
+            pytest.param(None, False, id="no-file"),
+        ],
+    )
+    def test_falls_through_to_astro_config(
+        self,
+        tmp_path,
+        routes_json,
+        routes_exist,
+    ):
+        """Falls through to .astro/config.yaml when proxy doesn't match."""
+        from astro_airflow_mcp.__main__ import discover_airflow_url
+
+        astro_dir = tmp_path / ".astro"
+        astro_dir.mkdir()
+        (astro_dir / "config.yaml").write_text("webserver:\n  port: 8081\n")
+
+        if routes_exist:
+            routes_file = tmp_path / "routes.json"
+            routes_file.write_text(routes_json)
+        else:
+            routes_file = Path("/nonexistent/routes.json")
+
+        result = discover_airflow_url(str(tmp_path), proxy_routes_path=routes_file)
+        assert result == ("http://localhost:8081", False)
+
+    def test_no_project_dir_returns_none(self):
+        """Returns None when no project dir is given."""
+        from astro_airflow_mcp.__main__ import discover_airflow_url
+
+        assert discover_airflow_url(None) is None
