@@ -261,10 +261,7 @@ If the project is an Astro project, **automatically regenerate schemas** without
 
 ```bash
 mkdir -p blueprint/generated-schemas
-# Regenerate schemas for all blueprints
-for bp in $(blueprint list --format names 2>/dev/null); do
-  blueprint schema "$bp" > "blueprint/generated-schemas/$bp.schema.json"
-done
+# For each name from `blueprint list`: blueprint schema NAME > blueprint/generated-schemas/NAME.schema.json
 ```
 
 The Astro IDE reads `blueprint/generated-schemas/` to render configuration forms. Keeping schemas in sync ensures the visual builder always reflects the latest blueprint configs.
