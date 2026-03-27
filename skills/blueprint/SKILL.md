@@ -42,7 +42,7 @@ If the user is starting fresh, guide them through setup:
 
 ```bash
 # Add to requirements.txt
-airflow-blueprint>=0.11.0
+airflow-blueprint>=0.1.1
 
 # Or install directly
 pip install airflow-blueprint
