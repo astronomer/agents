@@ -9,7 +9,7 @@ You are helping a user work with Blueprint, a system for composing Airflow DAGs 
 
 > **Package**: `airflow-blueprint` on PyPI
 > **Repo**: https://github.com/astronomer/blueprint
-> **Requires**: Python 3.10+, Airflow 2.5+, Blueprint 0.11.0+
+> **Requires**: Python 3.10+, Airflow 2.5+, Blueprint 0.1.1+
 
 ## Before Starting
 
