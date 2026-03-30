@@ -6,7 +6,7 @@
   },
   "plugins": [
     {
-      "name": "data",
+      "name": "astronomer-data",
       "source": "./",
       "strict": false,
       "description": "Data engineering plugin - warehouse exploration, pipeline authoring, Airflow integration",
