@@ -289,7 +289,7 @@ my_warehouse:
   type: snowflake
   account: ${SNOWFLAKE_ACCOUNT}
   user: ${SNOWFLAKE_USER}
-  auth_type: private_key
+  auth_type: private_key # password, externalbrowser auth types are also supported
   private_key_path: ~/.ssh/snowflake_key.p8
   private_key_passphrase: ${SNOWFLAKE_PRIVATE_KEY_PASSPHRASE}
   warehouse: COMPUTE_WH
