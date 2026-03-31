@@ -35,7 +35,7 @@ project-root/
 claude plugin marketplace add astronomer/agents
 
 # Install the plugin
-claude plugin install data@astronomer
+claude plugin install astronomer-data@astronomer
 
 # Or test locally (session only)
 claude --plugin-dir .
@@ -43,7 +43,7 @@ claude --plugin-dir .
 
 After adding skills or making changes, reinstall the plugin:
 ```bash
-claude plugin uninstall data@astronomer && claude plugin install data@astronomer
+claude plugin uninstall astronomer-data@astronomer && claude plugin install astronomer-data@astronomer
 ```
 
 ## Skills
@@ -61,7 +61,7 @@ description: When to use this skill (Claude uses this to decide when to invoke i
 
 - Skills are auto-discovered from the `skills/` directory
 - Claude invokes skills automatically based on the description matching user requests
-- Users can also invoke directly with `/plugin-name:skill-name` (e.g., `/data:authoring-dags`)
+- Users can also invoke directly with `/plugin-name:skill-name` (e.g., `/astronomer-data:authoring-dags`)
 
 ## Configuration
 

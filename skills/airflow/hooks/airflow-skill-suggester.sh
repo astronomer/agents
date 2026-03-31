@@ -8,7 +8,7 @@ USER_PROMPT=$(cat)
 PROMPT_LOWER=$(echo "$USER_PROMPT" | tr '[:upper:]' '[:lower:]')
 
 # Check if user already explicitly mentioned using a skill
-if echo "$PROMPT_LOWER" | grep -q "use.*skill\|/data:"; then
+if echo "$PROMPT_LOWER" | grep -q "use.*skill\|/astronomer-data:"; then
     exit 0
 fi
 
@@ -29,12 +29,12 @@ for keyword in "${DEPLOY_KEYWORDS[@]}"; do
         cat <<'EOF'
 Deployment request detected.
 
-IMPORTANT: Use the `/data:deploying-airflow` skill for deployment operations. This skill covers:
+IMPORTANT: Use the `/astronomer-data:deploying-airflow` skill for deployment operations. This skill covers:
 - Astro deploy commands (full, DAG-only, image-only, dbt)
 - CI/CD setup and GitHub integration
 - Open-source deployment (Docker Compose, Kubernetes Helm chart)
 
-Load the skill: `/data:deploying-airflow`
+Load the skill: `/astronomer-data:deploying-airflow`
 
 Then proceed with the user's request.
 EOF
@@ -62,13 +62,13 @@ for keyword in "${LOCAL_KEYWORDS[@]}"; do
         cat <<'EOF'
 Local Airflow environment request detected.
 
-IMPORTANT: Use the `/data:managing-astro-local-env` skill for local environment management. The Astro CLI is the recommended way to run Airflow locally:
+IMPORTANT: Use the `/astronomer-data:managing-astro-local-env` skill for local environment management. The Astro CLI is the recommended way to run Airflow locally:
 - `astro dev init` to initialize a project
 - `astro dev start` to start a local Airflow environment
 - `astro dev parse` to validate DAGs
 - `astro dev pytest` to run tests
 
-Load the skill: `/data:managing-astro-local-env`
+Load the skill: `/astronomer-data:managing-astro-local-env`
 
 Then proceed with the user's request.
 EOF
@@ -112,13 +112,13 @@ if [ "$MATCHED" = true ]; then
     cat <<'EOF'
 Airflow operation detected.
 
-IMPORTANT: Use the `/data:airflow` skill for Airflow operations. This skill provides:
+IMPORTANT: Use the `/astronomer-data:airflow` skill for Airflow operations. This skill provides:
 - Structured workflow guidance
 - Best practices for MCP tool usage
 - Routing to specialized skills (testing, debugging, authoring, deploying)
 - Prevention of bash/CLI antipatterns
 
-Load the skill first: `/data:airflow`
+Load the skill first: `/astronomer-data:airflow`
 
 Then proceed with the user's request.
 EOF

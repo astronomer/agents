@@ -64,7 +64,10 @@ This installs all Astronomer skills into your project via [skills.sh](https://sk
 ```bash
 # Add the marketplace and install the plugin
 claude plugin marketplace add astronomer/agents
-claude plugin install data@astronomer
+claude plugin install astronomer-data@astronomer
+
+# Upgrading from the old plugin name? Uninstall first:
+# claude plugin uninstall data@astronomer
 ```
 
 The plugin includes the Airflow MCP server that runs via `uvx` from PyPI. Data warehouse queries are handled by the `analyzing-data` skill using a background Jupyter kernel.
@@ -151,7 +154,7 @@ uvx astro-airflow-mcp --transport stdio
 
 ## Features
 
-The `data` plugin bundles an MCP server and skills into a single installable package.
+The `astronomer-data` plugin bundles an MCP server and skills into a single installable package.
 
 ### MCP Server
 
@@ -230,15 +233,15 @@ Astro is Astronomer's managed Airflow platform. It's optional, but a good fit if
 
 ```mermaid
 flowchart LR
-    init["/data:warehouse-init"] --> analyzing["/data:analyzing-data"]
-    analyzing --> profiling["/data:profiling-tables"]
-    analyzing --> freshness["/data:checking-freshness"]
+    init["/astronomer-data:warehouse-init"] --> analyzing["/astronomer-data:analyzing-data"]
+    analyzing --> profiling["/astronomer-data:profiling-tables"]
+    analyzing --> freshness["/astronomer-data:checking-freshness"]
 ```
 
-1. **Initialize** (`/data:warehouse-init`) - One-time setup to generate `warehouse.md` with schema metadata
-2. **Analyze** (`/data:analyzing-data`) - Answer business questions with SQL
-3. **Profile** (`/data:profiling-tables`) - Deep dive into specific tables for statistics and quality
-4. **Check freshness** (`/data:checking-freshness`) - Verify data is up to date before using
+1. **Initialize** (`/astronomer-data:warehouse-init`) - One-time setup to generate `warehouse.md` with schema metadata
+2. **Analyze** (`/astronomer-data:analyzing-data`) - Answer business questions with SQL
+3. **Profile** (`/astronomer-data:profiling-tables`) - Deep dive into specific tables for statistics and quality
+4. **Check freshness** (`/astronomer-data:checking-freshness`) - Verify data is up to date before using
 
 #### DAG Development Flow
 
@@ -246,17 +249,17 @@ For open-source Airflow, use Docker Compose for local dev and the Helm chart for
 
 ```mermaid
 flowchart LR
-    setup["/data:setting-up-astro-project"] --> authoring["/data:authoring-dags"]
-    setup --> env["/data:managing-astro-local-env"]
-    authoring --> testing["/data:testing-dags"]
-    testing --> debugging["/data:debugging-dags"]
+    setup["/astronomer-data:setting-up-astro-project"] --> authoring["/astronomer-data:authoring-dags"]
+    setup --> env["/astronomer-data:managing-astro-local-env"]
+    authoring --> testing["/astronomer-data:testing-dags"]
+    testing --> debugging["/astronomer-data:debugging-dags"]
 ```
 
-1. **Setup** (`/data:setting-up-astro-project`) - Initialize project structure and dependencies
-2. **Environment** (`/data:managing-astro-local-env`) - Start/stop local Airflow for development
-3. **Author** (`/data:authoring-dags`) - Write DAG code following best practices
-4. **Test** (`/data:testing-dags`) - Run DAGs and fix issues iteratively
-5. **Debug** (`/data:debugging-dags`) - Deep investigation for complex failures
+1. **Setup** (`/astronomer-data:setting-up-astro-project`) - Initialize project structure and dependencies
+2. **Environment** (`/astronomer-data:managing-astro-local-env`) - Start/stop local Airflow for development
+3. **Author** (`/astronomer-data:authoring-dags`) - Write DAG code following best practices
+4. **Test** (`/astronomer-data:testing-dags`) - Run DAGs and fix issues iteratively
+5. **Debug** (`/astronomer-data:debugging-dags`) - Deep investigation for complex failures
 
 ### Airflow CLI (`af`)
 
@@ -303,13 +306,13 @@ my_warehouse:
 > [!IMPORTANT]
 > **How the `databases` list works:**
 > - **Optional for most connectors** (`snowflake`, `postgres`, `bigquery`) but **required for `sqlalchemy`**
-> - **For schema discovery** (`/data:warehouse-init`): Determines which databases are scanned and included in the generated `.astro/warehouse.md`. Only databases listed here will be discovered. If omitted, no schema discovery will occur.
-> - **For query execution** (`/data:analyzing-data`): The **first database** in the list becomes the default database context for the connection, but does NOT restrict which databases you can query. You can still access any database you have permissions for using fully-qualified table names (e.g., `OTHER_DB.SCHEMA.TABLE`).
+> - **For schema discovery** (`/astronomer-data:warehouse-init`): Determines which databases are scanned and included in the generated `.astro/warehouse.md`. Only databases listed here will be discovered. If omitted, no schema discovery will occur.
+> - **For query execution** (`/astronomer-data:analyzing-data`): The **first database** in the list becomes the default database context for the connection, but does NOT restrict which databases you can query. You can still access any database you have permissions for using fully-qualified table names (e.g., `OTHER_DB.SCHEMA.TABLE`).
 >
 > **Example:** If you configure `databases: [ANALYTICS, RAW]`:
 > - `ANALYTICS` becomes the default database for queries
 > - You can still query `PROD` with `SELECT * FROM PROD.PUBLIC.USERS`
-> - Only `ANALYTICS` and `RAW` will appear in warehouse schema documentation (run `/data:warehouse-init --refresh` after adding `PROD` to include it)
+> - Only `ANALYTICS` and `RAW` will appear in warehouse schema documentation (run `/astronomer-data:warehouse-init --refresh` after adding `PROD` to include it)
 
 > [!NOTE]
 > The `account` field requires your Snowflake **account identifier** (e.g., `orgname-accountname` or `xy12345.us-east-1`), not your account name. Find this in your Snowflake console under Admin > Accounts.
@@ -425,13 +428,13 @@ For remote instances, set environment variables:
 
 ## Usage
 
-Skills are invoked automatically based on what you ask. You can also invoke them directly with `/data:<skill-name>`.
+Skills are invoked automatically based on what you ask. You can also invoke them directly with `/astronomer-data:<skill-name>`.
 
 ### Getting Started
 
 1. **Initialize your warehouse** (recommended first step):
    ```
-   /data:warehouse-init
+   /astronomer-data:warehouse-init
    ```
    This generates `.astro/warehouse.md` with schema metadata for faster queries.
 
@@ -460,7 +463,7 @@ claude --plugin-dir .
 
 # Or install from local marketplace
 claude plugin marketplace add .
-claude plugin install data@astronomer
+claude plugin install astronomer-data@astronomer
 ```
 
 ### Adding Skills
@@ -478,7 +481,7 @@ description: When to invoke this skill
 
 After adding skills, reinstall the plugin:
 ```bash
-claude plugin uninstall data@astronomer && claude plugin install data@astronomer
+claude plugin uninstall astronomer-data@astronomer && claude plugin install astronomer-data@astronomer
 ```
 
 ## Troubleshooting
@@ -487,7 +490,8 @@ claude plugin uninstall data@astronomer && claude plugin install data@astronomer
 
 | Issue | Solution |
 |-------|----------|
-| Skills not appearing | Reinstall plugin: `claude plugin uninstall data@astronomer && claude plugin install data@astronomer` |
+| Skills not appearing | Reinstall plugin: `claude plugin uninstall astronomer-data@astronomer && claude plugin install astronomer-data@astronomer` |
+| Installed as `data@astronomer` (old name) | Uninstall old name and reinstall: `claude plugin uninstall data@astronomer && claude plugin install astronomer-data@astronomer` |
 | Warehouse connection errors | Check credentials in `~/.astro/agents/.env` and connection config in `warehouse.yml` |
 | Airflow not detected | Ensure you're running from a directory with `airflow.cfg` or a `dags/` folder |
 
