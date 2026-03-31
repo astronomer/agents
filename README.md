@@ -190,6 +190,7 @@ The `astronomer-data` plugin bundles an MCP server and skills into a single inst
 | [setting-up-astro-project](./skills/setting-up-astro-project/) (Astro) | Initialize and configure new Astro/Airflow projects |
 | [managing-astro-local-env](./skills/managing-astro-local-env/) (Astro) | Manage local Airflow environment (start, stop, logs, troubleshoot) |
 | [authoring-dags](./skills/authoring-dags/) | Create and validate Airflow DAGs with best practices |
+| [blueprint](./skills/blueprint/) | Compose DAGs from YAML using reusable templates with Pydantic validation ([airflow-blueprint](https://github.com/astronomer/blueprint)) |
 | [testing-dags](./skills/testing-dags/) | Test and debug Airflow DAGs locally |
 | [debugging-dags](./skills/debugging-dags/) | Deep failure diagnosis and root cause analysis |
 | [deploying-airflow](./skills/deploying-airflow/) | Deploy Airflow DAGs and projects (Astro, Docker Compose, Kubernetes) |
