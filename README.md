@@ -67,7 +67,7 @@ claude plugin marketplace add astronomer/agents
 claude plugin install astronomer-data@astronomer
 
 # Upgrading from the old plugin name? Uninstall first:
-# claude plugin uninstall data@astronomer
+# claude plugin uninstall data@astronomer && claude plugin marketplace update && claude plugin install astronomer-data@astronomer
 ```
 
 The plugin includes the Airflow MCP server that runs via `uvx` from PyPI. Data warehouse queries are handled by the `analyzing-data` skill using a background Jupyter kernel.
@@ -482,7 +482,7 @@ description: When to invoke this skill
 
 After adding skills, reinstall the plugin:
 ```bash
-claude plugin uninstall astronomer-data@astronomer && claude plugin install astronomer-data@astronomer
+claude plugin uninstall astronomer-data@astronomer && claude plugin marketplace update && claude plugin install astronomer-data@astronomer
 ```
 
 ## Troubleshooting
@@ -491,8 +491,8 @@ claude plugin uninstall astronomer-data@astronomer && claude plugin install astr
 
 | Issue | Solution |
 |-------|----------|
-| Skills not appearing | Reinstall plugin: `claude plugin uninstall astronomer-data@astronomer && claude plugin install astronomer-data@astronomer` |
-| Installed as `data@astronomer` (old name) | Uninstall old name and reinstall: `claude plugin uninstall data@astronomer && claude plugin install astronomer-data@astronomer` |
+| Skills not appearing | Reinstall plugin: `claude plugin uninstall astronomer-data@astronomer && claude plugin marketplace update && claude plugin install astronomer-data@astronomer` |
+| Installed as `data@astronomer` (old name) | Uninstall old name and reinstall: `claude plugin uninstall data@astronomer && claude plugin marketplace update && claude plugin install astronomer-data@astronomer` |
 | Warehouse connection errors | Check credentials in `~/.astro/agents/.env` and connection config in `warehouse.yml` |
 | Airflow not detected | Ensure you're running from a directory with `airflow.cfg` or a `dags/` folder |
 

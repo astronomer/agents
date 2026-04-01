@@ -78,7 +78,7 @@ description: When to use this skill (Claude uses this to decide when to invoke i
 After adding or modifying skills, reinstall the plugin to test:
 
 ```bash
-claude plugin uninstall astronomer-data@astronomer && claude plugin install astronomer-data@astronomer
+claude plugin uninstall astronomer-data@astronomer && claude plugin marketplace update && claude plugin install astronomer-data@astronomer
 ```
 
 ### Working on the MCP Server

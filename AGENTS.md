@@ -43,7 +43,7 @@ claude --plugin-dir .
 
 After adding skills or making changes, reinstall the plugin:
 ```bash
-claude plugin uninstall astronomer-data@astronomer && claude plugin install astronomer-data@astronomer
+claude plugin uninstall astronomer-data@astronomer && claude plugin marketplace update && claude plugin install astronomer-data@astronomer
 ```
 
 ## Skills
