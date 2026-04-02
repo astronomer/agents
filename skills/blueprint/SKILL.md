@@ -9,7 +9,7 @@ You are helping a user work with Blueprint, a system for composing Airflow DAGs 
 
 > **Package**: `airflow-blueprint` on PyPI
 > **Repo**: https://github.com/astronomer/blueprint
-> **Requires**: Python 3.10+, Airflow 2.5+, Blueprint 0.1.1+
+> **Requires**: Python 3.10+, Airflow 2.5+, Blueprint 0.2.0+
 
 ## Before Starting
 
@@ -26,6 +26,9 @@ Confirm with the user:
 |--------------|--------|
 | "Create a blueprint" / "Define a template" | Go to **Creating Blueprints** |
 | "Create a DAG from YAML" / "Compose steps" | Go to **Composing DAGs in YAML** |
+| "Customize DAG args" / "Add tags to DAG" | Go to **Customizing DAG-Level Configuration** |
+| "Override config at runtime" / "Trigger with params" | Go to **Runtime Parameter Overrides** |
+| "Post-process DAGs" / "Add callback" | Go to **Post-Build Callbacks** |
 | "Validate my YAML" / "Lint blueprint" | Go to **Validation Commands** |
 | "Set up blueprint in my project" | Go to **Project Setup** |
 | "Version my blueprint" | Go to **Versioning** |
@@ -42,7 +45,7 @@ If the user is starting fresh, guide them through setup:
 
 ```bash
 # Add to requirements.txt
-airflow-blueprint>=0.1.1
+airflow-blueprint>=0.2.0
 
 # Or install directly
 pip install airflow-blueprint
@@ -55,12 +58,10 @@ Create `dags/loader.py`:
 ```python
 from blueprint import build_all
 
-build_all(
-    dag_defaults={
-        "default_args": {"owner": "data-team", "retries": 2},
-    }
-)
+build_all()
 ```
+
+DAG-level configuration (schedule, description, tags, default_args, etc.) is handled via YAML fields and `BlueprintDagArgs` templates — see **Customizing DAG-Level Configuration**.
 
 ### 3. Verify Installation
 
@@ -135,7 +136,7 @@ When user wants to create a DAG from blueprints:
 # dags/my_pipeline.dag.yaml
 dag_id: my_pipeline
 schedule: "@daily"
-tags: [etl]
+description: "My data pipeline"
 
 steps:
   step_one:
@@ -149,6 +150,8 @@ steps:
     target: analytics.output
 ```
 
+By default, only `schedule` and `description` are supported as DAG-level fields (via the built-in `DefaultDagArgs`). For other fields like `tags`, `default_args`, `catchup`, etc., see **Customizing DAG-Level Configuration**.
+
 ### Reserved Keys in Steps
 
 | Key | Purpose |
@@ -161,12 +164,155 @@ Everything else passes to the blueprint's config.
 
 ### Jinja2 Support
 
-YAML supports Airflow context:
+YAML supports Jinja2 templating with access to environment variables, Airflow variables/connections, and runtime context:
 
 ```yaml
 dag_id: "{{ env.get('ENV', 'dev') }}_pipeline"
 schedule: "{{ var.value.schedule | default('@daily') }}"
+
+steps:
+  extract:
+    blueprint: extract
+    output_path: "/data/{{ context.ds_nodash }}/output.csv"
+    run_id: "{{ context.dag_run.run_id }}"
 ```
+
+Available template variables:
+- `env` — environment variables
+- `var` — Airflow Variables
+- `conn` — Airflow Connections
+- `context` — proxy that generates Airflow template expressions for runtime macros (e.g. `context.ds_nodash`, `context.dag_run.conf`, `context.task_instance.xcom_pull(...)`)
+
+---
+
+## Customizing DAG-Level Configuration
+
+By default, Blueprint supports `schedule` and `description` as DAG-level YAML fields. To use other DAG constructor arguments (tags, default_args, catchup, etc.), define a `BlueprintDagArgs` subclass.
+
+### When to Use
+
+- User wants `tags`, `default_args`, `catchup`, `start_date`, or any other DAG kwargs in YAML
+- User wants to derive DAG properties from config (e.g. team name → owner, tier → retries)
+
+### Defining a BlueprintDagArgs Subclass
+
+```python
+# dags/templates/my_dag_args.py
+from pydantic import BaseModel
+from blueprint import BlueprintDagArgs
+
+class MyDagArgsConfig(BaseModel):
+    schedule: str | None = None
+    description: str | None = None
+    tags: list[str] = []
+    owner: str = "data-team"
+    retries: int = 2
+
+class MyDagArgs(BlueprintDagArgs[MyDagArgsConfig]):
+    def render(self, config: MyDagArgsConfig) -> dict[str, Any]:
+        return {
+            "schedule": config.schedule,
+            "description": config.description,
+            "tags": config.tags,
+            "default_args": {
+                "owner": config.owner,
+                "retries": config.retries,
+            },
+        }
+```
+
+Then in YAML, the extra fields are validated by the config model:
+
+```yaml
+dag_id: my_pipeline
+schedule: "@daily"
+tags: [etl, production]
+owner: data-team
+retries: 3
+
+steps:
+  extract:
+    blueprint: extract
+    source_table: raw.data
+```
+
+### Rules
+
+- Only **one** `BlueprintDagArgs` subclass per project (raises `MultipleDagArgsError` if more than one exists)
+- The `render()` method returns a dict of kwargs passed to the Airflow `DAG()` constructor
+- If no custom subclass exists, the built-in `DefaultDagArgs` is used (supports only `schedule` and `description`)
+
+---
+
+## Runtime Parameter Overrides
+
+Blueprint config fields can be overridden at DAG trigger time using Airflow params. This enables users to customize behavior when manually triggering DAGs from the Airflow UI.
+
+### Using `self.param()` in Template Fields
+
+Use `self.param("field")` in operator template fields to make a config field overridable at runtime:
+
+```python
+class ExtractConfig(BaseModel):
+    query: str = Field(description="SQL query to run")
+    batch_size: int = Field(default=1000, ge=1)
+
+class Extract(Blueprint[ExtractConfig]):
+    def render(self, config: ExtractConfig) -> TaskGroup:
+        with TaskGroup(group_id=self.step_id) as group:
+            BashOperator(
+                task_id="run_query",
+                bash_command=f"run-etl --query {self.param('query')} --batch {self.param('batch_size')}"
+            )
+        return group
+```
+
+### Using `self.resolve_config()` in Python Callables
+
+For `@task` or `PythonOperator` callables, use `self.resolve_config()` to merge runtime params into config:
+
+```python
+class Extract(Blueprint[ExtractConfig]):
+    def render(self, config: ExtractConfig) -> TaskGroup:
+        bp = self  # capture reference for closure
+
+        @task(task_id="run_query")
+        def run_query(**context):
+            resolved = bp.resolve_config(config, context)
+            # resolved.query has the runtime override if one was provided
+            execute(resolved.query, resolved.batch_size)
+
+        with TaskGroup(group_id=self.step_id) as group:
+            run_query()
+        return group
+```
+
+### How It Works
+
+- Params are **auto-generated** from Pydantic config models and namespaced per step (e.g. `step_name__field`)
+- YAML values become param defaults; Pydantic metadata (description, constraints, enum values) flows through to the Airflow trigger form
+- Invalid overrides raise `ValidationError` at execution time
+
+---
+
+## Post-Build Callbacks
+
+Use `on_dag_built` to post-process DAGs after they are constructed. This is useful for adding tags, access controls, audit metadata, or any cross-cutting concern.
+
+```python
+from pathlib import Path
+from blueprint import build_all
+
+def add_audit_tags(dag, yaml_path: Path) -> None:
+    dag.tags.append("managed-by-blueprint")
+    dag.tags.append(f"source:{yaml_path.name}")
+
+build_all(on_dag_built=add_audit_tags)
+```
+
+The callback receives:
+- `dag` — the constructed Airflow `DAG` object (mutable)
+- `yaml_path` — the `Path` to the YAML file that defined the DAG
 
 ---
 
@@ -225,6 +371,20 @@ class ExtractV2Config(BaseModel):
 class ExtractV2(Blueprint[ExtractV2Config]):
     def render(self, config): ...
 ```
+
+### Explicit Name and Version
+
+As an alternative to the class name convention, blueprints can set `name` and `version` directly:
+
+```python
+class MyCustomExtractor(Blueprint[ExtractV3Config]):
+    name = "extract"
+    version = 3
+
+    def render(self, config): ...
+```
+
+This is useful when the class name doesn't follow the `NameV{N}` convention or when you want clearer control.
 
 ### Using Versions in YAML
 
@@ -297,11 +457,21 @@ from blueprint import build_all
 build_all()
 ```
 
+### Validation errors shown as Airflow import errors
+
+As of v0.2.0, Pydantic validation errors are surfaced as Airflow import errors with actionable messages instead of being silently swallowed. The error message includes details on missing fields, unexpected fields, and type mismatches, along with guidance to run `blueprint lint` or `blueprint describe`.
+
 ### "Cyclic dependency detected"
 
 **Cause**: Circular `depends_on` references.
 
 **Fix**: Review step dependencies and remove cycles.
+
+### "MultipleDagArgsError"
+
+**Cause**: More than one `BlueprintDagArgs` subclass discovered in the project.
+
+**Fix**: Only one `BlueprintDagArgs` subclass is allowed. Remove or merge duplicates.
 
 ### Debugging in Airflow UI
 
