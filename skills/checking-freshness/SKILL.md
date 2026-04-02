@@ -1,6 +1,6 @@
 ---
 name: checking-freshness
-description: Quick data freshness check. Use when the user asks if data is up to date, when a table was last updated, if data is stale, or needs to verify data currency before using it.
+description: Quick data freshness check. Use when the user asks if data is up to date, when a table was last updated, if data is stale, or needs to verify data currency before using it. Use this even for Airflow-related tables like dag_runs or task_instances.
 ---
 
 # Data Freshness Check

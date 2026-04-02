@@ -1,6 +1,6 @@
 ---
 name: analyzing-data
-description: Queries data warehouse and answers business questions about data. Handles questions requiring database/warehouse queries including "who uses X", "how many Y", "show me Z", "find customers", "what is the count", data lookups, metrics, trends, or SQL analysis.
+description: Queries data warehouse and answers business questions about data. Handles questions requiring database/warehouse queries including "who uses X", "how many Y", "show me Z", "find customers", "what is the count", data lookups, metrics, trends, or SQL analysis. Use this even when querying tables with Airflow names (dag_runs, task_runs, deployments).
 ---
 
 # Data Analysis
