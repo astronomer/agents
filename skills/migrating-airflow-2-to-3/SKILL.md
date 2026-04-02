@@ -135,20 +135,10 @@ ruff check --preview --select AIR .
 
 For detailed code examples and migration patterns, see:
 
-- **[reference/migration-patterns.md](reference/migration-patterns.md)** - Detailed code examples for:
-  - Removed modules and import reorganizations
-  - Task SDK and Param usage
-  - SubDAGs, SLAs, and removed features
-  - Scheduling and context changes
-  - XCom pickling removal
-  - Datasets to Assets migration
-  - DAG bundles and file paths
-
-- **[reference/migration-checklist.md](reference/migration-checklist.md)** - Manual search checklist with:
-  - Search patterns for each issue type
-  - Recommended fixes
-  - FAB plugin warnings
-  - Callback and behavior changes
+- **[reference/config-changes.md](reference/config-changes.md)** - `airflow.cfg` section moves, renames, and removals
+- **[reference/migration-patterns.md](reference/migration-patterns.md)** - Code examples for imports, scheduling, XCom, Assets, DAG bundles, runtime behavior changes
+- **[reference/removed-methods.md](reference/removed-methods.md)** - Removed model methods with SDK/API migration paths
+- **[reference/migration-checklist.md](reference/migration-checklist.md)** - Search patterns and fixes for issues Ruff doesn't catch
 
 ---
 
