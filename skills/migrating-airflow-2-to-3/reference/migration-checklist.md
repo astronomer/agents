@@ -39,14 +39,23 @@ After running Ruff's AIR rules, use this manual search checklist to find remaini
 - `timetable=`
 - `days_ago(`
 - `fail_stop=`
+- `concurrency=` (on DAG constructor)
 - `sla=`
 - `sla_miss_callback`
+- `task_concurrency=`
 
 **Fix:**
 - `schedule_interval` and `timetable` → use `schedule=`
 - `days_ago` → use `pendulum.today("UTC").add(days=-N)`
 - `fail_stop` → renamed to `fail_fast`
+- `concurrency` (DAG) → renamed to `max_active_tasks`
 - `sla` and `sla_miss_callback` → removed; use **Astro Alerts** or OSS **Deadline Alerts** (Airflow 3.1+ experimental)
+- `task_concurrency` → renamed to `max_active_tis_per_dag`
+
+### Additional parameter removals
+
+**Search for:**
+- `execution_date` on `TriggerDagRunOperator` → removed; use `logical_date` or `run_id`
 
 ---
 
@@ -122,8 +131,31 @@ After running Ruff's AIR rules, use this manual search checklist to find remaini
 - `/api/v1`
 - `auth=(`
 - `execution_date` (in API params)
+- `dataset_triggered` or `dataset_expression` (in API responses/requests)
+- `schedule_interval` (in API responses)
+- `/api/v1/roles`, `/api/v1/permissions`, `/api/v1/users`
 
-**Fix:** Update to `/api/v2` with Bearer tokens. Replace `execution_date` params with `logical_date`. Dataset endpoints now under `asset` resources
+**Fix:** Update to `/api/v2` with Bearer tokens. Replace `execution_date` params with `logical_date`. Dataset endpoints now under `asset` resources.
+
+**Endpoint renames:**
+
+| Old Endpoint | New Endpoint |
+|-------------|-------------|
+| `/api/v1/datasets` | `/api/v2/assets` |
+| `/api/v1/datasets/{uri}` | `/api/v2/assets/{uri}` |
+| `/api/v1/datasets/events` | `/api/v2/assets/events` |
+| `/api/v1/roles` | `/auth/fab/v1/roles` |
+| `/api/v1/permissions` | `/auth/fab/v1/permissions` |
+| `/api/v1/users` | `/auth/fab/v1/users` |
+
+**Field renames in API responses:**
+
+| Old Field | New Field |
+|-----------|-----------|
+| `dataset_triggered` | `asset_triggered` |
+| `dataset_expression` | `asset_expression` |
+| `concurrency` (in DAGDetail) | `max_active_tasks` |
+| `schedule_interval` | `timetable_summary` |
 
 ---
 
@@ -157,7 +189,25 @@ After running Ruff's AIR rules, use this manual search checklist to find remaini
 
 ---
 
-## 12. Callback and behavior changes
+## 12. Configuration file (`airflow.cfg`)
+
+**Search for:**
+- `AIRFLOW__CORE__SQL_ALCHEMY` (database settings moved to `[database]`)
+- `AIRFLOW__CORE__REMOTE_LOGGING` or `AIRFLOW__CORE__BASE_LOG_FOLDER` (logging settings moved to `[logging]`)
+- `AIRFLOW__CORE__DAG_CONCURRENCY` (renamed to `max_active_tasks_per_dag`)
+- `AIRFLOW__SCHEDULER__DEACTIVATE_STALE_DAGS_INTERVAL` (renamed to `parsing_cleanup_interval`)
+- `AIRFLOW__WEBSERVER__BASE_URL` (moved to `[api]base_url`)
+- `AIRFLOW__KUBERNETES__` (section replaced by `[kubernetes_executor]`)
+
+**Fix:** Update environment variables and config references to new section/key names. See [config-changes.md](config-changes.md) for full mapping.
+
+---
+
+## 13. `airflow_local_settings.py`: rename `policy` → `task_policy`
+
+---
+
+## 14. Callback and behavior changes
 
 **Search for:**
 - `on_success_callback`

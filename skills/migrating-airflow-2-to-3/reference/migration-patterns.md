@@ -11,6 +11,8 @@ Detailed code examples for Airflow 2 to 3 migration.
 - [XCom Pickling Removal](#xcom-pickling-removal)
 - [Datasets to Assets](#datasets-to-assets)
 - [DAG Bundles & File Paths](#dag-bundles--file-paths)
+- [CLI Argument Changes](#cli-argument-changes)
+- [Runtime Behavioral Changes](#runtime-behavioral-changes)
 
 ---
 
@@ -217,7 +219,7 @@ Code changes:
 
 ### Other removed or renamed code features
 
-- `DagParam` removed - use `Param` from `airflow.sdk`.
+- `DagParam` removed — use `Param` from `airflow.sdk`.
 - `SimpleHttpOperator` removed - use `HttpOperator` from the HTTP provider.
 - Trigger rules:
   - `dummy` - use `TriggerRule.ALWAYS`.
@@ -233,6 +235,13 @@ Code changes:
 - `dag_run.external_trigger` removed - infer from `dag_run.run_type`.
 - `test_mode` removed; avoid relying on this flag.
 - Cannot trigger a DAG with a `logical_date` in the future; use `logical_date=None` and rely on `run_id` instead.
+
+### Executor removals
+
+- **SequentialExecutor** removed — use `LocalExecutor` instead (can use SQLite for local dev).
+- **CeleryKubernetesExecutor** removed — use [Multiple Executor Configuration](https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/executor/index.html) instead.
+- **LocalKubernetesExecutor** removed — use Multiple Executor Configuration instead.
+- **Executor registration via plugins** removed — treat executors as plain Python classes.
 
 ---
 
@@ -266,7 +275,7 @@ Note: These replacements are **not always drop-in**; logic changes may be requir
 
 ### `days_ago` removed
 
-The helper `days_ago` from `airflow.utils.dates` was removed. Replace with explicit datetimes:
+The helper `days_ago` from `airflow.utils.dates` is removed. Replace with explicit datetimes:
 
 ```python
 # WRONG - Removed in Airflow 3
@@ -413,3 +422,55 @@ def my_dag():
 ```
 
 **Note**: Triggers cannot be in the DAG bundle; they must be elsewhere on `sys.path`.
+
+---
+
+## CLI Argument Changes
+
+Several Airflow CLI arguments were renamed or removed in Airflow 3. Update any scripts, CI pipelines, or documentation that invoke these commands.
+
+| Command | Old Argument | New Argument / Replacement |
+|---------|-------------|---------------------------|
+| `airflow tasks run` / `test` | `--ignore-depends-on-past` | `--depends-on-past ignore` |
+| `airflow backfill` | `--ignore-first-depends-on-past` | Always `True` now (argument removed) |
+| `airflow backfill` | `--treat-dag-as-regex` | `--treat-dag-id-as-regex` |
+| `airflow tasks list` | `--tree` | Removed; use `airflow dag show` instead |
+| Many commands | `--subdir` / `-S` | Removed; use DAG bundles instead |
+| `airflow dag list-runs` | `-d` / `--dag-id` (flag) | Positional argument (no flag needed) |
+
+---
+
+## Runtime Behavioral Changes
+
+These changes affect DAG execution behavior without changing imports or API signatures. They can cause silent bugs if not addressed.
+
+### Connection validation
+
+`Connection.extra` must now be valid JSON. Airflow 3 enforces this at save time. Connections with non-JSON `extra` fields will fail validation.
+
+### DAG tags type change
+
+`DAG.tags` changed from `list` to `MutableSet`. This means:
+- Duplicate tags are silently removed
+- Tag ordering is not guaranteed
+- Code that relies on `tags[0]` or list-specific operations will break
+
+### Param serialization
+
+All `Param` values must be JSON serializable. Parsed date/time `Param` values are now RFC 3339 compliant. Non-serializable default values will raise errors at DAG parse time.
+
+### Dataset/Asset hashability
+
+`Dataset` (now `Asset`) and `DatasetAlias` (now `AssetAlias`) are no longer hashable. Code that uses them as dictionary keys or in sets will raise `TypeError`. Additionally, `Dataset` equality now considers the `extra` dict.
+
+### Cron scheduling semantics
+
+Cron schedules now default to `CronTriggerTimetable` instead of `CronDataIntervalTimetable`. Under the new timetable, `logical_date` equals `run_after` (not `data_interval_start`). Set `AIRFLOW__CORE__CREATE_CRON_DATA_INTERVALS=True` to revert to Airflow 2 behavior.
+
+### `logical_date` can be `None`
+
+For asset-triggered or manually-triggered DAG runs, `logical_date` can be `None`. Code that assumes `logical_date` is always a datetime will raise `AttributeError`. Use defensive access patterns.
+
+### XCom pickling disabled
+
+XCom pickling is disabled by default for security. The default XCom backend requires JSON-serializable values. Use a custom XCom backend for complex objects.
