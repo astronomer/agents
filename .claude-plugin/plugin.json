@@ -14,16 +14,6 @@
         ]
       }
     ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/airflow/hooks/airflow-skill-suggester.sh"
-          }
-        ]
-      }
-    ],
     "Stop": [
       {
         "hooks": [

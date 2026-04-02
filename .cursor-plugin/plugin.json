@@ -25,11 +25,6 @@
   "hooks": {
     "version": 1,
     "hooks": {
-      "beforeSubmitPrompt": [
-        {
-          "command": "./skills/airflow/hooks/airflow-skill-suggester.sh"
-        }
-      ],
       "stop": [
         {
           "command": "uv run ./skills/analyzing-data/scripts/cli.py stop"

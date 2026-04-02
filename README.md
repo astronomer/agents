@@ -107,7 +107,7 @@ Add to `~/.cursor/mcp.json`:
 </details>
 
 <details>
-<summary>Enable hooks (skill suggestions, session management)</summary>
+<summary>Enable hooks (session management)</summary>
 
 Create `.cursor/hooks.json` in your project:
 
@@ -115,12 +115,6 @@ Create `.cursor/hooks.json` in your project:
 {
   "version": 1,
   "hooks": {
-    "beforeSubmitPrompt": [
-      {
-        "command": "$CURSOR_PROJECT_DIR/.cursor/skills/airflow/hooks/airflow-skill-suggester.sh",
-        "timeout": 5
-      }
-    ],
     "stop": [
       {
         "command": "uv run $CURSOR_PROJECT_DIR/.cursor/skills/analyzing-data/scripts/cli.py stop",
@@ -132,7 +126,6 @@ Create `.cursor/hooks.json` in your project:
 ```
 
 **What these hooks do:**
-- `beforeSubmitPrompt`: Suggests data skills when you mention Airflow keywords
 - `stop`: Cleans up kernel when session ends
 
 </details>
