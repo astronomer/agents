@@ -228,6 +228,8 @@ import os""")
                 lines.append(f"    password={self.password!r},")
         elif self.auth_type == "private_key":
             lines.append("    private_key=_load_private_key(),")
+        elif self.auth_type == "externalbrowser":
+            lines.append("    authenticator='externalbrowser',")
         if self.warehouse:
             lines.append(f"    warehouse={self.warehouse!r},")
         if self.role:

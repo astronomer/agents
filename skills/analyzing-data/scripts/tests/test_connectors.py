@@ -87,8 +87,23 @@ class TestSnowflakeConnector:
         )
         conn.validate("test")  # Should pass
 
+    def test_validate_externalbrowser_auth(self):
+        conn = SnowflakeConnector(
+            account="a",
+            user="u",
+            auth_type="externalbrowser",
+            databases=[],
+        )
+        conn.validate("test")  # Should pass without password or key
+
     def test_get_required_packages_password(self):
         conn = SnowflakeConnector(account="a", user="u", password="p", databases=[])
+        assert conn.get_required_packages() == ["snowflake-connector-python[pandas]"]
+
+    def test_get_required_packages_externalbrowser(self):
+        conn = SnowflakeConnector(
+            account="a", user="u", auth_type="externalbrowser", databases=[]
+        )
         assert conn.get_required_packages() == ["snowflake-connector-python[pandas]"]
 
     def test_get_required_packages_private_key(self):
