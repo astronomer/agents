@@ -71,7 +71,10 @@ class CLIContext:
         config_values = self._load_from_config()
 
         # Determine final values with priority: env > config > default
-        if os.environ.get("AIRFLOW_API_URL"):
+        # If the URL is overridden by env var, don't inherit auth from config
+        # since the config's auth is for a different instance.
+        url_from_env = bool(os.environ.get("AIRFLOW_API_URL"))
+        if url_from_env:
             final_url = os.environ["AIRFLOW_API_URL"]
         elif config_values and config_values.url:
             final_url = config_values.url
@@ -81,7 +84,7 @@ class CLIContext:
         # Auth token priority
         if os.environ.get("AIRFLOW_AUTH_TOKEN"):
             final_token = os.environ["AIRFLOW_AUTH_TOKEN"]
-        elif config_values and config_values.token:
+        elif not url_from_env and config_values and config_values.token:
             final_token = config_values.token
         else:
             final_token = None
@@ -89,14 +92,14 @@ class CLIContext:
         # Username/password priority
         if os.environ.get("AIRFLOW_USERNAME"):
             final_username = os.environ["AIRFLOW_USERNAME"]
-        elif config_values and config_values.username:
+        elif not url_from_env and config_values and config_values.username:
             final_username = config_values.username
         else:
             final_username = None
 
         if os.environ.get("AIRFLOW_PASSWORD"):
             final_password = os.environ["AIRFLOW_PASSWORD"]
-        elif config_values and config_values.password:
+        elif not url_from_env and config_values and config_values.password:
             final_password = config_values.password
         else:
             final_password = None
