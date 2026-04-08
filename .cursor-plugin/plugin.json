@@ -31,5 +31,15 @@
         }
       ]
     }
+  },
+  "mcpServers": {
+    "analytics-viz": {
+      "command": "uv",
+      "args": [
+        "run",
+        "./skills/analyzing-data/scripts/viz_mcp.py",
+        "--stdio"
+      ]
+    }
   }
 }
