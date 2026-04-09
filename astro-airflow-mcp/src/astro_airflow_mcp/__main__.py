@@ -5,56 +5,52 @@ import logging
 import os
 from pathlib import Path
 
-import yaml
-
+from astro_airflow_mcp.constants import DEFAULT_AIRFLOW_URL
 from astro_airflow_mcp.logging import configure_logging, get_logger
 from astro_airflow_mcp.server import configure, mcp
 
 logger = get_logger("main")
 
-# Default Airflow URL if no config is found
-DEFAULT_AIRFLOW_URL = "http://localhost:8080"
 
+def discover_airflow_url(
+    project_dir: str | None,
+    proxy_routes_path: Path | None = None,
+    proxy_global_config_path: Path | None = None,
+) -> tuple[str, bool] | None:
+    """Discover Airflow URL, checking proxy routes first then .astro/config.yaml.
 
-def discover_airflow_url(project_dir: str | None) -> str | None:
-    """Discover Airflow URL from .astro/config.yaml in the project directory.
-
-    Looks for the Astro CLI config file and extracts the webserver/api-server port.
-    Prefers api-server.port (Airflow 3.x) over webserver.port (Airflow 2.x).
+    Discovery priority:
+    1. Proxy routes.json match by project directory (Astro CLI reverse proxy)
+    2. .astro/config.yaml port (Airflow 3.x api-server.port, then 2.x webserver.port)
 
     Args:
         project_dir: The project directory to search in
+        proxy_routes_path: Path to proxy routes.json (for testing)
+        proxy_global_config_path: Path to global astro config (for testing)
 
     Returns:
-        The discovered Airflow URL (e.g., "http://localhost:8081"), or None if not found
+        Tuple of (url, is_proxy) if found, None otherwise
     """
     if not project_dir:
         return None
 
-    config_path = Path(project_dir) / ".astro" / "config.yaml"
-    if not config_path.exists():
-        return None
+    from astro_airflow_mcp.discovery.local import LocalDiscoveryBackend
 
-    try:
-        with open(config_path) as f:
-            config = yaml.safe_load(f)
+    backend = LocalDiscoveryBackend()
 
-        if not config:
-            return None
+    # Step 1: Check proxy routes for a matching project directory
+    proxy_url = backend.find_proxy_url_for_project(
+        project_dir,
+        routes_path=proxy_routes_path,
+        global_config_path=proxy_global_config_path,
+    )
+    if proxy_url:
+        return (proxy_url, True)
 
-        # Try api-server.port first (Airflow 3.x), then webserver.port (Airflow 2.x)
-        port = None
-        if "api-server" in config and isinstance(config["api-server"], dict):
-            port = config["api-server"].get("port")
-        if port is None and "webserver" in config and isinstance(config["webserver"], dict):
-            port = config["webserver"].get("port")
-
-        if port:
-            return f"http://localhost:{port}"
-
-    except Exception as e:
-        # Log but don't fail - we'll fall back to default
-        logger.debug("Failed to read .astro/config.yaml: %s", e)
+    # Step 2: Check .astro/config.yaml for port
+    port = backend.get_astro_project_port(project_dir=Path(project_dir))
+    if port:
+        return (f"http://localhost:{port}", False)
 
     return None
 
@@ -147,10 +143,11 @@ def main():
     airflow_url = args.airflow_url
     url_source = "explicit"
     if not airflow_url:
-        # Try auto-discovery from .astro/config.yaml
-        airflow_url = discover_airflow_url(args.airflow_project_dir)
-        if airflow_url:
-            url_source = "auto-discovered"
+        # Try auto-discovery: proxy routes → .astro/config.yaml → default
+        result = discover_airflow_url(args.airflow_project_dir)
+        if result:
+            airflow_url, is_proxy = result
+            url_source = "auto-discovered (proxy)" if is_proxy else "auto-discovered"
         else:
             airflow_url = DEFAULT_AIRFLOW_URL
             url_source = "default"
