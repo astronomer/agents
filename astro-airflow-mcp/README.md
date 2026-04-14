@@ -501,7 +501,7 @@ The plugin runs inside Airflow's API server and forwards your auth token to inte
 
 **Requirements:** Airflow 3.x (uses the FastAPI plugin system introduced in Airflow 3).
 
-#### Step 1: Install the plugin
+#### Install
 
 Add `astro-airflow-mcp` to your `requirements.txt`:
 
@@ -511,115 +511,16 @@ astro-airflow-mcp
 
 The package auto-registers as an Airflow plugin. No Dockerfile changes or configuration needed.
 
-#### Step 2: Set environment variables
-
-Set these on your Airflow deployment:
+#### Environment variables
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `AF_READ_ONLY` | Recommended | `false` | Set to `true` to block all write operations (trigger, pause, clear, delete) at the MCP server level, regardless of token permissions |
 | `FASTMCP_STATELESS_HTTP` | For Claude Code | `false` | Set to `true` to disable stateful sessions. Required for Claude Code, which does not persist `mcp-session-id` headers across requests |
 
-For **Astro** deployments:
+#### Connect your MCP client
 
-```bash
-astro deployment variable create --deployment-id <DEPLOYMENT_ID> AF_READ_ONLY=true
-astro deployment variable create --deployment-id <DEPLOYMENT_ID> FASTMCP_STATELESS_HTTP=true
-```
-
-For **open-source** Airflow, set these as standard environment variables in your deployment configuration.
-
-#### Step 3: Configure authentication
-
-The MCP protocol uses POST requests for all operations, including reads. Your auth token must have a role that allows POST requests to the webserver.
-
-<details>
-<summary><strong>Astro deployments</strong></summary>
-
-**Option A: Use a built-in role**
-
-Create a Deployment API token with `DEPLOYMENT_ADMIN`, `WORKSPACE_OPERATOR`, or `WORKSPACE_AUTHOR` role. These all allow POST and work with the MCP plugin.
-
-> **Note:** `WORKSPACE_MEMBER` does **not** work — Astro's auth proxy blocks POST requests for this role, which prevents the MCP handshake.
-
-```bash
-astro deployment token create \
-  --deployment-id <DEPLOYMENT_ID> \
-  --name "mcp-readonly" \
-  --role DEPLOYMENT_ADMIN
-```
-
-**Option B: Create a least-privilege custom role (recommended)**
-
-For production use, create a custom `MCP_VIEWER` Deployment role with only read permissions. This can be done in the Astro UI (**Organization Settings** > **Access Management** > **Roles** > **+ Add Role**) or via the API.
-
-The role should include all `deployment.airflow.*.get` permissions:
-
-```
-deployment.get
-deployment.airflow.adminMenu.get
-deployment.airflow.astronomer.get
-deployment.airflow.auditLog.get
-deployment.airflow.browseMenu.get
-deployment.airflow.clusterActivity.get
-deployment.airflow.configMenu.get
-deployment.airflow.connection.get
-deployment.airflow.customMenu.get
-deployment.airflow.dag.get
-deployment.airflow.dagCode.get
-deployment.airflow.dagDependencies.get
-deployment.airflow.dagRun.get
-deployment.airflow.datasets.get
-deployment.airflow.docs.get
-deployment.airflow.importError.get
-deployment.airflow.job.get
-deployment.airflow.plugin.get
-deployment.airflow.pool.get
-deployment.airflow.provider.get
-deployment.airflow.slaMiss.get
-deployment.airflow.taskInstance.get
-deployment.airflow.taskLog.get
-deployment.airflow.taskReschedule.get
-deployment.airflow.trigger.get
-deployment.airflow.variable.get
-deployment.airflow.website.get
-deployment.airflow.xcom.get
-```
-
-See the [Custom role permissions reference](https://www.astronomer.io/docs/astro/deployment-role-reference) for details on each permission. Then create a token with the custom role:
-
-```bash
-astro deployment token create \
-  --deployment-id <DEPLOYMENT_ID> \
-  --name "mcp-viewer" \
-  --role MCP_VIEWER
-```
-
-</details>
-
-<details>
-<summary><strong>Open-source Airflow</strong></summary>
-
-Use any authentication method supported by your Airflow deployment (basic auth, token-based). The MCP plugin inherits Airflow's native RBAC — a user with the Viewer role can use all read tools. Set the token via the `AIRFLOW_AUTH_TOKEN` environment variable or pass it as a Bearer token in MCP client configuration.
-
-</details>
-
-#### Step 4: Connect your MCP client
-
-The MCP endpoint is available at `https://<your-airflow-url>/mcp/v1/`.
-
-**Claude Code:**
-
-```bash
-claude mcp add -t http -s user \
-  -H "Authorization: Bearer <TOKEN>" \
-  -- airflow \
-  "https://<your-airflow-url>/mcp/v1/"
-```
-
-> **Important:** Use `-t http`, not `-t sse`. The endpoint returns SSE-formatted responses, but the correct Claude Code transport type is `http`.
-
-**Cursor / VS Code / other MCP clients:**
+The MCP endpoint is available at `https://<your-airflow-url>/mcp/v1/`. Configure your client with a Bearer token that has permission to POST to the webserver:
 
 ```json
 {
@@ -634,16 +535,22 @@ claude mcp add -t http -s user \
 }
 ```
 
-#### Troubleshooting
+For Claude Code, use `-t http` (not `-t sse`):
 
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| Health check passes but zero tools load | Stateful session mode | Set `FASTMCP_STATELESS_HTTP=true` on the deployment |
-| `Failed to connect` with `-t sse` | Wrong transport type | Use `-t http` instead of `-t sse` |
-| 401 on MCP endpoint | Missing or expired token | Regenerate the Deployment API token |
-| 403 on some read tools | Incomplete role permissions | Ensure the role includes all `deployment.airflow.*.get` permissions |
-| 403 on `get_airflow_config`, `list_dag_warnings` | Airflow Admin RBAC required | These endpoints require Airflow's Admin role regardless of Astro permissions. This is an Airflow limitation — most tools work without Admin access |
-| `WORKSPACE_MEMBER` token fails | POST blocked by Astro proxy | Use a higher-privilege role or create a custom `MCP_VIEWER` role |
+```bash
+claude mcp add -t http -s user \
+  -H "Authorization: Bearer <TOKEN>" \
+  -- airflow \
+  "https://<your-airflow-url>/mcp/v1/"
+```
+
+#### Astro deployments
+
+For full setup instructions on Astronomer Astro — including authentication, custom deployment roles, and troubleshooting — see the [Airflow MCP Plugin guide](https://www.astronomer.io/docs/astro/astro-mcp-server#airflow-mcp-plugin) in the Astro documentation.
+
+#### Open-source Airflow
+
+For open-source Airflow, the plugin inherits Airflow's native RBAC. A user with the Viewer role can use all read tools. Set environment variables in your deployment configuration and pass a Bearer token via your MCP client config.
 
 ### CLI Options
 
