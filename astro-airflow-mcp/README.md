@@ -495,12 +495,48 @@ Connect MCP clients to: `http://localhost:8000/mcp`
 
 ### Airflow Plugin Mode
 
-Install into your Airflow 3.x environment to expose MCP at `http://your-airflow:8080/mcp/v1`:
+Install into your Airflow 3.x environment to expose MCP at `https://your-airflow/mcp/v1/`:
 
 ```bash
 # Add to your Airflow project (Astro Runtime or open-source Airflow 3.x)
 echo astro-airflow-mcp >> requirements.txt
 ```
+
+Then configure your MCP client to connect via the `url` transport:
+
+```json
+{
+  "mcpServers": {
+    "airflow": {
+      "url": "https://<your-airflow-url>/mcp/v1/",
+      "headers": {
+        "Authorization": "Bearer <your-token>"
+      }
+    }
+  }
+}
+```
+
+For Astro deployments, use your deployment URL and an API token:
+
+```json
+{
+  "mcpServers": {
+    "airflow": {
+      "url": "https://<deployment-url>/mcp/v1/",
+      "headers": {
+        "Authorization": "Bearer <astro-api-token>"
+      }
+    }
+  }
+}
+```
+
+Generate a token with `astro token` or from the Astro UI.
+
+**How it works:** The plugin runs inside Airflow's API server and forwards
+your auth token to internal API calls. It uses stateless HTTP transport,
+so it works with multiple API server replicas without session affinity.
 
 ### CLI Options
 
