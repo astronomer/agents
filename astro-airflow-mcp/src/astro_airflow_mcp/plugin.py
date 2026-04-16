@@ -19,15 +19,15 @@ from astro_airflow_mcp import __version__
 # This allows Airflow to control log level, format, and destination
 logger = logging.getLogger(__name__)
 
-# Per-request auth token (Airflow 3.x bearer tokens), set by middleware
-# and read by the adapter. ContextVar ensures isolation between concurrent requests.
+# Per-request auth token (bearer), set inside the async handler before
+# dispatching to the MCP ASGI app. The adapter reads this via a lambda
+# override on the adapter manager. ContextVar scopes it to the current
+# request's task context, so concurrent requests don't leak credentials.
 _request_auth_token: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "mcp_request_auth_token", default=None
 )
 
-
-# Per-request basic auth (Airflow 2.x), set in the async handler
-# and read by the adapter for internal API calls.
+# Per-request basic auth (Airflow 2.x), analogous to the bearer token above.
 _request_basic_auth: contextvars.ContextVar[tuple[str, str] | None] = contextvars.ContextVar(
     "mcp_request_basic_auth", default=None
 )
@@ -42,8 +42,23 @@ except ImportError:
     logger.warning("Airflow not available, plugin disabled")
 
 
+# Detect the installed Airflow major version so we can pick the correct
+# plugin integration (FastAPI for AF3, Flask blueprint for AF2).
+# Falling back to 0 means neither branch activates.
+_airflow_major = 0
+if AIRFLOW_AVAILABLE:
+    try:
+        import airflow as _airflow
+
+        _airflow_major = int(str(_airflow.__version__).split(".")[0])
+    except Exception:
+        logger.debug("Could not determine Airflow major version")
+
+
 # FastAPI app configuration for Airflow 3.x plugin system
 try:
+    if _airflow_major and _airflow_major < 3:
+        raise ImportError(f"Airflow {_airflow_major}.x detected — skipping FastAPI plugin path")
     from fastapi import FastAPI
 
     from astro_airflow_mcp.server import _manager, mcp
@@ -115,7 +130,7 @@ except ImportError as e:
 # ---------------------------------------------------------------------------
 flask_blueprints_config: list = []
 
-if not fastapi_apps_config:
+if _airflow_major == 2 and not fastapi_apps_config:
     try:
         from flask import Blueprint
         from flask import Response as FlaskResponse
@@ -161,50 +176,54 @@ if not fastapi_apps_config:
         # FastMCP needs a running lifespan to initialize its task group.
         # We keep one asyncio loop in a daemon thread. Lazy because
         # gunicorn forks workers and threads don't survive the fork.
-        _v2_state: dict[str, Any] = {"loop": None, "ready": False}
         _v2_lock = threading.Lock()
+        _v2_loop: asyncio.AbstractEventLoop | None = None
 
         def _ensure_ready() -> asyncio.AbstractEventLoop:
-            if _v2_state["ready"]:
-                return _v2_state["loop"]
+            global _v2_loop
+            if _v2_loop is not None:
+                return _v2_loop
             with _v2_lock:
-                if _v2_state["ready"]:
-                    return _v2_state["loop"]
+                if _v2_loop is not None:
+                    return _v2_loop
 
-                # Configure adapter for plugin mode.
-                # Per-request auth is stored in a module-level dict (not
-                # ContextVars — those don't propagate across the thread
-                # boundary to the background asyncio loop). Safe because
-                # gunicorn sync workers handle one request at a time.
-                # URL is resolved lazily via _get_plugin_url() because
-                # webserver.base_url may not be set at plugin load time.
+                # Configure adapter URL (lazy because webserver.base_url
+                # may not be set at plugin load time on Astro).
                 _plugin_url_v2 = _get_plugin_url()
                 configure(url=_plugin_url_v2)
-                _manager._get_auth_token = lambda: _v2_state.get("bearer_token")  # type: ignore[assignment]
-                _manager._get_basic_auth = lambda: _v2_state.get("basic_auth")  # type: ignore[assignment]
+                # Override adapter auth getters to read from per-request
+                # ContextVars. The handler sets them inside the async
+                # coroutine (see _handle below), scoping them to the
+                # current request's task context.
+                _manager._get_auth_token = lambda: _request_auth_token.get()  # type: ignore[assignment]
+                _manager._get_basic_auth = lambda: _request_basic_auth.get()  # type: ignore[assignment]
                 logger.info("MCP plugin URL: %s", _plugin_url_v2)
 
                 loop = asyncio.new_event_loop()
                 threading.Thread(target=loop.run_forever, daemon=True, name="mcp-loop").start()
 
-                # Start ASGI lifespan (initializes FastMCP task group)
+                # Start ASGI lifespan (initializes FastMCP task group).
+                # We require startup.complete before accepting requests —
+                # otherwise requests fail with a cryptic task-group error.
+                startup_result: dict[str, str] = {}
                 started = threading.Event()
 
                 async def _lifespan() -> None:
-                    done = asyncio.Event()
+                    shutdown = asyncio.Event()
 
                     async def recv() -> dict:
-                        if not done.is_set():
+                        if "status" not in startup_result:
                             return {"type": "lifespan.startup"}
-                        await asyncio.Event().wait()
+                        await shutdown.wait()
                         return {"type": "lifespan.shutdown"}
 
                     async def send(msg: dict) -> None:
-                        if msg["type"] in (
-                            "lifespan.startup.complete",
-                            "lifespan.startup.failed",
-                        ):
-                            done.set()
+                        if msg["type"] == "lifespan.startup.complete":
+                            startup_result["status"] = "complete"
+                            started.set()
+                        elif msg["type"] == "lifespan.startup.failed":
+                            startup_result["status"] = "failed"
+                            startup_result["message"] = msg.get("message", "")
                             started.set()
 
                     await _mcp_asgi_app(
@@ -214,10 +233,15 @@ if not fastapi_apps_config:
                     )
 
                 asyncio.run_coroutine_threadsafe(_lifespan(), loop)
-                started.wait(timeout=10)
+                if not started.wait(timeout=10):
+                    raise RuntimeError("MCP ASGI lifespan did not complete startup within 10s")
+                if startup_result.get("status") != "complete":
+                    raise RuntimeError(
+                        f"MCP ASGI lifespan startup failed: "
+                        f"{startup_result.get('message', 'unknown')}"
+                    )
 
-                _v2_state["loop"] = loop
-                _v2_state["ready"] = True
+                _v2_loop = loop
                 logger.info("MCP ASGI loop and lifespan ready")
                 return loop
 
@@ -226,7 +250,7 @@ if not fastapi_apps_config:
 
         @bp.record_once
         def _exempt_csrf(state: Any) -> None:
-            """Exempt from CSRF — MCP clients use Basic auth, not cookies."""
+            """Exempt from CSRF — MCP clients authenticate via headers, not cookies."""
             csrf = state.app.extensions.get("csrf")
             if csrf:
                 csrf.exempt(bp)
@@ -243,16 +267,16 @@ if not fastapi_apps_config:
             body = flask_request.get_data()
             path = "/" + subpath if subpath else "/"
 
-            # Store per-request auth in _v2_state so the adapter can
-            # read it from the background thread. Safe because gunicorn
-            # sync workers handle one request at a time.
+            # Extract per-request auth from the incoming request. Pass
+            # these into the coroutine so they can be stored in the
+            # request-scoped ContextVars (see _handle below).
             auth_header = flask_request.headers.get("Authorization", "")
+            req_bearer: str | None = None
+            req_basic: tuple[str, str] | None = None
             if auth_header.lower().startswith("bearer "):
-                _v2_state["bearer_token"] = auth_header[7:]
-                _v2_state["basic_auth"] = None
+                req_bearer = auth_header[7:]
             elif flask_request.authorization and flask_request.authorization.username:
-                _v2_state["bearer_token"] = None
-                _v2_state["basic_auth"] = (
+                req_basic = (
                     flask_request.authorization.username,
                     flask_request.authorization.password or "",
                 )
@@ -263,6 +287,13 @@ if not fastapi_apps_config:
 
             async def _handle() -> None:
                 nonlocal status
+                # Scope auth to this request's task context. Children
+                # tasks spawned by the ASGI app inherit this context,
+                # so the adapter's auth-getter lambda reads the correct
+                # credentials for *this* request.
+                _request_auth_token.set(req_bearer)
+                _request_basic_auth.set(req_basic)
+
                 request_sent = False
                 done = asyncio.Event()
 
@@ -315,10 +346,12 @@ if not fastapi_apps_config:
             future = asyncio.run_coroutine_threadsafe(_handle(), loop)
             future.result(timeout=120)
 
+            # Preserve header list (not dict) so multi-value headers
+            # like Set-Cookie aren't collapsed.
             return FlaskResponse(
                 response=b"".join(parts),
                 status=status,
-                headers=dict(resp_headers),
+                headers=resp_headers,
             )
 
         flask_blueprints_config = [bp]

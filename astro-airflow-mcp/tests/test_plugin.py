@@ -94,3 +94,28 @@ def test_plugin_mutual_exclusivity():
 
     if AirflowMCPPlugin.fastapi_apps:
         assert AirflowMCPPlugin.flask_blueprints == []
+
+
+def test_auth_contextvars_isolated_per_context():
+    """Per-request auth ContextVars must not leak across request contexts.
+
+    Simulates two concurrent requests setting the same ContextVar in
+    their own copied contexts and asserts each sees only its own value.
+    """
+    import contextvars
+
+    from astro_airflow_mcp.plugin import _request_auth_token
+
+    results: dict[str, str | None] = {}
+
+    def req(label: str, token: str) -> None:
+        _request_auth_token.set(token)
+        results[label] = _request_auth_token.get()
+
+    ctx_a = contextvars.copy_context()
+    ctx_b = contextvars.copy_context()
+    ctx_a.run(req, "a", "token-a")
+    ctx_b.run(req, "b", "token-b")
+    assert results == {"a": "token-a", "b": "token-b"}
+    # The outer context should be unaffected
+    assert _request_auth_token.get() is None

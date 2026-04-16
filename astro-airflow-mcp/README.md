@@ -499,7 +499,7 @@ Install into your Airflow environment to expose an MCP endpoint directly on the 
 
 The plugin runs inside Airflow's webserver process and forwards your auth token to internal API calls. On Airflow 3, it uses stateless HTTP transport so it works with multiple API server replicas without session affinity.
 
-**Requirements:** Airflow 2.4+ or Airflow 3.x. The plugin auto-detects the Airflow version and registers appropriately:
+**Requirements:** Airflow 2.4+ or Airflow 3.x. The plugin reads `airflow.__version__` at import time and registers the matching integration:
 - **Airflow 3.x**: Mounts as a FastAPI app via the `fastapi_apps` plugin attribute
 - **Airflow 2.x**: Registers as a Flask blueprint via the `flask_blueprints` plugin attribute (bridges the MCP ASGI app to Flask via a background asyncio loop)
 
@@ -518,8 +518,8 @@ The package auto-registers as an Airflow plugin. No Dockerfile changes or config
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `AF_READ_ONLY` | Recommended | `false` | Set to `true` to block all write operations (trigger, pause, clear, delete) at the MCP server level, regardless of token permissions |
-| `FASTMCP_STATELESS_HTTP` | For Claude Code on AF3 | `false` | Set to `true` to disable stateful sessions. Required for Claude Code, which does not persist `mcp-session-id` headers across requests. Airflow 2 plugin mode is stateless by default. |
-| `AIRFLOW_API_URL` | Optional | auto-detected | Override the internal API URL (e.g. on AF2, defaults to `http://localhost:<webserver_port><base_url_path>`) |
+| `FASTMCP_STATELESS_HTTP` | Standalone HTTP server only | `false` | Disables stateful sessions when running the MCP server standalone. Not used in plugin mode — the plugin always runs FastMCP in stateless HTTP mode so Claude Code works out of the box |
+| `AIRFLOW_API_URL` | Optional | auto-detected | Override the internal API URL. On AF2 the default includes any `webserver.base_url` path prefix (e.g. `http://localhost:8080/d<deployment-id>`) |
 
 #### Connect your MCP client
 
