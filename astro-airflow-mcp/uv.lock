@@ -9,7 +9,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-04-07T01:26:56.293439Z"
+exclude-newer = "2026-04-09T14:33:37.830555Z"
 exclude-newer-span = "P7D"
 
 [[package]]
@@ -355,7 +355,7 @@ requires-dist = [
     { name = "simple-term-menu", specifier = ">=1.6.0" },
     { name = "typer", specifier = ">=0.12.0" },
 ]
-provides-extras = ["plugin"]
+provides-extras = ["plugin", "plugin-v2"]
 
 [package.metadata.requires-dev]
 dev = [

@@ -1,7 +1,7 @@
 [project]
 name = "astro-airflow-mcp"
 dynamic = ["version"]
-description = "A FastMCP server for Airflow integration that can run standalone or as an Airflow 3 plugin"
+description = "A FastMCP server for Airflow integration that can run standalone or as an Airflow 2/3 plugin"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -19,6 +19,10 @@ dependencies = [
 plugin = [
     "apache-airflow>=3.0.0",
     "fastapi>=0.100.0",
+]
+plugin-v2 = [
+    # No extra deps needed: Flask comes with Airflow 2.x, asyncio is stdlib.
+    # Install into an Airflow 2.4+ environment: pip install astro-airflow-mcp
 ]
 
 [project.scripts]
