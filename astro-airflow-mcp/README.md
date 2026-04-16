@@ -179,7 +179,7 @@ claude mcp add airflow -e AIRFLOW_API_URL=https://your-airflow.example.com -e AI
 - **MCP Prompts**: Guided workflows for common tasks (troubleshooting, health checks, onboarding)
 - **Dual deployment modes**:
   - **Standalone server**: Run as an independent MCP server
-  - **Airflow plugin**: Integrate directly into Airflow 3.x webserver
+  - **Airflow plugin**: Integrate directly into Airflow 2.x (Flask) or 3.x (FastAPI) webserver
 - **Flexible Authentication**:
   - Bearer token (Airflow 2.x and 3.x)
   - Username/password with automatic OAuth2 token exchange (Airflow 3.x)
@@ -495,11 +495,13 @@ Connect MCP clients to: `http://localhost:8000/mcp`
 
 ### Airflow Plugin Mode
 
-Install into your Airflow 3.x environment to expose an MCP endpoint directly on the webserver. This lets AI tools connect to your Airflow instance remotely via the MCP protocol — no standalone server needed.
+Install into your Airflow environment to expose an MCP endpoint directly on the webserver. This lets AI tools connect to your Airflow instance remotely via the MCP protocol — no standalone server needed.
 
-The plugin runs inside Airflow's API server and forwards your auth token to internal API calls. It uses stateless HTTP transport, so it works with multiple API server replicas without session affinity.
+The plugin runs inside Airflow's webserver process and forwards your auth token to internal API calls. On Airflow 3, it uses stateless HTTP transport so it works with multiple API server replicas without session affinity.
 
-**Requirements:** Airflow 3.x (uses the FastAPI plugin system introduced in Airflow 3).
+**Requirements:** Airflow 2.4+ or Airflow 3.x. The plugin reads `airflow.__version__` at import time and registers the matching integration:
+- **Airflow 3.x**: Mounts as a FastAPI app via the `fastapi_apps` plugin attribute
+- **Airflow 2.x**: Registers as a Flask blueprint via the `flask_blueprints` plugin attribute (bridges the MCP ASGI app to Flask via a background asyncio loop)
 
 #### Install
 
@@ -516,11 +518,14 @@ The package auto-registers as an Airflow plugin. No Dockerfile changes or config
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `AF_READ_ONLY` | Recommended | `false` | Set to `true` to block all write operations (trigger, pause, clear, delete) at the MCP server level, regardless of token permissions |
-| `FASTMCP_STATELESS_HTTP` | For Claude Code | `false` | Set to `true` to disable stateful sessions. Required for Claude Code, which does not persist `mcp-session-id` headers across requests |
+| `FASTMCP_STATELESS_HTTP` | Standalone HTTP server only | `false` | Disables stateful sessions when running the MCP server standalone. Not used in plugin mode — the plugin always runs FastMCP in stateless HTTP mode so Claude Code works out of the box |
+| `AIRFLOW_API_URL` | Optional | auto-detected | Override the internal API URL. On AF2 the default includes any `webserver.base_url` path prefix (e.g. `http://localhost:8080/d<deployment-id>`) |
 
 #### Connect your MCP client
 
-The MCP endpoint is available at `https://<your-airflow-url>/mcp/v1/`. Configure your client with a Bearer token that has permission to POST to the webserver:
+The MCP endpoint is available at `https://<your-airflow-url>/mcp/v1/`. Configure your client with an auth header that matches your Airflow's auth backend:
+- **Airflow 3 / Astro**: Bearer token (deployment JWT or session token)
+- **Airflow 2 / open-source**: Basic auth or Bearer token, depending on the configured API auth backend
 
 ```json
 {
@@ -548,9 +553,17 @@ claude mcp add -t http -s user \
 
 For full setup instructions on Astronomer Astro — including authentication, custom deployment roles, and troubleshooting — see the [Airflow MCP Plugin guide](https://www.astronomer.io/docs/astro/astro-mcp-server#airflow-mcp-plugin) in the Astro documentation.
 
+On Astro Airflow 2 deployments, the plugin reads `webserver.base_url` at request time to resolve the deployment path prefix (e.g. `/d<short-name>`) when making internal API calls. No extra config is required.
+
 #### Open-source Airflow
 
-For open-source Airflow, the plugin inherits Airflow's native RBAC. A user with the Viewer role can use all read tools. Set environment variables in your deployment configuration and pass a Bearer token via your MCP client config.
+For open-source Airflow, the plugin inherits Airflow's native RBAC. A user with the Viewer role can use all read tools. Set environment variables in your deployment configuration and pass a Bearer token (AF3) or basic auth (AF2) via your MCP client config.
+
+#### Airflow 2.x notes
+
+- The plugin registers a Flask blueprint at `/mcp/v1/` on the webserver. It is exempt from CSRF (MCP clients authenticate via `Authorization` header, not session cookies).
+- FastMCP's ASGI lifespan is started lazily on the first MCP request in each gunicorn worker — this adds a small one-time latency to the first call per worker.
+- Per-request auth (bearer token or basic auth) is extracted from the incoming `Authorization` header and forwarded to internal API calls to `localhost`.
 
 ### CLI Options
 
@@ -617,7 +630,8 @@ The server is built using [FastMCP](https://github.com/jlowin/fastmcp) with an a
 ### Deployment Modes
 
 - **Standalone**: Independent ASGI application with HTTP/SSE transport
-- **Plugin**: Mounted into Airflow 3.x FastAPI webserver
+- **Plugin (Airflow 3.x)**: Mounted into Airflow's FastAPI webserver via `fastapi_apps`
+- **Plugin (Airflow 2.x)**: Registered as a Flask blueprint via `flask_blueprints`, bridging to FastMCP's ASGI app through a background asyncio loop
 
 ## Development
 
