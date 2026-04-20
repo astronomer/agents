@@ -1,40 +1,60 @@
 ---
 name: airflow-hitl
-description: Use when the user needs human-in-the-loop workflows in Airflow (approval/reject, form input, or human-driven branching). Covers ApprovalOperator, HITLOperator, HITLBranchOperator, HITLEntryOperator. Requires Airflow 3.1+. Does not cover AI/LLM calls (see airflow-ai).
+description: Use when the user needs human-in-the-loop workflows in Airflow (approval/reject, form input, or human-driven branching). Covers ApprovalOperator, HITLOperator, HITLBranchOperator, HITLEntryOperator, HITLTrigger. Requires Airflow 3.1+. Does not cover AI/LLM calls (see airflow-ai).
 ---
 
 # Airflow Human-in-the-Loop Operators
 
-Implement human approval gates, form inputs, and human-driven branching in Airflow DAGs using the HITL operators. These deferrable operators pause workflow execution until a human responds via the Airflow UI or REST API.
+Pause a DAG until a human responds via the Airflow UI or REST API. HITL operators are deferrable — they release their worker slot while waiting.
 
-## Implementation Checklist
-
-Execute steps in order. Prefer deferrable HITL operators over custom sensors/polling loops.
-
-> **CRITICAL**: Requires Airflow 3.1+. NOT available in Airflow 2.x.
+> **Requires Airflow 3.1+** (`uvx --from astro-airflow-mcp af config version`).
 >
-> **Deferrable**: All HITL operators are deferrable—they release their worker slot while waiting for human input.
+> **UI location**: Browse → Required Actions. Respond from the task instance page's Required Actions tab.
 >
-> **UI Location**: View pending actions at **Browse → Required Actions** in Airflow UI. Respond via the **task instance page's Required Actions tab** or the REST API.
->
-> **Cross-reference**: For AI/LLM calls, see the **airflow-ai** skill.
+> **Cross-references**: `airflow-ai` for AI/LLM task decorators; `airflow` for registry and API discovery commands used below.
 
 ---
 
-## Step 1: Choose operator
+## Step 1 — Pick the capability you need
 
-| Operator | Human action | Outcome |
-|----------|--------------|---------|
-| `ApprovalOperator` | Approve or Reject | Reject causes downstream tasks to be skipped (approval task itself succeeds) |
-| `HITLOperator` | Select option(s) + form | Returns selections |
-| `HITLBranchOperator` | Select downstream task(s) | Runs selected, skips others |
-| `HITLEntryOperator` | Submit form | Returns form data |
+| Capability | Class (verify in Step 2) |
+|---|---|
+| Approve or reject; downstream skips on reject | `ApprovalOperator` |
+| Present N options and return which were chosen | `HITLOperator` |
+| Branch to one or more downstream tasks based on a choice | `HITLBranchOperator` |
+| Collect a form (no approve/select step) | `HITLEntryOperator` |
+| Use the HITL trigger directly (advanced / custom operators) | `HITLTrigger` |
+
+This is the only place class names are hardcoded. The provider adds, renames, and removes params across releases — do not copy parameter lists from memory. Fetch the current signature before writing code.
 
 ---
 
-## Step 2: Implement operator
+## Step 2 — Discover the current signatures from the Airflow Registry
 
-### ApprovalOperator
+Before writing HITL code, run these to see the live roster and constructor params (see the `airflow` skill for the full `af registry` reference):
+
+```bash
+# Every HITL-related module in the standard provider
+uvx --from astro-airflow-mcp af registry modules standard \
+  | jq '.modules[] | select(.import_path | test("\\.hitl\\.")) | {name, type, import_path, short_description, docs_url}'
+
+# Constructor signatures: name, type, default, required, description
+uvx --from astro-airflow-mcp af registry parameters standard \
+  | jq '.classes | to_entries[] | select(.key | test("\\.hitl\\.")) | {fqn: .key, parameters: .value.parameters}'
+
+# Pin to the exact installed provider version
+uvx --from astro-airflow-mcp af config providers \
+  | jq '.providers[] | select(.package_name == "apache-airflow-providers-standard") | .version'
+# then: af registry parameters standard --version <VERSION>
+```
+
+If the registry shows a param that this skill does not mention, prefer the registry. If the registry shows a class that is not in Step 1, treat it as additive — the decision table above may be stale.
+
+---
+
+## Step 3 — Canonical example (approval gate)
+
+Starting point for any HITL task. Adapt by swapping the class name and params per Step 2.
 
 ```python
 from airflow.providers.standard.operators.hitl import ApprovalOperator
@@ -51,7 +71,7 @@ def approval_example():
         task_id="approve_report",
         subject="Report Approval",
         body="{{ ti.xcom_pull(task_ids='prepare') }}",
-        defaults="Approve",  # Optional: auto on timeout
+        defaults="Approve",              # Auto-selected on timeout
         params={"comments": Param("", type="string")},
     )
 
@@ -65,232 +85,100 @@ def approval_example():
 approval_example()
 ```
 
-### HITLOperator
-
-> **Required parameters**: `subject` and `options`.
-
-```python
-from airflow.providers.standard.operators.hitl import HITLOperator
-from airflow.sdk import dag, task, chain, Param
-from datetime import timedelta
-from pendulum import datetime
-
-@dag(start_date=datetime(2025, 1, 1), schedule="@daily")
-def hitl_example():
-    hitl = HITLOperator(
-        task_id="select_option",
-        subject="Select Payment Method",
-        body="Choose how to process payment",
-        options=["ACH", "Wire", "Check"],  # REQUIRED
-        defaults=["ACH"],
-        multiple=False,
-        execution_timeout=timedelta(hours=4),
-        params={"amount": Param(1000, type="number")},
-    )
-
-    @task
-    def process(result):
-        print(f"Selected: {result['chosen_options']}")
-        print(f"Amount: {result['params_input']['amount']}")
-
-    process(hitl.output)
-
-hitl_example()
-```
-
-### HITLBranchOperator
-
-> **IMPORTANT**: Options can either:
-> 1. **Directly match downstream task IDs** - simpler approach
-> 2. **Use `options_mapping`** - for human-friendly labels that map to task IDs
-
-```python
-from airflow.providers.standard.operators.hitl import HITLBranchOperator
-from airflow.sdk import dag, task, chain
-from pendulum import datetime
-
-DEPTS = ["marketing", "engineering", "sales"]
-
-@dag(start_date=datetime(2025, 1, 1), schedule="@daily")
-def branch_example():
-    branch = HITLBranchOperator(
-        task_id="select_dept",
-        subject="Select Departments",
-        options=[f"Fund {d}" for d in DEPTS],
-        options_mapping={f"Fund {d}": d for d in DEPTS},
-        multiple=True,
-    )
-
-    for dept in DEPTS:
-        @task(task_id=dept)
-        def handle(dept_name: str = dept):
-            # Bind the loop variable at definition time to avoid late-binding bugs
-            print(f"Processing {dept_name}")
-        chain(branch, handle())
-
-branch_example()
-```
-
-### HITLEntryOperator
-
-```python
-from airflow.providers.standard.operators.hitl import HITLEntryOperator
-from airflow.sdk import dag, task, chain, Param
-from pendulum import datetime
-
-@dag(start_date=datetime(2025, 1, 1), schedule="@daily")
-def entry_example():
-    entry = HITLEntryOperator(
-        task_id="get_input",
-        subject="Enter Details",
-        body="Provide response",
-        params={
-            "response": Param("", type="string"),
-            "priority": Param("p3", type="string"),
-        },
-    )
-
-    @task
-    def process(result):
-        print(f"Response: {result['params_input']['response']}")
-
-    process(entry.output)
-
-entry_example()
-```
+For the other classes in Step 1, the shape is the same (`task_id`, `subject`, plus class-specific params). Verify each constructor through Step 2 — for example, `HITLBranchOperator` requires every option either to match a downstream task id directly or to be resolved via a mapping param surfaced in the registry.
 
 ---
 
-## Step 3: Optional features
+## Step 4 — Behavior contracts (stable across versions)
 
-### Notifiers
+### Timeout
+- With `defaults` set: task succeeds on timeout, default option(s) selected.
+- Without `defaults`: task fails on timeout.
 
-```python
-from airflow.sdk import BaseNotifier, Context
-from airflow.providers.standard.operators.hitl import HITLOperator
-
-class MyNotifier(BaseNotifier):
-    template_fields = ("message",)
-    def __init__(self, message=""): self.message = message
-    def notify(self, context: Context):
-        if context["ti"].state == "running":
-            url = HITLOperator.generate_link_to_ui_from_context(context, base_url="https://airflow.example.com")
-            self.log.info(f"Action needed: {url}")
-
-hitl = HITLOperator(..., notifiers=[MyNotifier("{{ task.subject }}")])
-```
-
-### Restrict respondents
-
-Format depends on your auth manager:
-
-| Auth Manager | Format | Example |
-|--------------|--------|--------|
-| SimpleAuthManager | Username | `["admin", "manager"]` |
-| FabAuthManager | Email | `["manager@example.com"]` |
-| Astro | Astro ID | `["cl1a2b3cd456789ef1gh2ijkl3"]` |
-
-> **Astro Users**: Find Astro ID at **Organization → Access Management**.
+### Markdown + Jinja in `body`
+`body` supports Markdown and is Jinja-templatable. Render XCom context directly:
 
 ```python
-hitl = HITLOperator(..., respondents=["manager@example.com"])  # FabAuthManager
-```
-
-### Timeout behavior
-
-- **With `defaults`**: Task succeeds, default option(s) selected
-- **Without `defaults`**: Task fails on timeout
-
-```python
-hitl = HITLOperator(
-    ...,
-    options=["Option A", "Option B"],
-    defaults=["Option A"],  # Auto-selected on timeout
-    execution_timeout=timedelta(hours=4),
-)
-```
-
-### Markdown in body
-
-The `body` parameter supports **markdown formatting** and is **Jinja templatable**:
-
-```python
-hitl = HITLOperator(
-    ...,
-    body="""**Total Budget:** {{ ti.xcom_pull(task_ids='get_budget') }}
+body = """**Total Budget:** {{ ti.xcom_pull(task_ids='get_budget') }}
 
 | Category | Amount |
 |----------|--------|
 | Marketing | $1M |
-""",
-)
+"""
 ```
 
 ### Callbacks
+All HITL operators accept the standard Airflow callback kwargs (`on_success_callback`, `on_failure_callback`, etc.).
 
-All HITL operators support standard Airflow callbacks:
+### Notifiers
+HITL operators accept a `notifiers` list. Inside a notifier's `notify(context)` method, build a link to the pending task with `HITLOperator.generate_link_to_ui_from_context(context, base_url=...)`.
 
-```python
-def on_hitl_failure(context):
-    print(f"HITL task failed: {context['task_instance'].task_id}")
+### Restricting who can respond
+The parameter name and accepted identifier format depend on the active auth manager. Do **not** hardcode — check which one is active and which kwarg the current provider exposes:
 
-def on_hitl_success(context):
-    print(f"HITL task succeeded with: {context['task_instance'].xcom_pull()}")
-
-hitl = HITLOperator(
-    task_id="approval_required",
-    subject="Review needed",
-    options=["Approve", "Reject"],
-    on_failure_callback=on_hitl_failure,
-    on_success_callback=on_hitl_success,
-)
+```bash
+uvx --from astro-airflow-mcp af config show | jq '.auth_manager // .core.auth_manager'
 ```
+
+Then look up the current kwarg in Step 2 (at the time of writing it is `assigned_users`, accepting identifiers in whatever format the active auth manager uses — Astro uses the Astro user ID, FabAuthManager uses email, SimpleAuthManager uses username).
 
 ---
 
-## Step 4: API integration
+## Step 5 — Responding from external integrations
 
-For external responders (Slack, custom app):
+For Slack bots, custom apps, or scripts. Discover the live endpoint rather than hardcoding a path:
+
+```bash
+uvx --from astro-airflow-mcp af api ls --filter hitl           # live endpoint list
+uvx --from astro-airflow-mcp af api spec \
+  | jq '.paths | to_entries[] | select(.key | test("hitl"))'   # request/response schemas
+```
+
+The PATCH-to-respond pattern is stable; the exact path is discovered. Typical shape:
 
 ```python
-import requests, os
+import os, requests
 
-HOST = os.getenv("AIRFLOW_HOST")
-TOKEN = os.getenv("AIRFLOW_API_TOKEN")
+HOST = os.environ["AIRFLOW_HOST"]
+TOKEN = os.environ["AIRFLOW_API_TOKEN"]
+HEADERS = {"Authorization": f"Bearer {TOKEN}"}
 
-# Get pending actions
-r = requests.get(f"{HOST}/api/v2/hitlDetails/?state=pending",
-                 headers={"Authorization": f"Bearer {TOKEN}"})
+# List pending — use the path from `af api ls --filter hitl`
+requests.get(f"{HOST}/<path>", headers=HEADERS, params={"state": "pending"})
 
-# Respond
+# Respond — same discovered path family, PATCH
 requests.patch(
-    f"{HOST}/api/v2/hitlDetails/{dag_id}/{run_id}/{task_id}",
-    headers={"Authorization": f"Bearer {TOKEN}"},
-    json={"chosen_options": ["ACH"], "params_input": {"amount": 1500}}
+    f"{HOST}/<path>/{dag_id}/{run_id}/{task_id}",
+    headers=HEADERS,
+    json={"chosen_options": ["Approve"], "params_input": {"comments": "ok"}},
 )
 ```
 
 ---
 
-## Step 5: Safety checks
+## Step 6 — Safety checks
 
-Before finalizing, verify:
-
-- [ ] Airflow 3.1+ installed
-- [ ] For `HITLBranchOperator`: options map to downstream task IDs
-- [ ] `defaults` values are in `options` list
-- [ ] API token configured if using external responders
-
----
-
-## Reference
-
-- Airflow HITL Operators: https://airflow.apache.org/docs/apache-airflow-providers-standard/stable/operators/hitl.html
+- [ ] Airflow version ≥ 3.1 (`af config version`).
+- [ ] Constructor kwargs match the current registry output from Step 2 — no `respondents`-vs-`assigned_users` style drift.
+- [ ] For branching: every option resolves to a downstream task id (directly or via the mapping kwarg from Step 2).
+- [ ] Every value in `defaults` is also in `options`.
+- [ ] `execution_timeout` set; `defaults` configured if timeout should succeed rather than fail.
+- [ ] API token configured if external responders are part of the flow.
 
 ---
 
-## Related Skills
+## References
 
-- **airflow-ai**: For AI/LLM task decorators and GenAI patterns
-- **authoring-dags**: For general DAG writing best practices
-- **testing-dags**: For testing DAGs with debugging cycles
+The upstream docs URL is surfaced per-module by the registry — do not hardcode:
+
+```bash
+uvx --from astro-airflow-mcp af registry modules standard \
+  | jq '.modules[] | select(.import_path | test("\\.hitl\\.")) | {name, docs_url}'
+```
+
+## Related skills
+
+- **airflow** — `af registry`, `af api`, `af config` command reference.
+- **airflow-ai** — AI/LLM task decorators and GenAI patterns.
+- **authoring-dags** — general DAG writing best practices.
+- **testing-dags** — iterative test → debug → fix cycles.
