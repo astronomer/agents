@@ -958,8 +958,6 @@ class TestCLIContextEmptyURL:
 
     def test_empty_env_var_exits_with_error(self, capsys):
         """AIRFLOW_API_URL='' should exit, not fall back to config or default."""
-        import pytest
-
         ctx = self._make_context()
         mock_config = ResolvedConfig(
             url="http://configured.example.com",
@@ -968,9 +966,9 @@ class TestCLIContextEmptyURL:
         with (
             patch.object(ctx, "_load_from_config", return_value=mock_config),
             patch.dict(os.environ, {"AIRFLOW_API_URL": ""}, clear=False),
+            pytest.raises(SystemExit) as exc_info,
         ):
-            with pytest.raises(SystemExit) as exc_info:
-                ctx.init()
+            ctx.init()
         assert exc_info.value.code == 2
         captured = capsys.readouterr()
         assert "AIRFLOW_API_URL is set but empty" in captured.err

@@ -75,27 +75,26 @@ class CLIContext:
         # since the config's auth is for a different instance.
         #
         # An explicitly empty AIRFLOW_API_URL ("" in the environment) is treated
-        # as "no Airflow is configured right now" — do NOT fall back to the
+        # as "no Airflow is configured right now" -- do NOT fall back to the
         # config file or DEFAULT_AIRFLOW_URL. This lets programmatic callers
         # (automation, agent frameworks) propagate "nothing is configured"
         # without risking queries against whatever happens to be listening on
         # localhost:8080.
-        url_env_value = os.environ.get("AIRFLOW_API_URL")
-        url_env_present = "AIRFLOW_API_URL" in os.environ
-        url_from_env = bool(url_env_value)
+        airflow_url_env = os.environ.get("AIRFLOW_API_URL")
+        url_from_env = bool(airflow_url_env)
 
-        if url_env_present and not url_env_value:
-            print(
-                "Error: AIRFLOW_API_URL is set but empty. No Airflow instance "
-                "is configured.\n"
+        if airflow_url_env is not None and not airflow_url_env:
+            message = (
+                "Error: AIRFLOW_API_URL is set but empty. "
+                "No Airflow instance is configured.\n"
                 "To configure one, either:\n"
                 "  - set AIRFLOW_API_URL to a webserver URL, or\n"
-                "  - run `af instance add <name> --url <url>` and "
-                "`af instance use <name>`.\n"
-                "To use the default (http://localhost:8080), unset "
-                "AIRFLOW_API_URL.",
-                file=sys.stderr,
+                "  - run `af instance add <name> --url <url>` "
+                "and `af instance use <name>`.\n"
+                "To use the default (http://localhost:8080), "
+                "unset AIRFLOW_API_URL."
             )
+            print(message, file=sys.stderr)
             sys.exit(2)
 
         if url_from_env:
