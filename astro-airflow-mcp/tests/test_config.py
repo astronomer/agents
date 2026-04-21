@@ -978,9 +978,7 @@ class TestCLIContextEmptyURL:
         """When AIRFLOW_API_URL is entirely unset, default fallback still works."""
         ctx = self._make_context()
         with patch.object(ctx, "_load_from_config", return_value=None):
-            env_clear = {
-                k: v for k, v in os.environ.items() if k != "AIRFLOW_API_URL"
-            }
+            env_clear = {k: v for k, v in os.environ.items() if k != "AIRFLOW_API_URL"}
             with patch.dict(os.environ, env_clear, clear=True):
                 ctx.init()
         assert ctx._manager._airflow_url == "http://localhost:8080"
@@ -993,9 +991,7 @@ class TestCLIContextEmptyURL:
             instance_name="test",
         )
         with patch.object(ctx, "_load_from_config", return_value=mock_config):
-            env_clear = {
-                k: v for k, v in os.environ.items() if k != "AIRFLOW_API_URL"
-            }
+            env_clear = {k: v for k, v in os.environ.items() if k != "AIRFLOW_API_URL"}
             with patch.dict(os.environ, env_clear, clear=True):
                 ctx.init()
         assert ctx._manager._airflow_url == "http://configured.example.com"
