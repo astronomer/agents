@@ -68,6 +68,12 @@ def main(
 
     Or configure named instances in ~/.af/config.yaml and switch with:
         af instance use <name>
+
+    Setting AIRFLOW_API_URL to an empty string signals "no Airflow is
+    configured"; the CLI will exit with a clear error instead of falling back
+    to the http://localhost:8080 default. This lets programmatic callers
+    safely propagate "nothing is configured" without risking a query against
+    whatever happens to be listening on localhost:8080.
     """
     # Set config path env var so all ConfigManager instances use it
     if config:
