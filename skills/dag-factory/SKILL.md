@@ -10,6 +10,7 @@ You are helping a user build Apache Airflow DAGs declaratively with **dag-factor
 > **Package**: `dag-factory` on PyPI
 > **Repo**: https://github.com/astronomer/dag-factory
 > **Docs**: https://astronomer.github.io/dag-factory/latest/
+> **Targets**: dag-factory **v1.0+** only. For pre-1.0 projects, see [reference/migration.md](reference/migration.md) before applying any guidance from this skill.
 > **Requires**: Python 3.10+, Airflow 2.4+ (Airflow 3 supported)
 
 ## Before Starting
@@ -17,7 +18,7 @@ You are helping a user build Apache Airflow DAGs declaratively with **dag-factor
 Confirm with the user:
 1. **Airflow version** ≥2.4
 2. **Python version** ≥3.10
-3. **dag-factory version**: v1.0+ recommended. If migrating from <1.0, see **Migration Notes** — there are several breaking changes.
+3. **dag-factory version**: this skill targets **v1.0+**. If the project is on <1.0, follow [reference/migration.md](reference/migration.md) to upgrade before continuing.
 4. **Use case**: dag-factory is for declarative, low-code DAG authoring. If the user needs reusable, validated Pythonic templates with Pydantic, suggest **blueprint** instead. If they need full Python flexibility, suggest the **authoring-dags** skill.
 
 ---
@@ -36,7 +37,7 @@ Confirm with the user:
 | "Use a timetable" / "datetime in YAML" / "timedelta in YAML" | Go to **Custom Python Objects (`__type__`)** |
 | "Lint my YAML" / "Validate" | Go to **Validation Commands** |
 | "Convert Airflow 2 YAML to Airflow 3" | Go to **Validation Commands** (`dagfactory convert`) |
-| "Migrate from dag-factory <1.0" | Go to **Migration Notes** |
+| "Migrate from dag-factory <1.0" | See [reference/migration.md](reference/migration.md) |
 | dag-factory errors / troubleshooting | Go to **Troubleshooting** |
 
 ---
@@ -149,9 +150,9 @@ There are four ways to set defaults, in **precedence order** (highest first):
 1. `default_args` / DAG-level keys inside an individual DAG
 2. The top-level `default:` block in the same YAML file
 3. `defaults_config_dict=` argument to `load_yaml_dags`
-4. A `defaults.yml` (or `defaults.yaml`) file via `default_args_config_path=` (or auto-detected next to the DAG YAML)
+4. A `defaults.yml` (or `defaults.yaml`) file via `defaults_config_path=` (or auto-detected next to the DAG YAML)
 
-> Note: in v1.0.0 the loader argument was **renamed** from `default_args_config_dict` to `defaults_config_dict`. The DAG-side `default_args_config_path` argument keeps its name.
+> Note: loader argument names and several other field names changed in v1.0.0. See [reference/migration.md](reference/migration.md) if you're working on an older project.
 
 ### `default` Block in the Same File
 
@@ -183,7 +184,7 @@ dag_two:
 
 ### `defaults.yml` File
 
-Place a `defaults.yml` next to the DAG YAML, or point `default_args_config_path` at a parent directory. dag-factory **merges** all `defaults.yml` files walking up the directory tree, with the file closest to the DAG YAML winning. DAG-level args (e.g. `schedule`, `catchup`) go at the root of `defaults.yml`; per-task defaults go under `default_args`.
+Place a `defaults.yml` next to the DAG YAML, or point `defaults_config_path` at a parent directory. dag-factory **merges** all `defaults.yml` files walking up the directory tree, with the file closest to the DAG YAML winning. DAG-level args (e.g. `schedule`, `catchup`) go at the root of `defaults.yml`; per-task defaults go under `default_args`.
 
 ```yaml
 # defaults.yml
@@ -234,7 +235,12 @@ tasks:
 
 ## Dynamic Task Mapping
 
-Use `expand` and `partial` keys on a task to map dynamically. Reference the output of another task with the `+` prefix or by name (`task_id.output` works for some forms; the `+` syntax is dag-factory's idiomatic resolver).
+Use `expand` and `partial` keys on a task to map dynamically. dag-factory has two distinct ways to reference an upstream task's output:
+
+- **`task_id.output`** — XCom-style reference, used inside `expand` `op_args` / `op_kwargs` (and the equivalent kwargs of other operators).
+- **`+task_id`** — bare value reference, used when the value sits directly under `expand` (e.g. `expand: {number: +numbers_list}`) or as a TaskFlow decorator argument.
+
+Don't mix them: `+request` won't resolve inside `op_args`, and `request.output` won't resolve as a bare `expand` value.
 
 ```yaml
 dynamic_task_map:
@@ -254,8 +260,22 @@ dynamic_task_map:
         op_kwargs:
           fixed_param: "test"
       expand:
-        op_args: request.output
+        op_args: request.output    # XCom-style — used inside op_args / op_kwargs
       dependencies: [request]
+```
+
+Bare-value form (TaskFlow `decorator` tasks, or any non-`op_args` mapping):
+
+```yaml
+tasks:
+  - task_id: numbers_list
+    decorator: airflow.sdk.definitions.decorators.task
+    python_callable: sample.build_numbers_list
+  - task_id: double_number
+    decorator: airflow.sdk.definitions.decorators.task
+    python_callable: sample.double
+    expand:
+      number: +numbers_list   # + resolves to upstream task `numbers_list`'s XComArg
 ```
 
 For named map indices (Airflow 2.9+), set `map_index_template: "{{ task.custom_mapping_key }}"` and have the callable assign `context["custom_mapping_key"]`.
@@ -294,18 +314,17 @@ consumer_dag:
 
 ### Conditional Dataset Scheduling (Airflow 2.9+ / dag-factory 0.22+)
 
-Combine datasets with `__and__` / `__or__`:
+Nesting the logical operators `__and__` / `__or__` under `datasets` key.
 
 ```yaml
 schedule:
-  __or__:
-    - __and__:
-        - s3://bucket-cjmm/raw/dataset_custom_1
-        - s3://bucket-cjmm/raw/dataset_custom_2
-    - s3://bucket-cjmm/raw/dataset_custom_3
+  datasets:
+    __or__:
+      - __and__:
+          - s3://bucket-cjmm/raw/dataset_custom_1
+          - s3://bucket-cjmm/raw/dataset_custom_2
+      - s3://bucket-cjmm/raw/dataset_custom_3
 ```
-
-> v1.0 renamed the legacy logical keys: `!and`/`and` → `__and__`, `!or`/`or` → `__or__`, `!join` → `__join__`. Update old YAML accordingly.
 
 ---
 
@@ -387,11 +406,9 @@ schedule:
 - Other keys become keyword arguments
 - For lists of typed objects, use `__type__: builtins.list` with an `items:` key
 
-> v1.0 removed the `*_sec` / `*_secs` shorthand fields (`dagrun_timeout_sec`, `retry_delay_sec`, etc.). Use the real Airflow names with `__type__: datetime.timedelta`.
-
 ### Reserved Keys
 
-Don't use these YAML keys for your own data — dag-factory reserves them: `__type__`, `__args__`, `__join__`, `__and__`, `__or__`.
+Don't use these YAML keys for your own data — dag-factory reserves them: `__type__`, `__args__`, `__join__`, `__and__`, `__or__`. The key `items` is also reserved when used inside a `__type__: builtins.list` block — don't add a custom field named `items` to a typed list construction.
 
 ---
 
@@ -419,24 +436,6 @@ astro dev parse
 ```
 
 `dagfactory lint` only checks YAML syntax — operator import errors and missing kwargs surface at Airflow parse time.
-
----
-
-## Migration Notes (pre-1.0 → 1.0)
-
-When working with an existing project, watch for these breaking changes:
-
-| Change | Old | New |
-|--------|-----|-----|
-| Class access | `from dagfactory import DagFactory` | `from dagfactory import load_yaml_dags` |
-| Loader kwarg | `default_args_config_dict=` | `defaults_config_dict=` |
-| Schedule key | `schedule_interval: ...` | `schedule: ...` |
-| Timeout shortcuts | `dagrun_timeout_sec: 300` | `dagrun_timeout: {__type__: datetime.timedelta, seconds: 300}` |
-| Logical keys | `!and`, `!or`, `!join`, `and`, `or` | `__and__`, `__or__`, `__join__` |
-| Timetable parsing | `timetable: {callable: ..., params: ...}` | `timetable: {__type__: ..., __args__: [...]}` |
-| Provider deps | Auto-installed | Install Airflow providers manually |
-| `clean_dags()` | Available on factory class | Removed; use `AIRFLOW__DAG_PROCESSOR__REFRESH_INTERVAL` |
-| Tasks/task_groups format | Dict keyed by id | List with `task_id` / `group_name` (dict still works) |
 
 ---
 
@@ -468,9 +467,9 @@ When working with an existing project, watch for these breaking changes:
 
 ### Multiple `defaults.yml` not merging as expected
 
-**Cause**: `default_args_config_path` not pointing at a parent directory of the DAG YAML.
+**Cause**: `defaults_config_path` not pointing at a parent directory of the DAG YAML.
 
-**Fix**: Set `default_args_config_path` to the highest ancestor folder you want included; dag-factory walks the tree from DAG file → ancestor and merges in that order, with files closer to the DAG winning.
+**Fix**: Set `defaults_config_path` to the highest ancestor folder you want included; dag-factory walks the tree from DAG file → ancestor and merges in that order, with files closer to the DAG winning.
 
 ---
 
@@ -497,4 +496,3 @@ Before finishing, verify with the user:
 - Docs: https://astronomer.github.io/dag-factory/latest/
 - PyPI: https://pypi.org/project/dag-factory/
 - Migration Guide: https://astronomer.github.io/dag-factory/latest/migration_guide/
-
