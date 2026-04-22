@@ -138,6 +138,10 @@ Or CLI flags: `af --airflow-url http://localhost:8080 --token "$TOKEN" <command>
 | `af api <endpoint>` | Direct REST API access |
 | `af api ls` | List available API endpoints |
 | `af api ls --filter X` | List endpoints matching pattern |
+| `af registry providers` | List providers in the Airflow Registry |
+| `af registry modules <provider>` | List operators/hooks/sensors/transfers in a provider |
+| `af registry parameters <provider>` | Constructor signatures (name, type, default, required) for a provider's classes |
+| `af registry connections <provider>` | Connection types a provider exposes |
 
 ## User Intent Patterns
 
@@ -195,6 +199,13 @@ Or CLI flags: `af --airflow-url http://localhost:8080 --token "$TOKEN" <command>
 - "Create connection via API" -> `af api connections -X POST --body '{...}'`
 - "Create variable via API" -> `af api variables -X POST -F key=name -f value=val`
 
+### Registry Discovery
+- "What operators does provider X have?" -> `af registry modules <provider>`
+- "What are the constructor params for operator Y?" -> `af registry parameters <provider>`
+- "What providers exist?" / "Is there a provider for Z?" -> `af registry providers`
+- "What connection types does provider X expose?" -> `af registry connections <provider>`
+- "Writing a DAG with a specific operator" -> use registry to verify current signature before copying examples
+
 ## Common Workflows
 
 ### Validate DAGs Before Deploying
@@ -215,6 +226,29 @@ Otherwise, validate against a running instance:
 af dags errors     # Check for parse/import errors
 af dags warnings   # Check for deprecation warnings
 ```
+
+### Discover Operator Signatures Before Writing Code
+
+The Airflow Registry at `airflow.apache.org/registry` is the authoritative source for provider classes and their current constructor signatures. Prefer it over memory or stale documentation when authoring DAGs — the registry reflects the live provider release.
+
+```bash
+# List all providers and pick the one you need
+af registry providers | jq '.providers[] | {id, name, version}'
+
+# List every operator / hook / sensor in a provider (e.g. standard, amazon, google)
+af registry modules standard \
+  | jq '.modules[] | {name, type, import_path, docs_url}'
+
+# Get the current constructor signature for a specific class
+af registry parameters standard \
+  | jq '.classes["airflow.providers.standard.operators.hitl.ApprovalOperator"].parameters'
+
+# Filter modules by substring (useful when you know the concept but not the class)
+af registry modules standard \
+  | jq '.modules[] | select(.import_path | test("hitl"))'
+```
+
+Results are cached locally: 1 hour for the latest version, 30 days for pinned versions (which are immutable). Add `--version X.Y.Z` to any `modules` / `parameters` / `connections` call to target a specific release.
 
 ### Investigate a Failed Run
 

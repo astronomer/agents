@@ -81,6 +81,31 @@ After adding or modifying skills, reinstall the plugin to test:
 claude plugin uninstall astronomer-data@astronomer && claude plugin marketplace update && claude plugin install astronomer-data@astronomer
 ```
 
+### Authoring Evergreen Skills
+
+Skills rot when they embed content that changes every upstream release (operator params, REST paths, CLI flags, version numbers). A skill the maintainer has to touch on every Airflow/provider release is broken by design. Write skills so they keep working without edits.
+
+**Three recurring rot patterns and their replacements:**
+
+| Rot pattern | What it looks like | Replacement |
+|---|---|---|
+| **Hardcoded version gates** | `> Requires Airflow 3.1+` as immutable text, `Cosmos 1.11+`, etc. | Instruct the agent to verify at runtime: `uvx --from astro-airflow-mcp af config version` and `af config providers \| jq ...`. Keep the floor version as a reference, not an assertion. |
+| **Embedded constructor signatures** | Multi-line `HITLOperator(task_id=..., subject=..., options=..., assigned_users=..., ...)` code blocks listing every kwarg | Name the class once in an anchoring table, then tell the agent to fetch current signatures via `af registry parameters <provider>` before writing code. One canonical example is fine; a parameter encyclopedia is not. |
+| **Quoted REST paths / CLI flags** | `POST /api/v2/hitlDetails/{dag_id}/{run_id}/{task_id}`, `astro deploy --dags --pytest` as verbatim contracts | Derive at use time: `af api ls --filter <keyword>`, `af api spec`, `astro <cmd> --help`. Keep the *pattern* (what method, what it does) and discover the path. |
+
+**Reviewer checklist for skill PRs:**
+
+- [ ] Are class, operator, or hook names mentioned more than once outside a single anchoring table? If so, ask if each repetition is needed — each one is a surface that can rot.
+- [ ] Does the skill quote a REST path verbatim instead of pointing at `af api ls` / `af api spec`?
+- [ ] Does the skill assert a version floor instead of teaching the agent to check it?
+- [ ] Does the skill embed a parameter table that duplicates what `af registry parameters` returns? If yes, delete the table and reference the command.
+- [ ] Does the skill include more than one full code example per concept? One canonical example is enough — the agent adapts it using discovery.
+- [ ] Does the skill cross-reference the `airflow` skill for registry and API discovery commands rather than re-explaining them?
+
+**When embedding a concrete example is the right call:**
+
+A single canonical example per capability is useful context — it anchors the agent on the correct shape (`@dag` decorator, import path, XCom wiring) that is stable across releases. Pair it with an explicit "verify params via `af registry` before writing code" instruction so stale param names in the example get corrected against live truth. See `skills/airflow-hitl/SKILL.md` for the current reference implementation of this pattern.
+
 ### Working on the MCP Server
 
 The Airflow MCP server is in `astro-airflow-mcp/`. See its [README](./astro-airflow-mcp/README.md) for specific development instructions.
