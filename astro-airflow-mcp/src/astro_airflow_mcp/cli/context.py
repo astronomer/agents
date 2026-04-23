@@ -73,7 +73,30 @@ class CLIContext:
         # Determine final values with priority: env > config > default
         # If the URL is overridden by env var, don't inherit auth from config
         # since the config's auth is for a different instance.
-        url_from_env = bool(os.environ.get("AIRFLOW_API_URL"))
+        #
+        # An explicitly empty AIRFLOW_API_URL ("" in the environment) is treated
+        # as "no Airflow is configured right now" -- do NOT fall back to the
+        # config file or DEFAULT_AIRFLOW_URL. This lets programmatic callers
+        # (automation, agent frameworks) propagate "nothing is configured"
+        # without risking queries against whatever happens to be listening on
+        # localhost:8080.
+        airflow_url_env = os.environ.get("AIRFLOW_API_URL")
+        url_from_env = bool(airflow_url_env)
+
+        if airflow_url_env is not None and not airflow_url_env:
+            message = (
+                "Error: AIRFLOW_API_URL is set but empty. "
+                "No Airflow instance is configured.\n"
+                "To configure one, either:\n"
+                "  - set AIRFLOW_API_URL to a webserver URL, or\n"
+                "  - run `af instance add <name> --url <url>` "
+                "and `af instance use <name>`.\n"
+                "To use the default (http://localhost:8080), "
+                "unset AIRFLOW_API_URL."
+            )
+            print(message, file=sys.stderr)
+            sys.exit(2)
+
         if url_from_env:
             final_url = os.environ["AIRFLOW_API_URL"]
         elif config_values and config_values.url:

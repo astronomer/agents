@@ -453,6 +453,13 @@ export AIRFLOW_PASSWORD=admin
 AIRFLOW_API_URL=http://localhost:5500 af dags list
 ```
 
+When `AIRFLOW_API_URL` is unset and no current instance is configured, the CLI falls back to `http://localhost:8080`. To explicitly signal "no Airflow is configured right now" (useful for automation / agent frameworks that don't want to risk querying a stale localhost service), set `AIRFLOW_API_URL=""`. The CLI will exit with a clear error instead of defaulting.
+
+```bash
+AIRFLOW_API_URL="" af dags list
+# Error: AIRFLOW_API_URL is set but empty. No Airflow instance is configured.
+```
+
 All commands output JSON (except `instance` commands which use human-readable tables), making them easy to use with tools like `jq`:
 
 ```bash

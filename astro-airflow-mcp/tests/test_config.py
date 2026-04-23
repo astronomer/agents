@@ -941,3 +941,57 @@ class TestCLIContextSSL:
             with patch.dict(os.environ, env_clear, clear=True):
                 ctx.init()
         assert ctx._manager._verify is True
+
+
+class TestCLIContextEmptyURL:
+    """Tests for explicit 'no Airflow configured' signal via empty AIRFLOW_API_URL."""
+
+    def _make_context(self):
+        from astro_airflow_mcp.cli.context import CLIContext
+
+        ctx = CLIContext.__new__(CLIContext)
+        ctx._manager = __import__(
+            "astro_airflow_mcp.adapter_manager", fromlist=["AdapterManager"]
+        ).AdapterManager()
+        ctx._initialized = False
+        return ctx
+
+    def test_empty_env_var_exits_with_error(self, capsys):
+        """AIRFLOW_API_URL='' should exit, not fall back to config or default."""
+        ctx = self._make_context()
+        mock_config = ResolvedConfig(
+            url="http://configured.example.com",
+            instance_name="test",
+        )
+        with (
+            patch.object(ctx, "_load_from_config", return_value=mock_config),
+            patch.dict(os.environ, {"AIRFLOW_API_URL": ""}, clear=False),
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            ctx.init()
+        assert exc_info.value.code == 2
+        captured = capsys.readouterr()
+        assert "AIRFLOW_API_URL is set but empty" in captured.err
+        assert "No Airflow instance is configured" in captured.err
+
+    def test_unset_env_var_falls_back_to_default(self):
+        """When AIRFLOW_API_URL is entirely unset, default fallback still works."""
+        ctx = self._make_context()
+        with patch.object(ctx, "_load_from_config", return_value=None):
+            env_clear = {k: v for k, v in os.environ.items() if k != "AIRFLOW_API_URL"}
+            with patch.dict(os.environ, env_clear, clear=True):
+                ctx.init()
+        assert ctx._manager._airflow_url == "http://localhost:8080"
+
+    def test_unset_env_var_uses_config(self):
+        """When AIRFLOW_API_URL is unset but config has a URL, config wins."""
+        ctx = self._make_context()
+        mock_config = ResolvedConfig(
+            url="http://configured.example.com",
+            instance_name="test",
+        )
+        with patch.object(ctx, "_load_from_config", return_value=mock_config):
+            env_clear = {k: v for k, v in os.environ.items() if k != "AIRFLOW_API_URL"}
+            with patch.dict(os.environ, env_clear, clear=True):
+                ctx.init()
+        assert ctx._manager._airflow_url == "http://configured.example.com"
