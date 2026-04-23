@@ -94,6 +94,26 @@ def get_dag_run(
         output_error(str(e))
 
 
+def _ensure_dag_unpaused(adapter: Any, dag_id: str, auto_unpause: bool) -> bool:
+    """Ensure the DAG is not paused before triggering a run.
+
+    Returns True if the DAG was unpaused as part of this call. Raises a typer.Exit
+    with an error message if the DAG is paused and auto_unpause is False.
+    """
+    dag_details = adapter.get_dag(dag_id)
+    if not dag_details.get("is_paused", False):
+        return False
+    if not auto_unpause:
+        output_error(
+            f"DAG '{dag_id}' is paused; a new run would not be scheduled. "
+            "Unpause it first (e.g., `af dags unpause {dag_id}`) or re-run without "
+            "--no-auto-unpause."
+        )
+        raise typer.Exit(code=1)
+    adapter.unpause_dag(dag_id)
+    return True
+
+
 @app.command("trigger")
 def trigger_dag(
     dag_id: Annotated[str, typer.Argument(help="The DAG ID to trigger")],
@@ -101,19 +121,33 @@ def trigger_dag(
         str | None,
         typer.Option("--conf", "-c", help="Configuration JSON to pass to the DAG run"),
     ] = None,
+    auto_unpause: Annotated[
+        bool,
+        typer.Option(
+            "--auto-unpause/--no-auto-unpause",
+            help="Automatically unpause the DAG if paused (default: enabled). "
+            "Use --no-auto-unpause to fail fast when the DAG is paused.",
+        ),
+    ] = True,
 ) -> None:
     """Trigger a new DAG run.
 
     Creates a new DAG run that will be picked up by the scheduler.
     Optionally pass configuration parameters via --conf.
+    If the DAG is paused, it is unpaused first unless --no-auto-unpause is set.
     """
     try:
         adapter = get_adapter()
         conf_dict = json.loads(conf) if conf else None
+        unpaused = _ensure_dag_unpaused(adapter, dag_id, auto_unpause)
         data = adapter.trigger_dag_run(dag_id=dag_id, conf=conf_dict)
+        if unpaused:
+            data = {**data, "unpaused": True}
         output_json(data)
     except json.JSONDecodeError as e:
         output_error(f"Invalid JSON in --conf: {e}")
+    except typer.Exit:
+        raise
     except Exception as e:
         output_error(str(e))
 
@@ -133,15 +167,27 @@ def trigger_dag_and_wait(
         float,
         typer.Option("--poll-interval", "-p", help="Seconds between status checks"),
     ] = 5.0,
+    auto_unpause: Annotated[
+        bool,
+        typer.Option(
+            "--auto-unpause/--no-auto-unpause",
+            help="Automatically unpause the DAG if paused (default: enabled). "
+            "Use --no-auto-unpause to fail fast when the DAG is paused.",
+        ),
+    ] = True,
 ) -> None:
     """Trigger a DAG run and wait for completion.
 
     This is a blocking operation that triggers the DAG and polls until
     it reaches a terminal state (success, failed, upstream_failed).
+    If the DAG is paused, it is unpaused first unless --no-auto-unpause is set —
+    otherwise the run would never be scheduled and this command would hang until timeout.
     """
     try:
         adapter = get_adapter()
         conf_dict = json.loads(conf) if conf else None
+
+        _ensure_dag_unpaused(adapter, dag_id, auto_unpause)
 
         # Step 1: Trigger the DAG
         trigger_data = adapter.trigger_dag_run(dag_id=dag_id, conf=conf_dict)
@@ -197,6 +243,8 @@ def trigger_dag_and_wait(
 
     except json.JSONDecodeError as e:
         output_error(f"Invalid JSON in --conf: {e}")
+    except typer.Exit:
+        raise
     except Exception as e:
         output_error(str(e))
 
