@@ -176,8 +176,8 @@ class TestListDagRunsTool:
             order_by="id",
         )
 
-    def test_list_dag_runs_impl_omits_order_by_when_none(self, mocker):
-        """The internal impl drops order_by when None so the Airflow default applies."""
+    def test_list_dag_runs_impl_passes_order_by_none(self, mocker):
+        """order_by=None reaches the adapter as None; BaseAdapter._call drops Nones."""
         mock_adapter = MagicMock()
         mock_adapter.list_dag_runs.return_value = {"dag_runs": [], "total_entries": 0}
 
@@ -189,6 +189,7 @@ class TestListDagRunsTool:
             dag_id="example_dag",
             limit=100,
             offset=0,
+            order_by=None,
         )
 
     def test_list_dag_runs_no_dag_runs_key(self, mocker):

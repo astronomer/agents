@@ -33,10 +33,9 @@ def _list_dag_runs_impl(
     """
     try:
         adapter = _get_adapter()
-        extra: dict[str, Any] = {}
-        if order_by is not None:
-            extra["order_by"] = order_by
-        data = adapter.list_dag_runs(dag_id=dag_id, limit=limit, offset=offset, **extra)
+        data = adapter.list_dag_runs(
+            dag_id=dag_id, limit=limit, offset=offset, order_by=order_by
+        )
 
         if "dag_runs" in data:
             return _wrap_list_response(data["dag_runs"], "dag_runs", data)
