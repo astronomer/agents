@@ -29,9 +29,15 @@ def list_dag_runs(
         typer.Option("--offset", "-o", help="Offset for pagination"),
     ] = 0,
     order_by: Annotated[
-        str | None,
-        typer.Option("--order-by", help="Sort field (prefix - for descending, e.g., -start_date)"),
-    ] = None,
+        str,
+        typer.Option(
+            "--order-by",
+            help=(
+                "Sort field; prefix with '-' for descending. Defaults to '-start_date' "
+                "so the most recent runs come first."
+            ),
+        ),
+    ] = "-start_date",
     state: Annotated[
         str | None,
         typer.Option("--state", "-s", help="Filter by state: running, success, failed, queued"),
