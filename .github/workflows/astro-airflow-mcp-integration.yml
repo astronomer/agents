@@ -35,7 +35,7 @@ jobs:
             health-endpoint: "/api/v2/monitor/health"
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
     - name: Set up Python 3.12
       uses: actions/setup-python@v5
