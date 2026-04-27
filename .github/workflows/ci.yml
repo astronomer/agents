@@ -14,10 +14,10 @@ jobs:
     name: Pre-commit checks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v8.1.0
 
       - name: Run prek
         run: uvx prek run --all-files
@@ -26,10 +26,10 @@ jobs:
     name: Unit tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v8.1.0
 
       - name: Run unit tests
         working-directory: skills/analyzing-data/scripts
@@ -54,10 +54,10 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v8.1.0
 
       - name: Run integration tests
         working-directory: skills/analyzing-data/scripts
@@ -73,10 +73,10 @@ jobs:
     name: Type checking
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v8.1.0
 
       - name: Run ty type checker
         working-directory: skills/analyzing-data/scripts

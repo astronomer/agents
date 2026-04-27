@@ -21,19 +21,19 @@ jobs:
         working-directory: astro-airflow-mcp
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
           fetch-depth: 0  # Full history for hatch-vcs to read version from tags
           fetch-tags: true  # Explicitly fetch tags for version detection
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v8.1.0
         with:
           enable-cache: true
 
@@ -53,7 +53,7 @@ jobs:
           SETUPTOOLS_SCM_PRETEND_VERSION: ${{ steps.version.outputs.version }}
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dist-packages
           path: astro-airflow-mcp/dist/*
@@ -72,7 +72,7 @@ jobs:
 
     steps:
       - name: Download build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: dist-packages
           path: dist
