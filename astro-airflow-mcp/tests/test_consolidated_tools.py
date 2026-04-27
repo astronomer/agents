@@ -119,6 +119,103 @@ class TestDiagnoseDagRun:
         assert "error" in data["run_info"]
 
 
+class TestListDagRunsTool:
+    """Tests for list_dag_runs MCP tool."""
+
+    def test_list_dag_runs_defaults_to_newest_first(self, mocker):
+        """Default order_by is '-start_date' so callers get recent runs, not oldest."""
+        mock_adapter = MagicMock()
+        mock_adapter.list_dag_runs.return_value = {
+            "dag_runs": [{"dag_run_id": "manual__2024-12-31"}],
+            "total_entries": 1,
+        }
+
+        mocker.patch("astro_airflow_mcp.tools.dag_run._get_adapter", return_value=mock_adapter)
+
+        list_fn = get_tool_fn(dag_run_module, "list_dag_runs")
+        list_fn("example_dag")
+
+        mock_adapter.list_dag_runs.assert_called_once_with(
+            dag_id="example_dag",
+            limit=100,
+            offset=0,
+            order_by="-start_date",
+        )
+
+    def test_list_dag_runs_passes_limit_and_offset(self, mocker):
+        """Caller-supplied limit and offset are forwarded to the adapter."""
+        mock_adapter = MagicMock()
+        mock_adapter.list_dag_runs.return_value = {"dag_runs": [], "total_entries": 0}
+
+        mocker.patch("astro_airflow_mcp.tools.dag_run._get_adapter", return_value=mock_adapter)
+
+        list_fn = get_tool_fn(dag_run_module, "list_dag_runs")
+        list_fn("example_dag", limit=25, offset=50)
+
+        mock_adapter.list_dag_runs.assert_called_once_with(
+            dag_id="example_dag",
+            limit=25,
+            offset=50,
+            order_by="-start_date",
+        )
+
+    def test_list_dag_runs_custom_order_by_overrides_default(self, mocker):
+        """Caller can override the default sort (e.g. to get oldest first)."""
+        mock_adapter = MagicMock()
+        mock_adapter.list_dag_runs.return_value = {"dag_runs": [], "total_entries": 0}
+
+        mocker.patch("astro_airflow_mcp.tools.dag_run._get_adapter", return_value=mock_adapter)
+
+        list_fn = get_tool_fn(dag_run_module, "list_dag_runs")
+        list_fn(order_by="id")
+
+        mock_adapter.list_dag_runs.assert_called_once_with(
+            dag_id=None,
+            limit=100,
+            offset=0,
+            order_by="id",
+        )
+
+    def test_list_dag_runs_impl_omits_order_by_when_none(self, mocker):
+        """The internal impl drops order_by when None so the Airflow default applies."""
+        mock_adapter = MagicMock()
+        mock_adapter.list_dag_runs.return_value = {"dag_runs": [], "total_entries": 0}
+
+        mocker.patch("astro_airflow_mcp.tools.dag_run._get_adapter", return_value=mock_adapter)
+
+        dag_run_module._list_dag_runs_impl(dag_id="example_dag", order_by=None)
+
+        mock_adapter.list_dag_runs.assert_called_once_with(
+            dag_id="example_dag",
+            limit=100,
+            offset=0,
+        )
+
+    def test_list_dag_runs_no_dag_runs_key(self, mocker):
+        """Falls back to a descriptive string when the API returns no dag_runs key."""
+        mock_adapter = MagicMock()
+        mock_adapter.list_dag_runs.return_value = {"unexpected": "shape"}
+
+        mocker.patch("astro_airflow_mcp.tools.dag_run._get_adapter", return_value=mock_adapter)
+
+        list_fn = get_tool_fn(dag_run_module, "list_dag_runs")
+        result = list_fn("example_dag")
+
+        assert "No DAG runs found" in result
+
+    def test_list_dag_runs_adapter_error(self, mocker):
+        """Exceptions from the adapter are returned as a string, not raised."""
+        mock_adapter = MagicMock()
+        mock_adapter.list_dag_runs.side_effect = Exception("boom")
+
+        mocker.patch("astro_airflow_mcp.tools.dag_run._get_adapter", return_value=mock_adapter)
+
+        list_fn = get_tool_fn(dag_run_module, "list_dag_runs")
+        result = list_fn("example_dag")
+
+        assert "boom" in result
+
+
 class TestDeleteDagRunTool:
     """Tests for delete_dag_run MCP tool."""
 

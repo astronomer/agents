@@ -17,6 +17,7 @@ def _list_dag_runs_impl(
     dag_id: str | None = None,
     limit: int = DEFAULT_LIMIT,
     offset: int = DEFAULT_OFFSET,
+    order_by: str | None = None,
 ) -> str:
     """Internal implementation for listing DAG runs from Airflow.
 
@@ -24,13 +25,18 @@ def _list_dag_runs_impl(
         dag_id: Optional DAG ID to filter runs for a specific DAG
         limit: Maximum number of DAG runs to return (default: 100)
         offset: Offset for pagination (default: 0)
+        order_by: Sort field; prefix with '-' for descending. ``None`` falls back
+                  to the Airflow API default (``id`` ascending, i.e. oldest first).
 
     Returns:
         JSON string containing the list of DAG runs with their metadata
     """
     try:
         adapter = _get_adapter()
-        data = adapter.list_dag_runs(dag_id=dag_id, limit=limit, offset=offset)
+        extra: dict[str, Any] = {}
+        if order_by is not None:
+            extra["order_by"] = order_by
+        data = adapter.list_dag_runs(dag_id=dag_id, limit=limit, offset=offset, **extra)
 
         if "dag_runs" in data:
             return _wrap_list_response(data["dag_runs"], "dag_runs", data)
@@ -213,7 +219,12 @@ def _trigger_dag_and_wait_impl(
 
 
 @mcp.tool()
-def list_dag_runs(dag_id: str | None = None) -> str:
+def list_dag_runs(
+    dag_id: str | None = None,
+    limit: int = DEFAULT_LIMIT,
+    offset: int = DEFAULT_OFFSET,
+    order_by: str = "-start_date",
+) -> str:
     """Get execution history and status of DAG runs (workflow executions).
 
     Use this tool when the user asks about:
@@ -237,11 +248,23 @@ def list_dag_runs(dag_id: str | None = None) -> str:
     Args:
         dag_id: Optional DAG ID to filter runs for a specific DAG.
                 If not provided, returns runs across all DAGs.
+        limit: Maximum number of DAG runs to return (default: 100).
+        offset: Offset for pagination (default: 0). Use together with `limit`
+                to page through DAGs that have more than `limit` runs.
+        order_by: Sort field; prefix with '-' for descending order.
+                  Defaults to '-start_date' so the most recent runs are
+                  returned first. The Airflow API default would be 'id'
+                  ascending (oldest first), which is rarely what callers want.
 
     Returns:
-        JSON with list of DAG runs, sorted by most recent
+        JSON with list of DAG runs, sorted most-recent-first by default
     """
-    return _list_dag_runs_impl(dag_id=dag_id)
+    return _list_dag_runs_impl(
+        dag_id=dag_id,
+        limit=limit,
+        offset=offset,
+        order_by=order_by,
+    )
 
 
 @mcp.tool()
