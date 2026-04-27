@@ -54,7 +54,7 @@ jobs:
         fetch-depth: 0  # Full history for hatch-vcs to read version from tags
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      uses: docker/setup-buildx-action@v4
 
     - name: Build and test Docker image
       working-directory: astro-airflow-mcp
