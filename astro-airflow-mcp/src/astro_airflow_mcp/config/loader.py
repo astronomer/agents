@@ -58,6 +58,14 @@ class ConfigManager:
             self.config_path = self.DEFAULT_CONFIG_DIR / self.DEFAULT_CONFIG_FILE
         self.lock_path = self.config_path.with_suffix(".lock")
 
+        # AF_CONFIG=/dev/null (or any non-regular file: directory, fifo,
+        # socket, device node) is sometimes used by wrappers as a
+        # "neutralize global config" sentinel. We can't read, write, or
+        # FileLock such a path — on macOS, opening /dev/null.lock with
+        # O_CREAT raises EPERM. Treat it as "no config": load() returns
+        # an empty config, save() is a no-op.
+        self._null_path = self.config_path.exists() and not self.config_path.is_file()
+
     def _ensure_dir(self) -> None:
         """Ensure the config directory exists."""
         self.config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -78,6 +86,9 @@ class ConfigManager:
         Raises:
             ConfigError: If config file is invalid
         """
+        if self._null_path:
+            return AirflowCliConfig.model_validate({})
+
         if not self.config_path.exists():
             config = self._create_default_config()
             self.save(config)
@@ -103,6 +114,9 @@ class ConfigManager:
         Args:
             config: Configuration to save
         """
+        if self._null_path:
+            return
+
         self._ensure_dir()
 
         with FileLock(self.lock_path):

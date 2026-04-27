@@ -1,6 +1,7 @@
 """Tests for af CLI config module."""
 
 import os
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -496,6 +497,66 @@ class TestConfigManager:
 
         manager.use_instance("staging")
         assert manager.get_current_instance() == "staging"
+
+
+class TestConfigManagerNullPath:
+    """Tests for ConfigManager when AF_CONFIG points to a non-regular file.
+
+    Wrappers like `astro otto` set AF_CONFIG=/dev/null as a "neutralize
+    global config" sentinel. /dev/null is a character device, so FileLock
+    can't create /dev/null.lock (EPERM on macOS). ConfigManager should
+    detect this and treat the path as "no config".
+    """
+
+    def test_load_with_dev_null_via_env(self, monkeypatch):
+        """AF_CONFIG=/dev/null does not crash and yields an empty config."""
+        if not Path(os.devnull).exists() or Path(os.devnull).is_file():
+            pytest.skip("os.devnull is not a non-regular file on this platform")
+
+        monkeypatch.setenv("AF_CONFIG", os.devnull)
+        manager = ConfigManager()
+
+        config = manager.load()
+        assert config.instances == []
+        assert config.current_instance is None
+
+        # Lock file must not be created next to /dev/null.
+        assert not Path(os.devnull + ".lock").exists()
+
+    def test_load_with_directory_path(self, tmp_path):
+        """A directory passed as config_path is treated as 'no config'.
+
+        Platform-agnostic stand-in for /dev/null: a directory satisfies the
+        same `exists() and not is_file()` predicate that triggers the
+        null-path branch.
+        """
+        manager = ConfigManager(config_path=tmp_path)
+
+        config = manager.load()
+        assert config.instances == []
+        assert config.current_instance is None
+
+        # No lock file adjacent to the directory.
+        assert not tmp_path.with_suffix(".lock").exists()
+
+    def test_save_is_noop_for_null_path(self, tmp_path):
+        """save() silently no-ops when config_path is non-regular."""
+        manager = ConfigManager(config_path=tmp_path)
+
+        config = AirflowCliConfig(
+            instances=[Instance(name="x", url="http://x", auth=Auth(token="t"))],
+            current_instance="x",
+        )
+        # Must not raise and must not create a lock or dump YAML into the dir.
+        manager.save(config)
+
+        assert not tmp_path.with_suffix(".lock").exists()
+        assert list(tmp_path.iterdir()) == []
+
+    def test_resolve_instance_returns_none_for_null_path(self, tmp_path):
+        """resolve_instance() returns None when config is neutralized."""
+        manager = ConfigManager(config_path=tmp_path)
+        assert manager.resolve_instance() is None
 
 
 class TestResolvedConfig:
