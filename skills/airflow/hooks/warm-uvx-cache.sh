@@ -1,8 +1,11 @@
 #!/bin/bash
-# Hook: SessionStart - Warm the uvx cache for astro-airflow-mcp
-# This ensures subsequent `uvx --from astro-airflow-mcp af` calls are fast
+# Hook: SessionStart - Warm the af / uvx cache so the first real call is fast.
+#
+# `af` on PATH is typically a thin shell wrapper that exec's
+# `uvx --from 'astro-airflow-mcp==<pin>' af`, so invoking it once warms the
+# uvx cache for whichever pin the wrapper installs. No-op if `af` isn't on
+# PATH (the skill's body tells the user how to install it).
 
-# Run in background so we don't block session startup
-(uvx --from astro-airflow-mcp@latest af --version > /dev/null 2>&1 &)
+(af --version > /dev/null 2>&1 &)
 
 exit 0

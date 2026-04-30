@@ -38,13 +38,7 @@ For more details:
 
 ## Running the CLI
 
-Run all `af` commands using uvx (no installation required):
-
-```bash
-uvx --from astro-airflow-mcp af <command>
-```
-
-Throughout this document, `af` is shorthand for `uvx --from astro-airflow-mcp af`.
+These commands assume `af` is on PATH. Run via `astro otto` to get it automatically, or install standalone with `uv tool install astro-airflow-mcp`.
 
 ## Instance Configuration
 
