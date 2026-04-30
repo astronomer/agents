@@ -301,22 +301,40 @@ class AstroCli:
     def get_context(self) -> str | None:
         """Get the current Astro context (domain).
 
+        Reads ``~/.astro/config.yaml`` directly — that's the source of
+        truth that astro CLI itself uses. Falls back to parsing
+        ``astro context list`` output if the file isn't readable.
+
         Returns:
-            Context domain (e.g., 'cloud.astronomer.io') or None
+            Context domain (eg ``"astronomer.io"``) or None
         """
+        # Primary path: read the active context straight from config.yaml.
+        # astro CLI's `context list` colors the active row with ANSI codes
+        # rather than marking it with an asterisk, so the table parser is
+        # unreliable across CLI versions.
+        astro_home = os.environ.get("ASTRO_HOME", str(Path.home() / ".astro"))
+        config_path = Path(astro_home) / "config.yaml"
+        if config_path.exists():
+            try:
+                with open(config_path) as f:
+                    cfg = yaml.safe_load(f) or {}
+                ctx = cfg.get("context")
+                if isinstance(ctx, str) and ctx:
+                    return ctx
+            except (yaml.YAMLError, OSError):
+                pass
+
+        # Fallback: parse `astro context list` (legacy asterisk format).
         try:
             result = self._run_command(["context", "list"], check_auth=False)
             if result.returncode != 0:
                 return None
 
-            # Parse table output - look for row with asterisk (current context)
             for line in result.stdout.strip().split("\n")[1:]:  # Skip header
                 if line.strip().startswith("*"):
-                    # Format: * DOMAIN  ...
                     parts = line.strip().split()
                     if len(parts) >= 2:
-                        return parts[1]  # Domain is second field after *
-
+                        return parts[1]
             return None
         except (AstroCliError, subprocess.TimeoutExpired):
             return None

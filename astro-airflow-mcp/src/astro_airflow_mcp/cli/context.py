@@ -158,14 +158,34 @@ class CLIContext:
         elif not verify_ssl:
             verify = False
 
-        # Configure the underlying adapter manager
-        self._manager.configure(
-            url=final_url,
-            auth_token=final_token,
-            username=final_username,
-            password=final_password,
-            verify=verify,
+        # When the resolved instance is configured for astro_pat AND the
+        # caller hasn't overridden auth via env vars, route through the PAT
+        # resolver instead of treating no-token as "no auth".
+        env_overrode_auth = bool(
+            os.environ.get("AIRFLOW_AUTH_TOKEN")
+            or os.environ.get("AIRFLOW_USERNAME")
+            or os.environ.get("AIRFLOW_PASSWORD")
         )
+        if (
+            not url_from_env
+            and not env_overrode_auth
+            and config_values is not None
+            and config_values.auth_kind == "astro_pat"
+        ):
+            self._manager.configure(
+                url=final_url,
+                auth_kind="astro_pat",
+                astro_context=config_values.astro_context,
+                verify=verify,
+            )
+        else:
+            self._manager.configure(
+                url=final_url,
+                auth_token=final_token,
+                username=final_username,
+                password=final_password,
+                verify=verify,
+            )
         self._initialized = True
 
     def get_adapter(self) -> AirflowAdapter:

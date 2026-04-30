@@ -37,21 +37,59 @@ class TestAuth:
 
     def test_auth_requires_method(self):
         """Test that auth must have some method configured."""
-        with pytest.raises(ValueError, match="must have either username/password or token"):
+        with pytest.raises(ValueError, match="must have one of"):
             Auth()
 
     def test_auth_cannot_have_both(self):
         """Test that auth cannot have both basic and token."""
-        with pytest.raises(ValueError, match="cannot have both"):
+        with pytest.raises(ValueError, match="cannot also have"):
             Auth(username="user", password="pass", token="token")
 
     def test_auth_partial_basic_invalid(self):
         """Test that partial basic auth is invalid."""
-        with pytest.raises(ValueError, match="must have either"):
+        with pytest.raises(ValueError, match="requires both username and password"):
             Auth(username="user")  # no password
 
-        with pytest.raises(ValueError, match="must have either"):
+        with pytest.raises(ValueError, match="requires both username and password"):
             Auth(password="pass")  # no username
+
+    def test_auth_astro_pat_kind(self):
+        """astro_pat with explicit kind requires no fields beyond context (optional)."""
+        auth = Auth(kind="astro_pat", context="astronomer.io")
+        assert auth.kind == "astro_pat"
+        assert auth.context == "astronomer.io"
+        assert auth.token is None
+        assert auth.username is None
+
+    def test_auth_astro_pat_inferred_from_context(self):
+        """`context` set without `kind` infers astro_pat."""
+        auth = Auth(context="astronomer.io")
+        assert auth.kind == "astro_pat"
+
+    def test_auth_kind_token_inferred(self):
+        auth = Auth(token="x")
+        assert auth.kind == "token"
+
+    def test_auth_kind_basic_inferred(self):
+        auth = Auth(username="u", password="p")
+        assert auth.kind == "basic"
+
+    def test_auth_astro_pat_rejects_token(self):
+        with pytest.raises(ValueError, match="astro_pat cannot have a token"):
+            Auth(kind="astro_pat", token="x")
+
+    def test_auth_astro_pat_rejects_basic(self):
+        with pytest.raises(ValueError, match="astro_pat cannot have username"):
+            Auth(kind="astro_pat", username="u", password="p")
+
+    def test_auth_token_kind_rejects_context(self):
+        with pytest.raises(ValueError, match="kind=token cannot have a context"):
+            Auth(kind="token", token="x", context="astronomer.io")
+
+    def test_auth_deployment_id_recorded(self):
+        """deployment_id is metadata; doesn't affect validation."""
+        auth = Auth(kind="astro_pat", context="astronomer.io", deployment_id="dep_xyz")
+        assert auth.deployment_id == "dep_xyz"
 
 
 class TestInstance:

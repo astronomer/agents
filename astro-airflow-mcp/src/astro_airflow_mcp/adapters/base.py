@@ -47,6 +47,7 @@ class AirflowAdapter(ABC):
         version: str,
         token_getter: Callable[[], str | None] | None = None,
         basic_auth_getter: Callable[[], tuple[str, str] | None] | None = None,
+        auth_handler: httpx.Auth | None = None,
         verify: bool | str = True,
     ):
         """Initialize adapter with connection details.
@@ -57,6 +58,10 @@ class AirflowAdapter(ABC):
             token_getter: Callable that returns current auth token (or None)
             basic_auth_getter: Callable that returns (username, password) tuple or None
                              Used as fallback for Airflow 2.x which doesn't support token auth
+            auth_handler: Optional ``httpx.Auth`` instance. When set, all HTTP
+                calls go through this handler (eg ``AstroPATAuth``), which
+                attaches the bearer and handles 401-retry. Takes precedence
+                over ``token_getter`` and ``basic_auth_getter``.
             verify: SSL verification setting. True (default) enables verification,
                     False disables it, or a string path to a CA bundle file.
         """
@@ -64,6 +69,7 @@ class AirflowAdapter(ABC):
         self.version = version
         self._token_getter = token_getter
         self._basic_auth_getter = basic_auth_getter
+        self._auth_handler = auth_handler
         self._verify: bool | str = verify
 
     @property
@@ -71,17 +77,23 @@ class AirflowAdapter(ABC):
     def api_base_path(self) -> str:
         """API base path for this version (e.g., '/api/v1' or '/api/v2')."""
 
-    def _setup_auth(self) -> tuple[dict[str, str], tuple[str, str] | None]:
-        """Set up authentication using token or basic auth.
+    def _setup_auth(self) -> tuple[dict[str, str], tuple[str, str] | httpx.Auth | None]:
+        """Set up authentication for an outgoing request.
 
-        Tries token-based auth first (Airflow 3.x), falls back to basic auth
-        (Airflow 2.x) if token is not available.
+        Precedence: ``auth_handler`` (eg ``AstroPATAuth``) > token > basic.
 
         Returns:
-            Tuple of (headers dict, auth tuple or None)
+            Tuple of (headers dict, auth value). The auth value is one of:
+            an ``httpx.Auth`` instance (attached and handles 401 retries),
+            a ``(username, password)`` tuple for basic auth, or ``None``.
+            httpx accepts all three under the ``auth=`` parameter.
         """
         headers: dict[str, str] = {}
-        auth: tuple[str, str] | None = None
+
+        # PAT or other Auth handler takes precedence: it manages bearer
+        # injection and 401-retry on its own.
+        if self._auth_handler is not None:
+            return headers, self._auth_handler
 
         # Try token-based auth first
         if self._token_getter:
@@ -91,6 +103,7 @@ class AirflowAdapter(ABC):
                 return headers, None
 
         # Fall back to basic auth if no token available
+        auth: tuple[str, str] | None = None
         if self._basic_auth_getter:
             auth = self._basic_auth_getter()
 

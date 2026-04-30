@@ -227,16 +227,34 @@ class TestTableParsing:
 
 
 class TestAstroCliContext:
-    """Tests for context management."""
+    """Tests for context management.
+
+    ``get_context`` reads ``~/.astro/config.yaml`` directly when present
+    (canonical path), and only falls back to parsing ``astro context list``
+    when the file is missing or unparseable. Each test isolates ASTRO_HOME
+    via tmp_path so the user's real config doesn't leak in.
+    """
 
     @pytest.fixture
-    def mock_cli(self):
-        """Create CLI with mocked astro path."""
+    def mock_cli(self, tmp_path, monkeypatch):
+        """Create CLI with mocked astro path and isolated ASTRO_HOME."""
+        monkeypatch.setenv("ASTRO_HOME", str(tmp_path / "astro"))
         with patch("shutil.which", return_value="/usr/local/bin/astro"):
             yield AstroCli()
 
-    def test_get_context_returns_current(self, mock_cli):
-        """Test get_context returns the current context domain."""
+    def test_get_context_reads_from_config_yaml(self, mock_cli, tmp_path):
+        """Primary path: read the active context from ~/.astro/config.yaml."""
+        astro_home = tmp_path / "astro"
+        astro_home.mkdir()
+        (astro_home / "config.yaml").write_text("context: cloud.astronomer.io\n")
+
+        # subprocess.run should not be called when we get a hit from disk.
+        with patch("subprocess.run") as run_mock:
+            assert mock_cli.get_context() == "cloud.astronomer.io"
+            run_mock.assert_not_called()
+
+    def test_get_context_falls_back_to_table_parser(self, mock_cli):
+        """When config.yaml is absent, fall back to legacy table parser."""
         output = """   DOMAIN                    LAST USED WORKSPACE
  * cloud.astronomer.io       my-workspace
    dev.astronomer.io         other-workspace"""
@@ -249,8 +267,8 @@ class TestAstroCliContext:
         with patch("subprocess.run", return_value=mock_result):
             assert mock_cli.get_context() == "cloud.astronomer.io"
 
-    def test_get_context_returns_none_on_failure(self, mock_cli):
-        """Test get_context returns None when command fails."""
+    def test_get_context_returns_none_when_no_config_and_command_fails(self, mock_cli):
+        """No config.yaml and `context list` fails → None."""
         mock_result = MagicMock()
         mock_result.returncode = 1
         mock_result.stdout = ""

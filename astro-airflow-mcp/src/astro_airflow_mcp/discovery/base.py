@@ -17,8 +17,15 @@ class DiscoveredInstance:
     Attributes:
         name: Suggested instance name
         url: Airflow webserver URL (base, no /api/v2)
-        auth_token: Token if available
         source: Backend name (e.g., "astro", "local")
+        auth_token: Static bearer token, when the backend has one. Astro
+            discovery no longer mints these; left for backends that produce
+            real long-lived tokens.
+        auth_kind: Suggested auth mode for the resulting instance
+            (``"astro_pat"``, ``"token"``, ``"basic"``, or None).
+        astro_context: Astro domain (eg ``"astronomer.io"``) for ``astro_pat``
+            instances. Lets the resolver pick the right credential at
+            request time even if the user later switches contexts.
         metadata: Backend-specific metadata
     """
 
@@ -26,6 +33,8 @@ class DiscoveredInstance:
     url: str
     source: str
     auth_token: str | None = None
+    auth_kind: str | None = None
+    astro_context: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
 

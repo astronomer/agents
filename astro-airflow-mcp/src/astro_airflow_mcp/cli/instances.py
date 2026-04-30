@@ -16,11 +16,7 @@ from astro_airflow_mcp.discovery import (
     DiscoveryRegistry,
     get_default_registry,
 )
-from astro_airflow_mcp.discovery.astro import (
-    AstroDiscoveryBackend,
-    AstroDiscoveryError,
-    AstroNotAuthenticatedError,
-)
+from astro_airflow_mcp.discovery.astro import AstroNotAuthenticatedError
 
 app = typer.Typer(help="Manage Airflow instances", no_args_is_help=True)
 console = Console()
@@ -52,6 +48,8 @@ def list_instances() -> None:
             marker = "*" if inst.name == config.current_instance else ""
             if inst.auth is None:
                 auth = "none"
+            elif inst.auth.kind == "astro_pat":
+                auth = "astro pat"
             elif inst.auth.token:
                 auth = "token"
             else:
@@ -82,6 +80,9 @@ def current_instance() -> None:
             console.print(f"URL: {instance.url}")
             if instance.auth is None:
                 console.print("Auth: none")
+            elif instance.auth.kind == "astro_pat":
+                ctx = instance.auth.context or "active context"
+                console.print(f"Auth: astro pat ({ctx})")
             elif instance.auth.token:
                 console.print("Auth: token")
             else:
@@ -319,19 +320,28 @@ def _determine_action(
     return "add"
 
 
+def _format_auth(inst: DiscoveredInstance) -> str:
+    """Render the auth column for the discovery table."""
+    if inst.auth_kind == "astro_pat":
+        return "[cyan]astro pat[/cyan]"
+    if inst.auth_kind == "token" or inst.auth_token:
+        return "token"
+    if inst.auth_kind == "basic":
+        return "basic"
+    return "[dim]none[/dim]"
+
+
 def _display_and_add_instances(
     all_instances: list[tuple[DiscoveredInstance, str]],
     manager: ConfigManager,
-    registry: DiscoveryRegistry,
+    registry: DiscoveryRegistry,  # noqa: ARG001 — kept for back-compat with callers
     dry_run: bool,
 ) -> None:
     """Display discovered instances and add them to config.
 
-    Args:
-        all_instances: List of (instance, action) tuples
-        manager: Config manager for adding instances
-        registry: Discovery registry for getting backends
-        dry_run: If True, preview without making changes
+    Astro-source instances are added with ``auth.kind="astro_pat"``: af
+    resolves the user's ``astro login`` session at request time. No
+    deployment tokens are minted.
     """
     if not all_instances:
         console.print("No instances discovered.", style="dim")
@@ -344,6 +354,7 @@ def _display_and_add_instances(
     table.add_column("NAME")
     table.add_column("SOURCE")
     table.add_column("URL")
+    table.add_column("AUTH")
     table.add_column("STATUS")
     table.add_column("ACTION")
 
@@ -353,6 +364,7 @@ def _display_and_add_instances(
             inst.name,
             inst.source,
             _truncate_url(inst.url),
+            _format_auth(inst),
             _format_status(status),
             _format_action(action),
         )
@@ -376,21 +388,24 @@ def _display_and_add_instances(
     for inst, _ in to_add:
         console.print(f"Processing [bold]{inst.name}[/bold]...")
 
-        token = inst.auth_token
-
-        # For Astro instances without a token, try to create one
-        if inst.source == "astro" and token is None:
-            deployment_id = inst.metadata.get("deployment_id") if inst.metadata else None
-            astro_backend = registry.get_backend("astro")
-            if deployment_id and isinstance(astro_backend, AstroDiscoveryBackend):
-                token = _create_astro_token(astro_backend, deployment_id, inst.name, inst.url)
-                if token is None:
-                    continue
-
-        # Add instance to config
         try:
-            manager.add_instance(inst.name, inst.url, token=token, source=inst.source)
-            auth_info = "token" if token else "none"
+            if inst.auth_kind == "astro_pat":
+                deployment_id = inst.metadata.get("deployment_id") if inst.metadata else None
+                manager.add_instance(
+                    inst.name,
+                    inst.url,
+                    kind="astro_pat",
+                    context=inst.astro_context,
+                    deployment_id=deployment_id,
+                    source=inst.source,
+                )
+                auth_info = f"astro pat ({inst.astro_context or 'active context'})"
+            elif inst.auth_token:
+                manager.add_instance(inst.name, inst.url, token=inst.auth_token, source=inst.source)
+                auth_info = "token"
+            else:
+                manager.add_instance(inst.name, inst.url, source=inst.source)
+                auth_info = "none"
             console.print(f"  [green]Added[/green] {inst.name} (auth: {auth_info})")
             added_count += 1
         except (ConfigError, ValueError) as e:
@@ -467,7 +482,7 @@ def discover_all(
                     console.print(f"[yellow]Skipping {backend_name}:[/yellow] Not available")
                 continue
 
-            instances = backend_obj.discover(create_tokens=False)
+            instances = backend_obj.discover()
             for inst in instances:
                 action = _determine_action(inst, existing_names, overwrite)
                 all_instances.append((inst, action))
@@ -515,14 +530,12 @@ def discover_astro(
         output_error("Astro CLI is not installed. Install with: brew install astro")
         return
 
-    if not isinstance(backend, AstroDiscoveryBackend):
-        output_error("Invalid backend type.")
-        return
-
     # Show context info
-    context = backend.get_context()
-    if context:
-        console.print(f"Astro context: [bold]{context}[/bold]")
+    get_context = getattr(backend, "get_context", None)
+    if callable(get_context):
+        context = get_context()
+        if context:
+            console.print(f"Astro context: [bold]{context}[/bold]")
     scope = "all workspaces" if all_workspaces else "current workspace"
     console.print(f"Scope: {scope}\n")
 
@@ -538,7 +551,7 @@ def discover_astro(
     console.print("Discovering Astro deployments...\n")
 
     try:
-        instances = backend.discover(all_workspaces=all_workspaces, create_tokens=False)
+        instances = backend.discover(all_workspaces=all_workspaces)
         all_instances = [
             (inst, _determine_action(inst, existing_names, overwrite)) for inst in instances
         ]
@@ -608,34 +621,3 @@ def discover_local(
     ]
 
     _display_and_add_instances(all_instances, manager, registry, dry_run)
-
-
-def _create_astro_token(
-    backend: AstroDiscoveryBackend, deployment_id: str, instance_name: str, url: str
-) -> str | None:
-    """Create an Astro deployment token.
-
-    Args:
-        backend: The Astro discovery backend
-        deployment_id: The deployment ID
-        instance_name: The instance name (for error messages)
-        url: The instance URL (for error messages)
-
-    Returns:
-        Token value or None if creation failed
-    """
-    if backend.token_exists(deployment_id):
-        console.print(
-            f"  [yellow]Warning:[/yellow] Token '{backend.token_name}' already exists.\n"
-            f"  Cannot retrieve existing token value. Either:\n"
-            f"  - Delete the token in Astro UI and re-run discover\n"
-            f"  - Manually add with: af instance add {instance_name} --url {url} --token <token>"
-        )
-        return None
-
-    try:
-        console.print(f"  Creating token '{backend.token_name}'...")
-        return backend.create_token(deployment_id)
-    except AstroDiscoveryError as e:
-        console.print(f"  [red]Error:[/red] {e}")
-        return None
