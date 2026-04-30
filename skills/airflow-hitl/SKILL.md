@@ -7,7 +7,7 @@ description: Use when the user needs human-in-the-loop workflows in Airflow (app
 
 Pause a DAG until a human responds via the Airflow UI or REST API. HITL operators are deferrable — they release their worker slot while waiting.
 
-> **Requires Airflow 3.1+** (`uvx --from astro-airflow-mcp af config version`).
+> **Requires Airflow 3.1+** (`af config version`).
 >
 > **UI location**: Browse → Required Actions. Respond from the task instance page's Required Actions tab.
 >
@@ -35,15 +35,15 @@ Before writing HITL code, run these to see the live roster and constructor param
 
 ```bash
 # Every HITL-related module in the standard provider
-uvx --from astro-airflow-mcp af registry modules standard \
+af registry modules standard \
   | jq '.modules[] | select(.import_path | test("\\.hitl\\.")) | {name, type, import_path, short_description, docs_url}'
 
 # Constructor signatures: name, type, default, required, description
-uvx --from astro-airflow-mcp af registry parameters standard \
+af registry parameters standard \
   | jq '.classes | to_entries[] | select(.key | test("\\.hitl\\.")) | {fqn: .key, parameters: .value.parameters}'
 
 # Pin to the exact installed provider version
-uvx --from astro-airflow-mcp af config providers \
+af config providers \
   | jq '.providers[] | select(.package_name == "apache-airflow-providers-standard") | .version'
 # then: af registry parameters standard --version <VERSION>
 ```
@@ -117,7 +117,7 @@ HITL operators accept a `notifiers` list. Inside a notifier's `notify(context)` 
 The parameter name and accepted identifier format depend on the active auth manager. Do **not** hardcode — check which one is active and which kwarg the current provider exposes:
 
 ```bash
-uvx --from astro-airflow-mcp af config show | jq '.auth_manager // .core.auth_manager'
+af config show | jq '.auth_manager // .core.auth_manager'
 ```
 
 Then look up the current kwarg in Step 2 (at the time of writing it is `assigned_users`, accepting identifiers in whatever format the active auth manager uses — Astro uses the Astro user ID, FabAuthManager uses email, SimpleAuthManager uses username).
@@ -129,8 +129,8 @@ Then look up the current kwarg in Step 2 (at the time of writing it is `assigned
 For Slack bots, custom apps, or scripts. Discover the live endpoint rather than hardcoding a path:
 
 ```bash
-uvx --from astro-airflow-mcp af api ls --filter hitl           # live endpoint list
-uvx --from astro-airflow-mcp af api spec \
+af api ls --filter hitl           # live endpoint list
+af api spec \
   | jq '.paths | to_entries[] | select(.key | test("hitl"))'   # request/response schemas
 ```
 
@@ -172,7 +172,7 @@ requests.patch(
 The upstream docs URL is surfaced per-module by the registry — do not hardcode:
 
 ```bash
-uvx --from astro-airflow-mcp af registry modules standard \
+af registry modules standard \
   | jq '.modules[] | select(.import_path | test("\\.hitl\\.")) | {name, docs_url}'
 ```
 
