@@ -19,6 +19,7 @@ from astro_airflow_mcp.astro_pat import (
     AstroPATResolver,
     AstroRefreshFailedError,
     _auth_config_url,
+    _CachedToken,
     _context_key,
     _find_context,
     _parse_expiry,
@@ -419,6 +420,32 @@ class TestPATAuthFlow:
         # Only one request: refresh returned the same static token, so the
         # auth flow gave up rather than retrying.
         assert call_count["n"] == 1
+
+
+class TestCachedTokenStaticVsExpiring:
+    """The static flag separates "never expires" from "couldn't parse expiresin"."""
+
+    def test_static_token_always_fresh(self, astro_home):
+        resolver = AstroPATResolver(env={})
+        # Static token in the past: still fresh because static=True wins.
+        cached = _CachedToken(bearer="x", expires_at=0.0, static=True)
+        assert resolver._fresh(cached) is True
+
+    def test_non_static_zero_expiry_is_stale(self, astro_home):
+        resolver = AstroPATResolver(env={})
+        # expires_at=0 with static=False means malformed config; force
+        # re-resolution rather than holding a possibly-expired bearer.
+        cached = _CachedToken(bearer="x", expires_at=0.0, static=False)
+        assert resolver._fresh(cached) is False
+
+    def test_non_static_future_expiry_is_fresh(self, astro_home):
+        resolver = AstroPATResolver(env={})
+        cached = _CachedToken(
+            bearer="x",
+            expires_at=time.time() + 3600,
+            static=False,
+        )
+        assert resolver._fresh(cached) is True
 
 
 class TestRefreshTokenRotation:

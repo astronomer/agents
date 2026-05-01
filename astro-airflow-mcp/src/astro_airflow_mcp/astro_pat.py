@@ -65,7 +65,11 @@ class AstroAuthConfigUnreachableError(AstroPATError):
 @dataclass
 class _CachedToken:
     bearer: str
-    expires_at: float  # epoch seconds; 0 means "unknown / treat as fresh"
+    expires_at: float  # epoch seconds; 0 means "unknown" (only meaningful when static=False)
+    # Static tokens (eg ASTRO_API_TOKEN) never expire and don't refresh.
+    # Non-static tokens with expires_at=0 mean "couldn't parse expiresin"
+    # and should be re-resolved from disk on every call.
+    static: bool = False
 
 
 def _astro_home() -> Path:
@@ -276,7 +280,7 @@ class AstroPATResolver:
         api_token = self._env.get(_API_TOKEN_ENV_VAR)
         if api_token:
             if not self._cached or self._cached.bearer != api_token:
-                self._cached = _CachedToken(bearer=api_token.strip(), expires_at=0.0)
+                self._cached = _CachedToken(bearer=api_token.strip(), expires_at=0.0, static=True)
             return self._cached.bearer
 
         if not force_refresh and self._cached and self._fresh(self._cached):
@@ -300,8 +304,11 @@ class AstroPATResolver:
 
             refresh_token = ctx.get("refreshtoken")
             if not refresh_token:
-                # API-token flow (or malformed config): surface what's there
-                # with expires_at=0 so callers don't keep retrying.
+                # API-token flow (or malformed config): surface what's
+                # there. static=False means _fresh checks expires_at, so a
+                # malformed expiresin (disk_exp=0) re-reads disk on every
+                # call (cheap, recovers when the user logs in again);
+                # a parseable expiresin caches normally.
                 if disk_bearer:
                     self._cached = _CachedToken(disk_bearer, disk_exp or 0.0)
                     return disk_bearer
@@ -314,9 +321,12 @@ class AstroPATResolver:
             return new_bearer
 
     def _fresh(self, cached: _CachedToken) -> bool:
-        # expires_at=0 means static (eg ASTRO_API_TOKEN); never auto-refresh.
-        if cached.expires_at == 0.0:
+        # Static tokens (eg ASTRO_API_TOKEN) never expire.
+        if cached.static:
             return True
+        # Non-static with expires_at=0 means "couldn't parse expiresin"; treat
+        # as stale so the next call re-resolves from disk instead of holding a
+        # possibly-expired bearer until the process restarts.
         return time.time() < cached.expires_at - EXPIRY_SKEW_SECONDS
 
     def _fetch_auth_config(self, domain: str) -> dict[str, Any]:
