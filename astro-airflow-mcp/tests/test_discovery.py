@@ -288,27 +288,6 @@ class TestAstroDiscoveryBackend:
 
         assert instances[0].astro_context is None
 
-    def test_discover_ignores_legacy_create_tokens_kwarg(self, mock_cli):
-        """Old callers passing create_tokens=False shouldn't break."""
-        mock_cli.list_deployments.return_value = [{"name": "dep1", "deployment_id": "id1"}]
-        mock_cli.inspect_deployment.return_value = AstroDeployment(
-            id="id1",
-            name="dep1",
-            workspace_id="ws1",
-            workspace_name="workspace1",
-            airflow_api_url="https://example.com",
-            status="HEALTHY",
-        )
-        mock_cli.get_context.return_value = "astronomer.io"
-
-        backend = AstroDiscoveryBackend(cli=mock_cli)
-        # Legacy kwarg should be ignored by **kwargs sink.
-        instances = backend.discover(create_tokens=False)
-
-        assert len(instances) == 1
-        assert instances[0].auth_kind == "astro_pat"
-        assert instances[0].astro_context is None
-
     def test_discover_handles_auth_error(self, mock_cli):
         """Test discover raises on auth error."""
         from astro_airflow_mcp.discovery.astro_cli import AstroCliNotAuthenticatedError

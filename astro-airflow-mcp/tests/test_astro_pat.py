@@ -12,12 +12,13 @@ import yaml
 
 from astro_airflow_mcp.astro_pat import (
     EXPIRY_SKEW_SECONDS,
-    AstroAuthConfigUnreachable,
-    AstroNotLoggedIn,
+    AstroAuthConfigUnreachableError,
+    AstroNotLoggedInError,
     AstroPATAuth,
     AstroPATResolver,
-    AstroRefreshFailed,
+    AstroRefreshFailedError,
     _auth_config_url,
+    _context_key,
     _find_context,
     _parse_expiry,
 )
@@ -31,7 +32,7 @@ def _write_config(astro_home: Path, *, domain: str, ctx: dict) -> Path:
     """Write a config.yaml under astro_home with the given context."""
     cfg = {
         "context": domain,
-        "contexts": {domain.replace(".", "_"): ctx},
+        "contexts": {_context_key(domain): ctx},
     }
     astro_home.mkdir(parents=True, exist_ok=True)
     path = astro_home / "config.yaml"
@@ -114,12 +115,12 @@ class TestFindContext:
         assert ctx["token"] == "Bearer x"
 
     def test_missing_active_context(self):
-        with pytest.raises(AstroNotLoggedIn, match="No active astro context"):
+        with pytest.raises(AstroNotLoggedInError, match="No active astro context"):
             _find_context({}, None)
 
     def test_no_matching_context(self):
         cfg = {"context": "astronomer.io", "contexts": {}}
-        with pytest.raises(AstroNotLoggedIn, match="No astro context for domain"):
+        with pytest.raises(AstroNotLoggedInError, match="No astro context for domain"):
             _find_context(cfg, None)
 
 
@@ -238,7 +239,7 @@ class TestResolverRefresh:
             json={"error": "invalid_grant", "error_description": "expired"},
         )
         resolver = AstroPATResolver(env={})
-        with pytest.raises(AstroRefreshFailed, match=r"invalid_grant|astro login"):
+        with pytest.raises(AstroRefreshFailedError, match=r"invalid_grant|astro login"):
             resolver.get_token()
 
     def test_auth_config_unreachable_surfaces(self, astro_home, httpx_mock):
@@ -249,14 +250,14 @@ class TestResolverRefresh:
             text="bad gateway",
         )
         resolver = AstroPATResolver(env={})
-        with pytest.raises(AstroAuthConfigUnreachable, match="HTTP 502"):
+        with pytest.raises(AstroAuthConfigUnreachableError, match="HTTP 502"):
             resolver.get_token()
 
 
 class TestResolverNoSession:
     def test_no_config_raises_not_logged_in(self, astro_home):
         resolver = AstroPATResolver(env={})
-        with pytest.raises(AstroNotLoggedIn):
+        with pytest.raises(AstroNotLoggedInError):
             resolver.get_token()
 
     def test_no_refresh_token_returns_static(self, astro_home):
@@ -305,36 +306,23 @@ class TestResolverConcurrency:
 
 
 class TestPATAuthFlow:
-    def _record(
-        self, transport_responses: list[httpx.Response]
-    ) -> tuple[httpx.MockTransport, list[httpx.Request]]:
-        """Build a MockTransport that returns prepped responses in order and
-        records the request seen on each call."""
+    def test_attaches_bearer_header(self, astro_home, fresh_token):
+        _write_config(astro_home, domain="astronomer.io", ctx=fresh_token)
+        resolver = AstroPATResolver(env={})
         recorded: list[httpx.Request] = []
 
         def handler(request: httpx.Request) -> httpx.Response:
             recorded.append(request)
-            return transport_responses.pop(0)
+            return httpx.Response(200, text="ok")
 
-        return httpx.MockTransport(handler), recorded
-
-    def test_attaches_bearer_header(self, astro_home, fresh_token):
-        _write_config(astro_home, domain="astronomer.io", ctx=fresh_token)
-        resolver = AstroPATResolver(env={})
-
-        transport, recorded = self._record([httpx.Response(200, text="ok")])
-        with httpx.Client(transport=transport, auth=AstroPATAuth(resolver)) as c:
+        with httpx.Client(transport=httpx.MockTransport(handler), auth=AstroPATAuth(resolver)) as c:
             r = c.get("https://example.com/version")
             assert r.status_code == 200
         assert recorded[0].headers["Authorization"] == "Bearer fresh-jwt"
 
     def test_retries_once_on_401_with_force_refresh(self, astro_home, httpx_mock):
-        # Verify the auth-flow's 401-retry path: deployment 401s, the auth
-        # flow forces a refresh, and the retry succeeds with the new token.
-        # We can't inspect Authorization headers post-hoc because httpx
-        # mutates the same Request across auth_flow yields, so we wrap the
-        # resolver to count force-refresh calls and verify the retry made
-        # it through with a fresh token.
+        # httpx mutates the same Request across auth_flow yields, so we
+        # count force-refresh calls instead of inspecting headers post-hoc.
         ctx = {
             "domain": "astronomer.io",
             "token": "Bearer first",
@@ -431,21 +419,11 @@ class TestSkewBoundary:
 
 
 class TestParsedYamlRobustness:
-    def test_partial_yaml_does_not_crash(self, astro_home: Path, monkeypatch: pytest.MonkeyPatch):
-        # Simulate a partial mid-write read: write a valid YAML half-way
-        # through being truncated. The resolver should treat this as
-        # "no session" rather than crashing.
+    def test_unparseable_yaml_treated_as_no_session(self, astro_home: Path):
+        # Mid-write reads can return partial YAML; resolver retries once and
+        # then surfaces "no session" rather than crashing on a parse error.
         astro_home.mkdir(parents=True, exist_ok=True)
-        (astro_home / "config.yaml").write_text("contexts:\n  astronomer_io:\n    token: Be")
-        # Make the retry-read see the same content (no race in this test).
-        resolver = AstroPATResolver(domain="astronomer.io", env={})
-        # The corrupt token is captured by safe_load: `Be` parses as a
-        # string. So we land in "no refresh token" with an invalid bearer.
-        # That's surfaced as an AstroNotLoggedIn or returned as-is depending
-        # on whether the parse succeeds. The contract here is just "doesn't
-        # raise an unexpected exception".
-        try:
-            tok = resolver.get_token()
-            assert isinstance(tok, str)
-        except AstroNotLoggedIn:
-            pass
+        (astro_home / "config.yaml").write_text("contexts: [\n  not closed")
+        resolver = AstroPATResolver(env={})
+        with pytest.raises(AstroNotLoggedInError):
+            resolver.get_token()

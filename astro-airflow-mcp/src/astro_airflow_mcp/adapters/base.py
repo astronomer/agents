@@ -78,36 +78,24 @@ class AirflowAdapter(ABC):
         """API base path for this version (e.g., '/api/v1' or '/api/v2')."""
 
     def _setup_auth(self) -> tuple[dict[str, str], tuple[str, str] | httpx.Auth | None]:
-        """Set up authentication for an outgoing request.
+        """Pick auth for an outgoing request.
 
         Precedence: ``auth_handler`` (eg ``AstroPATAuth``) > token > basic.
-
-        Returns:
-            Tuple of (headers dict, auth value). The auth value is one of:
-            an ``httpx.Auth`` instance (attached and handles 401 retries),
-            a ``(username, password)`` tuple for basic auth, or ``None``.
-            httpx accepts all three under the ``auth=`` parameter.
+        Returns ``(headers, auth)`` where ``auth`` is whatever httpx accepts
+        under its ``auth=`` parameter (Auth instance, ``(user, pass)`` tuple,
+        or ``None``).
         """
         headers: dict[str, str] = {}
-
-        # PAT or other Auth handler takes precedence: it manages bearer
-        # injection and 401-retry on its own.
         if self._auth_handler is not None:
             return headers, self._auth_handler
-
-        # Try token-based auth first
         if self._token_getter:
             token = self._token_getter()
             if token:
                 headers["Authorization"] = f"Bearer {token}"
                 return headers, None
-
-        # Fall back to basic auth if no token available
-        auth: tuple[str, str] | None = None
         if self._basic_auth_getter:
-            auth = self._basic_auth_getter()
-
-        return headers, auth
+            return headers, self._basic_auth_getter()
+        return headers, None
 
     def _call(
         self,
@@ -139,14 +127,9 @@ class AirflowAdapter(ABC):
         all_params = {k: v for k, v in all_params.items() if v is not None}
 
         with httpx.Client(timeout=30.0, verify=self._verify) as client:
-            if auth:
-                response = client.get(url, params=all_params, headers=headers, auth=auth)
-            else:
-                response = client.get(url, params=all_params, headers=headers)
-
+            response = client.get(url, params=all_params, headers=headers, auth=auth)
             if response.status_code == 404:
                 raise NotFoundError(endpoint)
-
             response.raise_for_status()
             return response.json()
 
@@ -176,11 +159,7 @@ class AirflowAdapter(ABC):
         url = f"{self.airflow_url}{self.api_base_path}/{endpoint}"
 
         with httpx.Client(timeout=30.0, verify=self._verify) as client:
-            if auth:
-                response = client.post(url, json=json_data, headers=headers, auth=auth)
-            else:
-                response = client.post(url, json=json_data, headers=headers)
-
+            response = client.post(url, json=json_data, headers=headers, auth=auth)
             if response.status_code == 404:
                 raise NotFoundError(endpoint)
 
@@ -213,10 +192,7 @@ class AirflowAdapter(ABC):
         url = f"{self.airflow_url}{self.api_base_path}/{endpoint}"
 
         with httpx.Client(timeout=30.0, verify=self._verify) as client:
-            if auth:
-                response = client.patch(url, json=json_data, headers=headers, auth=auth)
-            else:
-                response = client.patch(url, json=json_data, headers=headers)
+            response = client.patch(url, json=json_data, headers=headers, auth=auth)
 
             if response.status_code == 404:
                 raise NotFoundError(endpoint)
@@ -247,10 +223,7 @@ class AirflowAdapter(ABC):
         url = f"{self.airflow_url}{self.api_base_path}/{endpoint}"
 
         with httpx.Client(timeout=30.0, verify=self._verify) as client:
-            if auth:
-                response = client.delete(url, headers=headers, auth=auth)
-            else:
-                response = client.delete(url, headers=headers)
+            response = client.delete(url, headers=headers, auth=auth)
 
             if response.status_code == 404:
                 raise NotFoundError(endpoint)

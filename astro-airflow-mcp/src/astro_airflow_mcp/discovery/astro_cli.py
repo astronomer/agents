@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import os
 import shutil
 import subprocess  # nosec B404 - subprocess is needed for CLI wrapper
 from dataclasses import dataclass
-from pathlib import Path
 
 import yaml
 
@@ -235,35 +233,23 @@ class AstroCli:
     def get_context(self) -> str | None:
         """Get the current Astro context (domain).
 
-        Reads ``~/.astro/config.yaml`` directly — that's the source of
-        truth that astro CLI itself uses. Falls back to parsing
-        ``astro context list`` output if the file isn't readable.
-
-        Returns:
-            Context domain (eg ``"astronomer.io"``) or None
+        Reads ``~/.astro/config.yaml`` directly (canonical source). Falls
+        back to parsing ``astro context list`` (legacy asterisk format)
+        only when the file is missing or unparseable.
         """
-        # Primary path: read the active context straight from config.yaml.
         # astro CLI's `context list` colors the active row with ANSI codes
         # rather than marking it with an asterisk, so the table parser is
         # unreliable across CLI versions.
-        astro_home = os.environ.get("ASTRO_HOME", str(Path.home() / ".astro"))
-        config_path = Path(astro_home) / "config.yaml"
-        if config_path.exists():
-            try:
-                with open(config_path) as f:
-                    cfg = yaml.safe_load(f) or {}
-                ctx = cfg.get("context")
-                if isinstance(ctx, str) and ctx:
-                    return ctx
-            except (yaml.YAMLError, OSError):
-                pass
+        from astro_airflow_mcp.astro_pat import _config_path, _read_yaml
 
-        # Fallback: parse `astro context list` (legacy asterisk format).
+        ctx = _read_yaml(_config_path()).get("context")
+        if isinstance(ctx, str) and ctx:
+            return ctx
+
         try:
             result = self._run_command(["context", "list"], check_auth=False)
             if result.returncode != 0:
                 return None
-
             for line in result.stdout.strip().split("\n")[1:]:  # Skip header
                 if line.strip().startswith("*"):
                     parts = line.strip().split()

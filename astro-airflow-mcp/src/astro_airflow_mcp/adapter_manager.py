@@ -6,12 +6,14 @@ from typing import TYPE_CHECKING
 
 from astro_airflow_mcp.adapters import AirflowAdapter, create_adapter
 from astro_airflow_mcp.astro_pat import AstroPATAuth, AstroPATResolver
-
-if TYPE_CHECKING:
-    import httpx
 from astro_airflow_mcp.auth import TokenManager
 from astro_airflow_mcp.constants import DEFAULT_AIRFLOW_URL
 from astro_airflow_mcp.logging import get_logger
+
+if TYPE_CHECKING:
+    import httpx
+
+    from astro_airflow_mcp.config.models import AuthKind
 
 logger = get_logger(__name__)
 
@@ -45,7 +47,7 @@ class AdapterManager:
         auth_token: str | None = None,
         username: str | None = None,
         password: str | None = None,
-        auth_kind: str | None = None,
+        auth_kind: AuthKind | None = None,
         astro_context: str | None = None,
         verify: bool | str = True,
     ) -> None:
@@ -80,16 +82,14 @@ class AdapterManager:
         self._token_manager = None
 
         if auth_kind == "astro_pat":
-            resolver = AstroPATResolver(domain=astro_context)
+            resolver = AstroPATResolver(domain=astro_context, verify=self._verify)
             self._auth_handler = AstroPATAuth(resolver)
             logger.debug(
                 "Configured adapter with AstroPATAuth (context=%s)", astro_context or "active"
             )
         elif auth_token:
-            # Direct token takes precedence - no token manager needed
             self._auth_token = auth_token
         elif username or password:
-            # Use token manager with credentials
             self._token_manager = TokenManager(
                 airflow_url=self._airflow_url,
                 username=username,
@@ -97,7 +97,7 @@ class AdapterManager:
                 verify=self._verify,
             )
         else:
-            # No auth provided - try credential-less token manager
+            # Credential-less: try the token endpoint anyway (eg all_admins).
             self._token_manager = TokenManager(
                 airflow_url=self._airflow_url,
                 username=None,
@@ -134,15 +134,9 @@ class AdapterManager:
         self._adapter = None
 
     def _get_auth_token(self) -> str | None:
-        """Get the current authentication token.
-
-        Returns:
-            Bearer token string, or None if no authentication configured
-        """
-        # Direct token takes precedence
+        """Get the current authentication token, or None if unconfigured."""
         if self._auth_token:
             return self._auth_token
-        # Otherwise use token manager
         if self._token_manager:
             return self._token_manager.get_token()
         return None

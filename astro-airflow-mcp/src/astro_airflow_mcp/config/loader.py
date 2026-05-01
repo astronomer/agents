@@ -29,8 +29,8 @@ class ResolvedConfig:
     username: str | None = None
     password: str | None = None
     token: str | None = None
-    auth_kind: str | None = None  # "basic" | "token" | "astro_pat" | None
-    astro_context: str | None = None  # set when auth_kind == "astro_pat"
+    auth_kind: AuthKind | None = None
+    astro_context: str | None = None  # only set when auth_kind == "astro_pat"
     instance_name: str | None = None
     sources: dict[str, str] = field(default_factory=dict)
     verify_ssl: bool = True

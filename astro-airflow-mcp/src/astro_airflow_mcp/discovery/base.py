@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from astro_airflow_mcp.config.models import AuthKind
 
 
 class DiscoveryError(Exception):
@@ -18,22 +21,18 @@ class DiscoveredInstance:
         name: Suggested instance name
         url: Airflow webserver URL (base, no /api/v2)
         source: Backend name (e.g., "astro", "local")
-        auth_token: Static bearer token, when the backend has one. Astro
-            discovery no longer mints these; left for backends that produce
-            real long-lived tokens.
-        auth_kind: Suggested auth mode for the resulting instance
-            (``"astro_pat"``, ``"token"``, ``"basic"``, or None).
-        astro_context: Astro domain (eg ``"astronomer.io"``) for ``astro_pat``
-            instances. Lets the resolver pick the right credential at
-            request time even if the user later switches contexts.
-        metadata: Backend-specific metadata
+        auth_token: Static bearer token, when the backend has one.
+        auth_kind: Suggested auth mode for the resulting instance.
+        astro_context: Astro domain pinned for ``astro_pat`` auth (None
+            means follow the active astro context at request time).
+        metadata: Backend-specific metadata.
     """
 
     name: str
     url: str
     source: str
     auth_token: str | None = None
-    auth_kind: str | None = None
+    auth_kind: AuthKind | None = None
     astro_context: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 

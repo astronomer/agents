@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, cast
+from typing import TYPE_CHECKING, Annotated, cast
 
 import typer
 from rich.console import Console
@@ -13,10 +13,29 @@ from astro_airflow_mcp.config import ConfigError, ConfigManager
 from astro_airflow_mcp.discovery import (
     DiscoveredInstance,
     DiscoveryError,
-    DiscoveryRegistry,
     get_default_registry,
 )
 from astro_airflow_mcp.discovery.astro import AstroNotAuthenticatedError
+
+if TYPE_CHECKING:
+    from astro_airflow_mcp.config.models import Auth
+
+
+def _describe_auth(auth: Auth | None, *, verbose: bool = False) -> str:
+    """Render an Auth value for `instance list` / `instance current` rows.
+
+    ``verbose`` adds the ``(<context>)`` suffix used by ``instance current``.
+    """
+    if auth is None:
+        return "none"
+    if auth.kind == "astro_pat":
+        if verbose:
+            return f"astro pat ({auth.context or 'active context'})"
+        return "astro pat"
+    if auth.token:
+        return "token"
+    return "basic"
+
 
 app = typer.Typer(help="Manage Airflow instances", no_args_is_help=True)
 console = Console()
@@ -46,15 +65,9 @@ def list_instances() -> None:
 
         for inst in config.instances:
             marker = "*" if inst.name == config.current_instance else ""
-            if inst.auth is None:
-                auth = "none"
-            elif inst.auth.kind == "astro_pat":
-                auth = "astro pat"
-            elif inst.auth.token:
-                auth = "token"
-            else:
-                auth = "basic"
-            table.add_row(marker, inst.name, inst.source or "-", inst.url, auth)
+            table.add_row(
+                marker, inst.name, inst.source or "-", inst.url, _describe_auth(inst.auth)
+            )
 
         console.print(table)
     except ConfigError as e:
@@ -78,15 +91,7 @@ def current_instance() -> None:
         if instance:
             console.print(f"Current instance: [bold]{current}[/bold]")
             console.print(f"URL: {instance.url}")
-            if instance.auth is None:
-                console.print("Auth: none")
-            elif instance.auth.kind == "astro_pat":
-                ctx = instance.auth.context or "active context"
-                console.print(f"Auth: astro pat ({ctx})")
-            elif instance.auth.token:
-                console.print("Auth: token")
-            else:
-                console.print("Auth: basic")
+            console.print(f"Auth: {_describe_auth(instance.auth, verbose=True)}")
     except ConfigError as e:
         output_error(str(e))
 
@@ -320,8 +325,8 @@ def _determine_action(
     return "add"
 
 
-def _format_auth(inst: DiscoveredInstance) -> str:
-    """Render the auth column for the discovery table."""
+def _format_discovered_auth(inst: DiscoveredInstance) -> str:
+    """Render the auth column for the discovery table (rich-markup variant)."""
     if inst.auth_kind == "astro_pat":
         return "[cyan]astro pat[/cyan]"
     if inst.auth_kind == "token" or inst.auth_token:
@@ -334,7 +339,6 @@ def _format_auth(inst: DiscoveredInstance) -> str:
 def _display_and_add_instances(
     all_instances: list[tuple[DiscoveredInstance, str]],
     manager: ConfigManager,
-    registry: DiscoveryRegistry,  # noqa: ARG001 — kept for back-compat with callers
     dry_run: bool,
 ) -> None:
     """Display discovered instances and add them to config.
@@ -364,7 +368,7 @@ def _display_and_add_instances(
             inst.name,
             inst.source,
             _truncate_url(inst.url),
-            _format_auth(inst),
+            _format_discovered_auth(inst),
             _format_status(status),
             _format_action(action),
         )
@@ -495,7 +499,7 @@ def discover_all(
         except DiscoveryError as e:
             console.print(f"[yellow]Skipping {backend_name}:[/yellow] {e}")
 
-    _display_and_add_instances(all_instances, manager, registry, dry_run)
+    _display_and_add_instances(all_instances, manager, dry_run)
 
 
 @discover_app.command("astro")
@@ -562,7 +566,7 @@ def discover_astro(
         output_error(f"Discovery failed: {e}")
         return
 
-    _display_and_add_instances(all_instances, manager, registry, dry_run)
+    _display_and_add_instances(all_instances, manager, dry_run)
 
 
 @discover_app.command("local")
@@ -620,4 +624,4 @@ def discover_local(
         (inst, _determine_action(inst, existing_names, overwrite)) for inst in instances
     ]
 
-    _display_and_add_instances(all_instances, manager, registry, dry_run)
+    _display_and_add_instances(all_instances, manager, dry_run)

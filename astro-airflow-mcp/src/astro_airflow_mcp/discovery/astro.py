@@ -1,18 +1,12 @@
 """Astro discovery backend for discovering deployments via Astro CLI.
 
-Discovery emits ``DiscoveredInstance``s with ``auth_kind="astro_pat"``: the
-resulting af instances reuse the user's ``astro login`` session for
-authentication, resolved at request time from ``~/.astro/config.yaml``.
-
-The previous behavior — minting a permanent ``DEPLOYMENT_ADMIN`` token per
-deployment via ``astro deployment token create`` — has been removed. Those
-tokens persisted in Astro until manually revoked, weren't tied to user
-identity, and accumulated across discovery runs.
+Emits ``DiscoveredInstance``s with ``auth_kind="astro_pat"``: af resolves
+the user's ``astro login`` session at request time from
+``~/.astro/config.yaml``.
 """
 
 from __future__ import annotations
 
-import logging
 import re
 from typing import Any
 
@@ -23,8 +17,9 @@ from astro_airflow_mcp.discovery.astro_cli import (
     AstroDeployment,
 )
 from astro_airflow_mcp.discovery.base import DiscoveredInstance, DiscoveryError
+from astro_airflow_mcp.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Most Astro users live in astronomer.io. When that's the active context
 # at discover time, omit it from the recorded instance so the resolver
@@ -76,17 +71,11 @@ class AstroDiscoveryBackend:
         """Get the current Astro context (domain), or None if unavailable."""
         return self._cli.get_context()
 
-    def discover(
-        self,
-        all_workspaces: bool = False,
-        **kwargs: Any,
-    ) -> list[DiscoveredInstance]:
+    def discover(self, all_workspaces: bool = False) -> list[DiscoveredInstance]:
         """Discover Astro deployments.
 
         Args:
             all_workspaces: If True, discover from all accessible workspaces.
-            **kwargs: Reserved for future options; unrecognized keys are
-                ignored (eg legacy ``create_tokens`` from older callers).
 
         Raises:
             AstroNotAuthenticatedError: If not authenticated with Astro.

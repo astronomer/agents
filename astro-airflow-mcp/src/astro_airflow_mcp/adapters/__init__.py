@@ -39,13 +39,10 @@ def detect_version(
     if auth_handler is not None:
         auth = auth_handler
     else:
-        # Set up authentication via legacy getters
         if token_getter:
             token = token_getter()
             if token:
                 headers["Authorization"] = f"Bearer {token}"
-
-        # Get basic auth as fallback
         if basic_auth_getter:
             auth = basic_auth_getter()
 
