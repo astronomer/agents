@@ -244,9 +244,10 @@ class TestAstroDiscoveryBackend:
         assert inst.url == "https://example.com"
         assert inst.source == "astro"
         assert inst.auth_kind == "astro_pat"
-        # Default context (astronomer.io) is NOT recorded — instances follow
-        # the active astro context at request time.
-        assert inst.astro_context is None
+        # Always pinned to the active context, even astronomer.io, so a
+        # later `astro context switch` can't ship a dev-tenant bearer to a
+        # prod-tenant URL.
+        assert inst.astro_context == "astronomer.io"
         assert inst.auth_token is None
 
     def test_discover_pins_non_default_context(self, mock_cli):
