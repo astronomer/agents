@@ -240,7 +240,7 @@ class AstroCli:
         # astro CLI's `context list` colors the active row with ANSI codes
         # rather than marking it with an asterisk, so the table parser is
         # unreliable across CLI versions.
-        from astro_airflow_mcp.astro_pat import _config_path, _read_yaml
+        from astro_airflow_mcp._astro_session import _config_path, _read_yaml
 
         ctx = _read_yaml(_config_path()).get("context")
         if isinstance(ctx, str) and ctx:

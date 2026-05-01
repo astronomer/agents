@@ -17,14 +17,45 @@ import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 import httpx
 import yaml
 from filelock import FileLock, Timeout
 
+from astro_airflow_mcp._astro_session import (
+    AstroNotLoggedInError,
+    AstroPATError,
+    _astro_home,
+    _auth_config_url,
+    _bearer_from_ctx,
+    _config_path,
+    _context_key,
+    _find_context,
+    _parse_expiry,
+    _read_yaml,
+)
 from astro_airflow_mcp.logging import get_logger
+
+# Re-exported so existing imports (eg from tests) continue to work.
+__all__ = [
+    "EXPIRY_SKEW_SECONDS",
+    "REFRESH_DEBOUNCE_SECONDS",
+    "AstroAuthConfigUnreachableError",
+    "AstroNotLoggedInError",
+    "AstroPATAuth",
+    "AstroPATError",
+    "AstroPATResolver",
+    "AstroRefreshFailedError",
+    "_astro_home",
+    "_auth_config_url",
+    "_bearer_from_ctx",
+    "_config_path",
+    "_context_key",
+    "_find_context",
+    "_parse_expiry",
+    "_read_yaml",
+]
 
 logger = get_logger(__name__)
 
@@ -47,17 +78,8 @@ _AUTH_CONFIG_HEADER = {
     "Content-Type": "application/json",
     "X-Astro-Client-Identifier": "cli",
 }
-_AUTH_CONFIG_PATH = "private/v1alpha1/cli/auth-config"
 
 _API_TOKEN_ENV_VAR = "ASTRO_API_TOKEN"  # nosec B105 - env var name, not a credential
-
-
-class AstroPATError(Exception):
-    """Base class for PAT auth failures."""
-
-
-class AstroNotLoggedInError(AstroPATError):
-    """No usable session in ~/.astro/config.yaml — user needs `astro login`."""
 
 
 class AstroRefreshFailedError(AstroPATError):
@@ -76,107 +98,6 @@ class _CachedToken:
     # Non-static tokens with expires_at=0 mean "couldn't parse expiresin"
     # and should be re-resolved from disk on every call.
     static: bool = False
-
-
-def _astro_home() -> Path:
-    return Path(os.environ.get("ASTRO_HOME") or (Path.home() / ".astro"))
-
-
-def _config_path() -> Path:
-    return _astro_home() / "config.yaml"
-
-
-def _read_yaml(path: Path) -> dict[str, Any]:
-    """Read and parse the astro config. Empty/missing → {}."""
-    try:
-        text = path.read_text()
-    except FileNotFoundError:
-        return {}
-    try:
-        return yaml.safe_load(text) or {}
-    except yaml.YAMLError:
-        # Astro CLI rewrites this file in place (truncate+write under flock).
-        # If we happen to read mid-write we get a partial document. One short
-        # retry catches the race; if it persists, surface as empty (caller
-        # decides whether that means "log in" or "use env var fallback").
-        time.sleep(0.05)
-        try:
-            return yaml.safe_load(path.read_text()) or {}
-        except (FileNotFoundError, yaml.YAMLError):
-            return {}
-
-
-def _find_context(cfg: dict[str, Any], domain: str | None) -> tuple[str, dict[str, Any]]:
-    """Locate (domain, context_dict) by domain or by active context.
-
-    astro CLI keys contexts by domain with dots replaced by underscores
-    (``astronomer.io`` → ``astronomer_io``). Some context dicts don't carry
-    an explicit ``domain`` field, so the keyed lookup is the canonical path
-    and we fall back to scanning ``ctx.domain`` only for older configs.
-    """
-    contexts = cfg.get("contexts") or {}
-    target = domain or cfg.get("context")
-    if not target:
-        raise AstroNotLoggedInError("No active astro context. Run `astro login` to authenticate.")
-    ctx = contexts.get(_context_key(target))
-    if ctx:
-        return target, ctx
-    # Backward-compat fallback for contexts that DO carry a `domain` field.
-    for c in contexts.values():
-        if c and c.get("domain") == target:
-            return target, c
-    raise AstroNotLoggedInError(f"No astro context for domain {target!r}. Run `astro login` first.")
-
-
-def _context_key(domain: str) -> str:
-    """Key under which astro CLI stores `domain`'s context (dots → underscores)."""
-    return domain.replace(".", "_")
-
-
-def _auth_config_url(domain: str) -> str:
-    """URL of the per-domain auth-config endpoint.
-
-    Mirrors ``pkg/domainutil/domain.go::GetURLToEndpoint`` in astro-cli:
-    plain domain → ``api.<domain>``, PR-preview ``prNNN.astronomer-dev.io``
-    → ``prNNN.api.astronomer-dev.io``, and ``localhost`` → port 8888.
-    """
-    if domain == "localhost":
-        return f"http://localhost:8888/{_AUTH_CONFIG_PATH}"
-    head, _, rest = domain.partition(".")
-    if head.startswith("pr") and rest:
-        return f"https://{head}.api.{rest}/{_AUTH_CONFIG_PATH}"
-    return f"https://api.{domain}/{_AUTH_CONFIG_PATH}"
-
-
-def _parse_expiry(ctx: dict[str, Any]) -> float:
-    """Return token expiry as epoch seconds. 0 if unknown.
-
-    astro CLI writes ``expiresin`` as a naive ISO timestamp (no ``Z``
-    suffix, no offset). ``datetime.fromisoformat`` and PyYAML both treat
-    those as naive, and ``.timestamp()`` would interpret a naive datetime
-    in local time — hours off on any non-UTC machine. Force-attach UTC
-    when no tzinfo is present so the computed expiry matches what astro
-    CLI actually wrote.
-    """
-    expiresin = ctx.get("expiresin")
-    if isinstance(expiresin, str):
-        try:
-            dt = datetime.fromisoformat(expiresin)
-        except ValueError:
-            return 0.0
-    elif isinstance(expiresin, datetime):
-        # PyYAML parses unquoted ISO timestamps as datetime when possible.
-        dt = expiresin
-    else:
-        return 0.0
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.timestamp()
-
-
-def _bearer_from_ctx(ctx: dict[str, Any]) -> str:
-    raw = ctx.get("token") or ""
-    return raw.removeprefix("Bearer ").strip()
 
 
 def _persist_rotated_session(
