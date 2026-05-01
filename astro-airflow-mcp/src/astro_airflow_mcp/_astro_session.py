@@ -47,15 +47,18 @@ def _config_path() -> Path:
 
 
 def _read_yaml(path: Path) -> dict[str, Any]:
-    """Read and parse the astro config. Empty/missing/unreadable → {}.
+    """Read and parse the astro config. Empty/missing/non-file → {}.
 
-    Returns an empty dict on any OSError (missing file, permission denied,
-    ASTRO_HOME pointing at a non-directory like ``/dev/null``, etc) so the
-    caller falls through to "no astro session" rather than the raw OS error.
+    Treats "missing or not-a-regular-file" as "no astro session" (path is
+    absent, ASTRO_HOME points at /dev/null or a directory, etc). Other
+    OSError shapes (PermissionError, IOError) are deliberately not
+    swallowed — those mean a real config exists but isn't readable, and
+    surfacing the error is more useful than a misleading "run astro
+    login" downstream.
     """
     try:
         text = path.read_text()
-    except OSError:
+    except (FileNotFoundError, NotADirectoryError, IsADirectoryError):
         return {}
     try:
         return yaml.safe_load(text) or {}
@@ -67,7 +70,7 @@ def _read_yaml(path: Path) -> dict[str, Any]:
         time.sleep(0.05)
         try:
             return yaml.safe_load(path.read_text()) or {}
-        except (OSError, yaml.YAMLError):
+        except (FileNotFoundError, NotADirectoryError, IsADirectoryError, yaml.YAMLError):
             return {}
 
 
