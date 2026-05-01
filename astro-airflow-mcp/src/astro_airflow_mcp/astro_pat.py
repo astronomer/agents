@@ -31,6 +31,12 @@ logger = get_logger(__name__)
 # Refresh 60s before expiry to absorb clock skew.
 EXPIRY_SKEW_SECONDS = 60
 
+# When auth_flow gets back-to-back 401s (eg af walking deployments the user
+# lacks access to), don't burn Auth0 quota force-refreshing for each. If we
+# already refreshed within this window, the cached bearer is fine; the next
+# 401 means "no access," not "expired token." Let it propagate.
+REFRESH_DEBOUNCE_SECONDS = 60
+
 # astro CLI's writeConfigYamlLocked uses a 10s lock timeout with 100ms
 # retries. Match those parameters so concurrent rewrites cooperate.
 _CONFIG_LOCK_TIMEOUT = 10.0
@@ -254,6 +260,10 @@ class AstroPATResolver:
         # (clientId, domainUrl) is static per domain; resolver only handles
         # one domain so a single slot suffices.
         self._auth_config: dict[str, Any] | None = None
+        # Tracks the last successful Auth0 refresh round-trip; used to
+        # debounce force_refresh requests when callers walk a list of
+        # deployments and 401 on each (no-access set).
+        self._last_refresh_at: float = 0.0
 
     @property
     def domain(self) -> str | None:
@@ -283,12 +293,28 @@ class AstroPATResolver:
                 self._cached = _CachedToken(bearer=api_token.strip(), expires_at=0.0, static=True)
             return self._cached.bearer
 
+        # Debounce: if we just refreshed, the cached bearer is the freshest
+        # we'll get. Another 401 means "no access," not "expired token";
+        # skipping the redundant Auth0 round-trip lets the 401 propagate.
+        if (
+            force_refresh
+            and self._cached
+            and time.time() - self._last_refresh_at < REFRESH_DEBOUNCE_SECONDS
+        ):
+            return self._cached.bearer
+
         if not force_refresh and self._cached and self._fresh(self._cached):
             return self._cached.bearer
 
         with self._lock:
             # Double-check inside the lock so a winning thread's refresh is
             # reused by losers waiting on the lock.
+            if (
+                force_refresh
+                and self._cached
+                and time.time() - self._last_refresh_at < REFRESH_DEBOUNCE_SECONDS
+            ):
+                return self._cached.bearer
             if not force_refresh and self._cached and self._fresh(self._cached):
                 return self._cached.bearer
 
@@ -318,6 +344,7 @@ class AstroPATResolver:
 
             new_bearer, new_exp = self._refresh(domain, refresh_token)
             self._cached = _CachedToken(new_bearer, new_exp)
+            self._last_refresh_at = time.time()
             return new_bearer
 
     def _fresh(self, cached: _CachedToken) -> bool:

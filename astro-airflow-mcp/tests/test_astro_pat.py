@@ -503,6 +503,40 @@ class TestRefreshTokenRotation:
         assert path.stat().st_mtime_ns == original_mtime
 
 
+class TestForceRefreshDebounce:
+    """Back-to-back force_refresh requests share one Auth0 round-trip."""
+
+    def test_second_force_refresh_returns_cached_token(self, astro_home, httpx_mock):
+        ctx = {
+            "domain": "astronomer.io",
+            "token": "Bearer stale",
+            "refreshtoken": "rt",
+            "expiresin": _iso(datetime.now(timezone.utc) - timedelta(hours=1)),
+        }
+        _write_config(astro_home, domain="astronomer.io", ctx=ctx)
+        httpx_mock.add_response(
+            url="https://api.astronomer.io/private/v1alpha1/cli/auth-config",
+            json={"clientId": "c", "domainUrl": "https://auth.astronomer.io/"},
+        )
+        # Only one /oauth/token response is registered. If the resolver
+        # hits Auth0 a second time, pytest-httpx raises a no-match error.
+        httpx_mock.add_response(
+            url="https://auth.astronomer.io/oauth/token",
+            method="POST",
+            json={"access_token": "fresh", "expires_in": 3600},
+        )
+
+        resolver = AstroPATResolver(env={})
+        # First force_refresh: actually hits Auth0.
+        assert resolver.get_token(force_refresh=True) == "fresh"
+        # Second force_refresh within the debounce window: returns cached
+        # bearer; no second Auth0 round-trip.
+        assert resolver.get_token(force_refresh=True) == "fresh"
+
+        oauth_calls = [r for r in httpx_mock.get_requests() if "oauth/token" in str(r.url)]
+        assert len(oauth_calls) == 1
+
+
 class TestSkewBoundary:
     def test_token_within_skew_triggers_refresh(self, astro_home, httpx_mock):
         # Token expires 30s from now — under the EXPIRY_SKEW_SECONDS threshold.
