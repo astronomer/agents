@@ -11,16 +11,18 @@ Auth0 exchange mirrors astro-cli/cmd/cloud/setup.go::refresh.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import threading
 import time
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import httpx
 import yaml
+from filelock import FileLock, Timeout
 
 from astro_airflow_mcp.logging import get_logger
 
@@ -28,6 +30,11 @@ logger = get_logger(__name__)
 
 # Refresh 60s before expiry to absorb clock skew.
 EXPIRY_SKEW_SECONDS = 60
+
+# astro CLI's writeConfigYamlLocked uses a 10s lock timeout with 100ms
+# retries. Match those parameters so concurrent rewrites cooperate.
+_CONFIG_LOCK_TIMEOUT = 10.0
+_CONFIG_LOCK_POLL_INTERVAL = 0.1
 
 # astro-cli's FetchDomainAuthConfig gates on the segment matching this header.
 _AUTH_CONFIG_HEADER = {
@@ -148,6 +155,62 @@ def _parse_expiry(ctx: dict[str, Any]) -> float:
 def _bearer_from_ctx(ctx: dict[str, Any]) -> str:
     raw = ctx.get("token") or ""
     return raw.removeprefix("Bearer ").strip()
+
+
+def _persist_rotated_session(
+    *,
+    domain: str,
+    bearer: str,
+    refresh_token: str,
+    expires_at: float,
+) -> None:
+    """Write a rotated Auth0 session back to ~/.astro/config.yaml.
+
+    Holds the same flock astro CLI uses (config.yaml.lock, 10s timeout,
+    100ms retry) and writes atomically via tmp + ``os.replace``. If the
+    config file or matching context is gone by the time we re-read,
+    silently skip — that means another process already mutated the file
+    and our update may no longer be applicable.
+    """
+    path = _config_path()
+    lock_path = path.with_suffix(path.suffix + ".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock = FileLock(str(lock_path), timeout=_CONFIG_LOCK_TIMEOUT)
+    try:
+        lock.acquire(poll_interval=_CONFIG_LOCK_POLL_INTERVAL)
+    except Timeout:
+        logger.warning("Timed out acquiring %s; skipping refresh_token persist", lock_path)
+        return
+    try:
+        cfg = _read_yaml(path)
+        contexts = cfg.get("contexts") if isinstance(cfg, dict) else None
+        if not isinstance(contexts, dict):
+            return
+        key = _context_key(domain)
+        ctx = contexts.get(key)
+        # Fall back to scanning by domain field for older configs.
+        if not isinstance(ctx, dict):
+            for k, v in contexts.items():
+                if isinstance(v, dict) and v.get("domain") == domain:
+                    key = k
+                    ctx = v
+                    break
+        if not isinstance(ctx, dict):
+            return
+        ctx["token"] = f"Bearer {bearer}"
+        ctx["refreshtoken"] = refresh_token
+        ctx["expiresin"] = (
+            datetime.fromtimestamp(expires_at, tz=timezone.utc).replace(tzinfo=None).isoformat()
+        )
+        contexts[key] = ctx
+        cfg["contexts"] = contexts
+        tmp_path = path.with_suffix(f"{path.suffix}.tmp.{os.getpid()}")
+        tmp_path.write_text(yaml.safe_dump(cfg, default_flow_style=False))
+        with contextlib.suppress(OSError):
+            os.chmod(tmp_path, 0o600)
+        os.replace(tmp_path, path)
+    finally:
+        lock.release()
 
 
 class AstroPATResolver:
@@ -306,8 +369,27 @@ class AstroPATResolver:
 
         bearer = data["access_token"]
         expires_in = float(data.get("expires_in") or 3600)
+        new_expiry = time.time() + expires_in
+        # Auth0 rotates refresh_token by default; persist the rotated value
+        # so the astro CLI's own next refresh doesn't fail with invalid_grant.
+        # If the response omits refresh_token (or returns the same one), skip
+        # the disk write entirely — that's the common no-rotation path.
+        rotated = data.get("refresh_token")
+        if isinstance(rotated, str) and rotated and rotated != refresh_token:
+            try:
+                _persist_rotated_session(
+                    domain=domain,
+                    bearer=bearer,
+                    refresh_token=rotated,
+                    expires_at=new_expiry,
+                )
+            except OSError as exc:
+                # Disk write failures shouldn't block the in-memory refresh;
+                # the user keeps working, but the astro CLI's own next
+                # refresh may need re-login.
+                logger.warning("Failed to persist rotated refresh_token for %s: %s", domain, exc)
         logger.info("Refreshed astro PAT for domain %s (expires_in=%ss)", domain, int(expires_in))
-        return bearer, time.time() + expires_in
+        return bearer, new_expiry
 
 
 class AstroPATAuth(httpx.Auth):

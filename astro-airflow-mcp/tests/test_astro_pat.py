@@ -391,6 +391,61 @@ class TestPATAuthFlow:
         assert call_count["n"] == 1
 
 
+class TestRefreshTokenRotation:
+    def _stale_ctx(self, refresh_token: str = "rt-old") -> dict:
+        return {
+            "domain": "astronomer.io",
+            "token": "Bearer stale",
+            "refreshtoken": refresh_token,
+            "expiresin": _iso(datetime.now(timezone.utc) - timedelta(hours=1)),
+        }
+
+    def test_rotated_refresh_token_persisted_to_disk(self, astro_home, httpx_mock):
+        path = _write_config(astro_home, domain="astronomer.io", ctx=self._stale_ctx("rt-old"))
+        httpx_mock.add_response(
+            url="https://api.astronomer.io/private/v1alpha1/cli/auth-config",
+            json={"clientId": "c", "domainUrl": "https://auth.astronomer.io/"},
+        )
+        httpx_mock.add_response(
+            url="https://auth.astronomer.io/oauth/token",
+            method="POST",
+            json={
+                "access_token": "rotated-jwt",
+                "expires_in": 3600,
+                "refresh_token": "rt-new",
+            },
+        )
+
+        resolver = AstroPATResolver(env={})
+        assert resolver.get_token() == "rotated-jwt"
+
+        # Re-read config; rotated refresh_token should land on disk so the
+        # astro CLI's own next refresh doesn't fail with invalid_grant.
+        on_disk = yaml.safe_load(path.read_text())
+        ctx = on_disk["contexts"][_context_key("astronomer.io")]
+        assert ctx["refreshtoken"] == "rt-new"
+        assert ctx["token"] == "Bearer rotated-jwt"
+
+    def test_unchanged_refresh_token_skips_disk_write(self, astro_home, httpx_mock):
+        # Common production path: Auth0 doesn't rotate. Disk shouldn't be
+        # touched (verified by checking mtime).
+        path = _write_config(astro_home, domain="astronomer.io", ctx=self._stale_ctx("rt-stay"))
+        original_mtime = path.stat().st_mtime_ns
+        httpx_mock.add_response(
+            url="https://api.astronomer.io/private/v1alpha1/cli/auth-config",
+            json={"clientId": "c", "domainUrl": "https://auth.astronomer.io/"},
+        )
+        httpx_mock.add_response(
+            url="https://auth.astronomer.io/oauth/token",
+            method="POST",
+            # No refresh_token in response (or it's the same).
+            json={"access_token": "fresh", "expires_in": 3600},
+        )
+        resolver = AstroPATResolver(env={})
+        assert resolver.get_token() == "fresh"
+        assert path.stat().st_mtime_ns == original_mtime
+
+
 class TestSkewBoundary:
     def test_token_within_skew_triggers_refresh(self, astro_home, httpx_mock):
         # Token expires 30s from now — under the EXPIRY_SKEW_SECONDS threshold.
