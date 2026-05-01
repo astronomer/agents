@@ -142,9 +142,11 @@ def _persist_rotated_session(
             return
         ctx["token"] = f"Bearer {bearer}"
         ctx["refreshtoken"] = refresh_token
-        ctx["expiresin"] = (
-            datetime.fromtimestamp(expires_at, tz=timezone.utc).replace(tzinfo=None).isoformat()
-        )
+        # Pass a tz-aware datetime so safe_dump emits an ISO timestamp with
+        # offset (eg `2026-05-01T16:48:36+00:00`), matching astro CLI's
+        # viper-written format. A naive string would parse fine on read but
+        # would silently flip the user's config to a different format.
+        ctx["expiresin"] = datetime.fromtimestamp(expires_at, tz=timezone.utc)
         contexts[key] = ctx
         cfg["contexts"] = contexts
         tmp_path = path.with_suffix(f"{path.suffix}.tmp.{os.getpid()}")

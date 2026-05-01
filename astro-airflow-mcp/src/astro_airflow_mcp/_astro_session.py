@@ -111,12 +111,11 @@ def _auth_config_url(domain: str) -> str:
 def _parse_expiry(ctx: dict[str, Any]) -> float:
     """Return token expiry as epoch seconds. 0 if unknown.
 
-    astro CLI writes ``expiresin`` as a naive ISO timestamp (no ``Z``
-    suffix, no offset). ``datetime.fromisoformat`` and PyYAML both treat
-    those as naive, and ``.timestamp()`` would interpret a naive datetime
-    in local time (hours off on any non-UTC machine). Force-attach UTC
-    when no tzinfo is present so the computed expiry matches what astro
-    CLI actually wrote.
+    astro CLI (via viper) writes ``expiresin`` as a tz-aware ISO timestamp
+    with the local offset (eg ``2026-05-01T16:48:36+01:00``). We anchor
+    naive datetimes to UTC as defense-in-depth in case a user hand-edits
+    the file or another writer drops the offset, since ``.timestamp()``
+    would otherwise interpret naive values as local time.
     """
     expiresin = ctx.get("expiresin")
     if isinstance(expiresin, str):

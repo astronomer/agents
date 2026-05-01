@@ -482,6 +482,10 @@ class TestRefreshTokenRotation:
         ctx = on_disk["contexts"][_context_key("astronomer.io")]
         assert ctx["refreshtoken"] == "rt-new"
         assert ctx["token"] == "Bearer rotated-jwt"
+        # expiresin is written tz-aware to match astro CLI's viper format,
+        # so future astro writes don't have to flip the user's config back.
+        assert isinstance(ctx["expiresin"], datetime)
+        assert ctx["expiresin"].tzinfo is not None
 
     def test_unchanged_refresh_token_skips_disk_write(self, astro_home, httpx_mock):
         # Common production path: Auth0 doesn't rotate. Disk shouldn't be
