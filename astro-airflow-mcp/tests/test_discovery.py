@@ -203,9 +203,7 @@ class TestAstroDiscoveryBackend:
     @pytest.fixture
     def mock_cli(self):
         """Create a mock AstroCli."""
-        cli = MagicMock()
-        cli.get_token_name.return_value = "af-discover-test-user"
-        return cli
+        return MagicMock()
 
     def test_name(self, mock_cli):
         """Test backend name."""
@@ -250,9 +248,6 @@ class TestAstroDiscoveryBackend:
         # the active astro context at request time.
         assert inst.astro_context is None
         assert inst.auth_token is None
-        # No deployment-token minting on the new path.
-        mock_cli.create_deployment_token.assert_not_called()
-        mock_cli.token_exists.assert_not_called()
 
     def test_discover_pins_non_default_context(self, mock_cli):
         """Non-default contexts (dev, sandbox, PR preview) are recorded."""
