@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import os
 import threading
 import time
 from datetime import datetime, timedelta, timezone
-from pathlib import Path  # noqa: TC003 — used as runtime fixture parameter type
+from pathlib import Path
 
 import httpx
 import pytest
@@ -574,6 +575,18 @@ class TestParsedYamlRobustness:
         # then surfaces "no session" rather than crashing on a parse error.
         astro_home.mkdir(parents=True, exist_ok=True)
         (astro_home / "config.yaml").write_text("contexts: [\n  not closed")
+        resolver = AstroPATResolver(env={})
+        with pytest.raises(AstroNotLoggedInError):
+            resolver.get_token()
+
+    def test_astro_home_at_dev_null_treated_as_no_session(self, monkeypatch):
+        # ASTRO_HOME=os.devnull is a sentinel some wrappers use to "neutralize"
+        # global astro state. Reading <devnull>/config.yaml raises
+        # NotADirectoryError (not FileNotFoundError); the resolver should
+        # still surface "no session" cleanly.
+        if not Path(os.devnull).exists() or Path(os.devnull).is_file():
+            pytest.skip("os.devnull is not a non-regular file on this platform")
+        monkeypatch.setenv("ASTRO_HOME", os.devnull)
         resolver = AstroPATResolver(env={})
         with pytest.raises(AstroNotLoggedInError):
             resolver.get_token()
