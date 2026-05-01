@@ -139,17 +139,29 @@ def _auth_config_url(domain: str) -> str:
 
 
 def _parse_expiry(ctx: dict[str, Any]) -> float:
-    """Return token expiry as epoch seconds. 0 if unknown."""
+    """Return token expiry as epoch seconds. 0 if unknown.
+
+    astro CLI writes ``expiresin`` as a naive ISO timestamp (no ``Z``
+    suffix, no offset). ``datetime.fromisoformat`` and PyYAML both treat
+    those as naive, and ``.timestamp()`` would interpret a naive datetime
+    in local time — hours off on any non-UTC machine. Force-attach UTC
+    when no tzinfo is present so the computed expiry matches what astro
+    CLI actually wrote.
+    """
     expiresin = ctx.get("expiresin")
     if isinstance(expiresin, str):
         try:
-            return datetime.fromisoformat(expiresin).timestamp()
+            dt = datetime.fromisoformat(expiresin)
         except ValueError:
-            pass
+            return 0.0
     elif isinstance(expiresin, datetime):
         # PyYAML parses unquoted ISO timestamps as datetime when possible.
-        return expiresin.timestamp()
-    return 0.0
+        dt = expiresin
+    else:
+        return 0.0
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.timestamp()
 
 
 def _bearer_from_ctx(ctx: dict[str, Any]) -> str:

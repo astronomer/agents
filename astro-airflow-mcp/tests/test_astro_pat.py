@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path  # noqa: TC003 — used as runtime fixture parameter type
 
@@ -130,15 +131,44 @@ class TestParseExpiry:
         assert _parse_expiry({"expiresin": when.isoformat()}) == when.timestamp()
 
     def test_datetime_value(self):
-        # PyYAML may parse unquoted ISO timestamps as naive datetimes.
+        # PyYAML may parse unquoted ISO timestamps as naive datetimes; treat
+        # those as UTC (matches what astro CLI writes).
         when = datetime(2026, 1, 1, 12, 0, 0)
-        assert _parse_expiry({"expiresin": when}) == when.timestamp()
+        expected = when.replace(tzinfo=timezone.utc).timestamp()
+        assert _parse_expiry({"expiresin": when}) == expected
 
     def test_missing(self):
         assert _parse_expiry({}) == 0.0
 
     def test_malformed_string(self):
         assert _parse_expiry({"expiresin": "not a date"}) == 0.0
+
+    def test_naive_iso_treated_as_utc_under_non_utc_tz(self, monkeypatch):
+        # astro CLI writes expiresin without a Z suffix or offset. On a
+        # non-UTC machine, datetime.fromisoformat(...).timestamp() would
+        # interpret it in local time, putting expiry hours off. Confirm
+        # we anchor to UTC instead.
+        monkeypatch.setenv("TZ", "America/Los_Angeles")
+        time.tzset()
+        try:
+            naive = "2026-01-01T12:00:00"
+            expected = datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc).timestamp()
+            assert _parse_expiry({"expiresin": naive}) == expected
+        finally:
+            monkeypatch.delenv("TZ", raising=False)
+            time.tzset()
+
+    def test_naive_datetime_treated_as_utc_under_non_utc_tz(self, monkeypatch):
+        # Same case but for the PyYAML-parsed datetime branch.
+        monkeypatch.setenv("TZ", "America/Los_Angeles")
+        time.tzset()
+        try:
+            naive = datetime(2026, 1, 1, 12, 0, 0)
+            expected = datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc).timestamp()
+            assert _parse_expiry({"expiresin": naive}) == expected
+        finally:
+            monkeypatch.delenv("TZ", raising=False)
+            time.tzset()
 
 
 class TestResolverHappyPath:
