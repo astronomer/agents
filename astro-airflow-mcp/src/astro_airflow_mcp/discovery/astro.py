@@ -26,6 +26,14 @@ from astro_airflow_mcp.discovery.base import DiscoveredInstance, DiscoveryError
 
 logger = logging.getLogger(__name__)
 
+# Most Astro users live in astronomer.io. When that's the active context
+# at discover time, omit it from the recorded instance so the resolver
+# follows wherever `astro context` points at request time (matches astro
+# CLI's mental model). Pin explicitly only for non-default contexts so a
+# user discovering under dev / sandbox / PR-preview gets stable behavior
+# even if they later `astro context switch` for unrelated work.
+DEFAULT_ASTRO_DOMAIN = "astronomer.io"
+
 
 class AstroDiscoveryError(DiscoveryError):
     """Error during Astro discovery."""
@@ -93,10 +101,11 @@ class AstroDiscoveryBackend:
         if all_workspaces:
             workspace_map = self._get_workspace_map()
 
-        # Capture the active context once; every PAT instance we emit binds
-        # to this domain so future `astro context switch` doesn't silently
-        # change which credential af uses.
-        context = self.get_context()
+        # Capture the active context once. We only pin to it (record on the
+        # instance) when it differs from DEFAULT_ASTRO_DOMAIN — see the
+        # constant's docstring for the reasoning.
+        active_context = self.get_context()
+        context = active_context if active_context != DEFAULT_ASTRO_DOMAIN else None
 
         instances: list[DiscoveredInstance] = []
         for dep_data in deployments_data:

@@ -246,11 +246,52 @@ class TestAstroDiscoveryBackend:
         assert inst.url == "https://example.com"
         assert inst.source == "astro"
         assert inst.auth_kind == "astro_pat"
-        assert inst.astro_context == "astronomer.io"
+        # Default context (astronomer.io) is NOT recorded — instances follow
+        # the active astro context at request time.
+        assert inst.astro_context is None
         assert inst.auth_token is None
         # No deployment-token minting on the new path.
         mock_cli.create_deployment_token.assert_not_called()
         mock_cli.token_exists.assert_not_called()
+
+    def test_discover_pins_non_default_context(self, mock_cli):
+        """Non-default contexts (dev, sandbox, PR preview) are recorded."""
+        mock_cli.list_deployments.return_value = [{"name": "dep1", "deployment_id": "id1"}]
+        mock_cli.inspect_deployment.return_value = AstroDeployment(
+            id="id1",
+            name="dep1",
+            workspace_id="ws1",
+            workspace_name="workspace1",
+            airflow_api_url="https://dev.example.com",
+            status="HEALTHY",
+        )
+        mock_cli.get_context.return_value = "astronomer-dev.io"
+
+        backend = AstroDiscoveryBackend(cli=mock_cli)
+        instances = backend.discover()
+
+        assert len(instances) == 1
+        # Non-default context is recorded so future `astro context switch`
+        # doesn't drift these instances onto the wrong session.
+        assert instances[0].astro_context == "astronomer-dev.io"
+
+    def test_discover_omits_context_when_get_context_fails(self, mock_cli):
+        """If get_context returns None, astro_context stays None (use active)."""
+        mock_cli.list_deployments.return_value = [{"name": "dep1", "deployment_id": "id1"}]
+        mock_cli.inspect_deployment.return_value = AstroDeployment(
+            id="id1",
+            name="dep1",
+            workspace_id="ws1",
+            workspace_name="workspace1",
+            airflow_api_url="https://example.com",
+            status="HEALTHY",
+        )
+        mock_cli.get_context.return_value = None
+
+        backend = AstroDiscoveryBackend(cli=mock_cli)
+        instances = backend.discover()
+
+        assert instances[0].astro_context is None
 
     def test_discover_ignores_legacy_create_tokens_kwarg(self, mock_cli):
         """Old callers passing create_tokens=False shouldn't break."""
@@ -271,6 +312,7 @@ class TestAstroDiscoveryBackend:
 
         assert len(instances) == 1
         assert instances[0].auth_kind == "astro_pat"
+        assert instances[0].astro_context is None
 
     def test_discover_handles_auth_error(self, mock_cli):
         """Test discover raises on auth error."""
