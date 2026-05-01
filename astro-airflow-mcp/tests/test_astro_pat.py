@@ -577,3 +577,13 @@ class TestParsedYamlRobustness:
         resolver = AstroPATResolver(env={})
         with pytest.raises(AstroNotLoggedInError):
             resolver.get_token()
+
+    def test_astro_home_at_dev_null_treated_as_no_session(self, monkeypatch):
+        # ASTRO_HOME=/dev/null is a sentinel some wrappers use to "neutralize"
+        # global astro state. Reading /dev/null/config.yaml raises
+        # NotADirectoryError (an OSError, NOT FileNotFoundError); the
+        # resolver should still surface "no session" cleanly.
+        monkeypatch.setenv("ASTRO_HOME", "/dev/null")
+        resolver = AstroPATResolver(env={})
+        with pytest.raises(AstroNotLoggedInError):
+            resolver.get_token()
