@@ -2,13 +2,9 @@
 
 from __future__ import annotations
 
-import getpass
-import os
-import re
 import shutil
 import subprocess  # nosec B404 - subprocess is needed for CLI wrapper
 from dataclasses import dataclass
-from pathlib import Path
 
 import yaml
 
@@ -75,73 +71,9 @@ class AstroCli:
         ]
     )
 
-    TOKEN_NAME_PREFIX = "af-discover"  # nosec B105 - not a password, just a token name prefix
-
     def __init__(self) -> None:
         """Initialize the Astro CLI wrapper."""
         self._astro_path: str | None = None
-
-    def get_token_name(self) -> str:
-        """Get a user-specific token name for discovery.
-
-        Generates a deterministic token name like 'af-discover-firstname-lastname'
-        using the user's Astro email, or OS username as fallback. This avoids
-        collisions when multiple users run discovery on the same deployment.
-
-        Returns:
-            Token name string (e.g., 'af-discover-firstname-lastname')
-        """
-        identifier = self._get_user_identifier()
-        normalized = re.sub(r"[^a-z0-9]+", "-", identifier.lower()).strip("-")
-        if normalized:
-            return f"{self.TOKEN_NAME_PREFIX}-{normalized}"
-        return self.TOKEN_NAME_PREFIX
-
-    def _get_user_identifier(self) -> str:
-        """Get a deterministic user identifier.
-
-        Tries user_email from ~/.astro/config.yaml first (email local part),
-        then falls back to the OS username.
-
-        Returns:
-            A string identifying the current user
-        """
-        email = self._get_user_email()
-        if email:
-            return email.split("@")[0]
-        try:
-            return getpass.getuser()
-        except KeyError:
-            return "unknown"
-
-    def _get_user_email(self) -> str | None:
-        """Get the user's email from Astro CLI config.
-
-        Returns:
-            Email string or None if unavailable
-        """
-        astro_home = os.environ.get("ASTRO_HOME", Path.home() / ".astro")
-        config_path = Path(astro_home) / "config.yaml"
-        if not config_path.exists():
-            return None
-
-        try:
-            with open(config_path) as f:
-                config = yaml.safe_load(f)
-
-            if not config:
-                return None
-
-            context_name = config.get("context", "")
-            if not context_name:
-                return None
-
-            context_key = context_name.replace(".", "_")
-            contexts = config.get("contexts", {})
-            context_data = contexts.get(context_key, {})
-            return context_data.get("user_email")
-        except (yaml.YAMLError, OSError):
-            return None
 
     def _get_astro_path(self) -> str:
         """Get the path to the astro CLI executable."""
@@ -301,22 +233,28 @@ class AstroCli:
     def get_context(self) -> str | None:
         """Get the current Astro context (domain).
 
-        Returns:
-            Context domain (e.g., 'cloud.astronomer.io') or None
+        Reads ``~/.astro/config.yaml`` directly (canonical source). Falls
+        back to parsing ``astro context list`` (legacy asterisk format)
+        only when the file is missing or unparseable.
         """
+        # astro CLI's `context list` colors the active row with ANSI codes
+        # rather than marking it with an asterisk, so the table parser is
+        # unreliable across CLI versions.
+        from astro_airflow_mcp._astro_session import _config_path, _read_yaml
+
+        ctx = _read_yaml(_config_path()).get("context")
+        if isinstance(ctx, str) and ctx:
+            return ctx
+
         try:
             result = self._run_command(["context", "list"], check_auth=False)
             if result.returncode != 0:
                 return None
-
-            # Parse table output - look for row with asterisk (current context)
             for line in result.stdout.strip().split("\n")[1:]:  # Skip header
                 if line.strip().startswith("*"):
-                    # Format: * DOMAIN  ...
                     parts = line.strip().split()
                     if len(parts) >= 2:
-                        return parts[1]  # Domain is second field after *
-
+                        return parts[1]
             return None
         except (AstroCliError, subprocess.TimeoutExpired):
             return None
@@ -370,92 +308,3 @@ class AstroCli:
             return AstroDeployment.from_inspect_yaml(data)
         except yaml.YAMLError as e:
             raise AstroCliError(f"Failed to parse deployment info: {e}") from e
-
-    def list_deployment_tokens(self, deployment_id: str) -> list[dict]:
-        """List API tokens for a deployment.
-
-        Args:
-            deployment_id: The deployment ID
-
-        Returns:
-            List of token dictionaries with id, name, role, etc.
-        """
-        args = ["deployment", "token", "list", "--deployment-id", deployment_id]
-        return self._run_list_command(args, "deployment tokens")
-
-    def token_exists(self, deployment_id: str, token_name: str) -> bool:
-        """Check if a token with the given name exists for a deployment.
-
-        Args:
-            deployment_id: The deployment ID
-            token_name: Name of the token to check
-
-        Returns:
-            True if token exists, False otherwise
-        """
-        tokens = self.list_deployment_tokens(deployment_id)
-        return any(t.get("name") == token_name for t in tokens)
-
-    def create_deployment_token(
-        self,
-        deployment_id: str,
-        name: str,
-        role: str = "DEPLOYMENT_ADMIN",
-        expiry_days: int = 0,
-    ) -> str:
-        """Create a new deployment API token.
-
-        Args:
-            deployment_id: The deployment ID
-            name: Name for the token
-            role: Token role (DEPLOYMENT_ADMIN, etc.)
-            expiry_days: Days until expiration (0 = never)
-
-        Returns:
-            The token value (only available at creation time)
-        """
-        args = [
-            "deployment",
-            "token",
-            "create",
-            "--deployment-id",
-            deployment_id,
-            "--name",
-            name,
-            "--role",
-            role,
-        ]
-
-        if expiry_days > 0:
-            args.extend(["--expiry", str(expiry_days)])
-
-        result = self._run_command(args, timeout=30)
-
-        if result.returncode != 0:
-            raise AstroCliError(f"Failed to create deployment token: {result.stderr}")
-
-        # Extract the token from stdout. The CLI output format varies by version,
-        # so we try multiple extraction strategies in order of specificity.
-        output = result.stdout.strip()
-
-        # Strategy 1: Look for a JWT token (header.payload.signature format)
-        # JWTs from Astro start with "eyJ" (base64 for '{"')
-        jwt_pattern = re.compile(r"eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+")
-        match = jwt_pattern.search(output)
-        if match:
-            return match.group(0)
-
-        # Strategy 2: Look for any long alphanumeric string (100+ chars)
-        # Some token formats may not be JWTs
-        token_pattern = re.compile(r"[A-Za-z0-9_-]{100,}")
-        match = token_pattern.search(output)
-        if match:
-            return match.group(0)
-
-        # Strategy 3: If the output is a single line of reasonable length, assume it's the token
-        if len(output) > 50 and "\n" not in output:
-            return output
-
-        raise AstroCliError(
-            f"Token creation succeeded but could not extract token value from output: {output[:200]}"
-        )

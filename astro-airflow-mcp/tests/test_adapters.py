@@ -66,6 +66,26 @@ class TestAirflowV2Adapter:
         assert headers == {}
         assert auth is None
 
+    def test_setup_auth_handler_takes_precedence(self):
+        """When auth_handler is set, it shadows token_getter and returns no headers."""
+        import httpx
+
+        class _Handler(httpx.Auth):
+            def auth_flow(self, request):
+                request.headers["Authorization"] = "Bearer from-handler"
+                yield request
+
+        handler = _Handler()
+        adapter = AirflowV2Adapter(
+            "http://localhost:8080",
+            "2.9.0",
+            token_getter=lambda: "ignored-token",
+            auth_handler=handler,
+        )
+        headers, auth = adapter._setup_auth()
+        assert headers == {}
+        assert auth is handler
+
     def test_get_dag_stats_call_with_dag_ids(self, mocker):
         """Test V2 adapter calls dagStats endpoint correctly with specific dag_ids."""
         adapter = AirflowV2Adapter(

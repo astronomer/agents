@@ -47,6 +47,7 @@ class AirflowAdapter(ABC):
         version: str,
         token_getter: Callable[[], str | None] | None = None,
         basic_auth_getter: Callable[[], tuple[str, str] | None] | None = None,
+        auth_handler: httpx.Auth | None = None,
         verify: bool | str = True,
     ):
         """Initialize adapter with connection details.
@@ -57,6 +58,10 @@ class AirflowAdapter(ABC):
             token_getter: Callable that returns current auth token (or None)
             basic_auth_getter: Callable that returns (username, password) tuple or None
                              Used as fallback for Airflow 2.x which doesn't support token auth
+            auth_handler: Optional ``httpx.Auth`` instance. When set, all HTTP
+                calls go through this handler (eg ``AstroPATAuth``), which
+                attaches the bearer and handles 401-retry. Takes precedence
+                over ``token_getter`` and ``basic_auth_getter``.
             verify: SSL verification setting. True (default) enables verification,
                     False disables it, or a string path to a CA bundle file.
         """
@@ -64,6 +69,7 @@ class AirflowAdapter(ABC):
         self.version = version
         self._token_getter = token_getter
         self._basic_auth_getter = basic_auth_getter
+        self._auth_handler = auth_handler
         self._verify: bool | str = verify
 
     @property
@@ -71,30 +77,25 @@ class AirflowAdapter(ABC):
     def api_base_path(self) -> str:
         """API base path for this version (e.g., '/api/v1' or '/api/v2')."""
 
-    def _setup_auth(self) -> tuple[dict[str, str], tuple[str, str] | None]:
-        """Set up authentication using token or basic auth.
+    def _setup_auth(self) -> tuple[dict[str, str], tuple[str, str] | httpx.Auth | None]:
+        """Pick auth for an outgoing request.
 
-        Tries token-based auth first (Airflow 3.x), falls back to basic auth
-        (Airflow 2.x) if token is not available.
-
-        Returns:
-            Tuple of (headers dict, auth tuple or None)
+        Precedence: ``auth_handler`` (eg ``AstroPATAuth``) > token > basic.
+        Returns ``(headers, auth)`` where ``auth`` is whatever httpx accepts
+        under its ``auth=`` parameter (Auth instance, ``(user, pass)`` tuple,
+        or ``None``).
         """
         headers: dict[str, str] = {}
-        auth: tuple[str, str] | None = None
-
-        # Try token-based auth first
+        if self._auth_handler is not None:
+            return headers, self._auth_handler
         if self._token_getter:
             token = self._token_getter()
             if token:
                 headers["Authorization"] = f"Bearer {token}"
                 return headers, None
-
-        # Fall back to basic auth if no token available
         if self._basic_auth_getter:
-            auth = self._basic_auth_getter()
-
-        return headers, auth
+            return headers, self._basic_auth_getter()
+        return headers, None
 
     def _call(
         self,
@@ -126,14 +127,9 @@ class AirflowAdapter(ABC):
         all_params = {k: v for k, v in all_params.items() if v is not None}
 
         with httpx.Client(timeout=30.0, verify=self._verify) as client:
-            if auth:
-                response = client.get(url, params=all_params, headers=headers, auth=auth)
-            else:
-                response = client.get(url, params=all_params, headers=headers)
-
+            response = client.get(url, params=all_params, headers=headers, auth=auth)
             if response.status_code == 404:
                 raise NotFoundError(endpoint)
-
             response.raise_for_status()
             return response.json()
 
@@ -163,11 +159,7 @@ class AirflowAdapter(ABC):
         url = f"{self.airflow_url}{self.api_base_path}/{endpoint}"
 
         with httpx.Client(timeout=30.0, verify=self._verify) as client:
-            if auth:
-                response = client.post(url, json=json_data, headers=headers, auth=auth)
-            else:
-                response = client.post(url, json=json_data, headers=headers)
-
+            response = client.post(url, json=json_data, headers=headers, auth=auth)
             if response.status_code == 404:
                 raise NotFoundError(endpoint)
 
@@ -200,10 +192,7 @@ class AirflowAdapter(ABC):
         url = f"{self.airflow_url}{self.api_base_path}/{endpoint}"
 
         with httpx.Client(timeout=30.0, verify=self._verify) as client:
-            if auth:
-                response = client.patch(url, json=json_data, headers=headers, auth=auth)
-            else:
-                response = client.patch(url, json=json_data, headers=headers)
+            response = client.patch(url, json=json_data, headers=headers, auth=auth)
 
             if response.status_code == 404:
                 raise NotFoundError(endpoint)
@@ -234,10 +223,7 @@ class AirflowAdapter(ABC):
         url = f"{self.airflow_url}{self.api_base_path}/{endpoint}"
 
         with httpx.Client(timeout=30.0, verify=self._verify) as client:
-            if auth:
-                response = client.delete(url, headers=headers, auth=auth)
-            else:
-                response = client.delete(url, headers=headers)
+            response = client.delete(url, headers=headers, auth=auth)
 
             if response.status_code == 404:
                 raise NotFoundError(endpoint)

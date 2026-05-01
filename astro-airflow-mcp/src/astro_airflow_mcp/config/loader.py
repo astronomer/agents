@@ -14,7 +14,7 @@ from astro_airflow_mcp.config.interpolation import interpolate_config_value
 from astro_airflow_mcp.config.models import AirflowCliConfig
 
 if TYPE_CHECKING:
-    from astro_airflow_mcp.config.models import Instance
+    from astro_airflow_mcp.config.models import AuthKind, Instance
 
 
 class ConfigError(Exception):
@@ -29,6 +29,8 @@ class ResolvedConfig:
     username: str | None = None
     password: str | None = None
     token: str | None = None
+    auth_kind: AuthKind | None = None
+    astro_context: str | None = None  # only set when auth_kind == "astro_pat"
     instance_name: str | None = None
     sources: dict[str, str] = field(default_factory=dict)
     verify_ssl: bool = True
@@ -142,6 +144,13 @@ class ConfigManager:
                     del inst["verify-ssl"]
                 if inst.get("ca-cert") is None:
                     del inst["ca-cert"]
+                # Drop null auth fields so PAT instances don't carry empty
+                # username/password/token/context lines that imply config.
+                auth = inst.get("auth")
+                if isinstance(auth, dict):
+                    for key in list(auth.keys()):
+                        if auth[key] is None:
+                            del auth[key]
 
             with open(self.config_path, "w") as f:
                 yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)
@@ -183,6 +192,8 @@ class ConfigManager:
                     username=interpolate_config_value(instance.auth.username),
                     password=interpolate_config_value(instance.auth.password),
                     token=interpolate_config_value(instance.auth.token),
+                    auth_kind=instance.auth.kind,
+                    astro_context=instance.auth.context,
                     instance_name=name,
                     sources={
                         "url": f"instance:{name}",
@@ -210,6 +221,9 @@ class ConfigManager:
         username: str | None = None,
         password: str | None = None,
         token: str | None = None,
+        kind: AuthKind | None = None,
+        context: str | None = None,
+        deployment_id: str | None = None,
         source: str | None = None,
         verify_ssl: bool = True,
         ca_cert: str | None = None,
@@ -222,6 +236,9 @@ class ConfigManager:
             username=username,
             password=password,
             token=token,
+            kind=kind,
+            context=context,
+            deployment_id=deployment_id,
             source=source,
             verify_ssl=verify_ssl,
             ca_cert=ca_cert,

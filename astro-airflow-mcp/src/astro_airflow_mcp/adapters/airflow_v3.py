@@ -24,11 +24,13 @@ class AirflowV3Adapter(AirflowAdapter):
         version: str,
         token_getter: Callable[[], str | None] | None = None,
         basic_auth_getter: Callable[[], tuple[str, str] | None] | None = None,
+        auth_handler: httpx.Auth | None = None,
         verify: bool | str = True,
     ):
         """Initialize V3 adapter, exchanging basic auth for JWT if needed."""
-        # If we have basic auth but no token, exchange for JWT
-        if basic_auth_getter and not token_getter:
+        # If an auth_handler is provided (eg AstroPATAuth), it takes
+        # precedence — don't try to swap basic auth for a JWT.
+        if auth_handler is None and basic_auth_getter and not token_getter:
             creds = basic_auth_getter()
             if creds:
                 jwt_token = self._exchange_for_token(airflow_url, creds[0], creds[1], verify=verify)
@@ -37,7 +39,14 @@ class AirflowV3Adapter(AirflowAdapter):
                     token_getter = self._make_token_getter(jwt_token)
                     basic_auth_getter = None  # Don't use basic auth
 
-        super().__init__(airflow_url, version, token_getter, basic_auth_getter, verify=verify)
+        super().__init__(
+            airflow_url,
+            version,
+            token_getter,
+            basic_auth_getter,
+            auth_handler=auth_handler,
+            verify=verify,
+        )
 
     @staticmethod
     def _make_token_getter(token: str) -> Callable[[], str | None]:

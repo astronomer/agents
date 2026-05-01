@@ -203,9 +203,7 @@ class TestAstroDiscoveryBackend:
     @pytest.fixture
     def mock_cli(self):
         """Create a mock AstroCli."""
-        cli = MagicMock()
-        cli.get_token_name.return_value = "af-discover-test-user"
-        return cli
+        return MagicMock()
 
     def test_name(self, mock_cli):
         """Test backend name."""
@@ -224,8 +222,8 @@ class TestAstroDiscoveryBackend:
         backend = AstroDiscoveryBackend(cli=mock_cli)
         assert backend.is_available() is False
 
-    def test_discover_returns_instances(self, mock_cli):
-        """Test discover returns list of instances."""
+    def test_discover_returns_pat_instances(self, mock_cli):
+        """Discover emits instances configured for astro_pat auth, no token mint."""
         mock_cli.list_deployments.return_value = [{"name": "dep1", "deployment_id": "id1"}]
         mock_cli.inspect_deployment.return_value = AstroDeployment(
             id="id1",
@@ -235,33 +233,46 @@ class TestAstroDiscoveryBackend:
             airflow_api_url="https://example.com",
             status="HEALTHY",
         )
-        mock_cli.token_exists.return_value = False
-        mock_cli.create_deployment_token.return_value = "test-token"
+        mock_cli.get_context.return_value = "astronomer.io"
 
         backend = AstroDiscoveryBackend(cli=mock_cli)
-        instances = backend.discover(create_tokens=True)
+        instances = backend.discover()
 
         assert len(instances) == 1
-        assert instances[0].name == "workspace1-dep1"
-        assert instances[0].url == "https://example.com"
-        assert instances[0].source == "astro"
-        assert instances[0].auth_token == "test-token"
-        # token_exists called for: create_token check + legacy token check
-        assert mock_cli.token_exists.call_count == 2
-        mock_cli.token_exists.assert_any_call("id1", "af-discover-test-user")
-        mock_cli.token_exists.assert_any_call("id1", "af-cli-discover")
-        mock_cli.create_deployment_token.assert_called_once_with("id1", "af-discover-test-user")
+        inst = instances[0]
+        assert inst.name == "workspace1-dep1"
+        assert inst.url == "https://example.com"
+        assert inst.source == "astro"
+        assert inst.auth_kind == "astro_pat"
+        # Always pinned to the active context, even astronomer.io, so a
+        # later `astro context switch` can't ship a dev-tenant bearer to a
+        # prod-tenant URL.
+        assert inst.astro_context == "astronomer.io"
+        assert inst.auth_token is None
 
-    def test_token_name_is_resolved_once_on_init(self, mock_cli):
-        """Test token name is computed once and reused."""
+    def test_discover_pins_non_default_context(self, mock_cli):
+        """Non-default contexts (dev, sandbox, PR preview) are recorded."""
+        mock_cli.list_deployments.return_value = [{"name": "dep1", "deployment_id": "id1"}]
+        mock_cli.inspect_deployment.return_value = AstroDeployment(
+            id="id1",
+            name="dep1",
+            workspace_id="ws1",
+            workspace_name="workspace1",
+            airflow_api_url="https://dev.example.com",
+            status="HEALTHY",
+        )
+        mock_cli.get_context.return_value = "astronomer-dev.io"
+
         backend = AstroDiscoveryBackend(cli=mock_cli)
+        instances = backend.discover()
 
-        assert backend.token_name == "af-discover-test-user"
-        assert backend.token_name == "af-discover-test-user"
-        mock_cli.get_token_name.assert_called_once()
+        assert len(instances) == 1
+        # Non-default context is recorded so future `astro context switch`
+        # doesn't drift these instances onto the wrong session.
+        assert instances[0].astro_context == "astronomer-dev.io"
 
-    def test_discover_without_tokens(self, mock_cli):
-        """Test discover without creating tokens."""
+    def test_discover_omits_context_when_get_context_fails(self, mock_cli):
+        """If get_context returns None, astro_context stays None (use active)."""
         mock_cli.list_deployments.return_value = [{"name": "dep1", "deployment_id": "id1"}]
         mock_cli.inspect_deployment.return_value = AstroDeployment(
             id="id1",
@@ -271,15 +282,12 @@ class TestAstroDiscoveryBackend:
             airflow_api_url="https://example.com",
             status="HEALTHY",
         )
+        mock_cli.get_context.return_value = None
 
         backend = AstroDiscoveryBackend(cli=mock_cli)
-        instances = backend.discover(create_tokens=False)
+        instances = backend.discover()
 
-        assert len(instances) == 1
-        assert instances[0].auth_token is None
-        # token_exists still called for legacy token check
-        mock_cli.token_exists.assert_called_once_with("id1", "af-cli-discover")
-        mock_cli.create_deployment_token.assert_not_called()
+        assert instances[0].astro_context is None
 
     def test_discover_handles_auth_error(self, mock_cli):
         """Test discover raises on auth error."""
@@ -300,75 +308,6 @@ class TestAstroDiscoveryBackend:
 
         with pytest.raises(AstroDiscoveryError, match="Failed to list"):
             backend.discover()
-
-    def test_discover_warns_on_legacy_token(self, mock_cli, caplog):
-        """Test discover logs warning when legacy af-cli-discover token is found."""
-        import logging
-
-        mock_cli.list_deployments.return_value = [
-            {"name": "dep1", "deployment_id": "id1"},
-            {"name": "dep2", "deployment_id": "id2"},
-        ]
-
-        dep1 = AstroDeployment(
-            id="id1",
-            name="dep1",
-            workspace_id="ws1",
-            workspace_name="workspace1",
-            airflow_api_url="https://dep1.example.com",
-            status="HEALTHY",
-        )
-        dep2 = AstroDeployment(
-            id="id2",
-            name="dep2",
-            workspace_id="ws1",
-            workspace_name="workspace1",
-            airflow_api_url="https://dep2.example.com",
-            status="HEALTHY",
-        )
-        mock_cli.inspect_deployment.side_effect = lambda dep_id, **_: (
-            dep1 if dep_id == "id1" else dep2
-        )
-
-        def token_exists_side_effect(dep_id, token_name):
-            return token_name == "af-cli-discover" and dep_id == "id1"
-
-        mock_cli.token_exists.side_effect = token_exists_side_effect
-        mock_cli.create_deployment_token.return_value = "new-token"
-
-        backend = AstroDiscoveryBackend(cli=mock_cli)
-
-        with caplog.at_level(logging.WARNING, logger="astro_airflow_mcp.discovery.astro"):
-            instances = backend.discover(create_tokens=False)
-
-        assert len(instances) == 2
-        assert "af-cli-discover" in caplog.text
-        assert "workspace1-dep1" in caplog.text
-        # dep2 should NOT be in the warning
-        assert "workspace1-dep2" not in caplog.text
-
-    def test_discover_no_warning_without_legacy_token(self, mock_cli, caplog):
-        """Test discover does not warn when no legacy tokens exist."""
-        import logging
-
-        mock_cli.list_deployments.return_value = [{"name": "dep1", "deployment_id": "id1"}]
-        mock_cli.inspect_deployment.return_value = AstroDeployment(
-            id="id1",
-            name="dep1",
-            workspace_id="ws1",
-            workspace_name="workspace1",
-            airflow_api_url="https://example.com",
-            status="HEALTHY",
-        )
-        mock_cli.token_exists.return_value = False
-        mock_cli.create_deployment_token.return_value = "test-token"
-
-        backend = AstroDiscoveryBackend(cli=mock_cli)
-
-        with caplog.at_level(logging.WARNING, logger="astro_airflow_mcp.discovery.astro"):
-            backend.discover(create_tokens=True)
-
-        assert "af-cli-discover" not in caplog.text
 
     def test_discover_skips_deployments_without_id(self, mock_cli):
         """Test discover skips deployments without ID."""
