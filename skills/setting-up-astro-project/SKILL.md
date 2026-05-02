@@ -19,6 +19,8 @@ This skill helps you initialize and configure Airflow projects using the Astro C
 astro dev init
 ```
 
+> **Don't pass `--airflow-version` or `--runtime-version` unless the user explicitly asks for a specific pin.** Plain `astro dev init` resolves to the latest Astro Runtime — that's the right default. Specifying a version risks pinning to a stale value from training data. If the user wants to know what was installed, read the generated `Dockerfile` afterward instead of guessing.
+
 Creates this structure:
 ```
 project/
