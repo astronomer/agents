@@ -78,6 +78,17 @@ class TestDiscoverProjectRoot:
 
         assert discover_project_root() == tmp_path.resolve()
 
+    def test_deleted_cwd_returns_none(self, tmp_path, monkeypatch):
+        """If Path.cwd() raises (deleted dir), discovery returns None
+        rather than crashing — there's no position to walk up from."""
+        monkeypatch.setattr(Path, "home", lambda: tmp_path / "fake-home")
+
+        def _raise() -> Path:
+            raise FileNotFoundError("cwd was deleted")
+
+        monkeypatch.setattr(Path, "cwd", _raise)
+        assert discover_project_root() is None
+
     def test_unresolvable_start_returns_none(self, tmp_path, monkeypatch):
         monkeypatch.setattr(Path, "home", lambda: tmp_path / "fake-home")
         # A path that can't be resolved (e.g. doesn't exist with strict

@@ -43,7 +43,12 @@ def discover_project_root(start: Path | None = None) -> Path | None:
     or ``None`` if no such ancestor exists.
     """
     if start is None:
-        start = Path.cwd()
+        try:
+            start = Path.cwd()
+        except (FileNotFoundError, OSError):
+            # cwd was deleted or otherwise unreadable — there's no
+            # filesystem position to walk up from. Skip layering.
+            return None
 
     try:
         start = start.resolve()
