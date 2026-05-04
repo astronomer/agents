@@ -1,3 +1,0 @@
-[submodule "vendor/dbt-agent-skills"]
-	path = vendor/dbt-agent-skills
-	url = https://github.com/dbt-labs/dbt-agent-skills.git
