@@ -1,6 +1,7 @@
 """Tests for af CLI config module."""
 
 import os
+import stat
 from pathlib import Path
 from unittest.mock import patch
 
@@ -153,13 +154,15 @@ class TestAirflowCliConfig:
         assert len(config.instances) == 1
         assert config.current_instance == "local"
 
-    def test_current_instance_must_exist(self):
-        """Test that current-instance must reference existing instance."""
-        with pytest.raises(ValueError, match="does not exist"):
-            AirflowCliConfig(
-                instances=[],
-                current_instance="nonexistent",
-            )
+    def test_current_instance_can_reference_unknown_for_layered_configs(self):
+        """current-instance referring to a name not in this file's instances
+        is permitted — it may live in a sibling scope (project-shared,
+        global). Layered config handles stale-pointer cleanup at read time."""
+        config = AirflowCliConfig(
+            instances=[],
+            current_instance="from-sibling-scope",
+        )
+        assert config.current_instance == "from-sibling-scope"
 
     def test_get_instance(self):
         """Test get_instance helper."""
@@ -367,20 +370,26 @@ class TestConfigManager:
             manager.load()
 
     def test_load_invalid_config(self, tmp_path):
-        """Test loading invalid config raises ConfigError."""
+        """Loading malformed YAML raises ConfigError."""
         config_path = tmp_path / "config.yaml"
-        config_path.write_text(
-            yaml.dump(
-                {
-                    "instances": [],
-                    "current-instance": "nonexistent",
-                }
-            )
-        )
+        config_path.write_text("instances: not-a-list\n")
 
         manager = ConfigManager(config_path=config_path)
         with pytest.raises(ConfigError, match="Invalid config"):
             manager.load()
+
+    def test_current_instance_pointing_to_unknown_loads_ok(self, tmp_path):
+        """current-instance referencing a name not in this file's instances
+        is allowed — in layered configs it can legitimately refer to an
+        instance from a sibling scope. Stale-pointer cleanup is the
+        layered config's job, not the model validator's."""
+        config_path = tmp_path / "config.yaml"
+        config_path.write_text("instances: []\ncurrent-instance: from-sibling-scope\n")
+
+        manager = ConfigManager(config_path=config_path)
+        config = manager.load(create_default_if_missing=False)
+        assert config.current_instance == "from-sibling-scope"
+        assert config.instances == []
 
     def test_resolve_instance(self, tmp_path):
         """Test resolving an instance."""
@@ -1094,3 +1103,316 @@ class TestCLIContextEmptyURL:
             with patch.dict(os.environ, env_clear, clear=True):
                 ctx.init()
         assert ctx._manager._airflow_url == "http://configured.example.com"
+
+
+class TestConfigManagerRoundTrip:
+    """Tests for cross-tool round-trip: af must preserve top-level keys it
+    doesn't own (e.g. astro-cli's ``project`` and ``contexts``) when it
+    writes to a shared YAML file.
+    """
+
+    def test_foreign_top_level_keys_preserved(self, tmp_path):
+        """Keys outside af's schema survive a load+save cycle."""
+        config_path = tmp_path / "config.yaml"
+        config_path.write_text(
+            "project:\n"
+            "  name: my-pipelines\n"
+            "  deployment: dep_abc123\n"
+            "contexts:\n"
+            "  astronomer.io:\n"
+            "    organization: org_xyz\n"
+            "    workspace: ws_456\n"
+            "instances:\n"
+            "  - name: prod\n"
+            "    url: https://prod.example.com\n"
+            "    auth:\n"
+            "      kind: astro_pat\n"
+            "      context: astronomer.io\n"
+        )
+
+        manager = ConfigManager(config_path=config_path)
+        config = manager.load()
+        assert len(config.instances) == 1
+        # Mutate something af owns and save.
+        manager.add_instance("staging", "https://staging.example.com", token="t")
+
+        raw = yaml.safe_load(config_path.read_text())
+        assert raw["project"] == {"name": "my-pipelines", "deployment": "dep_abc123"}
+        assert raw["contexts"] == {
+            "astronomer.io": {"organization": "org_xyz", "workspace": "ws_456"}
+        }
+        # af's keys updated as expected.
+        names = {i["name"] for i in raw["instances"]}
+        assert names == {"prod", "staging"}
+
+    def test_fresh_file_is_created_0600(self, tmp_path):
+        """First save creates the file with 0600 — the file may sit alongside
+        astro-cli auth tokens at ~/.astro/config.yaml, so default umask
+        (0644) is too loose."""
+        config_path = tmp_path / "config.yaml"
+        manager = ConfigManager(config_path=config_path)
+        manager.save(AirflowCliConfig())
+        assert stat.S_IMODE(config_path.stat().st_mode) == 0o600
+
+    def test_save_preserves_file_mode(self, tmp_path):
+        """File mode (e.g. 0600 for ~/.astro/config.yaml with auth tokens)
+        survives an af write."""
+        config_path = tmp_path / "config.yaml"
+        # Create the file via a save first so it exists with default mode.
+        manager = ConfigManager(config_path=config_path)
+        manager.save(AirflowCliConfig())
+        # Tighten perms the way astro-cli does.
+        os.chmod(config_path, 0o600)
+        assert stat.S_IMODE(config_path.stat().st_mode) == 0o600
+
+        # An af write must keep 0600.
+        manager.add_instance("x", "http://x", token="t")
+        assert stat.S_IMODE(config_path.stat().st_mode) == 0o600
+
+    def test_output_is_alphabetically_sorted(self, tmp_path):
+        """Output keys are sorted so cross-tool writes don't churn diffs.
+        Both af (yaml.safe_dump sort_keys=True) and astro-cli (Viper
+        WriteConfigAs) emit alphabetized keys; this test pins af's behavior.
+        """
+        config_path = tmp_path / "config.yaml"
+        manager = ConfigManager(config_path=config_path)
+        manager.add_instance("zebra", "https://z", token="t")
+        manager.add_instance("alpha", "https://a", token="t")
+
+        text = config_path.read_text()
+        # Top-level keys: current-instance, instances, telemetry — but
+        # telemetry is omitted at default. Just verify alphabetical at the
+        # top level by checking 'current-instance' precedes 'instances'.
+        assert text.index("current-instance:") < text.index("instances:")
+        # Within an instance entry, auth precedes name precedes url.
+        assert text.index("auth:") < text.index("name: alpha")
+
+    def test_save_is_idempotent(self, tmp_path):
+        """Two saves of the same config produce byte-identical output."""
+        config_path = tmp_path / "config.yaml"
+        manager = ConfigManager(config_path=config_path)
+        manager.add_instance("x", "https://x", token="${T}")
+        first = config_path.read_bytes()
+        manager.save(manager.load())
+        second = config_path.read_bytes()
+        assert first == second
+
+
+class TestDefaultPathAndLegacyFallback:
+    """Default global path is now ``~/.astro/config.yaml``. The pre-existing
+    ``~/.af/config.yaml`` is honored read-only when the new path has no af
+    keys yet, so we don't lose user data on upgrade.
+    """
+
+    def test_default_path_is_under_dot_astro(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        monkeypatch.delenv("AF_CONFIG", raising=False)
+
+        manager = ConfigManager()
+        assert manager.config_path == tmp_path / ".astro" / "config.yaml"
+        assert manager._using_default_path is True
+
+    def test_explicit_path_is_not_default(self, tmp_path):
+        manager = ConfigManager(config_path=tmp_path / "config.yaml")
+        assert manager._using_default_path is False
+
+    def test_af_config_env_var_is_not_default(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("AF_CONFIG", str(tmp_path / "explicit.yaml"))
+        manager = ConfigManager()
+        assert manager._using_default_path is False
+
+    def test_legacy_fallback_when_new_path_has_no_af_keys(self, tmp_path, monkeypatch):
+        """A pre-existing ~/.af/config.yaml is loaded when ~/.astro/config.yaml
+        has no instances key (e.g. astro-cli wrote it before af first ran)."""
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        monkeypatch.delenv("AF_CONFIG", raising=False)
+        # Reset the module-level flag that suppresses repeated warnings.
+        from astro_airflow_mcp.config import loader as loader_mod
+
+        monkeypatch.setattr(loader_mod, "_legacy_warning_emitted", False)
+
+        # Astro-cli content present at new path, no instances yet.
+        astro_dir = tmp_path / ".astro"
+        astro_dir.mkdir()
+        (astro_dir / "config.yaml").write_text("contexts:\n  astronomer.io:\n    workspace: ws\n")
+
+        # Legacy af content with an instance.
+        legacy_dir = tmp_path / ".af"
+        legacy_dir.mkdir()
+        (legacy_dir / "config.yaml").write_text(
+            "instances:\n"
+            "  - name: legacy\n"
+            "    url: http://legacy.example.com\n"
+            "    auth:\n"
+            "      kind: token\n"
+            "      token: tkn\n"
+            "current-instance: legacy\n"
+        )
+
+        manager = ConfigManager()
+        config = manager.load()
+        assert [i.name for i in config.instances] == ["legacy"]
+        assert config.current_instance == "legacy"
+
+    def test_legacy_fallback_emits_deprecation_warning(self, tmp_path, monkeypatch, capsys):
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        monkeypatch.delenv("AF_CONFIG", raising=False)
+        from astro_airflow_mcp.config import loader as loader_mod
+
+        monkeypatch.setattr(loader_mod, "_legacy_warning_emitted", False)
+
+        legacy_dir = tmp_path / ".af"
+        legacy_dir.mkdir()
+        (legacy_dir / "config.yaml").write_text(
+            "instances:\n  - {name: x, url: http://x, auth: {kind: token, token: t}}\n"
+        )
+
+        ConfigManager().load()
+        err = capsys.readouterr().err
+        assert "legacy ~/.af/config.yaml" in err
+        assert "af migrate" in err
+
+    def test_legacy_fallback_only_warns_once(self, tmp_path, monkeypatch, capsys):
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        monkeypatch.delenv("AF_CONFIG", raising=False)
+        from astro_airflow_mcp.config import loader as loader_mod
+
+        monkeypatch.setattr(loader_mod, "_legacy_warning_emitted", False)
+
+        legacy_dir = tmp_path / ".af"
+        legacy_dir.mkdir()
+        (legacy_dir / "config.yaml").write_text(
+            "instances:\n  - {name: x, url: http://x, auth: {kind: token, token: t}}\n"
+        )
+
+        ConfigManager().load()
+        ConfigManager().load()
+        err = capsys.readouterr().err
+        assert err.count("af migrate") == 1
+
+    def test_new_path_with_instances_skips_legacy(self, tmp_path, monkeypatch):
+        """Once af has written the new path, the legacy file is ignored."""
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        monkeypatch.delenv("AF_CONFIG", raising=False)
+        from astro_airflow_mcp.config import loader as loader_mod
+
+        monkeypatch.setattr(loader_mod, "_legacy_warning_emitted", False)
+
+        astro_dir = tmp_path / ".astro"
+        astro_dir.mkdir()
+        (astro_dir / "config.yaml").write_text(
+            "instances:\n  - {name: new, url: http://new, auth: {kind: token, token: t}}\n"
+        )
+
+        legacy_dir = tmp_path / ".af"
+        legacy_dir.mkdir()
+        (legacy_dir / "config.yaml").write_text(
+            "instances:\n  - {name: legacy, url: http://legacy, auth: {kind: token, token: t}}\n"
+        )
+
+        config = ConfigManager().load()
+        assert [i.name for i in config.instances] == ["new"]
+
+    def test_explicit_path_does_not_trigger_legacy_fallback(self, tmp_path, monkeypatch):
+        """An explicit config_path means 'use exactly this'; no fallback."""
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        legacy_dir = tmp_path / ".af"
+        legacy_dir.mkdir()
+        (legacy_dir / "config.yaml").write_text(
+            "instances:\n  - {name: legacy, url: http://x, auth: {kind: token, token: t}}\n"
+        )
+
+        explicit_path = tmp_path / "explicit.yaml"
+        # File doesn't exist; ConfigManager creates the default localhost
+        # instance and writes it. Legacy must NOT bleed in.
+        config = ConfigManager(config_path=explicit_path).load()
+        names = [i.name for i in config.instances]
+        assert "legacy" not in names
+        assert "localhost:8080" in names
+
+    def test_telemetry_notice_shown_survives_af_write(self, tmp_path):
+        """astro-cli writes telemetry.notice_shown; af must not clobber it.
+
+        Both tools share telemetry.enabled and telemetry.anonymous_id, but
+        notice_shown is astro-cli-specific. Sub-key merge (not block
+        replace) means af preserves it.
+        """
+        config_path = tmp_path / "config.yaml"
+        config_path.write_text(
+            "telemetry:\n  enabled: true\n  notice_shown: '2026-01-15T12:00:00Z'\n"
+        )
+
+        manager = ConfigManager(config_path=config_path)
+        # Trigger an af write that touches telemetry.
+        manager.set_telemetry_disabled(True)
+
+        raw = yaml.safe_load(config_path.read_text())
+        assert raw["telemetry"]["enabled"] is False  # af's update applied
+        assert raw["telemetry"]["notice_shown"] == "2026-01-15T12:00:00Z"  # preserved
+
+    def test_af_reads_astro_cli_anonymous_id(self, tmp_path):
+        """af adopts astro-cli's anonymous_id rather than minting its own.
+
+        Both tools sharing the same ID across tools is the desired
+        end-state — the user is one user, telemetry should correlate.
+        """
+        config_path = tmp_path / "config.yaml"
+        config_path.write_text(
+            "telemetry:\n  anonymous_id: shared-uuid-from-astro\n  enabled: true\n"
+        )
+
+        manager = ConfigManager(config_path=config_path)
+        config = manager.load()
+        assert config.telemetry.anonymous_id == "shared-uuid-from-astro"
+
+    def test_af_default_save_preserves_disk_telemetry(self, tmp_path):
+        """When af has no telemetry deltas, on-disk telemetry survives.
+
+        Default Telemetry() is enabled=True, anonymous_id=None — af's
+        cleanup pops the block from `data`, and the merge code must not
+        delete the on-disk block as a result.
+        """
+        config_path = tmp_path / "config.yaml"
+        config_path.write_text(
+            "telemetry:\n"
+            "  anonymous_id: persisted-id\n"
+            "  enabled: true\n"
+            "  notice_shown: '2026-01-15T12:00:00Z'\n"
+        )
+
+        manager = ConfigManager(config_path=config_path)
+        # Add an instance — touches save() but not telemetry.
+        manager.add_instance("x", "http://x", token="t")
+
+        raw = yaml.safe_load(config_path.read_text())
+        assert raw["telemetry"]["anonymous_id"] == "persisted-id"
+        assert raw["telemetry"]["enabled"] is True
+        assert raw["telemetry"]["notice_shown"] == "2026-01-15T12:00:00Z"
+
+    def test_first_save_after_legacy_fallback_lands_on_new_path(self, tmp_path, monkeypatch):
+        """The migration is "load from old, save to new on first write"."""
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        monkeypatch.delenv("AF_CONFIG", raising=False)
+        from astro_airflow_mcp.config import loader as loader_mod
+
+        monkeypatch.setattr(loader_mod, "_legacy_warning_emitted", False)
+
+        legacy_path = tmp_path / ".af" / "config.yaml"
+        legacy_path.parent.mkdir()
+        legacy_path.write_text(
+            "instances:\n  - {name: legacy, url: http://x, auth: {kind: token, token: t}}\n"
+        )
+
+        manager = ConfigManager()
+        manager.add_instance("new", "http://new", token="t")  # load+modify+save
+
+        new_path = tmp_path / ".astro" / "config.yaml"
+        assert new_path.is_file()
+        new_text = new_path.read_text()
+        # Both legacy + new instances should be in the new file (load
+        # picked up legacy; save wrote merged config to new path).
+        assert "name: legacy" in new_text
+        assert "name: new" in new_text
+        # Implicit fallback never deletes the old file; explicit `af migrate`
+        # is what renames it to .bak.
+        assert legacy_path.is_file()

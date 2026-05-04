@@ -18,6 +18,7 @@ from astro_airflow_mcp.cli.api import api_command
 from astro_airflow_mcp.cli.context import get_adapter, init_context
 from astro_airflow_mcp.cli.output import output_error, output_json
 from astro_airflow_mcp.cli.telemetry import track_command
+from astro_airflow_mcp.config import legacy_default_path
 from astro_airflow_mcp.config.loader import ConfigManager
 
 app = typer.Typer(
@@ -120,6 +121,72 @@ def telemetry(
             output_json({"telemetry": "enabled"})
         else:
             output_error(f"Unknown action '{action}'. Use 'enable' or 'disable'.")
+    except Exception as e:
+        output_error(str(e))
+
+
+@app.command()
+def migrate() -> None:
+    """Migrate ~/.af/config.yaml → ~/.astro/config.yaml.
+
+    af originally stored its config at ``~/.af/config.yaml``. The new
+    location ``~/.astro/config.yaml`` is shared with astro-cli, so a
+    single ``astro login`` powers both tools and ``af`` can sit next to
+    astro-cli's project config in ``.astro/config.yaml``.
+
+    This command:
+      1. Reads ``~/.af/config.yaml`` if present.
+      2. Merges its instances/current-instance/telemetry into
+         ``~/.astro/config.yaml``, preserving any astro-cli content.
+      3. Renames the old file to ``~/.af/config.yaml.bak``.
+
+    Idempotent — re-runs are safe and report "nothing to migrate".
+    """
+    legacy_path = legacy_default_path()
+    new_manager = ConfigManager()  # default path: ~/.astro/config.yaml
+
+    if not legacy_path.is_file():
+        if new_manager.config_path.is_file():
+            output_json(
+                {
+                    "status": "already-migrated",
+                    "config": str(new_manager.config_path),
+                }
+            )
+        else:
+            output_json({"status": "nothing-to-migrate"})
+        return
+
+    try:
+        # Read the legacy file directly (no fallback chain). We use the
+        # same ConfigManager primitive load+save the implicit fallback
+        # uses, so the migration result is byte-equivalent to what would
+        # eventually happen on the next save() call.
+        legacy_manager = ConfigManager(config_path=legacy_path)
+        legacy_config = legacy_manager.load(create_default_if_missing=False)
+
+        # save() merges af-owned keys into whatever astro-cli has already
+        # written to the new path; foreign keys (project, contexts, etc.)
+        # are preserved.
+        new_manager.save(legacy_config)
+
+        # Preserve a backup so users can roll back if something looks
+        # wrong. Find the first available .bak slot.
+        backup = legacy_path.parent / (legacy_path.name + ".bak")
+        i = 1
+        while backup.exists():
+            backup = legacy_path.parent / f"{legacy_path.name}.bak.{i}"
+            i += 1
+        legacy_path.rename(backup)
+
+        output_json(
+            {
+                "status": "migrated",
+                "from": str(legacy_path),
+                "to": str(new_manager.config_path),
+                "backup": str(backup),
+            }
+        )
     except Exception as e:
         output_error(str(e))
 

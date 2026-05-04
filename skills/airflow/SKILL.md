@@ -67,11 +67,27 @@ af instance discover local --scan     # Deep scan all ports 1024-65535
 # running discover without it. The non-dry-run mode creates API tokens in
 # Astro Cloud, which is a sensitive action that requires explicit approval.
 
-# Override instance for a single command
-af --instance staging dags list
+# Show where an instance came from (file path + scope)
+af instance show prod
+
+# Override instance for a single command via env vars
+AIRFLOW_API_URL=https://staging.example.com AIRFLOW_AUTH_TOKEN=$STG af dags list
+
+# Or switch persistently
+af instance use staging
 ```
 
-Config file: `~/.af/config.yaml` (override with `--config` or `AF_CONFIG` env var)
+Config layout (mirrors `git config` system/global/local):
+
+| Scope | File | Committed? |
+|---|---|---|
+| Global | `~/.astro/config.yaml` | n/a (per-user) |
+| Project shared | `<root>/.astro/config.yaml` | yes |
+| Project local | `<root>/.astro/config.local.yaml` | no (gitignored) |
+
+`<root>` is found by walking up from cwd looking for `.astro/`. Default write routing inside a project: `add`/`discover` → project-shared, `use` → project-local. Override with `--global` / `--project` / `--local`. Set `AF_CONFIG=<path>` to bypass layering and use a single file.
+
+Migrate from the legacy `~/.af/config.yaml` with `af migrate` (idempotent; renames the old file to `.bak`).
 
 Tokens in config can reference environment variables using `${VAR}` syntax:
 ```yaml
