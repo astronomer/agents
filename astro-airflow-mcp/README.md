@@ -15,13 +15,20 @@
     - [Core Tools](#core-tools)
     - [MCP Resources](#mcp-resources)
     - [MCP Prompts](#mcp-prompts)
-  - [Airflow CLI Tool](#af-tool)
+  - [Airflow CLI Tool](#airflow-cli-tool)
+    - [Installation](#installation)
+    - [Quick Reference](#quick-reference)
     - [Instance Management](#instance-management)
+    - [Configuration scopes](#configuration-scopes)
     - [Instance Discovery](#instance-discovery)
+    - [Direct API Access](#direct-api-access)
+    - [Configuration](#configuration-1)
+    - [Registry Caching](#registry-caching)
   - [Advanced Usage](#advanced-usage)
     - [Running as Standalone Server](#running-as-standalone-server)
     - [Airflow Plugin Mode](#airflow-plugin-mode)
     - [CLI Options](#cli-options)
+    - [Telemetry](#telemetry)
   - [Architecture](#architecture)
     - [Core Components](#core-components)
     - [Version Handling Strategy](#version-handling-strategy)
@@ -343,12 +350,59 @@ af instance add corp --url https://airflow.corp.example.com --no-verify-ssl --us
 af instance add corp --url https://airflow.corp.example.com --ca-cert /path/to/ca-bundle.pem --token '${TOKEN}'
 
 # List and switch instances
-af instance list      # Shows all instances in a table
-af instance use prod  # Switch to prod instance
-af instance current   # Show current instance
+af instance list                # All instances, with scope and current marker
+af instance use prod            # Switch to prod
+af instance current             # Show current instance
+af instance show prod           # Show instance details + which file it came from
 af instance delete old-instance
-af instance reset     # Reset to default configuration
+af instance reset               # Reset global config to default
 ```
+
+### Configuration scopes
+
+`af` reads and writes config across three scopes, co-located with the Astro CLI's `~/.astro/` directory and any project's `.astro/` directory. The model mirrors `git config` (system / global / local).
+
+| Scope | File | Committed? | Use for |
+|---|---|---|---|
+| Global | `~/.astro/config.yaml` | n/a (per-user) | Personal default deployments, localhost |
+| Project shared | `<root>/.astro/config.yaml` | yes (recommended) | The team's deployment inventory for this project |
+| Project local | `<root>/.astro/config.local.yaml` | no (gitignored) | Personal `current-instance` and per-developer overrides |
+
+`<root>` is found by walking up from `cwd` looking for a `.astro/` directory. Once you're in a project, `af instance discover` populates the team's deployment list directly into the committed file, so a fresh clone + `astro login` gets every teammate working immediately.
+
+**Read precedence (most-specific wins):** `current-instance` from project-local, then global. Instance lookup: project-local → project-shared → global; same-named entries in narrower scopes shadow.
+
+**Write routing** (default, no flags):
+- `add`: project-shared inside a project, else global
+- `use`: project-local (each developer can target a different deployment without touching the committed file)
+- `delete`: most-specific scope that has the name (rerun to peel scopes)
+- `discover`: project-shared inside a project, else global
+
+Override with mutually-exclusive flags on `add` / `use` / `delete` / `discover`:
+
+```bash
+af instance add local-dev --url http://localhost:8080 --global
+af instance use prod --local                                  # implicit, but explicit works
+af instance delete prod --global                              # only delete the global copy
+af instance discover --project                                # populate the team inventory
+```
+
+**Project-shared is committed by default**, so prefer `astro_pat` (which stores no secret on disk) or `${ENV_VAR}` interpolation when adding token/basic auth there. For literal credentials you don't want in git, use `--local` (gitignored) or `--global`. `af` does not police what you put where — gitignore is the contract.
+
+Use `AF_CONFIG=<path>` (or `--config <path>`) to bypass layering entirely and read/write a single file — preserves the `astro otto` wrapper's `AF_CONFIG=/dev/null` neutralize-config sentinel.
+
+#### Migrating from `~/.af/config.yaml`
+
+Older versions of `af` stored config at `~/.af/config.yaml`. On first read, that file is honored as a one-time fallback (with a stderr deprecation note). Run `af migrate` to move it explicitly:
+
+```bash
+af migrate
+# {"status": "migrated", "from": "/Users/julian/.af/config.yaml",
+#  "to": "/Users/julian/.astro/config.yaml",
+#  "backup": "/Users/julian/.af/config.yaml.bak"}
+```
+
+The migration preserves any astro-cli content already in `~/.astro/config.yaml` (the `save` merge keeps unknown top-level keys like `project`, `cloud`, `contexts`). Re-runs are idempotent.
 
 ### Instance Discovery
 
@@ -372,11 +426,13 @@ af instance discover local
 
 # Deep scan all ports for local instances
 af instance discover local --scan
+
+# Force a specific scope
+af instance discover --global              # personal global config, even when in a project
+af instance discover astro --project       # explicit (this is also the default in a project)
 ```
 
-> **Note:** Always run with `--dry-run` first. The Astro discovery backend creates API tokens in Astro Cloud, so review the list before confirming. Token names are user-specific (for example, `af-discover-<user>`) to avoid collisions when multiple users discover the same deployment.
-
-Config file location: `~/.af/config.yaml` (override with `--config` or `AF_CONFIG` env var)
+Discovered Astro instances use `astro_pat` auth — they store only the deployment ID and the active `astro` context, not a token. Tokens are resolved from the user's `astro login` session at request time, so `.astro/config.yaml` is safe to commit.
 
 ### Direct API Access
 
@@ -415,6 +471,10 @@ af api spec
 - `-f key=value`: Keeps value as raw string
 - `--body '{}'`: Raw JSON body for complex objects
 
+#### Config file format
+
+Each scope file (global / project-shared / project-local) shares the same schema. `af` rewrites only its own top-level keys (`instances`, `current-instance`); other keys (e.g. astro-cli's `project`, `cloud`, `contexts`) are preserved untouched on round-trip. Example:
+
 ```yaml
 instances:
 - name: local
@@ -428,7 +488,13 @@ instances:
 - name: prod
   url: https://prod.example.com
   auth:
-    token: ${AIRFLOW_PROD_TOKEN}  # Environment variable interpolation
+    token: ${AIRFLOW_PROD_TOKEN}  # Env-var interpolation; safe to commit
+- name: prod-astro
+  url: https://prod.astronomer.run/dXYZ
+  auth:
+    kind: astro_pat                # Resolves from `astro login` at request time
+    context: astronomer.io
+    deployment_id: clXYZ123        # Diagnostic only; tokens are not stored
 - name: corporate
   url: https://airflow.corp.example.com
   auth:
@@ -438,6 +504,8 @@ instances:
   # ca-cert: /path/to/ca.pem     # Or provide a custom CA bundle
 current-instance: local
 ```
+
+Project-shared (`.astro/config.yaml`) is committed by default, so prefer `astro_pat` or `${VAR}` interpolation for credentials there. Put literal secrets in project-local (`.astro/config.local.yaml`, gitignored) instead.
 
 ### Configuration
 
@@ -600,7 +668,7 @@ For open-source Airflow, the plugin inherits Airflow's native RBAC. A user with 
 
 | Flag | Environment Variable | Description |
 |------|---------------------|-------------|
-| `--config`, `-c` | `AF_CONFIG` | Path to config file (default: `~/.af/config.yaml`) |
+| `--config`, `-c` | `AF_CONFIG` | Single-file mode: bypass layered config and use this file as the entire config (default layering reads `~/.astro/config.yaml` and any project `.astro/config.{yaml,local.yaml}` it walks up to) |
 | `--version`, `-v` | | Show version and exit |
 
 ### Telemetry

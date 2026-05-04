@@ -35,16 +35,20 @@ class CLIContext:
         return cls._instance
 
     def _load_from_config(self) -> ResolvedConfig | None:
-        """Load configuration from config file.
+        """Load configuration via the layered config (global + project).
+
+        Read precedence: project-local > project-shared > global. When
+        ``AF_CONFIG`` is set, layering is skipped and the single file is
+        used (preserves the ``astro otto`` AF_CONFIG=/dev/null wrapper
+        semantics).
 
         Returns:
             ResolvedConfig if available, None otherwise
         """
         try:
-            from astro_airflow_mcp.config import ConfigError, ConfigManager
+            from astro_airflow_mcp.config import ConfigError, LayeredConfig
 
-            manager = ConfigManager()
-            return manager.resolve_instance()
+            return LayeredConfig().resolve_instance()
         except FileNotFoundError:
             # No config file - this is normal for first-time users
             return None

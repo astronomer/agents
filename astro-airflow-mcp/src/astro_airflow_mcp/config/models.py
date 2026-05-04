@@ -117,9 +117,16 @@ class Instance(BaseModel):
 
 
 class Telemetry(BaseModel):
-    """Telemetry configuration."""
+    """Telemetry configuration.
 
-    model_config = ConfigDict(extra="forbid")
+    Shared with astro-cli: both tools read/write ``enabled`` and
+    ``anonymous_id`` (so the same anonymous_id correlates across tools).
+    astro-cli additionally writes ``notice_shown``; we ``extra="ignore"``
+    so loading doesn't fail on it (and on any future shared sub-keys
+    astro-cli adds), and the loader's sub-key merge preserves it on save.
+    """
+
+    model_config = ConfigDict(extra="ignore")
 
     enabled: bool = Field(default=True, description="Whether anonymous telemetry is enabled")
     anonymous_id: str | None = Field(default=None, description="Anonymous user ID for telemetry")
@@ -140,15 +147,6 @@ class AirflowCliConfig(BaseModel):
             if instance.name == name:
                 return instance
         return None
-
-    @model_validator(mode="after")
-    def validate_references(self) -> AirflowCliConfig:
-        """Validate that current-instance references an existing instance."""
-        if self.current_instance is not None:
-            instance_names = {i.name for i in self.instances}
-            if self.current_instance not in instance_names:
-                raise ValueError(f"current-instance '{self.current_instance}' does not exist")
-        return self
 
     def add_instance(
         self,

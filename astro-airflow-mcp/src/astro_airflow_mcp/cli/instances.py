@@ -9,7 +9,7 @@ from rich.console import Console
 from rich.table import Table
 
 from astro_airflow_mcp.cli.output import output_error
-from astro_airflow_mcp.config import ConfigError, ConfigManager
+from astro_airflow_mcp.config import ConfigError, ConfigManager, LayeredConfig, Scope
 from astro_airflow_mcp.discovery import (
     DiscoveredInstance,
     DiscoveryError,
@@ -19,6 +19,29 @@ from astro_airflow_mcp.discovery.astro import AstroNotAuthenticatedError
 
 if TYPE_CHECKING:
     from astro_airflow_mcp.config.models import Auth
+
+
+def _resolve_scope_flag(global_: bool, project: bool, local: bool) -> Scope:
+    """Combine mutually-exclusive ``--global`` / ``--project`` / ``--local``
+    flags into a single ``Scope``. Default is ``AUTO``: LayeredConfig
+    decides based on cwd."""
+    n = sum(1 for f in (global_, project, local) if f)
+    if n > 1:
+        raise typer.BadParameter("--global, --project, and --local are mutually exclusive")
+    if global_:
+        return Scope.GLOBAL
+    if project:
+        return Scope.PROJECT_SHARED
+    if local:
+        return Scope.PROJECT_LOCAL
+    return Scope.AUTO
+
+
+_SCOPE_FLAG_HELP = {
+    "global": "Write to global config (~/.astro/config.yaml)",
+    "project": "Write to project-shared config (.astro/config.yaml, committed)",
+    "local": "Write to project-local config (.astro/config.local.yaml, gitignored)",
+}
 
 
 def _describe_auth(auth: Auth | None, *, verbose: bool = False) -> str:
@@ -45,10 +68,11 @@ console = Console()
 def list_instances() -> None:
     """List all configured instances."""
     try:
-        manager = ConfigManager()
-        config = manager.load()
+        layered = LayeredConfig()
+        rows = layered.list_instances_with_scope()
+        current = layered.get_current_instance()
 
-        if not config.instances:
+        if not rows:
             console.print("No instances configured.", style="dim")
             console.print(
                 "\nAdd one with: af instance add <name> --url <url> --username <user> --password <pass>",
@@ -59,14 +83,20 @@ def list_instances() -> None:
         table = Table(show_header=True, header_style="bold", box=None, pad_edge=False)
         table.add_column("", width=1)  # Current marker
         table.add_column("NAME")
+        table.add_column("SCOPE")
         table.add_column("SOURCE")
         table.add_column("URL")
         table.add_column("AUTH")
 
-        for inst in config.instances:
-            marker = "*" if inst.name == config.current_instance else ""
+        for inst, scope in rows:
+            marker = "*" if inst.name == current else ""
             table.add_row(
-                marker, inst.name, inst.source or "-", inst.url, _describe_auth(inst.auth)
+                marker,
+                inst.name,
+                scope.value,
+                inst.source or "-",
+                inst.url,
+                _describe_auth(inst.auth),
             )
 
         console.print(table)
@@ -78,16 +108,15 @@ def list_instances() -> None:
 def current_instance() -> None:
     """Show the current instance."""
     try:
-        manager = ConfigManager()
-        current = manager.get_current_instance()
+        layered = LayeredConfig()
+        current = layered.get_current_instance()
 
         if current is None:
             console.print("No current instance set.", style="dim")
             console.print("\nSet one with: af instance use <name>", style="dim")
             return
 
-        config = manager.load()
-        instance = config.get_instance(current)
+        instance = layered.get_instance(current)
         if instance:
             console.print(f"Current instance: [bold]{current}[/bold]")
             console.print(f"URL: {instance.url}")
@@ -99,20 +128,32 @@ def current_instance() -> None:
 @app.command("use")
 def use_instance(
     name: Annotated[str | None, typer.Argument(help="Name of the instance to switch to")] = None,
+    global_scope: Annotated[
+        bool, typer.Option("--global", help=_SCOPE_FLAG_HELP["global"])
+    ] = False,
+    project_scope: Annotated[
+        bool, typer.Option("--project", help=_SCOPE_FLAG_HELP["project"])
+    ] = False,
+    local_scope: Annotated[bool, typer.Option("--local", help=_SCOPE_FLAG_HELP["local"])] = False,
 ) -> None:
     """Switch to a different instance.
 
     If no name is provided, an interactive menu will be shown.
+
+    By default writes ``current-instance`` to project-local config when
+    in a project (so each developer can target a different deployment
+    without conflicting commits) and to global config otherwise.
     """
     try:
-        manager = ConfigManager()
+        scope = _resolve_scope_flag(global_scope, project_scope, local_scope)
+        layered = LayeredConfig()
 
-        # If no name provided, show interactive selector
+        # If no name provided, show interactive selector over the merged view.
         if name is None:
             from simple_term_menu import TerminalMenu
 
-            config = manager.load()
-            if not config.instances:
+            instances = layered.list_instances()
+            if not instances:
                 console.print("No instances configured.", style="dim")
                 console.print(
                     "\nAdd one with: af instance add <name> --url <url>",
@@ -120,12 +161,11 @@ def use_instance(
                 )
                 return
 
-            instance_names = [inst.name for inst in config.instances]
-
-            # Pre-select current instance if set
+            instance_names = [inst.name for inst in instances]
             cursor_index = 0
-            if config.current_instance and config.current_instance in instance_names:
-                cursor_index = instance_names.index(config.current_instance)
+            current = layered.get_current_instance()
+            if current and current in instance_names:
+                cursor_index = instance_names.index(current)
 
             menu = TerminalMenu(
                 instance_names,
@@ -138,12 +178,13 @@ def use_instance(
                 console.print("Cancelled.", style="dim")
                 return
 
-            # TerminalMenu defaults to single-select (multi_select=False)
-            # In single-select mode, show() returns int; multi-select returns tuple[int, ...]
             name = instance_names[cast("int", choice_index)]
 
-        manager.use_instance(name)
-        console.print(f"Switched to instance [bold]{name}[/bold]", highlight=False)
+        target = layered.use_instance(name, scope=scope)
+        console.print(
+            f"Switched to instance [bold]{name}[/bold] ([dim]{target.value}[/dim])",
+            highlight=False,
+        )
     except (ConfigError, ValueError) as e:
         output_error(str(e))
 
@@ -172,11 +213,23 @@ def add_instance(
         str | None,
         typer.Option("--ca-cert", help="Path to custom CA certificate bundle"),
     ] = None,
+    global_scope: Annotated[
+        bool, typer.Option("--global", help=_SCOPE_FLAG_HELP["global"])
+    ] = False,
+    project_scope: Annotated[
+        bool, typer.Option("--project", help=_SCOPE_FLAG_HELP["project"])
+    ] = False,
+    local_scope: Annotated[bool, typer.Option("--local", help=_SCOPE_FLAG_HELP["local"])] = False,
 ) -> None:
     """Add or update an Airflow instance.
 
     Auth is optional. Provide --username and --password for basic auth,
     or --token for token auth. Omit auth options for open instances.
+
+    By default writes to project-shared config when in a project, else
+    global. Project-shared is committed by default — prefer
+    ``${ENV_VAR}`` interpolation or ``--local`` for secrets you don't
+    want in git.
     """
     has_basic = username is not None and password is not None
     has_token = token is not None
@@ -195,9 +248,10 @@ def add_instance(
         return
 
     try:
-        manager = ConfigManager()
-        is_update = manager.load().get_instance(name) is not None
-        manager.add_instance(
+        scope = _resolve_scope_flag(global_scope, project_scope, local_scope)
+        layered = LayeredConfig()
+        is_update = layered.get_instance(name) is not None
+        target = layered.add_instance(
             name,
             url,
             username=username,
@@ -206,6 +260,7 @@ def add_instance(
             source="manual",
             verify_ssl=not no_verify_ssl,
             ca_cert=ca_cert,
+            scope=scope,
         )
 
         action = "Updated" if is_update else "Added"
@@ -215,7 +270,7 @@ def add_instance(
             auth_type = "basic"
         else:
             auth_type = "none"
-        console.print(f"{action} instance [bold]{name}[/bold]")
+        console.print(f"{action} instance [bold]{name}[/bold] ([dim]{target.value}[/dim])")
         console.print(f"URL: {url}")
         console.print(f"Auth: {auth_type}")
         if no_verify_ssl:
@@ -229,13 +284,60 @@ def add_instance(
 @app.command("delete")
 def delete_instance(
     name: Annotated[str, typer.Argument(help="Name of the instance to delete")],
+    global_scope: Annotated[
+        bool, typer.Option("--global", help=_SCOPE_FLAG_HELP["global"])
+    ] = False,
+    project_scope: Annotated[
+        bool, typer.Option("--project", help=_SCOPE_FLAG_HELP["project"])
+    ] = False,
+    local_scope: Annotated[bool, typer.Option("--local", help=_SCOPE_FLAG_HELP["local"])] = False,
 ) -> None:
-    """Delete an instance."""
+    """Delete an instance.
+
+    By default deletes from the most-specific scope that has the name
+    (project-local, then project-shared, then global). Same-named
+    instances in less-specific scopes are kept; rerun delete to peel
+    them off one at a time, or use a scope flag to target one directly.
+    """
     try:
-        manager = ConfigManager()
-        manager.delete_instance(name)
-        console.print(f"Deleted instance [bold]{name}[/bold]")
+        scope = _resolve_scope_flag(global_scope, project_scope, local_scope)
+        target = LayeredConfig().delete_instance(name, scope=scope)
+        console.print(f"Deleted instance [bold]{name}[/bold] ([dim]{target.value}[/dim])")
     except (ConfigError, ValueError) as e:
+        output_error(str(e))
+
+
+@app.command("show")
+def show_instance(
+    name: Annotated[str, typer.Argument(help="Name of the instance to show")],
+) -> None:
+    """Show details for an instance, including which file it came from.
+
+    Mirrors ``git config --show-origin`` — useful for answering "where
+    is this instance defined?" when the same name lives in multiple
+    scopes (the most-specific wins).
+    """
+    try:
+        layered = LayeredConfig()
+        found = layered.find_instance(name)
+        if found is None:
+            output_error(f"Instance '{name}' not found")
+            return
+        instance, scope, file_path = found
+
+        console.print(f"Instance: [bold]{name}[/bold]")
+        console.print(f"Scope: [dim]{scope.value}[/dim] ({file_path})")
+        console.print(f"URL: {instance.url}")
+        console.print(f"Auth: {_describe_auth(instance.auth, verbose=True)}")
+        if instance.auth and instance.auth.deployment_id:
+            console.print(f"Deployment ID: {instance.auth.deployment_id}")
+        if instance.source:
+            console.print(f"Source: {instance.source}")
+        if not instance.verify_ssl:
+            console.print("SSL verification: [yellow]disabled[/yellow]")
+        if instance.ca_cert:
+            console.print(f"CA cert: {instance.ca_cert}")
+    except ConfigError as e:
         output_error(str(e))
 
 
@@ -338,14 +440,19 @@ def _format_discovered_auth(inst: DiscoveredInstance) -> str:
 
 def _display_and_add_instances(
     all_instances: list[tuple[DiscoveredInstance, str]],
-    manager: ConfigManager,
+    layered: LayeredConfig,
     dry_run: bool,
+    scope: Scope = Scope.AUTO,
 ) -> None:
     """Display discovered instances and add them to config.
 
     Astro-source instances are added with ``auth.kind="astro_pat"``: af
     resolves the user's ``astro login`` session at request time. No
     deployment tokens are minted.
+
+    ``scope`` selects the target file. AUTO writes to project-shared
+    when in a project (so ``af instance discover`` populates the
+    committable project inventory), else global.
     """
     if not all_instances:
         console.print("No instances discovered.", style="dim")
@@ -389,26 +496,32 @@ def _display_and_add_instances(
 
     # Add instances
     added_count = 0
+    target_scope: Scope | None = None
     for inst, _ in to_add:
         console.print(f"Processing [bold]{inst.name}[/bold]...")
 
         try:
             if inst.auth_kind == "astro_pat":
                 deployment_id = inst.metadata.get("deployment_id") if inst.metadata else None
-                manager.add_instance(
+                target_scope = layered.add_instance(
                     inst.name,
                     inst.url,
                     kind="astro_pat",
                     context=inst.astro_context,
                     deployment_id=deployment_id,
                     source=inst.source,
+                    scope=scope,
                 )
                 auth_info = f"astro pat ({inst.astro_context or 'active context'})"
             elif inst.auth_token:
-                manager.add_instance(inst.name, inst.url, token=inst.auth_token, source=inst.source)
+                target_scope = layered.add_instance(
+                    inst.name, inst.url, token=inst.auth_token, source=inst.source, scope=scope
+                )
                 auth_info = "token"
             else:
-                manager.add_instance(inst.name, inst.url, source=inst.source)
+                target_scope = layered.add_instance(
+                    inst.name, inst.url, source=inst.source, scope=scope
+                )
                 auth_info = "none"
             console.print(f"  [green]Added[/green] {inst.name} (auth: {auth_info})")
             added_count += 1
@@ -417,7 +530,8 @@ def _display_and_add_instances(
 
     console.print()
     if added_count > 0:
-        console.print(f"Successfully added {added_count} instance(s).")
+        suffix = f" to [dim]{target_scope.value}[/dim] config" if target_scope is not None else ""
+        console.print(f"Successfully added {added_count} instance(s){suffix}.")
     else:
         console.print("No instances were added.")
 
@@ -438,6 +552,13 @@ def discover_all(
         bool,
         typer.Option("--overwrite", "-o", help="Overwrite existing instances"),
     ] = False,
+    global_scope: Annotated[
+        bool, typer.Option("--global", help=_SCOPE_FLAG_HELP["global"])
+    ] = False,
+    project_scope: Annotated[
+        bool, typer.Option("--project", help=_SCOPE_FLAG_HELP["project"])
+    ] = False,
+    local_scope: Annotated[bool, typer.Option("--local", help=_SCOPE_FLAG_HELP["local"])] = False,
 ) -> None:
     """Discover from all available backends.
 
@@ -449,6 +570,19 @@ def discover_all(
     if ctx.invoked_subcommand is not None:
         return
 
+    write_scope = _resolve_scope_flag(global_scope, project_scope, local_scope)
+
+    # Validate write scope before doing discovery work (which can hit
+    # the Astro API or scan ports). Otherwise --project outside a
+    # project would scan, then fail at write time.
+    try:
+        layered = LayeredConfig()
+        layered.assert_writable(write_scope)
+        existing_names = {inst.name for inst in layered.list_instances()}
+    except ConfigError as e:
+        output_error(str(e))
+        return
+
     registry = get_default_registry()
     available = registry.get_available_backends()
 
@@ -458,15 +592,6 @@ def discover_all(
 
     backends_to_use = [b.name for b in available]
     console.print(f"Discovery backends: {', '.join(backends_to_use)}\n")
-
-    # Load existing config
-    try:
-        manager = ConfigManager()
-        config = manager.load()
-        existing_names = {inst.name for inst in config.instances}
-    except ConfigError as e:
-        output_error(f"Failed to load config: {e}")
-        return
 
     console.print("Discovering instances...\n")
     all_instances: list[tuple[DiscoveredInstance, str]] = []
@@ -499,7 +624,7 @@ def discover_all(
         except DiscoveryError as e:
             console.print(f"[yellow]Skipping {backend_name}:[/yellow] {e}")
 
-    _display_and_add_instances(all_instances, manager, dry_run)
+    _display_and_add_instances(all_instances, layered, dry_run, scope=write_scope)
 
 
 @discover_app.command("astro")
@@ -516,6 +641,13 @@ def discover_astro(
         bool,
         typer.Option("--overwrite", "-o", help="Overwrite existing instances"),
     ] = False,
+    global_scope: Annotated[
+        bool, typer.Option("--global", help=_SCOPE_FLAG_HELP["global"])
+    ] = False,
+    project_scope: Annotated[
+        bool, typer.Option("--project", help=_SCOPE_FLAG_HELP["project"])
+    ] = False,
+    local_scope: Annotated[bool, typer.Option("--local", help=_SCOPE_FLAG_HELP["local"])] = False,
 ) -> None:
     """Discover Astro deployments via the Astro CLI.
 
@@ -523,6 +655,17 @@ def discover_astro(
         af instance discover astro                  # Current workspace only
         af instance discover astro --all-workspaces # All accessible workspaces
     """
+    write_scope = _resolve_scope_flag(global_scope, project_scope, local_scope)
+
+    # Validate write scope before hitting the Astro API.
+    try:
+        layered = LayeredConfig()
+        layered.assert_writable(write_scope)
+        existing_names = {inst.name for inst in layered.list_instances()}
+    except ConfigError as e:
+        output_error(str(e))
+        return
+
     registry = get_default_registry()
     backend = registry.get_backend("astro")
 
@@ -540,17 +683,8 @@ def discover_astro(
         context = get_context()
         if context:
             console.print(f"Astro context: [bold]{context}[/bold]")
-    scope = "all workspaces" if all_workspaces else "current workspace"
-    console.print(f"Scope: {scope}\n")
-
-    # Load existing config
-    try:
-        manager = ConfigManager()
-        config = manager.load()
-        existing_names = {inst.name for inst in config.instances}
-    except ConfigError as e:
-        output_error(f"Failed to load config: {e}")
-        return
+    discovery_scope = "all workspaces" if all_workspaces else "current workspace"
+    console.print(f"Scope: {discovery_scope}\n")
 
     console.print("Discovering Astro deployments...\n")
 
@@ -566,7 +700,7 @@ def discover_astro(
         output_error(f"Discovery failed: {e}")
         return
 
-    _display_and_add_instances(all_instances, manager, dry_run)
+    _display_and_add_instances(all_instances, layered, dry_run, scope=write_scope)
 
 
 @discover_app.command("local")
@@ -583,6 +717,13 @@ def discover_local(
         bool,
         typer.Option("--overwrite", "-o", help="Overwrite existing instances"),
     ] = False,
+    global_scope: Annotated[
+        bool, typer.Option("--global", help=_SCOPE_FLAG_HELP["global"])
+    ] = False,
+    project_scope: Annotated[
+        bool, typer.Option("--project", help=_SCOPE_FLAG_HELP["project"])
+    ] = False,
+    local_scope: Annotated[bool, typer.Option("--local", help=_SCOPE_FLAG_HELP["local"])] = False,
 ) -> None:
     """Discover local Airflow instances by scanning ports.
 
@@ -592,20 +733,22 @@ def discover_local(
     """
     from astro_airflow_mcp.discovery.local import LocalDiscoveryBackend
 
+    write_scope = _resolve_scope_flag(global_scope, project_scope, local_scope)
+
+    # Validate write scope before scanning ports.
+    try:
+        layered = LayeredConfig()
+        layered.assert_writable(write_scope)
+        existing_names = {inst.name for inst in layered.list_instances()}
+    except ConfigError as e:
+        output_error(str(e))
+        return
+
     registry = get_default_registry()
     backend = registry.get_backend("local")
 
     if backend is None or not isinstance(backend, LocalDiscoveryBackend):
         output_error("Local backend not available.")
-        return
-
-    # Load existing config
-    try:
-        manager = ConfigManager()
-        config = manager.load()
-        existing_names = {inst.name for inst in config.instances}
-    except ConfigError as e:
-        output_error(f"Failed to load config: {e}")
         return
 
     if scan:
@@ -624,4 +767,4 @@ def discover_local(
         (inst, _determine_action(inst, existing_names, overwrite)) for inst in instances
     ]
 
-    _display_and_add_instances(all_instances, manager, dry_run)
+    _display_and_add_instances(all_instances, layered, dry_run, scope=write_scope)
