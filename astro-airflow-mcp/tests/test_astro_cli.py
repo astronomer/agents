@@ -76,6 +76,22 @@ class TestAstroDeployment:
         assert deployment.status == "UNKNOWN"
         assert deployment.airflow_api_url == ""
 
+    def test_from_inspect_yaml_strips_query_string(self):
+        """Some Astro deployments return webserver_url with ?orgId=… —
+        if we store that, every API call concatenates /api/v1/... into
+        the query string and breaks. Strip query/fragment at the boundary."""
+        data = {
+            "deployment": {
+                "configuration": {"name": "t"},
+                "metadata": {
+                    "deployment_id": "dep-123",
+                    "webserver_url": "https://xyz.astronomer.run/abc?orgId=org_abc",
+                },
+            }
+        }
+        deployment = AstroDeployment.from_inspect_yaml(data)
+        assert deployment.airflow_api_url == "https://xyz.astronomer.run/abc"
+
 
 class TestAstroCliInstallation:
     """Tests for CLI installation detection."""

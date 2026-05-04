@@ -1,8 +1,25 @@
 """Shared utility functions for CLI and MCP server."""
 
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 from astro_airflow_mcp.constants import FAILED_TASK_STATES
+
+
+def normalize_airflow_url(url: str) -> str:
+    """Strip query string, fragment, and trailing slash from an Airflow base URL.
+
+    API URLs are built by concatenation (eg ``f"{airflow_url}/api/v2/version"``),
+    so a stored URL like ``https://host/dep?orgId=foo`` produces the malformed
+    ``https://host/dep?orgId=foo/api/v2/version`` — the path stays at ``/dep``
+    and ``/api/...`` ends up inside the query string. Normalizing once at the
+    boundary keeps every downstream call safe.
+    """
+    if not url:
+        return url
+    parts = urlsplit(url)
+    path = parts.path.rstrip("/")
+    return urlunsplit((parts.scheme, parts.netloc, path, "", ""))
 
 
 def filter_connection_passwords(connections: list[dict[str, Any]]) -> list[dict[str, Any]]:

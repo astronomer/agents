@@ -8,6 +8,7 @@ from astro_airflow_mcp.adapters.airflow_v2 import AirflowV2Adapter
 from astro_airflow_mcp.adapters.airflow_v3 import AirflowV3Adapter
 from astro_airflow_mcp.adapters.base import AirflowAdapter, NotFoundError
 from astro_airflow_mcp.astro_pat import AstroPATError
+from astro_airflow_mcp.utils import normalize_airflow_url
 
 
 def detect_version(
@@ -33,6 +34,8 @@ def detect_version(
     Raises:
         RuntimeError: If version detection fails
     """
+    airflow_url = normalize_airflow_url(airflow_url)
+
     headers: dict[str, str] = {}
     auth: tuple[str, str] | httpx.Auth | None = None
 
@@ -46,48 +49,52 @@ def detect_version(
         if basic_auth_getter:
             auth = basic_auth_getter()
 
-    # Try Airflow 3 API first (/api/v2/version)
-    try:
-        with httpx.Client(timeout=10.0, verify=verify) as client:
-            response = client.get(
-                f"{airflow_url}/api/v2/version",
-                headers=headers,
-                auth=auth,
-            )
-            if response.status_code == 200:
-                data = response.json()
-                version = data.get("version", "3.0.0")
-                major = int(version.split(".")[0])
-                return (major, version)
-    except AstroPATError:
-        # PAT misconfiguration (no astro login, refresh failed, etc) —
-        # surface to the caller rather than masking as a version detection
-        # failure.
-        raise
-    except Exception:  # nosec B110 - try v1 API next
-        pass
+    probe_failures: list[str] = []
 
-    # Try Airflow 2 API (/api/v1/version)
-    try:
-        with httpx.Client(timeout=10.0, verify=verify) as client:
-            response = client.get(
-                f"{airflow_url}/api/v1/version",
-                headers=headers,
-                auth=auth,
-            )
-            if response.status_code == 200:
-                data = response.json()
-                version = data.get("version", "2.0.0")
-                major = int(version.split(".")[0])
-                return (major, version)
-    except AstroPATError:
-        raise
-    except Exception:  # nosec B110 - raise RuntimeError below
-        pass
+    def _probe(api_path: str, default_version: str) -> tuple[int, str] | None:
+        try:
+            with httpx.Client(timeout=10.0, verify=verify) as client:
+                response = client.get(
+                    f"{airflow_url}{api_path}/version",
+                    headers=headers,
+                    auth=auth,
+                )
+        except AstroPATError:
+            # PAT misconfiguration (no astro login, refresh failed, etc) —
+            # surface to the caller rather than masking as a version
+            # detection failure.
+            raise
+        except Exception as e:
+            probe_failures.append(f"{api_path}: {type(e).__name__}: {e}")
+            return None
 
+        if response.status_code == 200:
+            try:
+                data = response.json()
+            except ValueError as e:
+                probe_failures.append(
+                    f"{api_path}: 200 but non-JSON body ({type(e).__name__}); "
+                    f"got Content-Type={response.headers.get('content-type', '?')}"
+                )
+                return None
+            version = data.get("version", default_version)
+            major = int(version.split(".")[0])
+            return (major, version)
+
+        probe_failures.append(f"{api_path}: HTTP {response.status_code}")
+        return None
+
+    result = _probe("/api/v2", "3.0.0")
+    if result is not None:
+        return result
+    result = _probe("/api/v1", "2.0.0")
+    if result is not None:
+        return result
+
+    detail = "; ".join(probe_failures) if probe_failures else "no response"
     raise RuntimeError(
         f"Failed to detect Airflow version at {airflow_url}. "
-        "Ensure Airflow is running and accessible."
+        f"Probes: {detail}. Ensure Airflow is running and accessible."
     )
 
 

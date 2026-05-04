@@ -8,6 +8,8 @@ from dataclasses import dataclass
 
 import yaml
 
+from astro_airflow_mcp.utils import normalize_airflow_url
+
 
 class AstroCliError(Exception):
     """Base exception for Astro CLI errors."""
@@ -46,6 +48,10 @@ class AstroDeployment:
         webserver_url = metadata.get("webserver_url", "")
         if webserver_url and not webserver_url.startswith("http"):
             webserver_url = f"https://{webserver_url}"
+        # Strip any query string / fragment that the control plane may
+        # include (eg ``?orgId=…``). API URLs are built by string
+        # concatenation downstream, so a stray ``?`` corrupts the path.
+        webserver_url = normalize_airflow_url(webserver_url)
 
         return cls(
             id=metadata.get("deployment_id", ""),

@@ -10,6 +10,7 @@ from astro_airflow_mcp.constants import (
 from astro_airflow_mcp.utils import (
     extract_failed_tasks,
     filter_connection_passwords,
+    normalize_airflow_url,
     wrap_list_response,
 )
 
@@ -196,3 +197,30 @@ class TestWrapListResponse:
 
         assert "total_dag_runs" in result
         assert "dag_runs" in result
+
+
+class TestNormalizeAirflowUrl:
+    """Tests for normalize_airflow_url."""
+
+    def test_strips_query_string(self):
+        # Astro stored some webserver_urls with ?orgId=… — concatenating
+        # /api/v2/version onto a URL with a query string corrupts the path.
+        url = "https://host.example.com/dep?orgId=org_abc"
+        assert normalize_airflow_url(url) == "https://host.example.com/dep"
+
+    def test_strips_fragment(self):
+        assert normalize_airflow_url("https://h/p#frag") == "https://h/p"
+
+    def test_strips_trailing_slash(self):
+        assert normalize_airflow_url("https://h/p/") == "https://h/p"
+
+    def test_passthrough_clean_url(self):
+        url = "https://h.example.com/dep"
+        assert normalize_airflow_url(url) == url
+
+    def test_handles_empty(self):
+        assert normalize_airflow_url("") == ""
+
+    def test_strips_query_and_fragment_and_slash(self):
+        url = "https://h/p/?x=1#y"
+        assert normalize_airflow_url(url) == "https://h/p"

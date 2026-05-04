@@ -34,6 +34,15 @@ class TestAirflowV2Adapter:
         )
         assert adapter.api_base_path == "/api/v1"
 
+    def test_constructor_normalizes_airflow_url(self):
+        """A query string on the stored URL must not corrupt API URLs.
+        Existing configs with ?orgId=… should keep working without re-discovery."""
+        adapter = AirflowV2Adapter(
+            "https://host.example.com/dep?orgId=org_abc",
+            "2.9.0",
+        )
+        assert adapter.airflow_url == "https://host.example.com/dep"
+
     def test_setup_auth_with_token_getter(self):
         """Test auth setup with token getter."""
         adapter = AirflowV2Adapter(
@@ -536,6 +545,47 @@ class TestVersionDetection:
         # Verify token was used in the request
         call_kwargs = mock_client.get.call_args[1]
         assert call_kwargs["headers"]["Authorization"] == "Bearer test_token"
+
+    def test_detect_version_strips_query_string_from_base_url(self, mocker):
+        """A stored URL with ?orgId=… (eg from Astro discovery) must not
+        corrupt the probe path. See bug recreated against an Astro deployment
+        where the saved URL had ?orgId=org_… appended."""
+        mock_response = mocker.Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"version": "3.2.1"}
+
+        mock_client = mocker.Mock()
+        mock_client.get.return_value = mock_response
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+
+        mocker.patch("httpx.Client", return_value=mock_client)
+
+        major, full = detect_version("https://host.example.com/dep?orgId=org_abc")
+
+        assert (major, full) == (3, "3.2.1")
+        called_url = mock_client.get.call_args[0][0]
+        assert called_url == "https://host.example.com/dep/api/v2/version"
+
+    def test_detect_version_failure_includes_probe_detail(self, mocker):
+        """RuntimeError must surface the actual probe failure (status code or
+        exception) so users don't get a black-box 'Failed to detect' error."""
+        bad_v2 = mocker.Mock(status_code=404)
+        bad_v1 = mocker.Mock(status_code=502)
+
+        mock_client = mocker.Mock()
+        mock_client.get.side_effect = [bad_v2, bad_v1]
+        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
+        mock_client.__exit__ = mocker.Mock(return_value=False)
+
+        mocker.patch("httpx.Client", return_value=mock_client)
+
+        with pytest.raises(RuntimeError) as exc_info:
+            detect_version("http://localhost:8080")
+
+        msg = str(exc_info.value)
+        assert "/api/v2: HTTP 404" in msg
+        assert "/api/v1: HTTP 502" in msg
 
 
 class TestAdapterFactory:
