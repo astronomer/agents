@@ -45,7 +45,7 @@ def main(
             "--config",
             "-c",
             envvar="AF_CONFIG",
-            help="Path to config file (default: ~/.af/config.yaml)",
+            help="Path to config file (default: ~/.astro/config.yaml)",
         ),
     ] = None,
     _version: Annotated[
@@ -67,7 +67,7 @@ def main(
     - AIRFLOW_PASSWORD: Password for basic auth
     - AIRFLOW_AUTH_TOKEN: Bearer token (takes precedence over basic auth)
 
-    Or configure named instances in ~/.af/config.yaml and switch with:
+    Or configure named instances in ~/.astro/config.yaml and switch with:
         af instance use <name>
 
     Setting AIRFLOW_API_URL to an empty string signals "no Airflow is
