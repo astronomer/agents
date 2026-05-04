@@ -48,6 +48,8 @@ Docker-free local development. Runs Airflow directly on your machine in a `.venv
 
 **Requirements:** Airflow 3 (runtime 3.x), `uv` on PATH. Not supported on Windows.
 
+> Plain `astro dev init` already pins a runtime 3.x image, so no version flag is needed. See **setting-up-astro-project** for project initialization.
+
 ### Start
 
 ```bash
