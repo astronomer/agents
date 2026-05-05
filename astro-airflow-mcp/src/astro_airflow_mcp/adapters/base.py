@@ -8,6 +8,7 @@ from typing import Any
 import httpx
 
 from astro_airflow_mcp.constants import READ_ONLY_ENV_VAR
+from astro_airflow_mcp.utils import normalize_airflow_url
 
 
 class ReadOnlyError(Exception):
@@ -65,7 +66,7 @@ class AirflowAdapter(ABC):
             verify: SSL verification setting. True (default) enables verification,
                     False disables it, or a string path to a CA bundle file.
         """
-        self.airflow_url = airflow_url
+        self.airflow_url = normalize_airflow_url(airflow_url)
         self.version = version
         self._token_getter = token_getter
         self._basic_auth_getter = basic_auth_getter
