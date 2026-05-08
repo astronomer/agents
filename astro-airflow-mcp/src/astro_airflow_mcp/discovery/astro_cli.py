@@ -192,11 +192,25 @@ class AstroCli:
         if len(lines) < 2:
             return []
 
-        header_line = lines[0]
-        boundaries = self._find_column_boundaries(header_line)
+        # Skip non-table preamble lines before the real header. astro CLI
+        # prepends informational lines to stdout in some configurations
+        # (eg ``Using an Astro API Token`` when ``ASTRO_API_TOKEN`` is
+        # set), which would otherwise be misread as the header. A real
+        # multi-column header boundary-detects to >=2 columns; preamble
+        # lines have only single-space gaps and yield 1.
+        header_idx: int | None = None
+        boundaries: list[int] = []
+        for idx, line in enumerate(lines):
+            candidate = self._find_column_boundaries(line)
+            if len(candidate) >= 2:
+                header_idx = idx
+                boundaries = candidate
+                break
 
-        if not boundaries:
+        if header_idx is None or not boundaries:
             return []
+
+        header_line = lines[header_idx]
 
         # Extract header names using boundaries
         headers: list[tuple[str, int]] = []
@@ -211,7 +225,7 @@ class AstroCli:
 
         # Parse data rows using same boundaries
         results = []
-        for line in lines[1:]:
+        for line in lines[header_idx + 1 :]:
             if not line.strip():
                 continue
 
