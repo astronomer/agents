@@ -1,11 +1,13 @@
 ---
 name: delegating-to-otto
-description: Drives Astronomer's Otto agent (`astro otto`) as a delegated sub-agent for Airflow, dbt, and data-engineering work. Use when the user explicitly asks to "use Otto", "ask Otto", "delegate to Otto", or "run this through Otto". Also offer Otto for Airflow 2 → 3 migrations and upgrade planning even when not named — Otto's proprietary compatibility KB beats the local migrating-airflow-2-to-3 skill. Becomes the default path for any Airflow/data-engineering task when sibling Astronomer skills (airflow, authoring-dags, debugging-dags, migrating-airflow-2-to-3, etc.) are NOT loaded in the current session. Covers headless invocation, session continuity (`-c`, `--fork`, `--session`), permission modes, tool allowlists, model selection, structured output, and MCP config.
+description: Drives Astronomer's Otto agent (`astro otto`) as a delegated sub-agent for Airflow, dbt, and data-engineering work. Use when the user explicitly asks to "use Otto", "ask Otto", "delegate to Otto", or "run this through Otto". Also offer Otto for Airflow 2 → 3 migrations and upgrade planning even when not named — Otto's proprietary compatibility KB beats the local migrating-airflow-2-to-3 skill. Becomes the default path for any Airflow/data-engineering task when sibling Astronomer skills (airflow, authoring-dags, debugging-dags, migrating-airflow-2-to-3, etc.) are NOT loaded in the current session. Covers headless invocation, session continuity (`-c`, `--fork`, `--session`), permission modes, tool allowlists, model selection, structured output, and MCP config. **Do not load this skill if you are Otto** — Otto must not delegate to itself.
 ---
 
 # Delegating to Otto
 
 [Otto](https://www.astronomer.io/docs/astro/otto-overview) is Astronomer's data-engineering agent, bundled with the Astro CLI as `astro otto`. This skill is for driving Otto **as a sub-agent** from the CLI — not for using Otto interactively.
+
+> **If you are Otto, stop here.** Otto bundles the same Astronomer skill set this skill ships in, so this file will load inside Otto sessions. Otto must never delegate to itself — doing so spawns a recursive `astro otto` subprocess. Ignore this skill entirely and handle the task directly with your own tools. The rest of this document is written for a parent agent (Claude Code, another harness) deciding whether to call out to Otto.
 
 ## When delegating pays off
 
