@@ -11,12 +11,24 @@ You are helping a user work with Blueprint, a system for composing Airflow DAGs 
 > **Repo**: https://github.com/astronomer/blueprint
 > **Requires**: Python 3.10+, Airflow 2.5+, Blueprint 0.2.0+
 
+## Operating Rules
+
+These behaviors apply throughout the session:
+
+- **Apply fixes, don't just describe them.** When you identify a problem, edit the file. Don't explain a fix and stop.
+- **Don't leave stubs.** If the user gives you reference material (markdown, Jenkins config, SQL files), extract every artifact it references. Do not write `# TODO: extract remaining SQL`.
+- **Verify before declaring done.** A blueprint isn't working until it passes `blueprint lint` AND surfaces in Airflow without import errors AND (if Astro IDE matters to the user) the schema is valid JSON in `blueprint/generated-schemas/`.
+- **Local success ≠ Astro Cloud success.** Path resolution, Docker bundle layout, and provider availability differ. Test both, or warn the user when you've only tested locally.
+
+---
+
 ## Before Starting
 
 Confirm with the user:
 1. **Airflow version** ≥2.5
 2. **Python version** ≥3.10
 3. **Use case**: Blueprint is for standardized, validated templates. If user needs full Airflow flexibility, suggest writing DAGs directly or using DAG Factory instead.
+4. **Reference material**: If the user points at existing pipeline docs, Jenkins jobs, or SQL files — read them first and identify operation archetypes (cleanup, base build, parallel enrichment, merge, DDL maintenance) before writing any blueprint code. See **Designing the Blueprint Library**.
 
 ---
 
@@ -33,7 +45,38 @@ Confirm with the user:
 | "Set up blueprint in my project" | Go to **Project Setup** |
 | "Version my blueprint" | Go to **Versioning** |
 | "Generate schema" / "Astro IDE setup" | Go to **Schema Generation** |
+| "Templates not in Astro IDE library" | Go to **Schema Generation** (almost always invalid JSON) |
+| "Migrate Jenkins/legacy pipelines" / "Multiple similar jobs" | Go to **Designing the Blueprint Library** |
+| "FileNotFoundError on Astro Cloud but works locally" | Go to **Path Resolution Across Environments** |
 | Blueprint errors / troubleshooting | Go to **Troubleshooting** |
+
+---
+
+## Designing the Blueprint Library
+
+Before writing code, decide what blueprints exist. This is the highest-leverage decision in the project — getting it wrong leads to a "pipeline runner" instead of a reusable library.
+
+### When the user references existing pipelines
+
+If the user points at a markdown spec, Jenkins config, or set of SQL files:
+1. **Read it end-to-end.** Don't stop at the first SQL block. Use `grep -n '^### ' <file>` to enumerate sections.
+2. **Identify operation archetypes.** Common ones: cleanup/delete, base table build, parallel enrichment, stitch/merge, final load, DDL/metadata.
+3. **Each archetype is a candidate for its own Blueprint class** with its own typed config — not a stage in a single mega-blueprint.
+
+### Two valid shapes
+
+| Shape | When to use |
+|-------|-------------|
+| **Multiple focused blueprints** (`BigQueryTableCleanup`, `BigQueryBaseTableBuild`, `BigQueryEnrichmentSet`) | Production libraries where developers compose pipelines from named building blocks. Each blueprint has narrow, validated config. Recommended default. |
+| **One pipeline blueprint** with `pre_steps` / `parallel_steps` / `post_steps` / `maintenance_steps` lists | Demos, or when the user explicitly wants one YAML knob to describe an entire workflow shape. Quick to ship, but every YAML re-declares the same operation types. |
+
+If you ship the second shape, say so explicitly: "this is a pipeline runner, not a library — each YAML still has to spell out every step." Don't let the user discover that later.
+
+### Red flags
+
+- One Blueprint class with `pre_steps`/`parallel_steps`/`post_steps` lists when the source material has clearly distinct operation types
+- Wrapping a single task in its own `TaskGroup` purely to make the IDE graph "look richer" — it's not best practice and makes IDE forms harder to fill in
+- Hardcoding source-system names (e.g. `bigquery_sql_pipeline`) into a blueprint that could be warehouse-agnostic
 
 ---
 
@@ -56,18 +99,34 @@ pip install airflow-blueprint
 Create `dags/loader.py`:
 
 ```python
+"""Airflow DAG loader for Astronomer Blueprint-managed DAG files."""
+
 from blueprint import build_all
 
 build_all()
 ```
+
+> **Important — safe-mode DAG discovery.** Airflow's DAG file processor uses safe-mode scanning that only reads files containing the words `dag` or `airflow`. A loader.py with just `from blueprint import build_all; build_all()` is silently skipped, the DAG processor reports `Found N files` without including it, and your blueprints never register. The docstring above satisfies safe-mode. Don't remove it.
 
 DAG-level configuration (schedule, description, tags, default_args, etc.) is handled via YAML fields and `BlueprintDagArgs` templates — see **Customizing DAG-Level Configuration**.
 
 ### 3. Verify Installation
 
 ```bash
-uvx --from airflow-blueprint blueprint list
+uvx --from airflow-blueprint blueprint list --template-dir dags/templates
 ```
+
+If your blueprints import provider operators (BigQuery, Snowflake, etc.), the standalone Blueprint CLI environment won't have them. Add `--with`:
+
+```bash
+# When templates use Google provider operators
+uvx --from airflow-blueprint --with apache-airflow-providers-google blueprint list --template-dir dags/templates
+
+# When templates use the standard provider (BashOperator, PythonOperator on Airflow 3+)
+uvx --from airflow-blueprint --with apache-airflow-providers-standard blueprint list --template-dir dags/templates
+```
+
+If you see `ModuleNotFoundError: No module named 'airflow.providers.X'` from `blueprint list`, that's the standalone CLI environment, not your Astro project. Add `--with apache-airflow-providers-X` to the uvx invocation. The same applies to `blueprint lint` and `blueprint schema`.
 
 If no blueprints found, user needs to create blueprint classes first.
 
@@ -81,8 +140,8 @@ When user wants to create a new blueprint template:
 
 ```python
 # dags/templates/my_blueprints.py
-from airflow.operators.bash import BashOperator
-from airflow.utils.task_group import TaskGroup
+from airflow.providers.standard.operators.bash import BashOperator
+from airflow.sdk import TaskGroup
 from blueprint import Blueprint, BaseModel, Field
 
 class MyConfig(BaseModel):
@@ -111,6 +170,8 @@ class MyBlueprint(Blueprint[MyConfig]):
 | Blueprint class | Must inherit from `Blueprint[ConfigClass]` |
 | `render()` method | Must return `TaskGroup` or `BaseOperator` |
 | Task IDs | Use `self.step_id` for the group/task ID |
+| `TaskGroup` import | Use `from airflow.sdk import TaskGroup` on Airflow 3+. `airflow.utils.task_group.TaskGroup` is deprecated and emits a warning. |
+| `BashOperator`/`PythonOperator` import | Use `from airflow.providers.standard.operators.bash import BashOperator` on Airflow 3+. The standalone Blueprint CLI needs `--with apache-airflow-providers-standard` to import these. |
 
 ### Recommend Strict Validation
 
@@ -123,6 +184,32 @@ class MyConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     # fields...
 ```
+
+### YAML-Compatible Field Types
+
+Blueprint validates that every config field round-trips through YAML. `dict[str, Any]` and bare `Any` are rejected at class definition time with:
+
+```
+TypeError: <Class> config model <ConfigClass> has non-YAML-compatible fields:
+  params: field 'params': type Any is not YAML-compatible
+```
+
+For free-form params/labels/tags, define explicit type aliases:
+
+```python
+YamlScalar = str | int | float | bool | None
+YamlValue = YamlScalar | list[YamlScalar] | dict[str, YamlScalar]
+
+class StepConfig(BaseModel):
+    params: dict[str, YamlValue] = Field(default_factory=dict)
+```
+
+Other field types to avoid in top-level config (cause "Unsupported Field" errors in the Astro IDE form renderer):
+- Bare `Union[A, B]` without a discriminator
+- Nested generics deeper than `dict[str, list[YamlScalar]]`
+- Custom Pydantic models referenced by `Annotated[..., Discriminator(...)]`
+
+If you need richer types, hide them inside a single string field that the blueprint parses internally, or break the blueprint into versions.
 
 ---
 
@@ -241,6 +328,83 @@ steps:
 - Only **one** `BlueprintDagArgs` subclass per project (raises `MultipleDagArgsError` if more than one exists)
 - The `render()` method returns a dict of kwargs passed to the Airflow `DAG()` constructor
 - If no custom subclass exists, the built-in `DefaultDagArgs` is used (supports only `schedule` and `description`)
+
+### Cluster Policy Compatibility
+
+Some Astro deployments enforce cluster policies that require specific tags (e.g. `marketing-secrets`, `finance-secrets`) or owner formats. A blueprint that works locally can fail on Astro Cloud with:
+
+```
+AirflowClusterPolicyViolation: DAG '<id>' must declare at least one secret-access tag.
+Valid tags: {'marketing-secrets', 'finance-secrets'}. DAG currently has tags: {'etl'}
+```
+
+When deploying to a customer environment:
+1. Ask which tags or owners are required by their cluster policy.
+2. Either bake the required tag into `BlueprintDagArgs.render()` so every DAG inherits it, or document it as a required YAML field.
+
+---
+
+## Path Resolution Across Environments
+
+This is the single most common reason a Blueprint project works locally and fails on Astro Cloud. Get this right from the first commit.
+
+### The problem
+
+`Path(__file__).resolve().parents[2]` works locally because the layout is `<project>/dags/templates/foo.py`. On Astro Cloud, DAGs are bundled and parsed from a path like:
+
+```
+/tmp/airflow/dag_bundles/astro/main/dags/<timestamp>/dags/templates/foo.py
+```
+
+…but `include/` files live at `/usr/local/airflow/include/`. So `parents[2] / "include/sql/foo.sql"` resolves under the bundle, where the file does not exist, and you get:
+
+```
+FileNotFoundError: SQL file not found for blueprint step '<id>': include/sql/foo.sql
+```
+
+### The fix
+
+Resolve assets against multiple roots. `AIRFLOW_HOME` is set in every Astro deployment and points at the project root inside the container.
+
+```python
+import os
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+AIRFLOW_HOME = Path(os.environ.get("AIRFLOW_HOME", "/usr/local/airflow"))
+
+
+def _resolve_project_path(relative_path: str) -> Path:
+    candidate = Path(relative_path)
+    if candidate.is_absolute():
+        if candidate.exists():
+            return candidate
+        raise FileNotFoundError(f"Not found: {relative_path}")
+
+    for root in (PROJECT_ROOT, PROJECT_ROOT.parent, AIRFLOW_HOME):
+        resolved = root / candidate
+        if resolved.exists():
+            return resolved
+
+    raise FileNotFoundError(
+        f"Not found in any root: {relative_path}. "
+        f"Checked: {PROJECT_ROOT}, {PROJECT_ROOT.parent}, {AIRFLOW_HOME}"
+    )
+```
+
+Apply the same logic to `template_searchpath` in `BlueprintDagArgs.render()`:
+
+```python
+"template_searchpath": [str(PROJECT_ROOT), str(AIRFLOW_HOME)],
+```
+
+### Verifying the fix
+
+The fix is invisible locally because both roots resolve to the same files. To prove it works:
+1. Deploy to Astro and check the import-error panel (`af dags errors` or the deployment logs page).
+2. If you don't have an Astro deployment handy, simulate it locally: `docker exec <dag-processor-container> python -c "from pathlib import Path; print(Path('include/sql/foo.sql').resolve())"` from inside the bundled DAG path.
+
+Never tell the user "ready to deploy" if you've only verified the local path.
 
 ---
 
@@ -408,10 +572,30 @@ steps:
 
 Generate JSON schemas for editor autocompletion or external tooling:
 
+### CRITICAL: Always use `--output`, never shell redirect
+
+The Blueprint CLI uses Rich for pretty terminal output. Piping `blueprint schema NAME > file.json` captures the **rendered** output — wrapped lines, padding spaces, and dropped commas at line boundaries — producing a file that *looks* like JSON but fails `json.loads()`. The Astro IDE silently drops invalid schema files, so the symptom is "my templates don't show up in the IDE library" with no error message anywhere.
+
+**Always do this:**
+
 ```bash
-# Generate schema for a blueprint
-blueprint schema extract > extract.schema.json
+blueprint schema extract --output blueprint/generated-schemas/extract.schema.json
 ```
+
+**Never do this:**
+
+```bash
+# WRONG — produces invalid JSON, IDE silently ignores it
+blueprint schema extract > blueprint/generated-schemas/extract.schema.json
+```
+
+Validate after generating:
+
+```bash
+python -c "import json; json.loads(open('blueprint/generated-schemas/extract.schema.json').read()); print('valid')"
+```
+
+A correctly generated schema includes `blueprint` and `version` constants under `properties` and lists both as required. If those are missing, the file is wrong.
 
 ### Astro Project Auto-Detection
 
@@ -421,10 +605,16 @@ If the project is an Astro project, **automatically regenerate schemas** without
 
 ```bash
 mkdir -p blueprint/generated-schemas
-# For each name from `blueprint list`: blueprint schema NAME > blueprint/generated-schemas/NAME.schema.json
+
+# For each blueprint name from `blueprint list`:
+uvx --from airflow-blueprint --with apache-airflow-providers-standard \
+  blueprint schema NAME --template-dir dags/templates \
+  --output blueprint/generated-schemas/NAME.schema.json
 ```
 
-The Astro IDE reads `blueprint/generated-schemas/` to render configuration forms. Keeping schemas in sync ensures the visual builder always reflects the latest blueprint configs.
+After regenerating, **delete stale schema files** for blueprints you've renamed or removed. The IDE reads every file in `generated-schemas/`, so a leftover schema for a deleted blueprint will still appear in the library.
+
+The Astro IDE reads `blueprint/generated-schemas/` to render configuration forms. Keeping schemas in sync — and committed to the branch the IDE is reading — ensures the visual builder always reflects the latest blueprint configs. If the IDE doesn't show templates after a deploy, check three things in order: (1) the schema file is valid JSON, (2) the schema file is committed and pushed, (3) the IDE is reading the same branch.
 
 If you cannot determine whether the project is an Astro project, ask the user once and remember for the rest of the session.
 
@@ -447,15 +637,65 @@ blueprint list --template-dir dags/templates/
 
 **Fix**: Run `blueprint describe <name>` to see valid field names.
 
-### DAG not appearing in Airflow
+### `ModuleNotFoundError: No module named 'airflow.providers.X'` from `blueprint list`/`lint`/`schema`
 
-**Cause**: Missing or broken loader.
+**Cause**: The standalone `uvx --from airflow-blueprint` environment does not include Airflow providers, even though your Astro Runtime project does.
 
-**Fix**: Ensure `dags/loader.py` exists and calls `build_all()`:
+**Fix**: Add `--with apache-airflow-providers-X` to the uvx invocation. The most common ones for blueprints:
+- `apache-airflow-providers-standard` — needed for `BashOperator`/`PythonOperator` on Airflow 3+
+- `apache-airflow-providers-google` — BigQuery, GCS, etc.
+- `apache-airflow-providers-snowflake` — Snowflake operators
+
+### DAG not appearing in Airflow (no error, no DAG either)
+
+**Most common cause**: `dags/loader.py` is being skipped by Airflow safe-mode DAG discovery because it doesn't contain the words `dag` or `airflow`.
+
+**Fix**: Add a docstring:
 ```python
+"""Airflow DAG loader for Astronomer Blueprint-managed DAG files."""
+
 from blueprint import build_all
+
 build_all()
 ```
+
+Confirm by checking the DAG processor logs (`astro dev logs --dag-processor`). The "DAG File Processing Stats" table will list every file the processor actually scanned. If `loader.py` is missing from that table, it was filtered out by safe-mode.
+
+**Other causes**: missing `dags/templates/__init__.py`, blueprint class import fails (check `astro dev logs --dag-processor` for tracebacks).
+
+### `TypeError: ... has non-YAML-compatible fields`
+
+**Cause**: A config field uses `Any`, an unconstrained `dict[str, Any]`, or a type Blueprint can't serialize through YAML.
+
+**Fix**: Replace with explicit types. See **YAML-Compatible Field Types** above.
+
+### `FileNotFoundError` only on Astro Cloud (works locally)
+
+**Cause**: Blueprint resolves `include/...` paths against `Path(__file__).parents[2]`, which points into the bundle directory on Astro, not the project root.
+
+**Fix**: See **Path Resolution Across Environments** — search multiple roots including `AIRFLOW_HOME`.
+
+### Templates don't appear in Astro IDE library
+
+This has one or two specific causes — work through them in order:
+
+1. **Schema file is invalid JSON.** Most common. Run:
+   ```bash
+   python -c "import json; json.loads(open('blueprint/generated-schemas/NAME.schema.json').read())"
+   ```
+   If that errors, the schema was generated with shell redirect (`>`) instead of `--output`. Regenerate with `--output`. See **Schema Generation**.
+
+2. **Schema file isn't committed/deployed.** The IDE reads the schema from the branch it's bound to. Verify `git status blueprint/generated-schemas/` is clean and the changes are pushed.
+
+3. **Stale schema for a renamed blueprint.** If you renamed `bigquery_sql_pipeline` → `sql_script_pipeline`, delete `blueprint/generated-schemas/bigquery_sql_pipeline.schema.json`.
+
+4. **"Unsupported Field" error visible in the IDE form.** A Pydantic field type isn't supported by the IDE's form renderer. See **YAML-Compatible Field Types**.
+
+### `AirflowClusterPolicyViolation` on Astro
+
+**Cause**: Customer cluster policy requires specific tags or owner formats.
+
+**Fix**: Add the required tag in `BlueprintDagArgs.render()` or in YAML. See **Cluster Policy Compatibility**.
 
 ### Validation errors shown as Airflow import errors
 
@@ -483,12 +723,21 @@ Every Blueprint task has extra fields in **Rendered Template**:
 
 ## Verification Checklist
 
-Before finishing, verify with user:
+Before declaring the work done, verify all of these:
 
-- [ ] `blueprint list` shows their templates
-- [ ] `blueprint lint` passes for all YAML files
-- [ ] `dags/loader.py` exists with `build_all()`
-- [ ] DAG appears in Airflow UI without parse errors
+- [ ] `blueprint list --template-dir dags/templates` shows every expected blueprint
+- [ ] `blueprint lint` passes for every `*.dag.yaml` file (loop over them; `blueprint lint dags/` on a directory currently fails with `Is a directory`)
+- [ ] `dags/loader.py` has a docstring containing "Airflow" or "DAG" (safe-mode discovery)
+- [ ] DAG appears in Airflow UI with `has_import_errors: false` (run `af dags get <dag_id>`)
+- [ ] If the project is on Astro: deployed and confirmed import-error-free in the Astro UI, **not just locally**
+- [ ] If Astro IDE is in scope:
+  - `blueprint/generated-schemas/<name>.schema.json` exists for every blueprint
+  - Each schema file passes `python -c "import json; json.loads(open(p).read())"`
+  - Each schema file contains `blueprint` and `version` constants under `properties`
+  - Stale schemas for renamed/deleted blueprints are removed
+  - Schema files are committed and pushed to the branch the IDE reads
+- [ ] If asset paths are referenced (SQL files, configs): verified to resolve under both `PROJECT_ROOT` and `AIRFLOW_HOME`
+- [ ] If a customer cluster policy is in play: required tags are present on every DAG
 
 ---
 
