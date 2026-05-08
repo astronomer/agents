@@ -240,6 +240,33 @@ class TestTableParsing:
         assert result[0]["status"] == ""
         assert result[1]["status"] == "HEALTHY"
 
+    def test_parse_table_output_skips_api_token_preamble(self, mock_cli):
+        """Astro CLI prints ``Using an Astro API Token`` ahead of the
+        table when ``ASTRO_API_TOKEN`` is set. The parser must skip it
+        rather than treating it as the header row (it has only
+        single-space gaps and would collapse the table to one column).
+        """
+        output = """Using an Astro API Token
+ NAME     NAMESPACE                    DEPLOYMENT ID
+ test     physical-refraction-2416     cml0a458406f401jkva87iahu"""
+
+        result = mock_cli._parse_table_output(output)
+        assert len(result) == 1
+        assert result[0]["name"] == "test"
+        assert result[0]["namespace"] == "physical-refraction-2416"
+        assert result[0]["deployment_id"] == "cml0a458406f401jkva87iahu"
+
+    def test_parse_table_output_preamble_only_no_table(self, mock_cli):
+        """When astro CLI prints a preamble but no table (eg auth notice
+        followed by ``no Deployments found in workspace X``), the parser
+        should return ``[]`` rather than misparsing the no-results line.
+        """
+        output = """Using an Astro API Token
+no Deployments found in workspace my-workspace"""
+
+        result = mock_cli._parse_table_output(output)
+        assert result == []
+
 
 class TestAstroCliContext:
     """Tests for context management.
