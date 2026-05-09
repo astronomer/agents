@@ -16,7 +16,7 @@ You are helping a user work with Blueprint, a system for composing Airflow DAGs 
 These behaviors apply throughout the session:
 
 - **Apply fixes, don't just describe them.** When you identify a problem, edit the file. Don't explain a fix and stop.
-- **Don't leave stubs.** If the user gives you reference material (markdown, Jenkins config, SQL files), extract every artifact it references. Do not write `# TODO: extract remaining SQL`.
+- **Don't leave stubs.** If the user gives you reference material (specs, existing pipeline configs, scripts), extract every artifact it references. Do not write `# TODO: extract the remaining steps`.
 - **Verify before declaring done.** A blueprint isn't working until it passes `blueprint lint` AND surfaces in Airflow without import errors AND (if Astro IDE matters to the user) the schema is valid JSON in `blueprint/generated-schemas/`.
 - **Local success ≠ Astro Cloud success.** Path resolution, Docker bundle layout, and provider availability differ. Test both, or warn the user when you've only tested locally.
 
@@ -28,7 +28,7 @@ Confirm with the user:
 1. **Airflow version** ≥2.5
 2. **Python version** ≥3.10
 3. **Use case**: Blueprint is for standardized, validated templates. If user needs full Airflow flexibility, suggest writing DAGs directly or using DAG Factory instead.
-4. **Reference material**: If the user points at existing pipeline docs, Jenkins jobs, or SQL files — read them first and identify operation archetypes (cleanup, base build, parallel enrichment, merge, DDL maintenance) before writing any blueprint code. See **Designing the Blueprint Library**.
+4. **Reference material**: If the user points at existing pipeline docs, configs from another orchestrator, or a set of scripts — read them first and identify operation archetypes (e.g. extract, transform, validate, load, notify, maintenance) before writing any blueprint code. See **Designing the Blueprint Library**.
 
 ---
 
@@ -46,7 +46,7 @@ Confirm with the user:
 | "Version my blueprint" | Go to **Versioning** |
 | "Generate schema" / "Astro IDE setup" | Go to **Schema Generation** |
 | "Templates not in Astro IDE library" | Go to **Schema Generation** (almost always invalid JSON) |
-| "Migrate Jenkins/legacy pipelines" / "Multiple similar jobs" | Go to **Designing the Blueprint Library** |
+| "Standardize many similar pipelines" / "Migrate from another orchestrator" | Go to **Designing the Blueprint Library** |
 | "FileNotFoundError on Astro Cloud but works locally" | Go to **Path Resolution Across Environments** |
 | Blueprint errors / troubleshooting | Go to **Troubleshooting** |
 
@@ -58,17 +58,22 @@ Before writing code, decide what blueprints exist. This is the highest-leverage 
 
 ### When the user references existing pipelines
 
-If the user points at a markdown spec, Jenkins config, or set of SQL files:
-1. **Read it end-to-end.** Don't stop at the first SQL block. Use `grep -n '^### ' <file>` to enumerate sections.
-2. **Identify operation archetypes.** Common ones: cleanup/delete, base table build, parallel enrichment, stitch/merge, final load, DDL/metadata.
+If the user points at reference material — a spec doc, configs from another orchestrator, a directory of scripts, an existing Airflow project — read it end-to-end before designing. Don't stop at the first example.
+
+1. **Enumerate the work.** Read every referenced artifact. Note the inputs, outputs, and side effects of each.
+2. **Identify operation archetypes.** Group similar pieces of work. Examples vary by domain:
+   - Data pipelines: extract, transform, validate, load, refresh
+   - ML workflows: featurize, train, evaluate, deploy, score
+   - Ops workflows: provision, configure, verify, notify, decommission
+   - Reporting: collect, aggregate, render, distribute
 3. **Each archetype is a candidate for its own Blueprint class** with its own typed config — not a stage in a single mega-blueprint.
 
 ### Two valid shapes
 
 | Shape | When to use |
 |-------|-------------|
-| **Multiple focused blueprints** (`BigQueryTableCleanup`, `BigQueryBaseTableBuild`, `BigQueryEnrichmentSet`) | Production libraries where developers compose pipelines from named building blocks. Each blueprint has narrow, validated config. Recommended default. |
-| **One pipeline blueprint** with `pre_steps` / `parallel_steps` / `post_steps` / `maintenance_steps` lists | Demos, or when the user explicitly wants one YAML knob to describe an entire workflow shape. Quick to ship, but every YAML re-declares the same operation types. |
+| **Multiple focused blueprints** (one per archetype) | Production libraries where developers compose pipelines from named building blocks. Each blueprint has narrow, validated config that maps to one kind of work. Recommended default. |
+| **One generic pipeline blueprint** with `pre_steps` / `parallel_steps` / `post_steps` / `maintenance_steps` lists | Demos, prototypes, or when the user explicitly wants one YAML knob to describe an entire workflow shape. Quick to ship, but every YAML re-declares the same operation types. |
 
 If you ship the second shape, say so explicitly: "this is a pipeline runner, not a library — each YAML still has to spell out every step." Don't let the user discover that later.
 
@@ -76,7 +81,8 @@ If you ship the second shape, say so explicitly: "this is a pipeline runner, not
 
 - One Blueprint class with `pre_steps`/`parallel_steps`/`post_steps` lists when the source material has clearly distinct operation types
 - Wrapping a single task in its own `TaskGroup` purely to make the IDE graph "look richer" — it's not best practice and makes IDE forms harder to fill in
-- Hardcoding source-system names (e.g. `bigquery_sql_pipeline`) into a blueprint that could be warehouse-agnostic
+- Hardcoding tool or vendor names into a blueprint that could be tool-agnostic (e.g. `bigquery_sql_pipeline` when `warehouse_query_pipeline` would do, or `slack_notify` when the underlying operator could target any chat tool)
+- A single blueprint config with a `kind` discriminator that switches between unrelated behaviors — split it into separate blueprints instead
 
 ---
 
@@ -346,25 +352,21 @@ When deploying to a customer environment:
 
 ## Path Resolution Across Environments
 
-This is the single most common reason a Blueprint project works locally and fails on Astro Cloud. Get this right from the first commit.
+If a blueprint reads files from the project (templates, configs, schemas, scripts, fixtures, anything under `include/` or similar), it needs to resolve those paths in a way that works both locally and on Astro Cloud. This is the single most common reason a Blueprint project works locally and fails when deployed.
 
 ### The problem
 
-`Path(__file__).resolve().parents[2]` works locally because the layout is `<project>/dags/templates/foo.py`. On Astro Cloud, DAGs are bundled and parsed from a path like:
+`Path(__file__).resolve().parents[N]` works locally because the layout is stable: `<project>/dags/templates/foo.py`. On Astro Cloud, DAGs are bundled and parsed from a transient path like:
 
 ```
 /tmp/airflow/dag_bundles/astro/main/dags/<timestamp>/dags/templates/foo.py
 ```
 
-…but `include/` files live at `/usr/local/airflow/include/`. So `parents[2] / "include/sql/foo.sql"` resolves under the bundle, where the file does not exist, and you get:
-
-```
-FileNotFoundError: SQL file not found for blueprint step '<id>': include/sql/foo.sql
-```
+…but project files like `include/...` live at `/usr/local/airflow/include/...`. So `parents[2] / "include/some_file"` resolves under the bundle, where the file does not exist, and you get a `FileNotFoundError` from inside the blueprint at parse time. Locally everything looked fine.
 
 ### The fix
 
-Resolve assets against multiple roots. `AIRFLOW_HOME` is set in every Astro deployment and points at the project root inside the container.
+Resolve project-relative paths against multiple roots. `AIRFLOW_HOME` is set in every Astro deployment and points at the project root inside the container, so it works as a stable anchor in both environments.
 
 ```python
 import os
@@ -375,6 +377,7 @@ AIRFLOW_HOME = Path(os.environ.get("AIRFLOW_HOME", "/usr/local/airflow"))
 
 
 def _resolve_project_path(relative_path: str) -> Path:
+    """Resolve a project-relative path. Works locally and on Astro Cloud."""
     candidate = Path(relative_path)
     if candidate.is_absolute():
         if candidate.exists():
@@ -391,6 +394,8 @@ def _resolve_project_path(relative_path: str) -> Path:
         f"Checked: {PROJECT_ROOT}, {PROJECT_ROOT.parent}, {AIRFLOW_HOME}"
     )
 ```
+
+This same pattern applies regardless of what the file is — SQL, YAML, JSON, a Python module loaded by path, a CSV fixture, etc.
 
 Apply the same logic to `template_searchpath` in `BlueprintDagArgs.render()`:
 
@@ -736,7 +741,7 @@ Before declaring the work done, verify all of these:
   - Each schema file contains `blueprint` and `version` constants under `properties`
   - Stale schemas for renamed/deleted blueprints are removed
   - Schema files are committed and pushed to the branch the IDE reads
-- [ ] If asset paths are referenced (SQL files, configs): verified to resolve under both `PROJECT_ROOT` and `AIRFLOW_HOME`
+- [ ] If the blueprint reads any project-relative paths: verified to resolve under both `PROJECT_ROOT` and `AIRFLOW_HOME`
 - [ ] If a customer cluster policy is in play: required tags are present on every DAG
 
 ---
