@@ -273,7 +273,10 @@ def get_variable(variable_key: str) -> str:
 
 
 @mcp.tool()
-def list_variables() -> str:
+def list_variables(
+    limit: int = DEFAULT_LIMIT,
+    offset: int = DEFAULT_OFFSET,
+) -> str:
     """Get all Airflow variables (key-value configuration pairs).
 
     Use this tool when the user asks about:
@@ -295,10 +298,18 @@ def list_variables() -> str:
     IMPORTANT: Sensitive variables (like passwords, API keys) may have their
     values masked in the response for security reasons.
 
+    Pagination: the response includes ``total_variables`` and ``returned_count``.
+    If ``total_variables > returned_count``, call again with
+    ``offset=offset + returned_count`` to fetch the next page.
+
+    Args:
+        limit: Maximum number of variables to return (default: 100)
+        offset: Offset for pagination (default: 0)
+
     Returns:
-        JSON with list of all variables and their values
+        JSON with list of variables, total count, and returned count
     """
-    return _list_variables_impl()
+    return _list_variables_impl(limit=limit, offset=offset)
 
 
 @mcp.tool()
