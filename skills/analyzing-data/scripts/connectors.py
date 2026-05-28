@@ -4,7 +4,7 @@ import os
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, TypeVar
 
 
 # --- Base class ---
@@ -63,7 +63,10 @@ def substitute_env_vars(value: Any) -> tuple[Any, str | None]:
 _CONNECTOR_REGISTRY: dict[str, type[DatabaseConnector]] = {}
 
 
-def register_connector(cls: type[DatabaseConnector]) -> type[DatabaseConnector]:
+T = TypeVar("T", bound="DatabaseConnector")
+
+
+def register_connector(cls: type[T]) -> type[T]:
     _CONNECTOR_REGISTRY[cls.connector_type()] = cls
     return cls
 
