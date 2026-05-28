@@ -42,12 +42,46 @@ Once you have identified a failed task:
 Gather additional context to understand WHY this happened:
 
 1. **Recent changes**: Was there a code deploy? Check git history if available
-2. **Data volume**: Did data volume spike? Run a quick count on source tables
-3. **Upstream health**: Did upstream tasks succeed but produce unexpected data?
-4. **Historical pattern**: Is this a recurring failure? Check if same task failed before
-5. **Timing**: Did this fail at an unusual time? (resource contention, maintenance windows)
+2. **Package version changes**: Was a package upgraded — in the image, in a venv-style operator, or at the index? See [Package version changes](#package-version-changes) below.
+3. **Data volume**: Did data volume spike? Run a quick count on source tables
+4. **Upstream health**: Did upstream tasks succeed but produce unexpected data?
+5. **Historical pattern**: Is this a recurring failure? Check if same task failed before
+6. **Timing**: Did this fail at an unusual time? (resource contention, maintenance windows)
 
 Use `af runs get <dag_id> <dag_run_id>` to compare the failed run against recent successful runs.
+
+### Package version changes
+
+A common cause of failures with no git activity is dependency drift — the user's code didn't change, but a package they depend on did. Check in this order:
+
+1. **Worker image diff** (preferred when available). Every Astro deploy = new image tag, so the registry has a "before" and "after". Diff `pip freeze` between current and previous image — that's ground truth for what changed:
+   ```
+   docker run --rm <current_image> pip freeze > /tmp/now.txt
+   docker run --rm <previous_image> pip freeze > /tmp/prev.txt
+   diff /tmp/prev.txt /tmp/now.txt
+   ```
+   Also compare `docker run --rm <image> python --version` between the two — a Python minor-version bump (3.11 → 3.12, or even a patch) can break wheel compatibility even when `pip freeze` looks identical. `af config providers` lists currently installed provider versions, useful for cross-checking against modules named in the traceback.
+
+2. **Venv-style operators bypass the worker image.** `@task.virtualenv`, `PythonVirtualenvOperator`, `ExternalPythonOperator`, and `KubernetesPodOperator` build their environment per task run, so an image diff won't catch failures inside them. If the failed task is one of these, read its `requirements` / `image` / `python_version` / `python` args directly:
+   - Unbounded specifier (e.g. `pandas>=2.0.0` with no upper bound, or no specifier at all) → a new upstream release is the prime suspect.
+   - `image="foo:latest"` or no tag → the image moved underneath you.
+   - `python_version="3.11"` (on `@task.virtualenv` / `PythonVirtualenvOperator`) or a `python` path (on `ExternalPythonOperator`) resolving to a different interpreter than it used to — a Python minor-version change can break wheel compatibility for unchanged `requirements`. Same vector applies to the worker image itself if the base Python changed there.
+
+   Fix is to pin: `pandas>=2.0.0,<3.0.0`, a lockfile, a specific image SHA, or a fully-qualified Python version (`python_version="3.11.7"` instead of `"3.11"`).
+
+3. **Index lookup** when image diff isn't conclusive (no image history, or a venv-style operator). Identify the configured index first — it may not be PyPI:
+   - Env vars: `UV_INDEX_URL`, `PIP_INDEX_URL`, `PIP_EXTRA_INDEX_URL`
+   - `pyproject.toml` → `[[tool.uv.index]]`
+   - `~/.pip/pip.conf`, `/etc/pip.conf`
+   - `Dockerfile` `--index-url` flags
+
+   Then query for releases of the suspect package since the first failure started. PyPI:
+   ```
+   curl -s https://pypi.org/pypi/<pkg>/json | jq '.releases | to_entries | map({version: .key, uploaded: .value[0].upload_time}) | sort_by(.uploaded) | reverse | .[:5]'
+   ```
+   Private indexes usually expose the same `/pypi/<pkg>/json` shape; fall back to the Simple API (`/simple/<pkg>/`) or ask the user if neither works.
+
+A release timestamp landing between the last green run and the first red run, for a package named in the traceback, is the answer.
 
 ### On Astro
 
@@ -85,6 +119,7 @@ How to prevent this from happening again:
 - Add better error handling?
 - Add alerting for edge cases?
 - Update documentation?
+- Pin dependencies (constraints file, lockfile, or upper-bound specifiers on venv/external/pod operators) to avoid silent upstream drift?
 
 ### Quick Commands
 Provide ready-to-use commands:
