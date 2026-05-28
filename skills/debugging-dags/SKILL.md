@@ -60,13 +60,14 @@ A common cause of failures with no git activity is dependency drift — the user
    docker run --rm <previous_image> pip freeze > /tmp/prev.txt
    diff /tmp/prev.txt /tmp/now.txt
    ```
-   `af config providers` lists currently installed provider versions — useful for cross-checking against modules named in the traceback.
+   Also compare `docker run --rm <image> python --version` between the two — a Python minor-version bump (3.11 → 3.12, or even a patch) can break wheel compatibility even when `pip freeze` looks identical. `af config providers` lists currently installed provider versions, useful for cross-checking against modules named in the traceback.
 
-2. **Venv-style operators bypass the worker image.** `@task.virtualenv`, `PythonVirtualenvOperator`, `ExternalPythonOperator`, and `KubernetesPodOperator` build their environment per task run, so an image diff won't catch failures inside them. If the failed task is one of these, read its `requirements` / `image` arg directly:
+2. **Venv-style operators bypass the worker image.** `@task.virtualenv`, `PythonVirtualenvOperator`, `ExternalPythonOperator`, and `KubernetesPodOperator` build their environment per task run, so an image diff won't catch failures inside them. If the failed task is one of these, read its `requirements` / `image` / `python_version` / `python` args directly:
    - Unbounded specifier (e.g. `pandas>=2.0.0` with no upper bound, or no specifier at all) → a new upstream release is the prime suspect.
    - `image="foo:latest"` or no tag → the image moved underneath you.
+   - `python_version="3.11"` (on `@task.virtualenv` / `PythonVirtualenvOperator`) or a `python` path (on `ExternalPythonOperator`) resolving to a different interpreter than it used to — a Python minor-version change can break wheel compatibility for unchanged `requirements`. Same vector applies to the worker image itself if the base Python changed there.
 
-   Fix is to pin: `pandas>=2.0.0,<3.0.0`, a lockfile, or a specific image SHA.
+   Fix is to pin: `pandas>=2.0.0,<3.0.0`, a lockfile, a specific image SHA, or a fully-qualified Python version (`python_version="3.11.7"` instead of `"3.11"`).
 
 3. **Index lookup** when image diff isn't conclusive (no image history, or a venv-style operator). Identify the configured index first — it may not be PyPI:
    - Env vars: `UV_INDEX_URL`, `PIP_INDEX_URL`, `PIP_EXTRA_INDEX_URL`
