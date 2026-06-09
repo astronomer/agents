@@ -9,6 +9,8 @@ from astro_airflow_mcp.server import (
     _wrap_list_response,
     mcp,
 )
+from astro_airflow_mcp.tool_annotations import read_only
+from astro_airflow_mcp.tool_errors import tool_error
 from astro_airflow_mcp.utils import filter_connection_passwords
 
 
@@ -50,7 +52,7 @@ def _list_connections_impl(
             return json.dumps(result, indent=2)
         return f"No connections found. Response: {data}"
     except Exception as e:
-        return str(e)
+        return tool_error(e)
 
 
 def _get_variable_impl(
@@ -69,7 +71,7 @@ def _get_variable_impl(
         data = adapter.get_variable(variable_key)
         return json.dumps(data, indent=2)
     except Exception as e:
-        return str(e)
+        return tool_error(e, variable_key=variable_key)
 
 
 def _list_variables_impl(
@@ -93,7 +95,7 @@ def _list_variables_impl(
             return _wrap_list_response(data["variables"], "variables", data)
         return f"No variables found. Response: {data}"
     except Exception as e:
-        return str(e)
+        return tool_error(e)
 
 
 def _get_version_impl() -> str:
@@ -107,7 +109,7 @@ def _get_version_impl() -> str:
         data = adapter.get_version()
         return json.dumps(data, indent=2)
     except Exception as e:
-        return str(e)
+        return tool_error(e)
 
 
 def _get_config_impl() -> str:
@@ -126,7 +128,7 @@ def _get_config_impl() -> str:
             return json.dumps(result, indent=2)
         return f"No configuration found. Response: {data}"
     except Exception as e:
-        return str(e)
+        return tool_error(e)
 
 
 def _get_pool_impl(
@@ -145,7 +147,7 @@ def _get_pool_impl(
         data = adapter.get_pool(pool_name)
         return json.dumps(data, indent=2)
     except Exception as e:
-        return str(e)
+        return tool_error(e, pool_name=pool_name)
 
 
 def _list_pools_impl(
@@ -169,7 +171,7 @@ def _list_pools_impl(
             return _wrap_list_response(data["pools"], "pools", data)
         return f"No pools found. Response: {data}"
     except Exception as e:
-        return str(e)
+        return tool_error(e)
 
 
 def _list_plugins_impl(
@@ -193,7 +195,7 @@ def _list_plugins_impl(
             return _wrap_list_response(data["plugins"], "plugins", data)
         return f"No plugins found. Response: {data}"
     except Exception as e:
-        return str(e)
+        return tool_error(e)
 
 
 def _list_providers_impl() -> str:
@@ -210,10 +212,10 @@ def _list_providers_impl() -> str:
             return _wrap_list_response(data["providers"], "providers", data)
         return f"No providers found. Response: {data}"
     except Exception as e:
-        return str(e)
+        return tool_error(e)
 
 
-@mcp.tool()
+@mcp.tool(annotations=read_only())
 def list_connections() -> str:
     """Get connection configurations for external systems (databases, APIs, services).
 
@@ -245,7 +247,7 @@ def list_connections() -> str:
     return _list_connections_impl()
 
 
-@mcp.tool()
+@mcp.tool(annotations=read_only())
 def get_variable(variable_key: str) -> str:
     """Get a specific Airflow variable by key.
 
@@ -272,7 +274,7 @@ def get_variable(variable_key: str) -> str:
     return _get_variable_impl(variable_key=variable_key)
 
 
-@mcp.tool()
+@mcp.tool(annotations=read_only())
 def list_variables() -> str:
     """Get all Airflow variables (key-value configuration pairs).
 
@@ -301,7 +303,7 @@ def list_variables() -> str:
     return _list_variables_impl()
 
 
-@mcp.tool()
+@mcp.tool(annotations=read_only())
 def get_airflow_version() -> str:
     """Get version information for the Airflow instance.
 
@@ -327,7 +329,7 @@ def get_airflow_version() -> str:
     return _get_version_impl()
 
 
-@mcp.tool()
+@mcp.tool(annotations=read_only())
 def get_airflow_config() -> str:
     """Get Airflow instance configuration and settings.
 
@@ -359,7 +361,7 @@ def get_airflow_config() -> str:
     return _get_config_impl()
 
 
-@mcp.tool()
+@mcp.tool(annotations=read_only())
 def get_pool(pool_name: str) -> str:
     """Get detailed information about a specific resource pool.
 
@@ -390,7 +392,7 @@ def get_pool(pool_name: str) -> str:
     return _get_pool_impl(pool_name=pool_name)
 
 
-@mcp.tool()
+@mcp.tool(annotations=read_only())
 def list_pools() -> str:
     """Get resource pools for managing task concurrency and resource allocation.
 
@@ -420,7 +422,7 @@ def list_pools() -> str:
     return _list_pools_impl()
 
 
-@mcp.tool()
+@mcp.tool(annotations=read_only())
 def list_plugins() -> str:
     """Get information about installed Airflow plugins.
 
@@ -449,7 +451,7 @@ def list_plugins() -> str:
     return _list_plugins_impl()
 
 
-@mcp.tool()
+@mcp.tool(annotations=read_only())
 def list_providers() -> str:
     """Get information about installed Airflow provider packages.
 

@@ -10,6 +10,8 @@ from astro_airflow_mcp.server import (
     _wrap_list_response,
     mcp,
 )
+from astro_airflow_mcp.tool_annotations import read_only, write
+from astro_airflow_mcp.tool_errors import error_payload, tool_error
 from astro_airflow_mcp.utils import extract_failed_tasks
 
 
@@ -39,7 +41,7 @@ def _list_dag_runs_impl(
             return _wrap_list_response(data["dag_runs"], "dag_runs", data)
         return f"No DAG runs found. Response: {data}"
     except Exception as e:
-        return str(e)
+        return tool_error(e, dag_id=dag_id)
 
 
 def _get_dag_run_impl(
@@ -60,7 +62,7 @@ def _get_dag_run_impl(
         data = adapter.get_dag_run(dag_id, dag_run_id)
         return json.dumps(data, indent=2)
     except Exception as e:
-        return str(e)
+        return tool_error(e, dag_id=dag_id, dag_run_id=dag_run_id)
 
 
 def _trigger_dag_impl(
@@ -89,7 +91,7 @@ def _trigger_dag_impl(
         data = adapter.trigger_dag_run(dag_id=dag_id, conf=conf)
         return json.dumps(data, indent=2)
     except Exception as e:
-        return str(e)
+        return tool_error(e, dag_id=dag_id)
 
 
 def _get_failed_task_instances(
@@ -140,20 +142,35 @@ def _trigger_dag_and_wait_impl(
 
     try:
         trigger_data = json.loads(trigger_response)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
         return json.dumps(
             {
-                "error": f"Failed to trigger DAG: {trigger_response}",
+                **error_payload(
+                    e,
+                    hint=f"The trigger response was not valid JSON: {trigger_response}",
+                    retryable=False,
+                    dag_id=dag_id,
+                ),
                 "timed_out": False,
             },
             indent=2,
         )
 
+    # If triggering itself failed, _trigger_dag_impl returns a structured error
+    # (with hint/retryable); propagate it rather than polling a run that was
+    # never created.
+    if isinstance(trigger_data, dict) and "error" in trigger_data:
+        return json.dumps({**trigger_data, "timed_out": False}, indent=2)
+
     dag_run_id = trigger_data.get("dag_run_id")
     if not dag_run_id:
         return json.dumps(
             {
-                "error": f"No dag_run_id in trigger response: {trigger_response}",
+                **error_payload(
+                    RuntimeError(f"No dag_run_id in trigger response: {trigger_response}"),
+                    retryable=False,
+                    dag_id=dag_id,
+                ),
                 "timed_out": False,
             },
             indent=2,
@@ -215,7 +232,7 @@ def _trigger_dag_and_wait_impl(
             return json.dumps(result, indent=2)
 
 
-@mcp.tool()
+@mcp.tool(annotations=read_only())
 def list_dag_runs(
     dag_id: str | None = None,
     limit: int = DEFAULT_LIMIT,
@@ -264,7 +281,7 @@ def list_dag_runs(
     )
 
 
-@mcp.tool()
+@mcp.tool(annotations=read_only())
 def get_dag_run(dag_id: str, dag_run_id: str) -> str:
     """Get detailed information about a specific DAG run execution.
 
@@ -301,7 +318,7 @@ def get_dag_run(dag_id: str, dag_run_id: str) -> str:
     return _get_dag_run_impl(dag_id=dag_id, dag_run_id=dag_run_id)
 
 
-@mcp.tool()
+@mcp.tool(annotations=write(destructive=False))
 def trigger_dag(dag_id: str, conf: dict | None = None) -> str:
     """Trigger a new DAG run (start a workflow execution manually).
 
@@ -346,7 +363,7 @@ def trigger_dag(dag_id: str, conf: dict | None = None) -> str:
     )
 
 
-@mcp.tool()
+@mcp.tool(annotations=write(destructive=False))
 def trigger_dag_and_wait(
     dag_id: str,
     conf: dict | None = None,
@@ -437,7 +454,7 @@ def _delete_dag_run_impl(dag_id: str, dag_run_id: str) -> str:
             result["deleted_run"] = run_details
         return json.dumps(result, indent=2)
     except Exception as e:
-        return str(e)
+        return tool_error(e, dag_id=dag_id, dag_run_id=dag_run_id)
 
 
 def _clear_dag_run_impl(
@@ -460,10 +477,10 @@ def _clear_dag_run_impl(
         data = adapter.clear_dag_run(dag_id, dag_run_id, dry_run=dry_run)
         return json.dumps(data, indent=2)
     except Exception as e:
-        return str(e)
+        return tool_error(e, dag_id=dag_id, dag_run_id=dag_run_id)
 
 
-@mcp.tool()
+@mcp.tool(annotations=write())
 def delete_dag_run(dag_id: str, dag_run_id: str) -> str:
     """Delete a specific DAG run permanently.
 
@@ -489,7 +506,7 @@ def delete_dag_run(dag_id: str, dag_run_id: str) -> str:
     return _delete_dag_run_impl(dag_id=dag_id, dag_run_id=dag_run_id)
 
 
-@mcp.tool()
+@mcp.tool(annotations=write(destructive=True, idempotent=True))
 def clear_dag_run(
     dag_id: str,
     dag_run_id: str,

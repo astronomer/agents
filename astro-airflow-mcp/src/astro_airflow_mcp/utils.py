@@ -14,12 +14,19 @@ def normalize_airflow_url(url: str) -> str:
     ``https://host/dep?orgId=foo/api/v2/version`` — the path stays at ``/dep``
     and ``/api/...`` ends up inside the query string. Normalizing once at the
     boundary keeps every downstream call safe.
+
+    Any userinfo (``user:password@``) is also dropped: credentials are supplied
+    separately via the token/basic-auth getters, and the normalized URL can end
+    up in logs and in structured tool errors surfaced to the model.
     """
     if not url:
         return url
     parts = urlsplit(url)
     path = parts.path.rstrip("/")
-    return urlunsplit((parts.scheme, parts.netloc, path, "", ""))
+    # Strip any ``user:password@`` userinfo while preserving host[:port] (and
+    # IPv6 brackets) verbatim.
+    netloc = parts.netloc.rsplit("@", 1)[-1]
+    return urlunsplit((parts.scheme, netloc, path, "", ""))
 
 
 def filter_connection_passwords(connections: list[dict[str, Any]]) -> list[dict[str, Any]]:

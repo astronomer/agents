@@ -9,6 +9,8 @@ from astro_airflow_mcp.server import (
     _wrap_list_response,
     mcp,
 )
+from astro_airflow_mcp.tool_annotations import read_only
+from astro_airflow_mcp.tool_errors import error_payload, tool_error
 
 
 def _list_dag_warnings_impl(
@@ -32,7 +34,7 @@ def _list_dag_warnings_impl(
             return _wrap_list_response(data["dag_warnings"], "dag_warnings", data)
         return f"No DAG warnings found. Response: {data}"
     except Exception as e:
-        return str(e)
+        return tool_error(e)
 
 
 def _list_import_errors_impl(
@@ -56,10 +58,10 @@ def _list_import_errors_impl(
             return _wrap_list_response(data["import_errors"], "import_errors", data)
         return f"No import errors found. Response: {data}"
     except Exception as e:
-        return str(e)
+        return tool_error(e)
 
 
-@mcp.tool()
+@mcp.tool(annotations=read_only())
 def list_dag_warnings() -> str:
     """Get warnings and issues detected in DAG definitions.
 
@@ -81,7 +83,7 @@ def list_dag_warnings() -> str:
     return _list_dag_warnings_impl()
 
 
-@mcp.tool()
+@mcp.tool(annotations=read_only())
 def list_import_errors() -> str:
     """Get import errors from DAG files that failed to parse or load.
 
@@ -117,7 +119,7 @@ def list_import_errors() -> str:
 # =============================================================================
 
 
-@mcp.tool()
+@mcp.tool(annotations=read_only())
 def explore_dag(dag_id: str) -> str:
     """Comprehensive investigation of a DAG - get all relevant info in one call.
 
@@ -148,25 +150,25 @@ def explore_dag(dag_id: str) -> str:
     try:
         result["dag_info"] = adapter.get_dag(dag_id)
     except Exception as e:
-        result["dag_info"] = {"error": str(e)}
+        result["dag_info"] = error_payload(e, dag_id=dag_id)
 
     # Get tasks
     try:
         tasks_data = adapter.list_tasks(dag_id)
         result["tasks"] = tasks_data.get("tasks", [])
     except Exception as e:
-        result["tasks"] = {"error": str(e)}
+        result["tasks"] = error_payload(e, dag_id=dag_id)
 
     # Get DAG source
     try:
         result["source"] = adapter.get_dag_source(dag_id)
     except Exception as e:
-        result["source"] = {"error": str(e)}
+        result["source"] = error_payload(e, dag_id=dag_id)
 
     return json.dumps(result, indent=2)
 
 
-@mcp.tool()
+@mcp.tool(annotations=read_only())
 def diagnose_dag_run(dag_id: str, dag_run_id: str) -> str:
     """Diagnose issues with a specific DAG run - get run details and failed tasks.
 
@@ -198,7 +200,7 @@ def diagnose_dag_run(dag_id: str, dag_run_id: str) -> str:
     try:
         result["run_info"] = adapter.get_dag_run(dag_id, dag_run_id)
     except Exception as e:
-        result["run_info"] = {"error": str(e)}
+        result["run_info"] = error_payload(e, dag_id=dag_id, dag_run_id=dag_run_id)
         return json.dumps(result, indent=2)
 
     # Get task instances for this run
@@ -230,12 +232,12 @@ def diagnose_dag_run(dag_id: str, dag_run_id: str) -> str:
             "failed_tasks": failed_tasks,
         }
     except Exception as e:
-        result["task_instances"] = {"error": str(e)}
+        result["task_instances"] = error_payload(e, dag_id=dag_id, dag_run_id=dag_run_id)
 
     return json.dumps(result, indent=2)
 
 
-@mcp.tool()
+@mcp.tool(annotations=read_only())
 def get_system_health() -> str:
     """Get overall Airflow system health - import errors, warnings, and DAG stats.
 
@@ -264,7 +266,7 @@ def get_system_health() -> str:
     try:
         result["version"] = adapter.get_version()
     except Exception as e:
-        result["version"] = {"error": str(e)}
+        result["version"] = error_payload(e)
 
     # Get import errors
     try:
@@ -275,7 +277,7 @@ def get_system_health() -> str:
             "errors": import_errors,
         }
     except Exception as e:
-        result["import_errors"] = {"error": str(e)}
+        result["import_errors"] = error_payload(e)
 
     # Get DAG warnings
     try:
@@ -286,7 +288,7 @@ def get_system_health() -> str:
             "warnings": dag_warnings,
         }
     except Exception as e:
-        result["dag_warnings"] = {"error": str(e)}
+        result["dag_warnings"] = error_payload(e)
 
     # Get DAG stats
     try:

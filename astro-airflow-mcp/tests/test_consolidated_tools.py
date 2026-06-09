@@ -311,6 +311,36 @@ class TestClearDagRunTool:
         assert "Server error" in result
 
 
+class TestTriggerDagAndWait:
+    """Tests for trigger_dag_and_wait error propagation."""
+
+    def test_propagates_structured_trigger_failure_without_polling(self, mocker):
+        """If triggering fails, return the structured error and never poll."""
+        trigger_error = json.dumps(
+            {
+                "error": "boom",
+                "error_type": "NotFoundError",
+                "hint": "check the dag_id",
+                "retryable": True,
+            }
+        )
+        mocker.patch.object(dag_run_module, "_trigger_dag_impl", return_value=trigger_error)
+        sleep = mocker.patch("astro_airflow_mcp.tools.dag_run.time.sleep")
+        get_run = mocker.patch.object(dag_run_module, "_get_dag_run_impl")
+
+        result = dag_run_module._trigger_dag_and_wait_impl(dag_id="my_dag")
+        data = json.loads(result)
+
+        # Structured error fields survive the hand-off; timed_out is annotated.
+        assert data["error"] == "boom"
+        assert data["error_type"] == "NotFoundError"
+        assert data["retryable"] is True
+        assert data["timed_out"] is False
+        # We must not poll a run that was never created.
+        sleep.assert_not_called()
+        get_run.assert_not_called()
+
+
 class TestGetSystemHealth:
     """Tests for get_system_health consolidated tool."""
 

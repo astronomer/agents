@@ -3,6 +3,8 @@
 import json
 
 from astro_airflow_mcp.server import _get_adapter, _wrap_list_response, mcp
+from astro_airflow_mcp.tool_annotations import read_only, write
+from astro_airflow_mcp.tool_errors import tool_error
 
 
 def _get_task_impl(dag_id: str, task_id: str) -> str:
@@ -20,7 +22,7 @@ def _get_task_impl(dag_id: str, task_id: str) -> str:
         data = adapter.get_task(dag_id, task_id)
         return json.dumps(data, indent=2)
     except Exception as e:
-        return str(e)
+        return tool_error(e, dag_id=dag_id, task_id=task_id)
 
 
 def _list_tasks_impl(dag_id: str) -> str:
@@ -40,7 +42,7 @@ def _list_tasks_impl(dag_id: str) -> str:
             return _wrap_list_response(data["tasks"], "tasks", data)
         return f"No tasks found. Response: {data}"
     except Exception as e:
-        return str(e)
+        return tool_error(e, dag_id=dag_id)
 
 
 def _get_task_instance_impl(dag_id: str, dag_run_id: str, task_id: str) -> str:
@@ -59,7 +61,7 @@ def _get_task_instance_impl(dag_id: str, dag_run_id: str, task_id: str) -> str:
         data = adapter.get_task_instance(dag_id, dag_run_id, task_id)
         return json.dumps(data, indent=2)
     except Exception as e:
-        return str(e)
+        return tool_error(e, dag_id=dag_id, dag_run_id=dag_run_id, task_id=task_id)
 
 
 def _get_task_logs_impl(
@@ -93,7 +95,7 @@ def _get_task_logs_impl(
         )
         return json.dumps(data, indent=2)
     except Exception as e:
-        return str(e)
+        return tool_error(e, dag_id=dag_id, dag_run_id=dag_run_id, task_id=task_id)
 
 
 def _clear_task_instances_impl(
@@ -136,10 +138,10 @@ def _clear_task_instances_impl(
         )
         return json.dumps(data, indent=2)
     except Exception as e:
-        return str(e)
+        return tool_error(e, dag_id=dag_id, dag_run_id=dag_run_id, task_ids=task_ids)
 
 
-@mcp.tool()
+@mcp.tool(annotations=read_only())
 def get_task(dag_id: str, task_id: str) -> str:
     """Get detailed information about a specific task definition in a DAG.
 
@@ -177,7 +179,7 @@ def get_task(dag_id: str, task_id: str) -> str:
     return _get_task_impl(dag_id=dag_id, task_id=task_id)
 
 
-@mcp.tool()
+@mcp.tool(annotations=read_only())
 def list_tasks(dag_id: str) -> str:
     """Get all tasks defined in a specific DAG.
 
@@ -209,7 +211,7 @@ def list_tasks(dag_id: str) -> str:
     return _list_tasks_impl(dag_id=dag_id)
 
 
-@mcp.tool()
+@mcp.tool(annotations=read_only())
 def get_task_instance(dag_id: str, dag_run_id: str, task_id: str) -> str:
     """Get detailed information about a specific task instance execution.
 
@@ -242,7 +244,7 @@ def get_task_instance(dag_id: str, dag_run_id: str, task_id: str) -> str:
     return _get_task_instance_impl(dag_id=dag_id, dag_run_id=dag_run_id, task_id=task_id)
 
 
-@mcp.tool()
+@mcp.tool(annotations=read_only())
 def get_task_logs(
     dag_id: str,
     dag_run_id: str,
@@ -290,7 +292,7 @@ def get_task_logs(
     )
 
 
-@mcp.tool()
+@mcp.tool(annotations=write(destructive=True, idempotent=True))
 def clear_task_instances(
     dag_id: str,
     dag_run_id: str,
