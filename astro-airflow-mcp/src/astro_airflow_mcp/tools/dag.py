@@ -8,6 +8,8 @@ from astro_airflow_mcp.server import (
     _wrap_list_response,
     mcp,
 )
+from astro_airflow_mcp.tool_annotations import read_only, write
+from astro_airflow_mcp.tool_errors import tool_error
 
 
 def _get_dag_details_impl(dag_id: str) -> str:
@@ -24,10 +26,10 @@ def _get_dag_details_impl(dag_id: str) -> str:
         data = adapter.get_dag(dag_id)
         return json.dumps(data, indent=2)
     except Exception as e:
-        return str(e)
+        return tool_error(e, dag_id=dag_id)
 
 
-@mcp.tool()
+@mcp.tool(annotations=read_only())
 def get_dag_details(dag_id: str) -> str:
     """Get detailed information about a specific Apache Airflow DAG.
 
@@ -86,10 +88,10 @@ def _list_dags_impl(
             return _wrap_list_response(data["dags"], "dags", data)
         return f"No DAGs found. Response: {data}"
     except Exception as e:
-        return str(e)
+        return tool_error(e)
 
 
-@mcp.tool()
+@mcp.tool(annotations=read_only())
 def list_dags() -> str:
     """Get information about all Apache Airflow DAGs (Directed Acyclic Graphs).
 
@@ -130,10 +132,10 @@ def _get_dag_source_impl(dag_id: str) -> str:
         source_data = adapter.get_dag_source(dag_id)
         return json.dumps(source_data, indent=2)
     except Exception as e:
-        return str(e)
+        return tool_error(e, dag_id=dag_id)
 
 
-@mcp.tool()
+@mcp.tool(annotations=read_only())
 def get_dag_source(dag_id: str) -> str:
     """Get the source code for a specific Apache Airflow DAG.
 
@@ -171,10 +173,10 @@ def _get_dag_stats_impl(dag_ids: list[str] | None = None) -> str:
         stats_data = adapter.get_dag_stats(dag_ids=dag_ids)
         return json.dumps(stats_data, indent=2)
     except Exception as e:
-        return str(e)
+        return tool_error(e, dag_ids=dag_ids)
 
 
-@mcp.tool()
+@mcp.tool(annotations=read_only())
 def get_dag_stats(dag_ids: list[str] | None = None) -> str:
     """Get statistics about DAG runs (success/failure counts by state).
 
@@ -217,10 +219,10 @@ def _pause_dag_impl(dag_id: str) -> str:
         data = adapter.pause_dag(dag_id)
         return json.dumps(data, indent=2)
     except Exception as e:
-        return str(e)
+        return tool_error(e, dag_id=dag_id)
 
 
-@mcp.tool()
+@mcp.tool(annotations=write(destructive=False, idempotent=True))
 def pause_dag(dag_id: str) -> str:
     """Pause a DAG to prevent new scheduled runs from starting.
 
@@ -261,10 +263,10 @@ def _unpause_dag_impl(dag_id: str) -> str:
         data = adapter.unpause_dag(dag_id)
         return json.dumps(data, indent=2)
     except Exception as e:
-        return str(e)
+        return tool_error(e, dag_id=dag_id)
 
 
-@mcp.tool()
+@mcp.tool(annotations=write(destructive=False, idempotent=True))
 def unpause_dag(dag_id: str) -> str:
     """Unpause a DAG to allow scheduled runs to resume.
 

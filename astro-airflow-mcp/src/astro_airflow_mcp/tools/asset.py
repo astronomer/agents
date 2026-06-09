@@ -8,6 +8,8 @@ from astro_airflow_mcp.server import (
     _wrap_list_response,
     mcp,
 )
+from astro_airflow_mcp.tool_annotations import read_only
+from astro_airflow_mcp.tool_errors import tool_error
 
 
 def _list_assets_impl(
@@ -31,7 +33,7 @@ def _list_assets_impl(
             return _wrap_list_response(data["assets"], "assets", data)
         return f"No assets found. Response: {data}"
     except Exception as e:
-        return str(e)
+        return tool_error(e)
 
 
 def _list_asset_events_impl(
@@ -67,7 +69,12 @@ def _list_asset_events_impl(
             return _wrap_list_response(data["asset_events"], "asset_events", data)
         return f"No asset events found. Response: {data}"
     except Exception as e:
-        return str(e)
+        return tool_error(
+            e,
+            source_dag_id=source_dag_id,
+            source_run_id=source_run_id,
+            source_task_id=source_task_id,
+        )
 
 
 def _get_upstream_asset_events_impl(
@@ -99,10 +106,10 @@ def _get_upstream_asset_events_impl(
             )
         return json.dumps(data, indent=2)
     except Exception as e:
-        return str(e)
+        return tool_error(e, dag_id=dag_id, dag_run_id=dag_run_id)
 
 
-@mcp.tool()
+@mcp.tool(annotations=read_only())
 def list_assets() -> str:
     """Get data assets and datasets tracked by Airflow (data lineage).
 
@@ -130,7 +137,7 @@ def list_assets() -> str:
     return _list_assets_impl()
 
 
-@mcp.tool()
+@mcp.tool(annotations=read_only())
 def list_asset_events(
     source_dag_id: str | None = None,
     source_run_id: str | None = None,
@@ -174,7 +181,7 @@ def list_asset_events(
     )
 
 
-@mcp.tool()
+@mcp.tool(annotations=read_only())
 def get_upstream_asset_events(
     dag_id: str,
     dag_run_id: str,

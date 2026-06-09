@@ -224,3 +224,12 @@ class TestNormalizeAirflowUrl:
     def test_strips_query_and_fragment_and_slash(self):
         url = "https://h/p/?x=1#y"
         assert normalize_airflow_url(url) == "https://h/p"
+
+    def test_strips_embedded_credentials(self):
+        # Userinfo must never survive normalization — the URL can surface in
+        # logs and in structured tool errors returned to the model.
+        url = "https://user:pw@host.example.com/dep"
+        assert normalize_airflow_url(url) == "https://host.example.com/dep"
+
+    def test_preserves_host_and_port_when_stripping_credentials(self):
+        assert normalize_airflow_url("http://u:p@host:8080/api") == "http://host:8080/api"
