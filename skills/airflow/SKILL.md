@@ -390,3 +390,5 @@ af api variables/old_var -X DELETE
 | **migrating-airflow-2-to-3** | Upgrading DAGs from Airflow 2.x to 3.x |
 | **managing-astro-local-env** | Starting, stopping, or troubleshooting local Airflow |
 | **setting-up-astro-project** | Initializing a new Astro/Airflow project |
+| **airflow-state-store** | Per-task checkpointing, watermarks, crash-safe operators (Airflow 3.3+) |
+| **airflow-hitl** | Pausing a DAG for human approval or input (Airflow 3.1+) |
