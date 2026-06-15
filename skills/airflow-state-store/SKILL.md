@@ -1,9 +1,9 @@
 ---
 name: airflow-state-store
-description: Use when the user asks about task store, checkpointing in tasks, persisting state across retries, job IDs surviving worker crashes, watermarks, asset metadata, resumable tasks, crash-safe operators, or "what's new in Airflow 3.3". Also use proactively when reading a DAG that uses Variables or XCom for intra-task coordination state — flag the anti-pattern and recommend task_store or asset_store instead. Requires Airflow 3.3+.
+description: Use when the user asks about task state store, checkpointing in tasks, persisting state across retries, job IDs surviving worker crashes, watermarks, asset metadata, resumable tasks, crash-safe operators, or "what's new in Airflow 3.3". Also use proactively when reading a DAG that uses Variables or XCom for intra-task coordination state — flag the anti-pattern and recommend task_state_store or asset_state_store instead. Requires Airflow 3.3+.
 ---
 
-# Airflow Task Store (AIP-103)
+# Airflow Task State Store (AIP-103)
 
 Airflow 3.3 ships two key/value stores and a crash-safety mixin for operators that submit external jobs.
 
@@ -19,11 +19,11 @@ Airflow 3.3 ships two key/value stores and a crash-safety mixin for operators th
 
 | I need to… | Use |
 |---|---|
-| Persist a cursor, offset, or job ID so a retry can resume instead of restart | `task_store` |
-| Pass small coordination state within one task across retries (not between tasks) | `task_store` |
-| Store a watermark or last-processed timestamp per asset, surviving across Dag runs | `asset_store` |
-| Cache asset-level metadata (manifest hash, row count, schema version) | `asset_store` |
-| Make an existing non deferrable operator crash-safe when it submits to an external system | `task_store` or `ResumableJobMixin` |
+| Persist a cursor, offset, or job ID so a retry can resume instead of restart | `task_state_store` |
+| Pass small coordination state within one task across retries (not between tasks) | `task_state_store` |
+| Store a watermark or last-processed timestamp per asset, surviving across Dag runs | `asset_state_store` |
+| Cache asset-level metadata (manifest hash, row count, schema version) | `asset_state_store` |
+| Make an existing non deferrable operator crash-safe when it submits to an external system | `task_state_store` or `ResumableJobMixin` |
 
 **When NOT to use these:**
 - Passing data *between* tasks -> use XCom
@@ -38,18 +38,18 @@ When the user asks to review a DAG or asks "is there a better way", scan for the
 
 | Pattern seen in DAG | Problem | Recommend |
 |---|---|---|
-| `Variable.get(...)` / `Variable.set(...)` inside a `@task` body for per-run state | Variables are global and shared; no scoping to task instance or retry | `task_store` |
-| `context["ti"].xcom_push(key="job_id", ...)` to survive retries | XCom is scoped to a Dag run, not a retry; a new ti_id is issued per retry | `task_store` or `ResumableJobMixin` |
+| `Variable.get(...)` / `Variable.set(...)` inside a `@task` body for per-run state | Variables are global and shared; no scoping to task instance or retry | `task_state_store` |
+| `context["ti"].xcom_push(key="job_id", ...)` to survive retries | XCom is scoped to a Dag run, not a retry; a new ti_id is issued per retry | `task_state_store` or `ResumableJobMixin` |
 | Manual `if Variable.get("job_id"): reconnect else: submit` retry-resume logic | Reimplements what `ResumableJobMixin` already provides, without the crash-safety guarantee | `ResumableJobMixin` |
-| `Variable.set("last_processed_at", ...)` for watermarks | Global; any Dag or task can overwrite it; no scoping to asset | `asset_store` |
+| `Variable.set("last_processed_at", ...)` for watermarks | Global; any Dag or task can overwrite it; no scoping to asset | `asset_state_store` |
 
 Show a before/after snippet when flagging. Use the canonical examples in Steps 3–5 as the "after".
 
 ---
 
-## Step 3 — `task_store`: per-task coordination state
+## Step 3 — `task_state_store`: per-task coordination state
 
-`task_store` is a key/value store scoped to a single task instance identity (dag_id + run_id + task_id + map_index). It survives retries — a new retry on the same task reads the same store.
+`task_state_store` is a key/value store scoped to a single task instance identity (dag_id + run_id + task_id + map_index). It survives retries — a new retry on the same task reads the same store.
 
 ```python
 from airflow.sdk import dag, task
@@ -60,13 +60,13 @@ def etl_with_checkpoint():
 
     @task(retries=3)
     def process_records(**context):
-        task_store = context["task_store"]  # injected by Airflow, no setup needed
-        cursor = task_store.get("last_cursor", default=0)
+        task_state_store = context["task_state_store"]  # injected by Airflow, no setup needed
+        cursor = task_state_store.get("last_cursor", default=0)
         records = fetch_records_after(cursor)
         for record in records:
             process(record)
             cursor = record["id"]
-            task_store.set("last_cursor", cursor)   # checkpoint after each record
+            task_state_store.set("last_cursor", cursor)   # checkpoint after each record
 
     process_records()
 
@@ -77,13 +77,13 @@ etl_with_checkpoint()
 ```python
 from airflow.sdk import NEVER_EXPIRE
 
-task_store.get(key, default=None)                        # returns a JsonValue or default
-task_store.set(key, value)                               # uses default_retention_days
-task_store.set(key, value, retention=timedelta(days=7))  # per-key TTL override
-task_store.set(key, value, retention=NEVER_EXPIRE)       # never expires regardless of config
-task_store.delete(key)                                   # no-op if key does not exist
-task_store.clear()                                       # delete all keys for this task instance
-task_store.clear(all_map_indices=True)                   # most relevant to mapped tasks only and it wipes all map indices
+task_state_store.get(key, default=None)                        # returns a JsonValue or default
+task_state_store.set(key, value)                               # uses default_retention_days
+task_state_store.set(key, value, retention=timedelta(days=7))  # per-key TTL override
+task_state_store.set(key, value, retention=NEVER_EXPIRE)       # never expires regardless of config
+task_state_store.delete(key)                                   # no-op if key does not exist
+task_state_store.clear()                                       # delete all keys for this task instance
+task_state_store.clear(all_map_indices=True)                   # most relevant to mapped tasks only and it wipes all map indices
 ```
 
 **Key rules:**
@@ -94,15 +94,15 @@ task_store.clear(all_map_indices=True)                   # most relevant to mapp
 
 **Mapped tasks — each index has its own namespace:**
 
-When a task is dynamically mapped (`task.expand(...)`), each map index gets an isolated `task_store` scoped to its own `map_index`. Indices do not share state.
+When a task is dynamically mapped (`task.expand(...)`), each map index gets an isolated `task_state_store` scoped to its own `map_index`. Indices do not share state.
 
 ```python
 @task(retries=2)
 def process_partition(partition_id, **context):
-    task_store = context["task_store"]
+    task_state_store = context["task_state_store"]
     # Scoped to THIS index only — other indices have their own copy
-    cursor = task_store.get("cursor", default=0)
-    task_store.set("cursor", new_cursor)
+    cursor = task_state_store.get("cursor", default=0)
+    task_state_store.set("cursor", new_cursor)
 
 process_partition.expand(partition_id=[0, 1, 2, 3])
 ```
@@ -122,16 +122,17 @@ def process(**context):
 ```python
 @task(retries=3)
 def process(**context):
-    cursor = task_store.get("cursor", default=0)
+    task_state_store = context["task_state_store"]
+    cursor = task_state_store.get("cursor", default=0)
     # ... process ...
-    task_store.set("cursor", new_cursor)    # scoped to this task instance
+    task_state_store.set("cursor", new_cursor)    # scoped to this task instance
 ```
 
 ---
 
-## Step 4 — `asset_store`: per-asset metadata across Dag runs
+## Step 4 — `asset_state_store`: per-asset metadata across Dag runs
 
-`asset_store` is scoped to an asset, not a task instance. It persists across Dag runs — the same key on the same asset is readable and writable by any task that produces or consumes it.
+`asset_state_store` is scoped to an asset, not a task instance. It persists across Dag runs — the same key on the same asset is readable and writable by any task that produces or consumes it.
 
 ```python
 from airflow.sdk import DAG, Asset, task
@@ -142,15 +143,15 @@ ORDERS = Asset(name="orders/daily", uri="s3://warehouse/orders/daily")
 with DAG(dag_id="producer", schedule=None, start_date=datetime(2026, 1, 1), catchup=False):
 
     @task(inlets=[ORDERS], outlets=[ORDERS])
-    def load(asset_store=None):        # asset_store injected by Airflow — declare as a kwarg
-        asset_store = asset_store[ORDERS]
+    def load(asset_state_store=None):        # asset_state_store injected by Airflow — declare as a kwarg
+        asset_state_store = asset_state_store[ORDERS]
 
-        watermark = asset_store.get("watermark", default="2026-01-01T00:00:00+00:00")
+        watermark = asset_state_store.get("watermark", default="2026-01-01T00:00:00+00:00")
         records = fetch_records_since(watermark)
 
         now = datetime.now(tz=timezone.utc).isoformat()
-        asset_store.set("watermark", now)
-        asset_store.set("last_run_summary", {"rows_loaded": len(records), "completed_at": now})
+        asset_state_store.set("watermark", now)
+        asset_state_store.set("last_run_summary", {"rows_loaded": len(records), "completed_at": now})
 
     load()
 ```
@@ -160,31 +161,31 @@ with DAG(dag_id="producer", schedule=None, start_date=datetime(2026, 1, 1), catc
 with DAG(dag_id="consumer", schedule=[ORDERS], start_date=datetime(2026, 1, 1), catchup=False):
 
     @task(inlets=[ORDERS])
-    def consume(asset_store=None):
-        asset_store = asset_store[ORDERS]
-        summary = asset_store.get("last_run_summary") or {}
-        print(f"Processing {summary.get('rows_loaded')} rows up to {asset_store.get('watermark')}")
+    def consume(asset_state_store=None):
+        asset_state_store = asset_state_store[ORDERS]
+        summary = asset_state_store.get("last_run_summary") or {}
+        print(f"Processing {summary.get('rows_loaded')} rows up to {asset_state_store.get('watermark')}")
 
     consume()
 ```
 
 **Key rules:**
-- `asset_store` is injected by Airflow as a named kwarg — declare it as `def my_task(asset_store=None)`. Do NOT combine with `**context`; Airflow injects it separately.
+- `asset_state_store` is injected by Airflow as a named kwarg — declare it as `def my_task(asset_state_store=None)`. Do NOT combine with `**context`; Airflow injects it separately.
 - Use `datetime.now(tz=timezone.utc).isoformat()` for timestamps — never `datetime.utcnow()` (not timezone-aware).
-- Same JSON-serializable value constraint as `task_store`.
-- No per-key expiry — asset store entries have no TTL (the asset outlives any single run).
+- Same JSON-serializable value constraint as `task_state_store`.
+- No per-key expiry — asset state store entries have no TTL (the asset outlives any single run).
 - Readable by any Dag that declares the asset as an inlet or outlet.
 
 **Mapped tasks — last writer wins:**
 
-`asset_store` is scoped to the asset, not the map index. If multiple mapped indices write the same key concurrently, the last write wins. Use distinct keys per index or ensure only one index writes to a given key.
+`asset_state_store` is scoped to the asset, not the map index. If multiple mapped indices write the same key concurrently, the last write wins. Use distinct keys per index or ensure only one index writes to a given key.
 
 ```python
 @task(outlets=[my_asset])
-def load_partition(partition_id, asset_store=None):
-    asset_store = asset_store[my_asset]
+def load_partition(partition_id, asset_state_store=None):
+    asset_state_store = asset_state_store[my_asset]
     # Distinct key per index — no race condition
-    asset_store.set(f"offset_{partition_id}", new_offset)
+    asset_state_store.set(f"offset_{partition_id}", new_offset)
 ```
 
 **Before (anti-pattern):**
@@ -195,9 +196,9 @@ Variable.set(f"watermark_{asset_name}", new_offset)   # global, not scoped to as
 **After:**
 ```python
 @task(inlets=[my_asset], outlets=[my_asset])
-def load(asset_store=None):
-    asset_store = asset_store[my_asset]
-    asset_store.set("watermark", new_offset)
+def load(asset_state_store=None):
+    asset_state_store = asset_state_store[my_asset]
+    asset_state_store.set("watermark", new_offset)
 ```
 
 ---
@@ -217,13 +218,13 @@ from pydantic import JsonValue
 
 class MyBatchOperator(BaseOperator, ResumableJobMixin):
 
-    external_id_key = "batch_job_id"   # key used in task_store; set once, never rename
+    external_id_key = "batch_job_id"   # key used in task_state_store; set once, never rename
 
     def execute(self, context):
         return self.execute_resumable(context)  # never call self.execute() — call this
 
     def submit_job(self, context) -> JsonValue:
-        # Submit and return the job identifier. This value is persisted to task_store
+        # Submit and return the job identifier. This value is persisted to task_state_store
         # before polling starts. Return None only if the system has no trackable ID
         # (in that case crash-safety is disabled and the job resubmits on every retry).
         return self.hook.submit_batch(...)
@@ -258,7 +259,7 @@ class MyBatchOperator(BaseOperator, ResumableJobMixin):
 
 ### `external_id_key` warning
 
-> **Never rename `external_id_key` on an operator that is already deployed with in-flight task instances.** The old key is stored in `task_store` under the previous name. A rename makes the mixin treat every active retry as a fresh submission, defeating the crash-safety guarantee.
+> **Never rename `external_id_key` on an operator that is already deployed with in-flight task instances.** The old key is stored in `task_state_store` under the previous name. A rename makes the mixin treat every active retry as a fresh submission, defeating the crash-safety guarantee.
 
 ### Before (anti-pattern):
 ```python
@@ -288,22 +289,22 @@ class MySparkOperator(BaseOperator, ResumableJobMixin):
 ```ini
 [state_store]
 # Full dotted path to the storage backend. Default writes to the Airflow metadata DB.
-backend = airflow.state.metastore.MetastoreStoreBackend
+backend = airflow.state.metastore.MetastoreStateStoreBackend
 
-# Days to retain task store entries after their last update. 0 = disable time-based cleanup.
-# Does NOT affect asset_store rows — asset store has no TTL.
+# Days to retain task state store entries after their last update. 0 = disable time-based cleanup.
+# Does NOT affect asset_state_store rows — asset state store has no TTL.
 default_retention_days = 30
 
 # Rows deleted per batch during cleanup. 0 = no batching (single unbounded delete).
 # Tune on large deployments to reduce lock contention.
 state_cleanup_batch_size = 0
 
-# Auto-delete all task store keys when a task succeeds. Default: False.
-# Does NOT affect asset_store — asset store persists across runs and must be cleared explicitly.
+# Auto-delete all task state store keys when a task succeeds. Default: False.
+# Does NOT affect asset_state_store — asset state store persists across runs and must be cleared explicitly.
 clear_on_success = False
 ```
 
-**Worker-side backend** (optional, `[workers]` section) — routes task store writes through a local backend before they reach the API server. Useful when large payloads or credentialed storage should stay on the worker:
+**Worker-side backend** (optional, `[workers]` section) — routes task state store writes through a local backend before they reach the API server. Useful when large payloads or credentialed storage should stay on the worker:
 
 ```ini
 [workers]
@@ -316,8 +317,8 @@ state_store_backend = mypackage.store.WorkerSideBackend
 
 - [ ] Airflow version ≥ 3.3 (`af config version`)
 - [ ] Values are JSON-serializable (`str`, `int`, `float`, `bool`, `list`, `dict` — no `datetime`, no custom objects)
-- [ ] `task_store` keys are short, descriptive strings (avoid dots and slashes)
-- [ ] Mapped tasks writing to `asset_store`: use distinct keys per index or accept last-writer-wins semantics
+- [ ] `task_state_store` keys are short, descriptive strings (avoid dots and slashes)
+- [ ] Mapped tasks writing to `asset_state_store`: use distinct keys per index or accept last-writer-wins semantics
 - [ ] `ResumableJobMixin`: `external_id_key` is set and will not be renamed after deployment
 - [ ] `ResumableJobMixin`: `execute()` calls `self.execute_resumable(context)`, not custom logic
 - [ ] Large payloads (> configured `max_value_storage_bytes`) use a custom `[state_store] backend` or a worker side backend configured via: `[workers] state_store_backend`
