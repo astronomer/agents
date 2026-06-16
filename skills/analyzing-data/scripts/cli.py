@@ -216,29 +216,6 @@ def install_packages(packages: tuple):
         sys.exit(1)
 
 
-@main.command()
-def ensure():
-    """Ensure kernel is running (start if needed). Used by hooks."""
-    check_uv_installed()
-    km = KernelManager()
-    if km.is_running:
-        return
-
-    try:
-        config = WarehouseConfig.load()
-        wh_name, wh_config = config.get_default()
-        click.echo(f"Starting kernel with: {wh_name}", err=True)
-        env_vars = wh_config.get_env_vars_for_kernel()
-        extra_packages = wh_config.get_required_packages()
-        km.start(env_vars=env_vars, extra_packages=extra_packages)
-        result = km.execute(wh_config.to_python_prelude(), timeout=60.0)
-        if result.output:
-            click.echo(result.output, err=True)
-    except Exception as e:
-        click.echo(f"Warning: {e}", err=True)
-        km.start()
-
-
 @main.group()
 def concept():
     """Manage concept cache (concept -> table mappings)."""
