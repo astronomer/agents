@@ -199,7 +199,6 @@ class AirflowV2Adapter(AirflowAdapter):
         source_dag_id: str | None = None,
         source_run_id: str | None = None,
         source_task_id: str | None = None,
-        order_by: str = "-timestamp",
     ) -> dict[str, Any]:
         """List dataset events (Airflow 2.x naming).
 
@@ -207,9 +206,12 @@ class AirflowV2Adapter(AirflowAdapter):
         - 'dataset_events' -> 'asset_events'
         - 'dataset_uri' -> 'uri'
         - 'dataset_id' -> 'asset_id'
+
+        Note: The /datasets/events endpoint does not support order_by. Airflow
+        returns events sorted by timestamp descending by default.
         """
         try:
-            params: dict[str, Any] = {"limit": limit, "offset": offset, "order_by": order_by}
+            params: dict[str, Any] = {"limit": limit, "offset": offset}
             if source_dag_id:
                 params["source_dag_id"] = source_dag_id
             if source_run_id:
@@ -310,10 +312,21 @@ class AirflowV2Adapter(AirflowAdapter):
     def list_import_errors(
         self, limit: int = 100, offset: int = 0, order_by: str = "-import_error_id"
     ) -> dict[str, Any]:
-        """List import errors from DAG files."""
-        return self._call(
-            "importErrors", params={"limit": limit, "offset": offset, "order_by": order_by}
-        )
+        """List import errors from DAG files.
+
+        Note: The /importErrors endpoint does not support order_by. Sorting is
+        performed client-side after fetching results.
+        """
+        data = self._call("importErrors", params={"limit": limit, "offset": offset})
+        if "import_errors" in data and order_by:
+            reverse = order_by.startswith("-")
+            field = order_by.lstrip("-")
+            data["import_errors"] = sorted(
+                data["import_errors"],
+                key=lambda x: x.get(field, 0),
+                reverse=reverse,
+            )
+        return data
 
     def list_plugins(self, limit: int = 100, offset: int = 0) -> dict[str, Any]:
         """List installed Airflow plugins."""
