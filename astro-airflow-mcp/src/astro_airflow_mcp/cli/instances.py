@@ -9,7 +9,13 @@ from rich.console import Console
 from rich.table import Table
 
 from astro_airflow_mcp.cli.output import output_error
-from astro_airflow_mcp.config import ConfigError, ConfigManager, LayeredConfig, Scope
+from astro_airflow_mcp.config import (
+    ConfigError,
+    ConfigManager,
+    ConfigWriteError,
+    LayeredConfig,
+    Scope,
+)
 from astro_airflow_mcp.discovery import (
     DiscoveredInstance,
     DiscoveryError,
@@ -42,6 +48,10 @@ _SCOPE_FLAG_HELP = {
     "project": "Write to project-shared config (.astro/config.yaml, committed)",
     "local": "Write to project-local config (.astro/config.local.yaml, gitignored)",
 }
+
+
+def _output_config_error(error: Exception) -> None:
+    output_error(str(error), exit_code=2 if isinstance(error, ConfigWriteError) else 1)
 
 
 def _describe_auth(auth: Auth | None, *, verbose: bool = False) -> str:
@@ -101,7 +111,7 @@ def list_instances() -> None:
 
         console.print(table)
     except ConfigError as e:
-        output_error(str(e))
+        _output_config_error(e)
 
 
 @app.command("current")
@@ -122,7 +132,7 @@ def current_instance() -> None:
             console.print(f"URL: {instance.url}")
             console.print(f"Auth: {_describe_auth(instance.auth, verbose=True)}")
     except ConfigError as e:
-        output_error(str(e))
+        _output_config_error(e)
 
 
 @app.command("use")
@@ -186,7 +196,7 @@ def use_instance(
             highlight=False,
         )
     except (ConfigError, ValueError) as e:
-        output_error(str(e))
+        _output_config_error(e)
 
 
 @app.command("add")
@@ -278,7 +288,7 @@ def add_instance(
         if ca_cert:
             console.print(f"CA cert: {ca_cert}")
     except (ConfigError, ValueError) as e:
-        output_error(str(e))
+        _output_config_error(e)
 
 
 @app.command("delete")
@@ -304,7 +314,7 @@ def delete_instance(
         target = LayeredConfig().delete_instance(name, scope=scope)
         console.print(f"Deleted instance [bold]{name}[/bold] ([dim]{target.value}[/dim])")
     except (ConfigError, ValueError) as e:
-        output_error(str(e))
+        _output_config_error(e)
 
 
 @app.command("show")
@@ -338,7 +348,7 @@ def show_instance(
         if instance.ca_cert:
             console.print(f"CA cert: {instance.ca_cert}")
     except ConfigError as e:
-        output_error(str(e))
+        _output_config_error(e)
 
 
 @app.command("reset")
@@ -355,6 +365,7 @@ def reset_instances(
     """
     try:
         manager = ConfigManager()
+        manager.require_writable("af instance reset")
         config = manager.load()
 
         if not config.instances:
@@ -388,7 +399,7 @@ def reset_instances(
         console.print("  URL: http://localhost:8080")
 
     except ConfigError as e:
-        output_error(str(e))
+        _output_config_error(e)
 
 
 def _format_status(status: str | None) -> str:
@@ -577,10 +588,10 @@ def discover_all(
     # project would scan, then fail at write time.
     try:
         layered = LayeredConfig()
-        layered.assert_writable(write_scope)
+        layered.assert_writable(write_scope, command_name="af instance discover")
         existing_names = {inst.name for inst in layered.list_instances()}
     except ConfigError as e:
-        output_error(str(e))
+        _output_config_error(e)
         return
 
     registry = get_default_registry()
@@ -660,10 +671,10 @@ def discover_astro(
     # Validate write scope before hitting the Astro API.
     try:
         layered = LayeredConfig()
-        layered.assert_writable(write_scope)
+        layered.assert_writable(write_scope, command_name="af instance discover astro")
         existing_names = {inst.name for inst in layered.list_instances()}
     except ConfigError as e:
-        output_error(str(e))
+        _output_config_error(e)
         return
 
     registry = get_default_registry()
@@ -738,10 +749,10 @@ def discover_local(
     # Validate write scope before scanning ports.
     try:
         layered = LayeredConfig()
-        layered.assert_writable(write_scope)
+        layered.assert_writable(write_scope, command_name="af instance discover local")
         existing_names = {inst.name for inst in layered.list_instances()}
     except ConfigError as e:
-        output_error(str(e))
+        _output_config_error(e)
         return
 
     registry = get_default_registry()
