@@ -133,7 +133,12 @@ class AirflowV3Adapter(AirflowAdapter):
         return self._patch(f"dags/{dag_id}", json_data={"is_paused": False})
 
     def list_dag_runs(
-        self, dag_id: str | None = None, limit: int = 100, offset: int = 0, **kwargs: Any
+        self,
+        dag_id: str | None = None,
+        limit: int = 100,
+        offset: int = 0,
+        order_by: str = "-start_date",
+        **kwargs: Any,
     ) -> dict[str, Any]:
         """List DAG runs.
 
@@ -141,12 +146,13 @@ class AirflowV3Adapter(AirflowAdapter):
             dag_id: Optional DAG ID. Use '~' or None for all DAGs.
             limit: Maximum number of runs to return
             offset: Offset for pagination
+            order_by: Sort field. Prefix with '-' for descending (default: '-start_date')
             **kwargs: Additional filters (e.g., state, start_date_gte)
         """
         dag_id_param = dag_id if dag_id else "~"
         return self._call(
             f"dags/{dag_id_param}/dagRuns",
-            params={"limit": limit, "offset": offset},
+            params={"limit": limit, "offset": offset, "order_by": order_by},
             **kwargs,
         )
 
@@ -201,6 +207,7 @@ class AirflowV3Adapter(AirflowAdapter):
         source_dag_id: str | None = None,
         source_run_id: str | None = None,
         source_task_id: str | None = None,
+        order_by: str = "-timestamp",
     ) -> dict[str, Any]:
         """List asset events (Airflow 3.x).
 
@@ -208,7 +215,7 @@ class AirflowV3Adapter(AirflowAdapter):
         - 'asset_uri' -> 'uri'
         """
         try:
-            params: dict[str, Any] = {"limit": limit, "offset": offset}
+            params: dict[str, Any] = {"limit": limit, "offset": offset, "order_by": order_by}
             if source_dag_id:
                 params["source_dag_id"] = source_dag_id
             if source_run_id:
@@ -328,9 +335,13 @@ class AirflowV3Adapter(AirflowAdapter):
         """List DAG warnings."""
         return self._call("dagWarnings", params={"limit": limit, "offset": offset})
 
-    def list_import_errors(self, limit: int = 100, offset: int = 0) -> dict[str, Any]:
+    def list_import_errors(
+        self, limit: int = 100, offset: int = 0, order_by: str = "-import_error_id"
+    ) -> dict[str, Any]:
         """List import errors from DAG files."""
-        return self._call("importErrors", params={"limit": limit, "offset": offset})
+        return self._call(
+            "importErrors", params={"limit": limit, "offset": offset, "order_by": order_by}
+        )
 
     def list_plugins(self, limit: int = 100, offset: int = 0) -> dict[str, Any]:
         """List installed Airflow plugins."""
@@ -361,7 +372,12 @@ class AirflowV3Adapter(AirflowAdapter):
     # Airflow 3.x specific features
 
     def get_task_instances(
-        self, dag_id: str, dag_run_id: str, limit: int = 100, offset: int = 0
+        self,
+        dag_id: str,
+        dag_run_id: str,
+        limit: int = 100,
+        offset: int = 0,
+        order_by: str = "-start_date",
     ) -> dict[str, Any]:
         """List all task instances for a DAG run.
 
@@ -370,13 +386,14 @@ class AirflowV3Adapter(AirflowAdapter):
             dag_run_id: DAG run ID
             limit: Maximum number of task instances to return
             offset: Offset for pagination
+            order_by: Sort field. Prefix with '-' for descending (default: '-start_date')
 
         Available in Airflow 3.0+.
         """
         try:
             return self._call(
                 f"dags/{dag_id}/dagRuns/{dag_run_id}/taskInstances",
-                params={"limit": limit, "offset": offset},
+                params={"limit": limit, "offset": offset, "order_by": order_by},
             )
         except NotFoundError:
             return self._handle_not_found(f"dags/{dag_id}/dagRuns/{dag_run_id}/taskInstances")
