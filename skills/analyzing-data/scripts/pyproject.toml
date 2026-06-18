@@ -8,7 +8,15 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest", "sqlalchemy", "polars", "pandas", "pyyaml", "python-dotenv"]
+test = [
+    "pytest",
+    "sqlalchemy",
+    "polars",
+    "pandas",
+    "pyyaml",
+    "python-dotenv",
+    "jupyter-client>=8.0.0",
+]
 test-integration = [
     "pytest",
     "sqlalchemy",
@@ -19,4 +27,6 @@ test-integration = [
     "psycopg[binary]",
     "duckdb",
     "duckdb-engine",
+    "jupyter-client>=8.0.0",
+    "ipykernel>=6.0.0",
 ]
