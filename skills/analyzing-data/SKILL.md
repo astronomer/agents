@@ -49,8 +49,21 @@ Answer business questions by querying the data warehouse. The kernel auto-starts
 |----------|---------|
 | `run_sql(query, limit=100)` | Polars DataFrame |
 | `run_sql_pandas(query, limit=100)` | Pandas DataFrame |
+| `run_sql_many(queries, limit=100)` | List of Polars DataFrames (one per query) |
 
 `pl` (Polars) and `pd` (Pandas) are pre-imported.
+
+**Run independent queries together** with `run_sql_many` — they execute concurrently (Snowflake async / connection-pool fan-out) instead of one at a time:
+
+```bash
+uv run scripts/cli.py exec "dfs = run_sql_many(['SELECT ...', 'SELECT ...']); print(dfs[0])"
+```
+
+`run_sql_many` is **fail-fast**: if any query errors, the call raises and the results of the queries that succeeded are discarded. Use separate `run_sql` calls if you need partial results.
+
+**Timeouts:** `exec` waits up to 120s by default, then interrupts the query and returns a "client stopped waiting" message (the query may still finish server-side). Raise it for known long-running queries: `uv run scripts/cli.py exec "..." -t 600`.
+
+**Idle kernel:** the kernel self-terminates after 2h idle (preserving state until then). Override with `ASTRO_KERNEL_IDLE_TIMEOUT` (seconds; `0` disables).
 
 ## CLI Reference
 

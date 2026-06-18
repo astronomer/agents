@@ -121,7 +121,13 @@ def start(warehouse: str | None):
 
 @main.command("exec")
 @click.argument("code")
-@click.option("--timeout", "-t", default=30.0, help="Timeout in seconds")
+@click.option(
+    "--timeout",
+    "-t",
+    default=120.0,
+    help="Seconds the client waits before interrupting the query (it may keep "
+    "running server-side). Raise for known long-running queries.",
+)
 def execute(code: str, timeout: float):
     """Execute Python code in the kernel. Auto-starts kernel if not running."""
     km = KernelManager()

@@ -264,7 +264,7 @@ import os""")
         if self.query_tag:
             status_lines.append(f'print(f"   Query Tag: {self.query_tag}")')
         status_lines.append(
-            'print("\\nAvailable: run_sql(query) -> polars, run_sql_pandas(query) -> pandas")'
+            'print("\\nAvailable: run_sql(query) -> polars, run_sql_pandas(query) -> pandas, run_sql_many([q1, q2]) -> [polars, ...]")'
         )
         sections.append("\n".join(status_lines))
 
@@ -328,22 +328,26 @@ class PostgresConnector(DatabaseConnector):
         return env_vars
 
     def to_python_prelude(self) -> str:
-        lines = ["_conn = psycopg.connect("]
-        lines.append(f"    host={self.host!r},")
-        lines.append(f"    port={self.port},")
-        lines.append(f"    user={self.user!r},")
+        # Build a _connect() factory (not a bare connection) so run_sql_many can
+        # open one connection per worker thread for real concurrency.
+        lines = ["    return psycopg.connect("]
+        lines.append(f"        host={self.host!r},")
+        lines.append(f"        port={self.port},")
+        lines.append(f"        user={self.user!r},")
         if self.password_env_var:
-            lines.append(f"    password=os.environ.get({self.password_env_var!r}),")
+            lines.append(f"        password=os.environ.get({self.password_env_var!r}),")
         elif self.password:
-            lines.append(f"    password={self.password!r},")
-        lines.append(f"    dbname={self.database!r},")
+            lines.append(f"        password={self.password!r},")
+        lines.append(f"        dbname={self.database!r},")
         if self.sslmode:
-            lines.append(f"    sslmode={self.sslmode!r},")
+            lines.append(f"        sslmode={self.sslmode!r},")
         if self.application_name:
-            lines.append(f"    application_name={self.application_name!r},")
-        lines.append("    autocommit=True,")
-        lines.append(")")
-        connection_code = "\n".join(lines)
+            lines.append(f"        application_name={self.application_name!r},")
+        lines.append("        autocommit=True,")
+        lines.append("    )")
+        connection_code = (
+            "def _connect():\n" + "\n".join(lines) + "\n\n_conn = _connect()"
+        )
 
         status_lines = [
             'print("PostgreSQL connection established")',
@@ -354,11 +358,12 @@ class PostgresConnector(DatabaseConnector):
         if self.application_name:
             status_lines.append(f'print("   Application: {self.application_name}")')
         status_lines += [
-            'print("\\nAvailable: run_sql(query) -> polars, run_sql_pandas(query) -> pandas")',
+            'print("\\nAvailable: run_sql(query) -> polars, run_sql_pandas(query) -> pandas, run_sql_many([q1, q2]) -> [polars, ...]")',
         ]
         status_code = "\n".join(status_lines)
 
         return f'''import psycopg
+from concurrent.futures import ThreadPoolExecutor
 import polars as pl
 import pandas as pd
 import os
@@ -387,6 +392,33 @@ def run_sql_pandas(query: str, limit: int = 100):
         rows = cursor.fetchall()
         df = pd.DataFrame(rows, columns=columns)
         return df.head(limit) if limit > 0 and len(df) > limit else df
+
+
+def run_sql_many(queries, limit: int = 100):
+    """Run independent queries concurrently, one connection per worker thread,
+    returning one Polars DataFrame per query in input order.
+
+    Fail-fast: raises on the first failing query (in input order); queued queries
+    that haven't started are cancelled and the call won't block on the rest, but
+    queries already running aren't cancelled and may finish server-side."""
+    def _one(query):
+        with _connect() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(query)
+                if cursor.description is None:
+                    return pl.DataFrame()
+                columns = [desc[0] for desc in cursor.description]
+                rows = cursor.fetchall()
+                df = pl.DataFrame(rows, schema=columns, orient="row")
+                return df.head(limit) if limit > 0 and len(df) > limit else df
+    ex = ThreadPoolExecutor(max_workers=min(len(queries), 8) or 1)
+    try:
+        futures = [ex.submit(_one, q) for q in queries]
+        return [f.result() for f in futures]
+    finally:
+        # Don't block on in-flight queries when a sibling fails or the cell is
+        # interrupted; cancel anything still queued so the kernel frees up fast.
+        ex.shutdown(wait=False, cancel_futures=True)
 
 {status_code}'''
 
@@ -492,11 +524,12 @@ _client = bigquery.Client(project={self.project!r}, credentials=_credentials)"""
         if self.labels:
             status_lines.append(f'print(f"   Labels: {self.labels!r}")')
         status_lines.append(
-            'print("\\nAvailable: run_sql(query) -> polars, run_sql_pandas(query) -> pandas")'
+            'print("\\nAvailable: run_sql(query) -> polars, run_sql_pandas(query) -> pandas, run_sql_many([q1, q2]) -> [polars, ...]")'
         )
         status_code = "\n".join(status_lines)
 
         return f'''from google.cloud import bigquery
+from concurrent.futures import ThreadPoolExecutor
 import polars as pl
 import pandas as pd
 import os
@@ -518,6 +551,28 @@ def run_sql_pandas(query: str, limit: int = 100):
     query_job = _client.query(query, job_config=job_config{query_extra_args})
     df = query_job.to_dataframe()
     return df.head(limit) if limit > 0 and len(df) > limit else df
+
+
+def run_sql_many(queries, limit: int = 100):
+    """Run independent queries concurrently (the BigQuery client is thread-safe),
+    returning one Polars DataFrame per query in input order.
+
+    Fail-fast: raises on the first failing query (in input order); queued queries
+    that haven't started are cancelled and the call won't block on the rest, but
+    queries already running aren't cancelled and may finish server-side."""
+    def _one(query):
+        job_config = bigquery.QueryJobConfig({job_config_str})
+        query_job = _client.query(query, job_config=job_config{query_extra_args})
+        result = pl.from_pandas(query_job.to_dataframe())
+        return result.head(limit) if limit > 0 and len(result) > limit else result
+    ex = ThreadPoolExecutor(max_workers=min(len(queries), 8) or 1)
+    try:
+        futures = [ex.submit(_one, q) for q in queries]
+        return [f.result() for f in futures]
+    finally:
+        # Don't block on in-flight queries when a sibling fails or the cell is
+        # interrupted; cancel anything still queued so the kernel frees up fast.
+        ex.shutdown(wait=False, cancel_futures=True)
 
 {status_code}'''
 
@@ -678,6 +733,7 @@ class SQLAlchemyConnector(DatabaseConnector):
         databases_str = ", ".join(self.databases)
 
         return f'''from sqlalchemy import create_engine, text
+from concurrent.futures import ThreadPoolExecutor
 import polars as pl
 import pandas as pd
 import os
@@ -708,9 +764,37 @@ def run_sql_pandas(query: str, limit: int = 100):
         return df.head(limit) if limit > 0 and len(df) > limit else df
     return pd.DataFrame()
 
+
+def run_sql_many(queries, limit: int = 100):
+    """Run independent queries concurrently via the engine's connection pool,
+    returning one Polars DataFrame per query in input order. Each query runs on
+    its own pooled connection in a worker thread (the pool serializes access per
+    connection, so this is safe for both server and file databases).
+
+    Fail-fast: raises on the first failing query (in input order); queued queries
+    that haven't started are cancelled and the call won't block on the rest, but
+    queries already running aren't cancelled and may finish server-side."""
+    def _one(query):
+        with _engine.connect() as conn:
+            result = conn.execute(text(query))
+            if not result.returns_rows:
+                return pl.DataFrame()
+            columns = list(result.keys())
+            rows = result.fetchall()
+            df = pl.DataFrame(rows, schema=columns, orient="row")
+            return df.head(limit) if limit > 0 and len(df) > limit else df
+    ex = ThreadPoolExecutor(max_workers=min(len(queries), {self.pool_size}) or 1)
+    try:
+        futures = [ex.submit(_one, q) for q in queries]
+        return [f.result() for f in futures]
+    finally:
+        # Don't block on in-flight queries when a sibling fails or the cell is
+        # interrupted; cancel anything still queued so the kernel frees up fast.
+        ex.shutdown(wait=False, cancel_futures=True)
+
 print("{db_type} connection established (via SQLAlchemy)")
 print(f"   Database(s): {databases_str}")
-print("\\nAvailable: run_sql(query) -> polars, run_sql_pandas(query) -> pandas")'''
+print("\\nAvailable: run_sql(query) -> polars, run_sql_pandas(query) -> pandas, run_sql_many([q1, q2]) -> [polars, ...]")'''
 
 
 __all__ = [
