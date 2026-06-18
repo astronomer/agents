@@ -15,9 +15,31 @@ class AirflowV2Adapter(AirflowAdapter):
         """API base path for Airflow 2.x."""
         return "/api/v1"
 
-    def list_dags(self, limit: int = 100, offset: int = 0, **kwargs: Any) -> dict[str, Any]:
+    def list_dags(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        order_by: str = "-dag_id",
+        tags: list[str] | None = None,
+        dag_id_pattern: str | None = None,
+        only_active: bool = True,
+        paused: bool | None = None,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
         """List all DAGs."""
-        return self._call("dags", params={"limit": limit, "offset": offset}, **kwargs)
+        params: dict[str, Any] = {
+            "limit": limit,
+            "offset": offset,
+            "order_by": order_by,
+            "only_active": only_active,
+        }
+        if tags is not None:
+            params["tags"] = tags
+        if dag_id_pattern is not None:
+            params["dag_id_pattern"] = dag_id_pattern
+        if paused is not None:
+            params["paused"] = paused
+        return self._call("dags", params=params, **kwargs)
 
     def get_dag(self, dag_id: str) -> dict[str, Any]:
         """Get details of a specific DAG."""
@@ -65,6 +87,9 @@ class AirflowV2Adapter(AirflowAdapter):
         limit: int = 100,
         offset: int = 0,
         order_by: str = "-start_date",
+        state: list[str] | None = None,
+        start_date_gte: str | None = None,
+        start_date_lte: str | None = None,
         **kwargs: Any,
     ) -> dict[str, Any]:
         """List DAG runs.
@@ -72,9 +97,16 @@ class AirflowV2Adapter(AirflowAdapter):
         Note: Airflow 2 requires dag_id. Use '~' to list runs for all DAGs.
         """
         dag_id_param = dag_id if dag_id else "~"
+        params: dict[str, Any] = {"limit": limit, "offset": offset, "order_by": order_by}
+        if state is not None:
+            params["state"] = state
+        if start_date_gte is not None:
+            params["start_date_gte"] = start_date_gte
+        if start_date_lte is not None:
+            params["start_date_lte"] = start_date_lte
         return self._call(
             f"dags/{dag_id_param}/dagRuns",
-            params={"limit": limit, "offset": offset, "order_by": order_by},
+            params=params,
             **kwargs,
         )
 
