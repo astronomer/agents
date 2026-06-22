@@ -1,13 +1,13 @@
 ---
 name: migrating-ai-sdk-to-common-ai
-description: Migrates Airflow projects from airflow-ai-sdk to apache-airflow-providers-common-ai 0.1.0+. Use this skill when the user wants to replace airflow-ai-sdk with the official Airflow AI provider, migrate LLM decorators (@task.llm, @task.agent, @task.llm_branch, @task.embed), switch from model strings/objects to connection-based LLM configuration, or update imports from airflow_ai_sdk to the new provider. Also trigger when the user mentions common-ai provider, AIP-99, pydanticai connection, or migrating away from airflow-ai-sdk.
+description: Migrates Airflow projects from airflow-ai-sdk to apache-airflow-providers-common-ai 0.4.0+. Use this skill when the user wants to replace airflow-ai-sdk with the official Airflow AI provider, migrate LLM decorators (@task.llm, @task.agent, @task.llm_branch, @task.embed), switch from model strings/objects to connection-based LLM configuration, update imports from airflow_ai_sdk to the new provider, or upgrade an existing common-ai 0.1.x setup to 0.4.x (multimodal prompts, toolsets, embedding operators). Also trigger when the user mentions common-ai provider, AIP-99, pydanticai connection, or migrating away from airflow-ai-sdk.
 ---
 
 # Migrate airflow-ai-sdk to apache-airflow-providers-common-ai
 
-This skill migrates Airflow projects from `airflow-ai-sdk` to `apache-airflow-providers-common-ai` (0.1.0+), the official Airflow AI provider built on PydanticAI.
+This skill migrates Airflow projects from `airflow-ai-sdk` to `apache-airflow-providers-common-ai` (target **0.4.0+**), the official Airflow AI provider built on PydanticAI. It also covers upgrading projects already on common-ai 0.1.x, since several capabilities (multimodal prompts, `toolsets`, embedding operators, structured-output XCom behavior) changed between 0.1.0 and 0.4.0.
 
-> **CRITICAL**: The new provider requires **Airflow 3.0+** and **pydantic-ai-slim >= 1.34.0**. The API surface has changed: LLM configuration moves from code (model strings/objects) to Airflow connections (`pydanticai` type). There is no `@task.embed` in the new provider.
+> **CRITICAL**: The new provider requires **Airflow 3.0+** and (for 0.4.0) **pydantic-ai-slim >= 1.71.0**. The API surface has changed: LLM configuration moves from code (model strings/objects) to Airflow connections (`pydanticai` type). There is no `@task.embed` in the new provider; embeddings move to the LlamaIndex integration or a plain `@task` (see Step 3).
 
 ## Before starting
 
@@ -38,12 +38,12 @@ airflow-ai-sdk[openai]
 
 **Add:**
 ```
-apache-airflow-providers-common-ai[openai]>=0.1.0
+apache-airflow-providers-common-ai[openai]>=0.4.0
 ```
 
-Use the latest available 0.x version unless the user has pinned a specific one. Available extras match the LLM provider: `[openai]`, `[anthropic]`, `[google]`, `[bedrock]`, `[groq]`, `[mistral]`, `[mcp]`.
+Use the latest available 0.x version unless the user has pinned a specific one. Available extras (0.4.0): `[openai]`, `[anthropic]`, `[google]`, `[bedrock]`, `[llamaindex]`, `[langchain]`, `[mcp]`, plus file-format extras (`[pdf]`, `[docx]`, `[parquet]`, `[avro]`) for `DocumentLoaderOperator` and `[sql]`/`[common-sql]` for the SQL operators. There are no `[groq]`/`[mistral]` extras; for those providers install the matching `pydantic-ai-slim` extra yourself.
 
-Keep `sentence-transformers` and `torch` if the project uses embeddings (they now run via plain `@task` instead of `@task.embed`).
+Add `[llamaindex]` if the project migrates `@task.embed` to the `LlamaIndexEmbeddingOperator` (recommended, see Step 3). In that case `sentence-transformers` and `torch` can usually be **removed**, which shrinks the image considerably. Keep them only if the project stays on local sentence-transformers embeddings via plain `@task`.
 
 ---
 
@@ -106,6 +106,10 @@ The env var name determines the connection ID:
 1. `model_id` parameter on the decorator/operator (highest)
 2. `model` in connection's extra JSON (fallback)
 
+### Other connection types (0.4.0)
+
+Besides `pydanticai`, the provider registers vendor-specific connection types: `pydanticai-azure` (Azure OpenAI: host = endpoint, extra `api_version`), `pydanticai-bedrock` (AWS credentials/region in extra), and `pydanticai-vertex` (GCP project/location in extra). The LlamaIndex and LangChain hooks read API key/host/extra from whatever connection ID they are given, so a single `pydanticai_default` connection can serve LLM calls **and** embeddings: one API key entry for the whole project.
+
 ---
 
 ## Step 3: Migrate decorators
@@ -154,6 +158,22 @@ def my_task(text: str) -> str:
 | (not available) | `model_id="openai:gpt-5"` | Override connection's model |
 | (not available) | `require_approval=True` | Built-in HITL review |
 | (not available) | `agent_params={...}` | Extra kwargs for pydantic-ai Agent |
+| (not available) | `serialize_output=True` | Force dict shape for BaseModel output |
+
+**Multimodal prompts (0.4.0+):** the translation function may return a `Sequence[UserContent]` instead of a string, e.g. for vision:
+
+```python
+@task.llm(llm_conn_id="pydanticai_default", system_prompt="...", output_type=ReviewAnalysis)
+def analyze(text: str, image_path: str | None = None):
+    if image_path:
+        with open(image_path, "rb") as f:
+            return [text, BinaryContent(data=f.read(), media_type="image/jpeg")]
+    return text
+```
+
+This matches the old airflow-ai-sdk vision pattern, so vision code migrates unchanged. Note: common-ai **0.1.x only accepted strings** — if a project disabled vision to migrate to 0.1.0, re-enable it when bumping to 0.4.0. Non-string prompts are incompatible with `require_approval=True` / `enable_hitl_review=True` (both render the prompt as text).
+
+**Structured output via XCom (0.4.0 behavior change):** with `output_type=<BaseModel subclass>`, the model **instance** flows through XCom on Airflow cores whose task SDK has `SUPPORTS_OPERATOR_DESERIALIZATION_WALKER` (attribute access downstream); on older cores (including Astro Runtime 3.2 task SDK 1.2.x) the provider automatically dumps to a **dict** (subscript access). Check which shape arrives at runtime before choosing attribute vs dict access downstream, or set `serialize_output=True` to force the dict shape everywhere. The `output_type` class must be defined at **module scope** (nested classes cannot be deserialized from XCom).
 
 ### @task.llm_branch
 
@@ -198,10 +218,12 @@ def research(question: str) -> str:
     return question
 
 # AFTER (common-ai provider) - No Agent object, config via parameters
+from pydantic_ai.toolsets import FunctionToolset
+
 @task.agent(
     llm_conn_id="pydanticai_default",
     system_prompt="You are a research assistant.",
-    agent_params={"tools": [search_tool, lookup_tool]},
+    toolsets=[FunctionToolset(tools=[search_tool, lookup_tool])],
 )
 def research(question: str) -> str:
     return question
@@ -213,37 +235,61 @@ def research(question: str) -> str:
 |----------------|-------------------|-------|
 | `agent=Agent(model, ...)` | `llm_conn_id="..."` | Model from connection |
 | Agent's `system_prompt` | `system_prompt="..."` | Now a decorator param |
-| Agent's `tools=[...]` | `agent_params={"tools": [...]}` | Tools via agent_params dict |
+| Agent's `tools=[...]` | `toolsets=[FunctionToolset(tools=[...])]` | Preferred: gets automatic tool-call logging |
+| Agent's `tools=[...]` | `agent_params={"tools": [...]}` | Also works, but no tool-call logging |
 | Agent's `output_type` | `output_type=MyModel` | Now a decorator param |
-| (not available) | `toolsets=[...]` | pydantic-ai 1.x Toolset objects |
-| (not available) | `durable=True` | Step-level caching |
-| (not available) | `enable_hitl_review=True` | Iterative human review loop |
+| (not available) | `durable=True` | Step-level caching (needs `[common.ai] durable_cache_path`) |
+| (not available) | `enable_hitl_review=True` | Iterative human review loop (see below) |
 
-**Key insight:** Everything that was configured on the `Agent()` constructor now goes into either a top-level decorator parameter or `agent_params`. The `agent_params` dict is passed directly to pydantic-ai's `Agent` constructor.
+**Key insight:** Everything that was configured on the `Agent()` constructor now goes into either a top-level decorator parameter or `agent_params`. The `agent_params` dict is passed directly to pydantic-ai's `Agent` constructor. Prefer `toolsets` over `agent_params["tools"]`: the operator wraps each toolset in a `LoggingToolset`, so every tool call appears in the task log with timing.
 
-### @task.embed (NO EQUIVALENT)
+**enable_hitl_review behavior:** the task generates a first draft, then **blocks** until a human acts. The reviewer uses the **HITL Review** tab/extra link on the task instance (chat UI from the provider's auto-registered `hitl_review` plugin) to request changes (agent regenerates with the feedback in its message history) or approve. Constraints: requires a string prompt, incompatible with `durable=True`, and the final (possibly regenerated) output is what flows to XCom. Warn users that the Dag run waits indefinitely at this task unless `hitl_timeout` is set. For headless testing, the plugin exposes REST endpoints under `/hitl-review`: `GET /sessions/find`, `POST /sessions/feedback`, `POST /sessions/approve`, `POST /sessions/reject` (query params `dag_id`, `task_id`, `run_id`, `map_index`).
 
-The new provider does NOT include an embed decorator. Replace with a plain `@task`:
+### @task.embed (NO EQUIVALENT — three replacement options)
+
+The new provider does NOT include an embed decorator. Pick the replacement based on what the project needs:
+
+**Option A (recommended): `LlamaIndexEmbeddingOperator`** (0.4.0, `[llamaindex]` extra). Connection-based, one task embeds the whole document list, and with `persist_dir` the resulting vector index is persisted for retrieval (pairs with `LlamaIndexRetrievalOperator`):
 
 ```python
-# BEFORE (airflow-ai-sdk)
-@task.embed(
-    model_name="all-MiniLM-L6-v2",
-    encode_kwargs={"normalize_embeddings": True},
-    max_active_tis_per_dagrun=1,
-)
-def embed_text(text: str) -> str:
-    return text
+from airflow.providers.common.ai.operators.llamaindex_embedding import LlamaIndexEmbeddingOperator
 
-# AFTER (plain @task with sentence-transformers)
-@task(max_active_tis_per_dagrun=1)
-def embed_text(text: str) -> list[float]:
-    from sentence_transformers import SentenceTransformer
-    model = SentenceTransformer("all-MiniLM-L6-v2")
-    return model.encode(text, normalize_embeddings=True).tolist()
+_embeddings = LlamaIndexEmbeddingOperator(
+    task_id="create_embeddings",
+    documents=[{"text": "...", "metadata": {"id": 1}}, ...],  # templated, accepts XComArg
+    llm_conn_id="pydanticai_default",   # reuses the same connection (API key only)
+    embed_model="text-embedding-3-small",
+    persist_dir=f"{AIRFLOW_HOME}/include/my_index",  # optional; local path or s3://, gs://, ...
+)
 ```
 
-Note: The model is loaded on each task execution. For small workloads this is fine. For large batches, consider embedding all texts in a single task instead of using `.expand()`.
+The operator returns `{"chunks": [{"text", "metadata", "vector"}], ...}`. Put a stable key into each document's `metadata` — it round-trips through chunking, so vectors can be mapped back to source records.
+
+**Option B: `LlamaIndexHook` for raw vectors** (no operator, no persisted index). Shortest path when vectors go straight to a database:
+
+```python
+@task
+def create_embeddings(rows):
+    from airflow.providers.common.ai.hooks.llamaindex import LlamaIndexHook
+    embed_model = LlamaIndexHook(
+        llm_conn_id="pydanticai_default",
+        embed_model="text-embedding-3-small",
+    ).get_embedding_model()
+    vectors = embed_model.get_text_embedding_batch([r["text"] for r in rows])
+    return list(zip([r["id"] for r in rows], vectors))
+```
+
+**Option C: plain `@task` with sentence-transformers** (keeps the old local/offline behavior, no API cost; requires keeping `sentence-transformers` + `torch` in requirements):
+
+```python
+@task
+def embed_texts(texts: list[str]) -> list[list[float]]:
+    from sentence_transformers import SentenceTransformer
+    model = SentenceTransformer("all-MiniLM-L6-v2")
+    return model.encode(texts, normalize_embeddings=True).tolist()
+```
+
+Note on dimensions: switching from `all-MiniLM-L6-v2` (384) to `text-embedding-3-small` (1536) changes vector size — existing stored embeddings must be regenerated, and fixed-size vector columns (e.g. pgvector `vector(384)`) need a schema change. Embed all texts in one task/batch call rather than `.expand()` per text: batching is one API round-trip and avoids per-task model loading.
 
 ---
 
@@ -257,10 +303,11 @@ Note: The model is loaded on each task execution. For small workloads this is fi
 | `class Foo(ai_sdk.BaseModel):` | `class Foo(BaseModel):` |
 | `from pydantic_ai import Agent` | Remove if Agent was only used for `@task.agent` |
 | `from pydantic_ai.models.openai import OpenAIModel` | Remove (model config in connection now) |
+| (new) | `from pydantic_ai.toolsets import FunctionToolset` for `@task.agent` toolsets |
 
 The `@task.llm`, `@task.agent`, `@task.llm_branch` decorators are auto-registered by the provider. No explicit import needed beyond `from airflow.sdk import task`.
 
-`pydantic_ai` imports for non-decorator usage (e.g., `BinaryContent` for multimodal) are still valid since the new provider depends on `pydantic-ai-slim>=1.34.0`.
+`pydantic_ai` imports for non-decorator usage (e.g., `BinaryContent` for multimodal) are still valid since the new provider depends on `pydantic-ai-slim` (>= 1.71.0 for provider 0.4.0).
 
 ---
 
@@ -317,9 +364,12 @@ Verify:
 - [ ] No imports from `airflow_ai_sdk`
 - [ ] No `Agent()` objects created for `@task.agent` (unless used outside decorators)
 - [ ] No `model=` parameter on LLM decorators (should be `llm_conn_id=`)
-- [ ] All `@task.embed` replaced with plain `@task`
+- [ ] All `@task.embed` replaced (LlamaIndex operator/hook or plain `@task`); stored embeddings regenerated if the model/dimensions changed
+- [ ] Vision translation functions return `[text, BinaryContent(...)]` again if they were string-only-restricted under common-ai 0.1.x
+- [ ] Downstream consumers of `output_type=BaseModel` results use the XCom shape that actually arrives (dict on older cores, instance on newer; `serialize_output=True` pins it)
 - [ ] `pydanticai` connection configured in `.env` or connections.yaml
-- [ ] `requirements.txt` has `apache-airflow-providers-common-ai[...]` instead of `airflow-ai-sdk[...]`
+- [ ] `requirements.txt` has `apache-airflow-providers-common-ai[...]` instead of `airflow-ai-sdk[...]`; `torch`/`sentence-transformers` removed if no longer used
+- [ ] Run the Dags end-to-end: tasks with `enable_hitl_review=True` or `require_approval=True` wait for human input, so the test plan must include acting on them (UI tab or `/hitl-review` REST)
 
 ---
 
@@ -327,12 +377,16 @@ Verify:
 
 These features are available after migration but have no airflow-ai-sdk equivalent:
 
-| Feature | Parameter | Description |
-|---------|-----------|-------------|
-| HITL approval | `require_approval=True` on `@task.llm` | Pause for human review before returning |
-| HITL review loop | `enable_hitl_review=True` on `@task.agent` | Iterative review with regeneration |
-| Durable execution | `durable=True` on `@task.agent` | Step-level caching for resilience |
-| Tool logging | `enable_tool_logging=True` on `@task.agent` | INFO-level tool call logs (default: on) |
-| Model override | `model_id="openai:gpt-5"` | Override connection's model per-task |
-| File analysis | `@task.llm_file_analysis` | Analyze files/images via ObjectStoragePath |
-| NL-to-SQL | `@task.llm_sql` | Generate SQL from natural language |
+| Feature | Parameter / API | Since | Description |
+|---------|-----------------|-------|-------------|
+| HITL approval | `require_approval=True` on `@task.llm` | 0.1.0 | Pause for human review before returning |
+| HITL review loop | `enable_hitl_review=True` on `@task.agent` | 0.1.0 | Iterative review with regeneration (chat UI via `hitl_review` plugin) |
+| Durable execution | `durable=True` on `@task.agent` | 0.1.0 | Step-level caching for resilience |
+| Tool logging | `enable_tool_logging=True` on `@task.agent` | 0.1.0 | INFO-level tool call logs (default: on; requires `toolsets`) |
+| Model override | `model_id="openai:gpt-5"` | 0.1.0 | Override connection's model per-task |
+| File analysis | `@task.llm_file_analysis` | 0.1.0 | Analyze files/images via ObjectStoragePath |
+| NL-to-SQL | `@task.llm_sql` | 0.1.0 | Generate SQL from natural language |
+| Multimodal prompts | Translation function returns `Sequence[UserContent]` | 0.4.0 | Vision and other binary content in `@task.llm` / `@task.agent` / `@task.llm_branch` |
+| Pydantic instance via XCom | `output_type=BaseModel` (with `serialize_output` opt-out) | 0.4.0 | Instance flows through XCom on capable cores; dict fallback otherwise |
+| Embeddings | `LlamaIndexEmbeddingOperator` (+ `persist_dir`) | 0.4.0 | Connection-based embeddings + persisted vector index |
+| Retrieval | `LlamaIndexRetrievalOperator` | 0.4.0 | Top-k similarity search over a persisted index |
