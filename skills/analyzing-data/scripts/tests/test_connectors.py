@@ -14,6 +14,7 @@ from connectors import (
     get_connector_class,
     list_connector_types,
 )
+from templates import HELPERS_CODE
 
 
 class TestRegistry:
@@ -1065,3 +1066,159 @@ class TestSQLiteEndToEnd:
             result_pd = local_vars["run_sql_pandas"]("SELECT * FROM users")
             assert len(result_pd) == 2
             assert "dataframe" in str(type(result_pd)).lower()
+
+
+class TestRunSqlMany:
+    """#2 concurrency: every connector exposes a concurrent run_sql_many."""
+
+    @pytest.mark.parametrize(
+        "connector",
+        [
+            SnowflakeConnector(
+                account="a", user="u", password="p", warehouse="WH", databases=["DB"]
+            ),
+            PostgresConnector(
+                host="h", port=5432, user="u", database="db", databases=["db"]
+            ),
+            BigQueryConnector(project="p", databases=["p"]),
+            SQLAlchemyConnector(url="postgresql://u:p@h/d", databases=["d"]),
+        ],
+        ids=["snowflake", "postgres", "bigquery", "sqlalchemy"],
+    )
+    def test_prelude_defines_run_sql_many(self, connector):
+        prelude = connector.to_python_prelude()
+        assert "def run_sql_many" in prelude
+        # advertised in the connection banner
+        assert "run_sql_many" in prelude.split("Available:")[-1]
+
+    def test_snowflake_uses_async_submission(self):
+        prelude = SnowflakeConnector(
+            account="a", user="u", password="p", databases=["DB"]
+        ).to_python_prelude()
+        assert "execute_async" in prelude
+        assert "get_results_from_sfqid" in prelude
+
+    def test_postgres_builds_connection_factory(self):
+        """run_sql_many needs a per-thread connection, so a _connect() factory
+        must exist (not just a bare _conn)."""
+        prelude = PostgresConnector(
+            host="localhost", user="u", database="db", databases=["db"]
+        ).to_python_prelude()
+        assert "def _connect()" in prelude
+        assert "_conn = _connect()" in prelude
+        assert "ThreadPoolExecutor" in prelude
+
+    def test_sqlalchemy_run_sql_many_executes_concurrently(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+            conn = SQLAlchemyConnector(url=f"sqlite:///{db_path}", databases=["test"])
+            local_vars: dict = {}
+            exec(conn.to_python_prelude(), local_vars)
+            local_vars["_conn"].execute(
+                local_vars["text"]("CREATE TABLE t (id INTEGER PRIMARY KEY, n TEXT)")
+            )
+            local_vars["_conn"].execute(
+                local_vars["text"]("INSERT INTO t (n) VALUES ('a'), ('b'), ('c')")
+            )
+            local_vars["_conn"].commit()
+
+            dfs = local_vars["run_sql_many"](
+                ["SELECT * FROM t", "SELECT count(*) AS c FROM t"]
+            )
+            assert len(dfs) == 2
+            assert len(dfs[0]) == 3
+            assert dfs[1][0, 0] == 3
+            # order preserved, polars returned
+            assert all("polars" in str(type(df)).lower() for df in dfs)
+
+    def test_sqlalchemy_run_sql_many_empty(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+            conn = SQLAlchemyConnector(url=f"sqlite:///{db_path}", databases=["test"])
+            local_vars: dict = {}
+            exec(conn.to_python_prelude(), local_vars)
+            assert local_vars["run_sql_many"]([]) == []
+
+    def test_sqlalchemy_run_sql_many_raises_on_bad_query(self):
+        # A failing query must propagate (fail-fast) and not hang on the executor.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+            conn = SQLAlchemyConnector(url=f"sqlite:///{db_path}", databases=["test"])
+            local_vars: dict = {}
+            exec(conn.to_python_prelude(), local_vars)
+            local_vars["_conn"].execute(
+                local_vars["text"]("CREATE TABLE t (id INTEGER PRIMARY KEY)")
+            )
+            local_vars["_conn"].commit()
+            with pytest.raises(Exception):  # noqa: B017 - any DB error is acceptable
+                local_vars["run_sql_many"](["SELECT * FROM t", "SELECT * FROM nope"])
+
+
+class TestSnowflakeRunSqlManyCursors:
+    """Snowflake run_sql_many must close every cursor it opens, even when a
+    query fails partway through collection (no cursor leak on the shared conn)."""
+
+    def _exec_helpers(self, fail_at=None, fail_submit_at=None):
+        import pandas as pd
+        import polars as pl
+
+        cursors = []
+
+        class FakeCursor:
+            def __init__(self, idx):
+                self.idx = idx
+                self.sfqid = f"qid-{idx}"
+                self.description = [("n",)]
+                self.closed = False
+
+            def execute_async(self, query):
+                if fail_submit_at is not None and self.idx == fail_submit_at:
+                    raise RuntimeError("submit failed")
+
+            def get_results_from_sfqid(self, qid):
+                if fail_at is not None and self.idx == fail_at:
+                    raise RuntimeError("query failed")
+
+            def fetch_pandas_all(self):
+                return pd.DataFrame({"n": [self.idx]})
+
+            def fetchall(self):
+                return [(self.idx,)]
+
+            def close(self):
+                self.closed = True
+
+        class FakeConn:
+            def cursor(self):
+                cur = FakeCursor(len(cursors))
+                cursors.append(cur)
+                return cur
+
+        namespace = {"_conn": FakeConn(), "pl": pl, "pd": pd}
+        exec(HELPERS_CODE, namespace)
+        return namespace["run_sql_many"], cursors
+
+    def test_success_returns_ordered_results_and_closes_all(self):
+        run_sql_many, cursors = self._exec_helpers()
+        dfs = run_sql_many(["q0", "q1", "q2"])
+        assert len(dfs) == 3
+        assert [df[0, 0] for df in dfs] == [0, 1, 2]  # order preserved
+        assert len(cursors) == 3
+        assert all(c.closed for c in cursors)
+
+    def test_failure_midbatch_still_closes_every_cursor(self):
+        run_sql_many, cursors = self._exec_helpers(fail_at=1)
+        with pytest.raises(RuntimeError, match="query failed"):
+            run_sql_many(["q0", "q1", "q2"])
+        # all three were opened in the submit loop; none may leak
+        assert len(cursors) == 3
+        assert all(c.closed for c in cursors), [c.closed for c in cursors]
+
+    def test_failure_during_submit_closes_opened_cursors(self):
+        # execute_async raising must not leak the cursor it was raised on, nor
+        # any opened before it (the cursor is tracked before submission).
+        run_sql_many, cursors = self._exec_helpers(fail_submit_at=1)
+        with pytest.raises(RuntimeError, match="submit failed"):
+            run_sql_many(["q0", "q1", "q2"])
+        assert len(cursors) == 2  # third was never created
+        assert all(c.closed for c in cursors), [c.closed for c in cursors]
