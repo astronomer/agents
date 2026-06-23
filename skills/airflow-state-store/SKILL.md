@@ -83,7 +83,6 @@ task_state_store.set(key, value, retention=timedelta(days=7))  # per-key TTL ove
 task_state_store.set(key, value, retention=NEVER_EXPIRE)       # never expires regardless of config
 task_state_store.delete(key)                                   # no-op if key does not exist
 task_state_store.clear()                                       # delete all keys for this task instance
-task_state_store.clear(all_map_indices=True)                   # most relevant to mapped tasks only and it wipes all map indices
 ```
 
 **Key rules:**
@@ -107,7 +106,7 @@ def process_partition(partition_id, **context):
 process_partition.expand(partition_id=[0, 1, 2, 3])
 ```
 
-`clear()` clears only the current index. `clear(all_map_indices=True)` wipes every index of this task — useful for a manual fleet-wide reset.
+`clear()` clears only the current index. To wipe state across all map indices of a task group, use the CLI or core API.
 
 **Before (anti-pattern):**
 ```python
@@ -208,6 +207,18 @@ def load(asset_state_store=None):
 Use when an operator submits a job to an external system (Spark, Databricks, dbt Cloud, AWS Batch, etc.) and then polls for completion. Without this mixin, a worker crash during polling means the next retry submits a duplicate job.
 
 > **Not a replacement for deferrable operators.** If a Triggerer is available, prefer the deferrable pattern — it frees the worker slot during polling. Use `ResumableJobMixin` when migrating to deferrable is too large a change, or when the deployment has no Triggerer.
+
+**Opting out of crash recovery:**
+
+The mixin ships with `durable=True` by default. Set `durable=False` to skip all `task_state_store` interaction and run a plain submit/poll/result cycle — useful in test environments or when the external system has its own dedup:
+
+```python
+MyBatchOperator(task_id="job", durable=False)
+
+# Or via default_args to disable for all tasks in a DAG:
+with DAG("my_dag", default_args={"durable": False}):
+    ...
+```
 
 ### Implementing the mixin
 
@@ -319,8 +330,10 @@ state_store_backend = mypackage.store.WorkerSideBackend
 - [ ] Values are JSON-serializable (`str`, `int`, `float`, `bool`, `list`, `dict` — no `datetime`, no custom objects)
 - [ ] `task_state_store` keys are short, descriptive strings (avoid dots and slashes)
 - [ ] Mapped tasks writing to `asset_state_store`: use distinct keys per index or accept last-writer-wins semantics
+- [ ] Mapped tasks: fleet-wide state clear uses CLI/core API from a downstream task, not `clear()` inside the task body
 - [ ] `ResumableJobMixin`: `external_id_key` is set and will not be renamed after deployment
 - [ ] `ResumableJobMixin`: `execute()` calls `self.execute_resumable(context)`, not custom logic
+- [ ] `ResumableJobMixin`: `durable=False` is intentional if crash recovery is disabled
 - [ ] Large payloads (> configured `max_value_storage_bytes`) use a custom `[state_store] backend` or a worker side backend configured via: `[workers] state_store_backend`
 
 ---
