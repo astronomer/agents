@@ -206,7 +206,16 @@ def load(asset_state_store=None):
 
 Use when an operator submits a job to an external system (Spark, Databricks, dbt Cloud, AWS Batch, etc.) and then polls for completion. Without this mixin, a worker crash during polling means the next retry submits a duplicate job.
 
-> **Not a replacement for deferrable operators.** If a Triggerer is available, prefer the deferrable pattern — it frees the worker slot during polling. Use `ResumableJobMixin` when migrating to deferrable is too large a change, or when the deployment has no Triggerer.
+**When NOT to use `ResumableJobMixin`:**
+
+| Situation | Use instead | Why |
+|---|---|---|
+| A Triggerer is deployed and a deferrable operator exists (or can be written) | Deferrable operator | Frees the worker slot during polling; more resource-efficient |
+| The task fans out many concurrent I/O operations within a single execution | `async def` task / `BaseAsyncOperator` | Async is for high-throughput I/O, not crash recovery |
+| `retries=0` | — | Crash recovery has nothing to reconnect to |
+| The external system has no trackable job ID (`submit_job` returns `None`) | Plain operator | The mixin's crash-safety guarantee is silently disabled; adds no value |
+
+`ResumableJobMixin` holds the worker slot for the full polling duration — the same as a standard synchronous operator. The benefit is crash safety and job continuity, not resource efficiency.
 
 **Opting out of crash recovery:**
 
