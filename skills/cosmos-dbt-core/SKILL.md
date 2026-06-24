@@ -329,7 +329,25 @@ my_dag = DbtDag(
 )
 ```
 
-### dbt Docs Hosting (Airflow 3.1+ / Cosmos 1.11+)
+### dbt Docs Hosting
+
+Cosmos serves dbt docs in the Airflow UI. The config depends on your Airflow major
+version (each uses a different UI plugin system) — it is not a free single-vs-multi choice:
+
+| Airflow         | Config                                                            | Scope                | Since          |
+|-----------------|------------------------------------------------------------------|----------------------|----------------|
+| 2 (FAB plugin)  | `DBT_DOCS_DIR` (+ `DBT_DOCS_CONN_ID`, `DBT_DOCS_INDEX_FILE_NAME`) | Single project       | Cosmos 1.4.0+  |
+| 3.1+ (FastAPI)  | `DBT_DOCS_PROJECTS` (JSON)                                        | One or more projects | Cosmos 1.11.0+ |
+
+Airflow 2:
+
+```bash
+AIRFLOW__COSMOS__DBT_DOCS_DIR="path/to/docs"                   # local path or S3/GCS/Azure/HTTP URI; defaults to the dbt target/ folder
+AIRFLOW__COSMOS__DBT_DOCS_CONN_ID="my_conn_id"                 # optional; for cloud storage
+AIRFLOW__COSMOS__DBT_DOCS_INDEX_FILE_NAME="static_index.html"  # optional; only if docs built with --static
+```
+
+Airflow 3.1+:
 
 ```bash
 AIRFLOW__COSMOS__DBT_DOCS_PROJECTS='{
@@ -341,6 +359,10 @@ AIRFLOW__COSMOS__DBT_DOCS_PROJECTS='{
     }
 }'
 ```
+
+Pick by Airflow version, not project count. The single-project settings are the Airflow 2
+path; Cosmos publishes no deprecation notice for them — do not describe them as "legacy"
+or "deprecated."
 
 Reference: https://astronomer.github.io/astronomer-cosmos/configuration/hosting-docs.html
 
