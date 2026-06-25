@@ -46,3 +46,31 @@ class TestRunsListCommand:
             offset=0,
             order_by="id",
         )
+
+    def test_end_date_filters_forwarded(self, mocker):
+        """--end-date-gte / --end-date-lte are forwarded to the adapter as kwargs."""
+        mock_adapter = MagicMock()
+        mock_adapter.list_dag_runs.return_value = {"dag_runs": [], "total_entries": 0}
+        mocker.patch("astro_airflow_mcp.cli.runs.get_adapter", return_value=mock_adapter)
+
+        result = runner.invoke(
+            app,
+            [
+                "runs",
+                "list",
+                "--end-date-gte",
+                "2026-06-10T15:00:00Z",
+                "--end-date-lte",
+                "2026-06-10T15:15:00Z",
+            ],
+        )
+
+        assert result.exit_code == 0
+        mock_adapter.list_dag_runs.assert_called_once_with(
+            dag_id=None,
+            limit=100,
+            offset=0,
+            order_by="-start_date",
+            end_date_gte="2026-06-10T15:00:00Z",
+            end_date_lte="2026-06-10T15:15:00Z",
+        )

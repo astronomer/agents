@@ -54,6 +54,18 @@ def list_dag_runs(
             "--start-date-lte", help="Runs with start_date <= value (e.g., 2024-01-01T00:00:00Z)"
         ),
     ] = None,
+    end_date_gte: Annotated[
+        str | None,
+        typer.Option(
+            "--end-date-gte", help="Runs with end_date >= value (e.g., 2024-01-01T00:00:00Z)"
+        ),
+    ] = None,
+    end_date_lte: Annotated[
+        str | None,
+        typer.Option(
+            "--end-date-lte", help="Runs with end_date <= value (e.g., 2024-01-01T00:00:00Z)"
+        ),
+    ] = None,
 ) -> None:
     """List DAG runs (workflow executions).
 
@@ -70,6 +82,10 @@ def list_dag_runs(
             kwargs["start_date_gte"] = start_date_gte
         if start_date_lte:
             kwargs["start_date_lte"] = start_date_lte
+        if end_date_gte:
+            kwargs["end_date_gte"] = end_date_gte
+        if end_date_lte:
+            kwargs["end_date_lte"] = end_date_lte
 
         adapter = get_adapter()
         data = adapter.list_dag_runs(dag_id=dag_id, limit=limit, offset=offset, **kwargs)
