@@ -20,6 +20,9 @@ def _list_dag_runs_impl(
     limit: int = DEFAULT_LIMIT,
     offset: int = DEFAULT_OFFSET,
     order_by: str | None = None,
+    state: list[str] | None = None,
+    start_date_gte: str | None = None,
+    start_date_lte: str | None = None,
 ) -> str:
     """Internal implementation for listing DAG runs from Airflow.
 
@@ -29,13 +32,24 @@ def _list_dag_runs_impl(
         offset: Offset for pagination (default: 0)
         order_by: Sort field; prefix with '-' for descending. ``None`` falls back
                   to the Airflow API default (``id`` ascending, i.e. oldest first).
+        state: Filter by run states (e.g., ['running', 'failed'])
+        start_date_gte: Filter runs started on or after this datetime
+        start_date_lte: Filter runs started on or before this datetime
 
     Returns:
         JSON string containing the list of DAG runs with their metadata
     """
     try:
         adapter = _get_adapter()
-        data = adapter.list_dag_runs(dag_id=dag_id, limit=limit, offset=offset, order_by=order_by)
+        data = adapter.list_dag_runs(
+            dag_id=dag_id,
+            limit=limit,
+            offset=offset,
+            order_by=order_by,
+            state=state,
+            start_date_gte=start_date_gte,
+            start_date_lte=start_date_lte,
+        )
 
         if "dag_runs" in data:
             return _wrap_list_response(data["dag_runs"], "dag_runs", data)
@@ -238,6 +252,9 @@ def list_dag_runs(
     limit: int = DEFAULT_LIMIT,
     offset: int = DEFAULT_OFFSET,
     order_by: str = "-start_date",
+    state: list[str] | None = None,
+    start_date_gte: str | None = None,
+    start_date_lte: str | None = None,
 ) -> str:
     """Get execution history and status of DAG runs (workflow executions).
 
@@ -269,6 +286,9 @@ def list_dag_runs(
                   Defaults to '-start_date' so the most recent runs are
                   returned first. The Airflow API default would be 'id'
                   ascending (oldest first), which is rarely what callers want.
+        state: Filter by run state(s) (e.g., ['failed', 'running']).
+        start_date_gte: Return only runs that started on or after this datetime (ISO 8601).
+        start_date_lte: Return only runs that started on or before this datetime (ISO 8601).
 
     Returns:
         JSON with list of DAG runs, sorted most-recent-first by default
@@ -278,6 +298,9 @@ def list_dag_runs(
         limit=limit,
         offset=offset,
         order_by=order_by,
+        state=state,
+        start_date_gte=start_date_gte,
+        start_date_lte=start_date_lte,
     )
 
 
