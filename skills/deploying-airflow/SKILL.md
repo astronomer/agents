@@ -1,6 +1,6 @@
 ---
 name: deploying-airflow
-description: Deploy Airflow DAGs and projects. Use when the user wants to deploy code, push DAGs, set up CI/CD, deploy to production, or asks about deployment strategies for Airflow.
+description: Deploys Airflow DAGs and projects. Use when deploying Airflow or answering anything about deployment - deploying DAGs/projects, pushing code, setting up CI/CD, deploying to production or deployment strategies for Airflow.
 ---
 
 # Deploying Airflow
