@@ -205,7 +205,9 @@ def diagnose_dag_run(dag_id: str, dag_run_id: str) -> str:
 
     # Get task instances for this run
     try:
-        tasks_data = adapter.get_task_instances(dag_id, dag_run_id)
+        # Page through every task instance: a single page (100) can hide a
+        # failed mapped instance at a high map_index on large DAG runs.
+        tasks_data = adapter.get_all_task_instances(dag_id, dag_run_id)
         task_instances = tasks_data.get("task_instances", [])
         result["task_instances"] = task_instances
 
@@ -219,6 +221,7 @@ def diagnose_dag_run(dag_id: str, dag_run_id: str) -> str:
                 failed_tasks.append(
                     {
                         "task_id": ti.get("task_id"),
+                        "map_index": ti.get("map_index"),
                         "state": state,
                         "start_date": ti.get("start_date"),
                         "end_date": ti.get("end_date"),

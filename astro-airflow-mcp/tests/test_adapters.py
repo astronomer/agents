@@ -1525,3 +1525,66 @@ class TestAdapterManagerSSL:
         mgr.get_adapter()
 
         assert mock_create.call_args[1]["verify"] is True
+
+
+class TestGetAllTaskInstances:
+    """Tests for AirflowAdapter.get_all_task_instances pagination helper."""
+
+    def _adapter(self):
+        return AirflowV3Adapter("http://localhost:8080", "3.1.0")
+
+    def test_pages_through_all_results(self, mocker):
+        """It walks every page and merges results past the first page.
+
+        Regression for the bug where a failed instance at a high map_index
+        (beyond page 1) was silently dropped because only one page was read.
+        """
+        adapter = self._adapter()
+        page1 = {
+            "task_instances": [
+                {"task_id": "t", "map_index": 0, "state": "success"},
+                {"task_id": "t", "map_index": 1, "state": "success"},
+            ],
+            "total_entries": 3,
+        }
+        page2 = {
+            "task_instances": [
+                {"task_id": "t", "map_index": 14, "state": "failed"},
+            ],
+            "total_entries": 3,
+        }
+        mock_get = mocker.patch.object(adapter, "get_task_instances", side_effect=[page1, page2])
+
+        result = adapter.get_all_task_instances("dag", "run", page_size=2)
+
+        assert mock_get.call_count == 2
+        assert mock_get.call_args_list[0][1] == {"limit": 2, "offset": 0}
+        assert mock_get.call_args_list[1][1] == {"limit": 2, "offset": 2}
+        assert result["total_entries"] == 3
+        states = [(ti["map_index"], ti["state"]) for ti in result["task_instances"]]
+        assert (14, "failed") in states
+
+    def test_single_short_page_stops_immediately(self, mocker):
+        """A first page shorter than page_size needs no further requests."""
+        adapter = self._adapter()
+        page = {
+            "task_instances": [{"task_id": "t", "map_index": -1, "state": "success"}],
+            "total_entries": 1,
+        }
+        mock_get = mocker.patch.object(adapter, "get_task_instances", side_effect=[page])
+
+        result = adapter.get_all_task_instances("dag", "run", page_size=100)
+
+        assert mock_get.call_count == 1
+        assert result == {"task_instances": page["task_instances"], "total_entries": 1}
+
+    def test_unavailable_endpoint_yields_empty_result(self, mocker):
+        """A payload without a task_instances key yields an empty result."""
+        adapter = self._adapter()
+        not_found = {"available": False, "note": "Endpoint not available"}
+        mock_get = mocker.patch.object(adapter, "get_task_instances", side_effect=[not_found])
+
+        result = adapter.get_all_task_instances("dag", "run")
+
+        assert mock_get.call_count == 1
+        assert result == {"task_instances": [], "total_entries": 0}
