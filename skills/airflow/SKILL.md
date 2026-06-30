@@ -1,6 +1,6 @@
 ---
 name: airflow
-description: Queries, manages, and troubleshoots Apache Airflow using the af CLI. Covers listing DAGs, triggering runs, reading task logs, diagnosing failures, debugging DAG import errors, checking connections, variables, pools, and monitoring health. Also routes to sub-skills for writing DAGs, debugging, deploying, and migrating Airflow 2 to 3. Use when user mentions "Airflow", "DAG", "DAG run", "task log", "import error", "parse error", "broken DAG", or asks to "trigger a pipeline", "debug import errors", "check Airflow health", "list connections", "retry a run", or any Airflow operation. Do NOT use for warehouse/SQL analytics on Airflow metadata tables — use analyzing-data instead.
+description: Queries, manages, and troubleshoots Apache Airflow using the `af` CLI. Use when working with anything related to Airflow - a DAG, a DAG run, a task log, an import or parse error, a broken DAG, or any Airflow operation. Covers listing and triggering DAGs, retrying runs, reading task logs, diagnosing failures, debugging import and parse errors, checking connections, variables and pools, exploring the REST API, and monitoring health (for example "trigger a pipeline", "retry a run", "list connections", "check Airflow health", "why did my DAG fail"). This is the entrypoint that routes to sibling skills for authoring, testing, deploying, and migrating Airflow 2 to 3. Not for warehouse/SQL analytics on Airflow metadata tables (use analyzing-data); for deep root-cause reports use debugging-dags or airflow-investigation.
 ---
 
 # Airflow Operations

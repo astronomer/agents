@@ -1,6 +1,6 @@
 ---
 name: debugging-dags
-description: Comprehensive DAG failure diagnosis and root cause analysis. Use for complex debugging requests requiring deep investigation like "diagnose and fix the pipeline", "full root cause analysis", "why is this failing and how to prevent it". For simple debugging ("why did dag fail", "show logs"), the airflow entrypoint skill handles it directly. This skill provides structured investigation and prevention recommendations.
+description: Comprehensive DAG failure diagnosis and root-cause analysis  with structured investigation and prevention recommendations. Use when deep failure investigation is needed, a DAG fails to import/parse or 'airflow dags list' errors on a file; a task or run is failing and must be diagnosed and fixed; requests like 'why did X fail', 'my dag keeps failing — find and fix it', or fixing a broken DAG so it loads cleanly. For simple 'why did it fail / show logs', the airflow skill handles it directly.
 ---
 
 # DAG Diagnosis
