@@ -124,10 +124,10 @@ func transform(ctx sdk.TIRunContext, client sdk.VariableClient) error {
 | `GetVariable(ctx, key)` | `(string, error)` | `VariableNotFound` if absent. |
 | `UnmarshalJSONVariable(ctx, key, &ptr)` | `error` | Decode a JSON variable into a struct/pointer. |
 | `GetConnection(ctx, connID)` | `(Connection, error)` | `ConnectionNotFound` if absent. |
-| `GetXCom(ctx, dagID, runID, taskID, mapIndex, key, value)` | `(any, error)` | `XComNotFound` if absent or null. |
+| `GetXCom(ctx, dagID, runID, taskID, mapIndex, key, value)` | `(any, error)` | `XComNotFound` only if the key is absent; a stored null returns `(nil, nil)`. |
 | `PushXCom(ctx, ti, key, value)` | `error` | Rarely needed; a returned value is pushed for you. |
 
-`Connection` exposes `ID`, `Type`, `Host`, `Port`, `Login`, `Password`, `Path` (schema), `Extra map[string]any`, plus `GetURI()`. Not-found cases return the sentinels `sdk.VariableNotFound`, `sdk.ConnectionNotFound`, `sdk.XComNotFound`.
+`Connection` exposes `ID`, `Type`, `Host`, `Port` (`int`), `Login *string`, `Password *string` (nil when unset, distinct from empty), `Path` (schema), `Extra map[string]any`, plus `GetURI()`. Not-found cases return the sentinels `sdk.VariableNotFound`, `sdk.ConnectionNotFound`, `sdk.XComNotFound`.
 
 To read an upstream task's result, call `GetXCom` explicitly, taking the `dag_id`/`run_id`/`task_id` you need from the runtime context (below).
 

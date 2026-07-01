@@ -20,7 +20,7 @@ The coordinator only recognizes a **packed** bundle: it scans for the AFBNDL01 t
 ```bash
 go tool airflow-go-pack ./example/bundle                              # build + pack in one step
 go tool airflow-go-pack --goos linux --goarch amd64 ./example/bundle -- -trimpath  # cross-compile; flags after -- pass to `go build`
-go tool airflow-go-pack --executable ./bin/sample-dag-bundle --source main.go --airflow-metadata  # pack an existing binary
+go tool airflow-go-pack --executable ./bin/sample-dag-bundle --source main.go --airflow-metadata <airflow-metadata.yaml> # pack an existing binary
 go tool airflow-go-pack inspect ./bin/sample-dag-bundle               # inspect a packed bundle
 ```
 
@@ -82,13 +82,13 @@ On the Helm chart, bake the bundle into a custom image as above or mount it via 
 
 ## Versioning and preview installs
 
-`go-sdk/` is a single Go module, so the only release tag is the module tag in monorepo subdir form, `go-sdk/vX.Y.Z` (do not create per-`cmd` tags). Your bundle module depends on `github.com/apache/airflow/go-sdk`; pinning that version also pins `airflow-go-pack`, which is a package in the same module referenced through the `tool` directive. Pin against a released tag once one exists:
+`go-sdk/` is a single Go module, so its release tag takes the monorepo subdir form, `go-sdk/vX.Y.Z` (do not create per-`cmd` tags). Your bundle module depends on `github.com/apache/airflow/go-sdk`; pinning that version also pins `airflow-go-pack`, which is a package in the same module referenced through the `tool` directive. Pin against the release tag:
 
 ```bash
-go get github.com/apache/airflow/go-sdk@vX.Y.Z
+go get github.com/apache/airflow/go-sdk@v1.0.0
 ```
 
-No version has been voted on or released yet, and the existing `go-sdk/v1.0.0-beta1` tags in the repo are placeholders, not releases (`proxy.golang.org` caches tags immutably, so do not rely on them). To try an unreleased build before a real tag exists, depend on a commit or branch; Go fabricates a pseudo-version:
+To build against an unreleased commit or branch (for example, to try a fix ahead of the next tag), depend on it directly and Go fabricates a pseudo-version:
 
 ```bash
 go get github.com/apache/airflow/go-sdk@<commit-or-branch>

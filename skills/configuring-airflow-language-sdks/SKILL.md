@@ -102,6 +102,7 @@ coordinators = {
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `executables_root` | *(required)* | One or more directories scanned **recursively** for executable bundles (AFBNDL01-trailered native binaries). Accepts a string or a list of strings/paths. Bundles are identified by the trailer magic, not by filename. The coordinator matches an incoming `dag_id` against each bundle's embedded manifest and verifies its integrity hash before launching. |
+| `task_startup_timeout` | `10.0` | Seconds to wait for the subprocess to connect after launch. Increase it if bundle startup is slow (constrained hardware, first cold start). |
 
 ---
 
