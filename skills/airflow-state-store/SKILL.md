@@ -1,6 +1,6 @@
 ---
 name: airflow-state-store
-description: Use when the user asks about task state store, checkpointing in tasks, persisting state across retries, job IDs surviving worker crashes, watermarks, asset metadata, resumable tasks, crash-safe operators, or "what's new in Airflow 3.3". Also use proactively when reading a DAG that uses Variables or XCom for intra-task coordination state — flag the anti-pattern and recommend task_state_store or asset_state_store instead. Requires Airflow 3.3+.
+description: Persists task and asset state across retries and DAG runs using Airflow 3.3's AIP-103 key/value stores (`task_state_store`, `asset_state_store`) and the crash-safe `ResumableJobMixin`. Use when the user asks about task state store, checkpointing in tasks, persisting state across retries, job IDs surviving worker crashes, watermarks, asset metadata, resumable tasks, crash-safe operators, or "what's new in Airflow 3.3". Also use proactively when reading a DAG that uses Variables or XCom for intra-task coordination state — flag the anti-pattern and recommend task_state_store or asset_state_store instead. Requires Airflow 3.3+.
 ---
 
 # Airflow Task State Store (AIP-103)
@@ -15,39 +15,39 @@ Airflow 3.3 ships two key/value stores and a crash-safety mixin for operators th
 
 ---
 
-## Step 1 — Pick the right primitive
+## Section 1 — Pick the right primitive
 
 | I need to… | Use |
 |---|---|
 | Persist a cursor, offset, or job ID so a retry can resume instead of restart | `task_state_store` |
 | Pass small coordination state within one task across retries (not between tasks) | `task_state_store` |
-| Store a watermark or last-processed timestamp per asset, surviving across Dag runs | `asset_state_store` |
+| Store a watermark or last-processed timestamp per asset, surviving across DAG runs | `asset_state_store` |
 | Cache asset-level metadata (manifest hash, row count, schema version) | `asset_state_store` |
 | Make an existing non deferrable operator crash-safe when it submits to an external system | `task_state_store` or `ResumableJobMixin` |
 
 **When NOT to use these:**
 - Passing data *between* tasks -> use XCom
 - Large payloads (model weights, dataframes) -> use XCom with an object storage backend
-- Config or secrets shared across Dags -> use Variables or Connections
+- Config or secrets shared across DAGs -> use Variables or Connections
 
 ---
 
-## Step 2 — Detect anti-patterns in existing DAGs (on demand)
+## Section 2 — Detect anti-patterns in existing DAGs (on demand)
 
 When the user asks to review a DAG or asks "is there a better way", scan for these patterns and flag them:
 
 | Pattern seen in DAG | Problem | Recommend |
 |---|---|---|
 | `Variable.get(...)` / `Variable.set(...)` inside a `@task` body for per-run state | Variables are global and shared; no scoping to task instance or retry | `task_state_store` |
-| `context["ti"].xcom_push(key="job_id", ...)` to survive retries | XCom is scoped to a Dag run, not a retry; a new ti_id is issued per retry | `task_state_store` or `ResumableJobMixin` |
+| `context["ti"].xcom_push(key="job_id", ...)` to survive retries | XCom is scoped to a DAG run, not a retry; a new ti_id is issued per retry | `task_state_store` or `ResumableJobMixin` |
 | Manual `if Variable.get("job_id"): reconnect else: submit` retry-resume logic | Reimplements what `ResumableJobMixin` already provides, without the crash-safety guarantee | `ResumableJobMixin` |
-| `Variable.set("last_processed_at", ...)` for watermarks | Global; any Dag or task can overwrite it; no scoping to asset | `asset_state_store` |
+| `Variable.set("last_processed_at", ...)` for watermarks | Global; any DAG or task can overwrite it; no scoping to asset | `asset_state_store` |
 
 Show a before/after snippet when flagging. Use the canonical examples in Steps 3–5 as the "after".
 
 ---
 
-## Step 3 — `task_state_store`: per-task coordination state
+## Section 3 — `task_state_store`: per-task coordination state
 
 `task_state_store` is a key/value store scoped to a single task instance identity (dag_id + run_id + task_id + map_index). It survives retries — a new retry on the same task reads the same store.
 
@@ -129,9 +129,9 @@ def process(**context):
 
 ---
 
-## Step 4 — `asset_state_store`: per-asset metadata across Dag runs
+## Section 4 — `asset_state_store`: per-asset metadata across DAG runs
 
-`asset_state_store` is scoped to an asset, not a task instance. It persists across Dag runs — the same key on the same asset is readable and writable by any task that produces or consumes it.
+`asset_state_store` is scoped to an asset, not a task instance. It persists across DAG runs — the same key on the same asset is readable and writable by any task that produces or consumes it.
 
 ```python
 from airflow.sdk import DAG, Asset, task
@@ -155,7 +155,7 @@ with DAG(dag_id="producer", schedule=None, start_date=datetime(2026, 1, 1), catc
     load()
 ```
 
-**Reading the store from a consumer Dag:**
+**Reading the store from a consumer DAG:**
 ```python
 with DAG(dag_id="consumer", schedule=[ORDERS], start_date=datetime(2026, 1, 1), catchup=False):
 
@@ -173,7 +173,7 @@ with DAG(dag_id="consumer", schedule=[ORDERS], start_date=datetime(2026, 1, 1), 
 - Use `datetime.now(tz=timezone.utc).isoformat()` for timestamps — never `datetime.utcnow()` (not timezone-aware).
 - Same JSON-serializable value constraint as `task_state_store`.
 - No per-key expiry — asset state store entries have no TTL (the asset outlives any single run).
-- Readable by any Dag that declares the asset as an inlet or outlet.
+- Readable by any DAG that declares the asset as an inlet or outlet.
 
 **Mapped tasks — last writer wins:**
 
@@ -202,7 +202,7 @@ def load(asset_state_store=None):
 
 ---
 
-## Step 5 — `ResumableJobMixin`: crash-safe external job submission
+## Section 5 — `ResumableJobMixin`: crash-safe external job submission
 
 Use when an operator submits a job to an external system (Spark, Databricks, dbt Cloud, AWS Batch, etc.) and then polls for completion. Without this mixin, a worker crash during polling means the next retry submits a duplicate job.
 
@@ -304,7 +304,7 @@ class MySparkOperator(BaseOperator, ResumableJobMixin):
 
 ---
 
-## Step 6 — Configuration reference
+## Section 6 — Configuration reference
 
 ```ini
 [state_store]
@@ -333,7 +333,7 @@ state_store_backend = mypackage.store.WorkerSideBackend
 
 ---
 
-## Step 7 — Safety checklist
+## Section 7 — Safety checklist
 
 - [ ] Airflow version ≥ 3.3 (`af config version`)
 - [ ] Values are JSON-serializable (`str`, `int`, `float`, `bool`, `list`, `dict` — no `datetime`, no custom objects)
