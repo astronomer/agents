@@ -69,6 +69,8 @@ COPY ./executable-bundles/ /opt/airflow/executable-bundles/
 
 On the Helm chart, bake the bundle into a custom image as above or mount it via a shared volume, and set the `[sdk]` config through environment variables on the worker/scheduler. See **deploying-airflow** for the broader Docker Compose and Helm workflow.
 
+> The `apache/airflow:3.3.0` tag above is illustrative: the language SDKs need Airflow 3.3 or newer. Pin whatever current 3.x you actually run rather than copying this tag from memory; read the base image's current tags or docs.
+
 ### Astro (one option, not required)
 
 1. Build/pack the bundle, then stage it in the project: `mkdir -p include/executable-bundles && cp ../go-bundle/<packed-bundle> include/executable-bundles/`.
