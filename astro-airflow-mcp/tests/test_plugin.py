@@ -96,6 +96,39 @@ def test_plugin_mutual_exclusivity():
         assert AirflowMCPPlugin.flask_blueprints == []
 
 
+def test_host_guard_kwargs_disables_by_default(monkeypatch):
+    """With no env override, the host guard is disabled on FastMCP >= 3.4.3."""
+    monkeypatch.delenv("ASTRO_MCP_ALLOWED_HOSTS", raising=False)
+    from astro_airflow_mcp.plugin import _host_guard_kwargs
+
+    def http_app(path=None, stateless_http=False, host_origin_protection=True, allowed_hosts=None):
+        pass
+
+    assert _host_guard_kwargs(http_app) == {"host_origin_protection": False}
+
+
+def test_host_guard_kwargs_allowlist_from_env(monkeypatch):
+    """ASTRO_MCP_ALLOWED_HOSTS keeps the guard on with an explicit allowlist."""
+    monkeypatch.setenv("ASTRO_MCP_ALLOWED_HOSTS", "a.example.com, b.example.com ,")
+    from astro_airflow_mcp.plugin import _host_guard_kwargs
+
+    def http_app(path=None, stateless_http=False, host_origin_protection=True, allowed_hosts=None):
+        pass
+
+    assert _host_guard_kwargs(http_app) == {"allowed_hosts": ["a.example.com", "b.example.com"]}
+
+
+def test_host_guard_kwargs_noop_on_old_fastmcp(monkeypatch):
+    """Older FastMCP without the guard kwargs gets no extra kwargs (no crash)."""
+    monkeypatch.delenv("ASTRO_MCP_ALLOWED_HOSTS", raising=False)
+    from astro_airflow_mcp.plugin import _host_guard_kwargs
+
+    def http_app(path=None, stateless_http=False):
+        pass
+
+    assert _host_guard_kwargs(http_app) == {}
+
+
 def test_auth_contextvars_isolated_per_context():
     """Per-request auth ContextVars must not leak across request contexts.
 
