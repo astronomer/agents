@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import asyncio
 import contextvars
-import inspect
 import logging
 import os
 import threading
@@ -34,7 +33,7 @@ _request_basic_auth: contextvars.ContextVar[tuple[str, str] | None] = contextvar
 )
 
 
-def _host_guard_kwargs(http_app: Any) -> dict[str, Any]:
+def _host_guard_kwargs() -> dict[str, Any]:
     """Host/Origin guard settings for the embedded (plugin-mode) MCP app.
 
     FastMCP >= 3.4.3 ships ``HostOriginGuardMiddleware``, enabled by default,
@@ -43,29 +42,19 @@ def _host_guard_kwargs(http_app: Any) -> dict[str, Any]:
     anything else. In plugin mode the MCP app is embedded in the Airflow
     webserver and reachable only through the platform ingress — which
     terminates TLS for the Deployment's hostname, runs forward-auth, and
-    requires a bearer token — so Host/Origin/DNS-rebinding are enforced there.
-    The loopback-only default therefore rejects every real request. Delegate
-    that check to the ingress by default.
+    requires a bearer token — so Host/Origin are enforced there and the
+    loopback-only default rejects every real request. Delegate that check to
+    the ingress by default.
 
     Set ``ASTRO_MCP_ALLOWED_HOSTS`` (comma-separated hostnames) to instead keep
-    the in-app guard enabled with an explicit allowlist.
-
-    The relevant keywords only exist on FastMCP >= 3.4.3, so we probe
-    ``http_app``'s signature and return nothing on older versions (which have
-    no such guard to configure). Standalone mode (``__main__.py``, served via
-    ``mcp.run``) is intentionally left on FastMCP's default protection, since a
-    locally-bound server is the case DNS-rebinding protection is meant for.
+    the guard enabled with an explicit allowlist. Standalone mode
+    (``__main__.py``, served via ``mcp.run``) keeps FastMCP's default
+    protection, which is what a locally-bound server needs.
     """
-    try:
-        params = inspect.signature(http_app).parameters
-    except (TypeError, ValueError):
-        return {}
     allowed = os.environ.get("ASTRO_MCP_ALLOWED_HOSTS", "").strip()
-    if allowed and "allowed_hosts" in params:
+    if allowed:
         return {"allowed_hosts": [h.strip() for h in allowed.split(",") if h.strip()]}
-    if "host_origin_protection" in params:
-        return {"host_origin_protection": False}
-    return {}
+    return {"host_origin_protection": False}
 
 
 try:
@@ -102,9 +91,7 @@ try:
     # Get the native MCP protocol ASGI app from FastMCP
     # Use stateless_http=True so sessions aren't stored in-memory,
     # which is required for multi-replica deployments (e.g., Astro)
-    mcp_protocol_app = mcp.http_app(
-        path="/", stateless_http=True, **_host_guard_kwargs(mcp.http_app)
-    )
+    mcp_protocol_app = mcp.http_app(path="/", stateless_http=True, **_host_guard_kwargs())
 
     # Wrap in a FastAPI app with the MCP app's lifespan
     # This is required for FastMCP to initialize its task group
@@ -208,9 +195,7 @@ if _airflow_major == 2 and not fastapi_apps_config:
             return f"http://localhost:{_plugin_port_v2}{_get_base_path()}"
 
         # ASGI app — same as the AF3 path but we call it from Flask
-        _mcp_asgi_app = mcp.http_app(
-            path="/", stateless_http=True, **_host_guard_kwargs(mcp.http_app)
-        )
+        _mcp_asgi_app = mcp.http_app(path="/", stateless_http=True, **_host_guard_kwargs())
 
         # --- Lazy init: event loop + ASGI lifespan ---
         # FastMCP needs a running lifespan to initialize its task group.
