@@ -12,6 +12,7 @@ import logging
 import os
 import threading
 from typing import Any
+from urllib.parse import urlparse
 
 from astro_airflow_mcp import __version__
 
@@ -31,6 +32,40 @@ _request_auth_token: contextvars.ContextVar[str | None] = contextvars.ContextVar
 _request_basic_auth: contextvars.ContextVar[tuple[str, str] | None] = contextvars.ContextVar(
     "mcp_request_basic_auth", default=None
 )
+
+
+def _host_guard_kwargs() -> dict[str, Any]:
+    """Host/Origin guard settings for the embedded (plugin-mode) MCP app.
+
+    FastMCP >= 3.4.3 ships ``HostOriginGuardMiddleware``, enabled by default,
+    which only accepts loopback Host headers (127.0.0.1/localhost/::1) plus the
+    ASGI ``scope["server"]`` host and returns ``421 "Misdirected Request"`` for
+    anything else. In plugin mode the MCP app is embedded in the Airflow
+    webserver, reached over the Deployment's own hostname, so the loopback-only
+    default rejects every real request.
+
+    Rather than disable the guard, keep it enabled and scope it to the
+    Deployment's hostname, which Astro injects as ``AIRFLOW__WEBSERVER__BASE_URL``
+    (an env var, so it's available at import time — unlike Airflow's ``conf``,
+    which is populated later). ``ASTRO_MCP_ALLOWED_HOSTS`` (comma-separated)
+    overrides the allowlist for custom domains or extra hosts.
+
+    If no hostname can be determined (non-Astro embedding), fall back to
+    delegating the check to whatever fronts the app. Standalone mode
+    (``__main__.py``, ``mcp.run``) keeps FastMCP's default protection, which is
+    what a locally-bound server needs.
+    """
+    allowed = os.environ.get("ASTRO_MCP_ALLOWED_HOSTS", "").strip()
+    if allowed:
+        return {"allowed_hosts": [h.strip() for h in allowed.split(",") if h.strip()]}
+
+    base_url = os.environ.get("AIRFLOW__WEBSERVER__BASE_URL", "").strip()
+    host = urlparse(base_url).hostname if base_url else None
+    if host:
+        return {"allowed_hosts": [host]}
+
+    return {"host_origin_protection": False}
+
 
 try:
     from airflow.plugins_manager import AirflowPlugin
@@ -66,7 +101,7 @@ try:
     # Get the native MCP protocol ASGI app from FastMCP
     # Use stateless_http=True so sessions aren't stored in-memory,
     # which is required for multi-replica deployments (e.g., Astro)
-    mcp_protocol_app = mcp.http_app(path="/", stateless_http=True)
+    mcp_protocol_app = mcp.http_app(path="/", stateless_http=True, **_host_guard_kwargs())
 
     # Wrap in a FastAPI app with the MCP app's lifespan
     # This is required for FastMCP to initialize its task group
@@ -170,7 +205,7 @@ if _airflow_major == 2 and not fastapi_apps_config:
             return f"http://localhost:{_plugin_port_v2}{_get_base_path()}"
 
         # ASGI app — same as the AF3 path but we call it from Flask
-        _mcp_asgi_app = mcp.http_app(path="/", stateless_http=True)
+        _mcp_asgi_app = mcp.http_app(path="/", stateless_http=True, **_host_guard_kwargs())
 
         # --- Lazy init: event loop + ASGI lifespan ---
         # FastMCP needs a running lifespan to initialize its task group.

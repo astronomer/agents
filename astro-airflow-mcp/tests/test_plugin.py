@@ -2,6 +2,8 @@
 
 import pytest
 
+from astro_airflow_mcp.plugin import _host_guard_kwargs
+
 
 def test_plugin_import():
     """Test that the plugin can be imported."""
@@ -94,6 +96,27 @@ def test_plugin_mutual_exclusivity():
 
     if AirflowMCPPlugin.fastapi_apps:
         assert AirflowMCPPlugin.flask_blueprints == []
+
+
+def test_host_guard_kwargs_scopes_to_deployment_host(monkeypatch):
+    """On Astro the guard stays enabled, scoped to the webserver base-URL hostname."""
+    monkeypatch.delenv("ASTRO_MCP_ALLOWED_HOSTS", raising=False)
+    monkeypatch.setenv("AIRFLOW__WEBSERVER__BASE_URL", "https://dep.d1.astronomer.run/dabc1234")
+    assert _host_guard_kwargs() == {"allowed_hosts": ["dep.d1.astronomer.run"]}
+
+
+def test_host_guard_kwargs_env_override_wins(monkeypatch):
+    """ASTRO_MCP_ALLOWED_HOSTS overrides the derived Deployment host."""
+    monkeypatch.setenv("AIRFLOW__WEBSERVER__BASE_URL", "https://dep.d1.astronomer.run/dabc1234")
+    monkeypatch.setenv("ASTRO_MCP_ALLOWED_HOSTS", "a.example.com, b.example.com ,")
+    assert _host_guard_kwargs() == {"allowed_hosts": ["a.example.com", "b.example.com"]}
+
+
+def test_host_guard_kwargs_falls_back_when_no_host(monkeypatch):
+    """With no override and no base URL, delegate host validation downstream."""
+    monkeypatch.delenv("ASTRO_MCP_ALLOWED_HOSTS", raising=False)
+    monkeypatch.delenv("AIRFLOW__WEBSERVER__BASE_URL", raising=False)
+    assert _host_guard_kwargs() == {"host_origin_protection": False}
 
 
 def test_auth_contextvars_isolated_per_context():
