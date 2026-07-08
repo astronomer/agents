@@ -12,6 +12,7 @@ import logging
 import os
 import threading
 from typing import Any
+from urllib.parse import urlparse
 
 from astro_airflow_mcp import __version__
 
@@ -40,20 +41,29 @@ def _host_guard_kwargs() -> dict[str, Any]:
     which only accepts loopback Host headers (127.0.0.1/localhost/::1) plus the
     ASGI ``scope["server"]`` host and returns ``421 "Misdirected Request"`` for
     anything else. In plugin mode the MCP app is embedded in the Airflow
-    webserver and reachable only through the platform ingress — which
-    terminates TLS for the Deployment's hostname, runs forward-auth, and
-    requires a bearer token — so Host/Origin are enforced there and the
-    loopback-only default rejects every real request. Delegate that check to
-    the ingress by default.
+    webserver, reached over the Deployment's own hostname, so the loopback-only
+    default rejects every real request.
 
-    Set ``ASTRO_MCP_ALLOWED_HOSTS`` (comma-separated hostnames) to instead keep
-    the guard enabled with an explicit allowlist. Standalone mode
-    (``__main__.py``, served via ``mcp.run``) keeps FastMCP's default
-    protection, which is what a locally-bound server needs.
+    Rather than disable the guard, keep it enabled and scope it to the
+    Deployment's hostname, which Astro injects as ``AIRFLOW__WEBSERVER__BASE_URL``
+    (an env var, so it's available at import time — unlike Airflow's ``conf``,
+    which is populated later). ``ASTRO_MCP_ALLOWED_HOSTS`` (comma-separated)
+    overrides the allowlist for custom domains or extra hosts.
+
+    If no hostname can be determined (non-Astro embedding), fall back to
+    delegating the check to whatever fronts the app. Standalone mode
+    (``__main__.py``, ``mcp.run``) keeps FastMCP's default protection, which is
+    what a locally-bound server needs.
     """
     allowed = os.environ.get("ASTRO_MCP_ALLOWED_HOSTS", "").strip()
     if allowed:
         return {"allowed_hosts": [h.strip() for h in allowed.split(",") if h.strip()]}
+
+    base_url = os.environ.get("AIRFLOW__WEBSERVER__BASE_URL", "").strip()
+    host = urlparse(base_url).hostname if base_url else None
+    if host:
+        return {"allowed_hosts": [host]}
+
     return {"host_origin_protection": False}
 
 
