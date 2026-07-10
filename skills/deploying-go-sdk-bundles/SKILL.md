@@ -1,6 +1,6 @@
 ---
 name: deploying-go-sdk-bundles
-description: Build, pack, and deploy compiled Airflow Go SDK bundles so the ExecutableCoordinator can run them. Use when the user wants to compile a Go task bundle, asks about `go build`, `go tool airflow-go-pack`, the AFBNDL01 self-contained executable bundle, packing or inspecting a bundle, placing it under `executables_root`, cross-compiling a bundle for workers, `go-sdk` module versioning/tags/pseudo-versions, or getting the bundle onto an Airflow worker (Docker, Kubernetes, or Astro). For the task code see authoring-go-sdk-tasks; for the shared coordinator settings see configuring-airflow-language-sdks.
+description: Builds, packs, and deploys compiled Airflow Go SDK bundles so the ExecutableCoordinator can run them. Use when the user wants to compile a Go task bundle, asks about `go build`, `go tool airflow-go-pack`, the AFBNDL01 self-contained executable bundle, packing or inspecting a bundle, placing it under `executables_root`, cross-compiling a bundle for workers, `go-sdk` module versioning/tags/pseudo-versions, or getting the bundle onto an Airflow worker (Docker, Kubernetes, or Astro). For the task code see authoring-go-sdk-tasks; for the shared coordinator settings see configuring-airflow-language-sdks.
 ---
 
 # Deploying Go SDK Bundles
@@ -9,7 +9,7 @@ A Go SDK deployment has one artifact: a **bundle**, a single self-contained nati
 
 > **Experimental.** The Go SDK is under active development and not production-ready. Everything resolves against the single module `github.com/apache/airflow/go-sdk` (Go 1.24+).
 
-> **Order of operations:** write the tasks (**authoring-go-sdk-tasks**) -> build and pack the bundle (this skill) -> place it under `executables_root` and configure the coordinator -> deploy the matching Python stub Dag.
+> **Order of operations:** write the tasks (**authoring-go-sdk-tasks**) -> build and pack the bundle (this skill) -> place it under `executables_root` and configure the coordinator -> deploy the matching Python stub DAG.
 
 ---
 
@@ -49,7 +49,7 @@ Python's `ExecutableCoordinator` scans `executables_root`, matches the incoming 
    queue_to_coordinator = {"golang": "go"}
    ```
 
-3. Deploy the matching Python stub Dag; its `queue=` must equal the `queue_to_coordinator` key (`golang` here), and its `dag_id`/`task_id`s must match what the bundle registered.
+3. Deploy the matching Python stub DAG; its `queue=` must equal the `queue_to_coordinator` key (`golang` here), and its `dag_id`/`task_id`s must match what the bundle registered.
 
 ---
 
@@ -104,7 +104,7 @@ go get github.com/apache/airflow/go-sdk@<commit-or-branch>
 - Built for the worker's OS/arch (e.g. `--goos linux --goarch amd64`).
 - Packed AFBNDL01 bundle placed under a directory in `executables_root`.
 - `ExecutableCoordinator` + `queue_to_coordinator` configured (**configuring-airflow-language-sdks**).
-- Python stub Dag deployed, its `queue=` routed to the Go coordinator.
+- Python stub DAG deployed, its `queue=` routed to the Go coordinator.
 - Re-packed after any rebuild/strip/sign (preserves `binary_sha256`).
 
 ---

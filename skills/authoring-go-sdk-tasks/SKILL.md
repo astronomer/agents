@@ -1,11 +1,11 @@
 ---
 name: authoring-go-sdk-tasks
-description: Write Airflow task logic in Go using the Airflow Go SDK. Use when the user wants to implement Airflow tasks in Go, asks about `BundleProvider`/`RegisterDags`, the `bundlev1` Registry/Dag interfaces, registering Go tasks (`AddTask`/`AddTaskWithName`), dependency injection by parameter type (`context.Context`, `sdk.TIRunContext`, `*slog.Logger`, `sdk.Client`), or reading connections/variables/XComs from Go. This skill covers the Go-specific native API; the shared Python-stub pattern and conceptual model live in authoring-language-sdk-tasks. For building/packing/shipping the bundle see deploying-go-sdk-bundles; for coordinator config see configuring-airflow-language-sdks.
+description: Writes Airflow task logic in Go using the Airflow Go SDK. Use when the user wants to implement Airflow tasks in Go, asks about `BundleProvider`/`RegisterDags`, the `bundlev1` Registry/Dag interfaces, registering Go tasks (`AddTask`/`AddTaskWithName`), dependency injection by parameter type (`context.Context`, `sdk.TIRunContext`, `*slog.Logger`, `sdk.Client`), or reading connections/variables/XComs from Go. This skill covers the Go-specific native API; the shared Python-stub pattern and conceptual model live in authoring-language-sdk-tasks. For building/packing/shipping the bundle see deploying-go-sdk-bundles; for coordinator config see configuring-airflow-language-sdks.
 ---
 
 # Authoring Go SDK Tasks
 
-The Airflow Go SDK implements the language-SDK model for Go: your Dag stays in Python, and each task is a compiled Go function registered inside a **bundle** (a single native executable). This skill covers the **Go-specific** native API. The shared model (the Python `@task.stub` pattern, ID matching, the XCom-as-JSON contract) lives in **authoring-language-sdk-tasks**; read that first if you are new to language SDKs.
+The Airflow Go SDK implements the language-SDK model for Go: your DAG stays in Python, and each task is a compiled Go function registered inside a **bundle** (a single native executable). This skill covers the **Go-specific** native API. The shared model (the Python `@task.stub` pattern, ID matching, the XCom-as-JSON contract) lives in **authoring-language-sdk-tasks**; read that first if you are new to language SDKs.
 
 > **Experimental.** The Go SDK is under active development and not production-ready. Module path `github.com/apache/airflow/go-sdk` (Go 1.24+). APIs may change.
 
@@ -43,7 +43,7 @@ The `queue` value (`"golang"` here) is an arbitrary label that must match the qu
 
 ## The bundle entry point
 
-A bundle implements `bundlev1.BundleProvider`: report its version and register your Dags and tasks. `main` is one line; `bundlev1server.Serve` wires the bundle to the Airflow runtime for you.
+A bundle implements `bundlev1.BundleProvider`: report its version and register your DAGs and tasks. `main` is one line; `bundlev1server.Serve` wires the bundle to the Airflow runtime for you.
 
 ```go
 package main
@@ -135,7 +135,7 @@ To read an upstream task's result, call `GetXCom` explicitly, taking the `dag_id
 
 ## Runtime context
 
-Declare an `sdk.TIRunContext` parameter to read metadata about the task instance and its Dag run. It is an interface that embeds `context.Context`, so it is usable anywhere a `context.Context` is expected.
+Declare an `sdk.TIRunContext` parameter to read metadata about the task instance and its DAG run. It is an interface that embeds `context.Context`, so it is usable anywhere a `context.Context` is expected.
 
 ```go
 func extract(ctx sdk.TIRunContext, log *slog.Logger) error {

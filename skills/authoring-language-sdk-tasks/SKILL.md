@@ -1,0 +1,123 @@
+---
+name: authoring-language-sdk-tasks
+description: The language-neutral foundation for Airflow language SDKs — implement task logic in a non-Python language while the DAG stays in Python. Use when the user wants to run an Airflow task in another language (Go or other native languages), asks how the Python `@task.stub` pairs with native task code, how task/DAG IDs must match across the two sides, how data passes via XCom as JSON, or which language SDKs exist. This skill owns the shared Python-stub pattern and conceptual model; for a specific language's native API, build, and runtime, use that language's skill (e.g. authoring-go-sdk-tasks).
+---
+
+# Authoring Language SDK Tasks (Shared Foundation)
+
+Airflow language SDKs let you implement task logic in a language other than Python while the DAG and its scheduling stay in Python. This skill describes the parts that are identical across every language SDK. Each language has its own companion skill for the native API, build tooling, and runtime — see [Per-language skills](#per-language-skills).
+
+> **Experimental.** The language SDKs are in preview. APIs and artifact coordinates may change.
+
+---
+
+## The model
+
+A DAG is authored in Python as usual. Tasks that should run in another language are declared as **stubs** routed to a dedicated queue. At runtime, Airflow hands a stub task to a **coordinator** that launches a short-lived **native subprocess** for that one task instance, runs your compiled/native code, and shuts the subprocess down.
+
+Consequences that hold for every language SDK:
+
+- **One subprocess per task instance** — there is no shared in-process state between task instances. Pass data via XCom or an external store.
+- **The DAG, schedule, retries, and queue routing live in Python.** The native side only implements task logic.
+- **Data crossing the boundary is JSON.** See [The XCom-as-JSON contract](#the-xcom-as-json-contract).
+
+---
+
+## The two-sided model
+
+Every task has two halves that must agree:
+
+1. A **Python stub** in a normal DAG file — no logic; it declares the task, its queue, the dependency graph, and retry policy.
+2. A **native implementation** (Go, etc.) whose IDs match the Python side and where the work happens.
+
+### Python side (scheduling)
+
+The example below uses the Go SDK to be concrete, but the Python side is **identical for every language SDK**. The queue name (`"golang"` here) is an arbitrary label you choose — it just has to match a key in `queue_to_coordinator` (see **configuring-airflow-language-sdks**). Pick whatever name fits the SDK you're routing to.
+
+```python
+from datetime import timedelta
+from airflow.sdk import dag, task
+
+
+@dag
+def sales_pipeline():
+    @task.stub(queue="golang")          # queue selects the coordinator (see configuring-airflow-language-sdks)
+    def extract(): ...
+
+    @task.stub(queue="golang")
+    def transform(extracted): ...        # arg only declares the dependency
+
+    @task.stub(queue="golang", retries=1, retry_delay=timedelta(seconds=5))
+    def load(transformed): ...
+
+    @task()                              # an ordinary Python task can sit downstream
+    def report(loaded):
+        print(f"done: {loaded}")
+
+    report(load(transform(extract())))
+
+
+sales_pipeline()
+```
+
+Rules that apply regardless of language:
+
+- The **stub function name is the task ID** and the `@dag` name (or `dag_id=`) is the DAG ID. The native side must use these exact IDs.
+- An upstream argument on a stub (e.g. `transform(extracted)`) exists **only to declare the dependency** in Python. The value itself is fetched on the native side via XCom — passing it in Python does not hand it to the native code.
+- **Queue, retries, and other task arguments are set on the stub**, not in the native code. A native task that fails is reported back to Airflow, which then applies the stub's retry policy.
+- The `queue` value is what routes the task to a coordinator; the same string must appear in `queue_to_coordinator` (see **configuring-airflow-language-sdks**).
+
+---
+
+## The XCom-as-JSON contract
+
+XCom values are stored as JSON in Airflow's metadata database, so the boundary between Python and any native language is JSON. The Python/JSON side is the same for every SDK:
+
+| Python type | JSON |
+|-------------|------|
+| `int` | number (integer) |
+| `float` | number (decimal) |
+| `str` | string |
+| `bool` | boolean |
+| `None` | null |
+| `list` | array |
+| `dict` | object |
+
+Each language SDK maps these JSON types onto its own native types. The native-type mapping lives in that language's skill. The key portability rule: a value pushed by one task is read by another **as JSON**, so the consuming side must expect a type compatible with what was stored.
+
+---
+
+## What is language-specific (and lives elsewhere)
+
+This skill deliberately stops at the shared concepts. The following differ per language and are documented in each language's companion skills:
+
+- **Native task API** — how you declare tasks, read connections/variables/XComs, and push results (annotations, interfaces, function registration, etc.).
+- **Native type mapping** — the native column of the JSON table above.
+- **Build and packaging** — how the artifact is compiled and bundled.
+- **Runtime prerequisite** — what must be present on the worker (a language runtime for some SDKs; none for the Go SDK's self-contained bundles).
+
+The Airflow-side wiring (which coordinator runs which queue) is shared in structure but has per-coordinator options; it lives in **configuring-airflow-language-sdks**.
+
+---
+
+## Language-agnostic pitfalls
+
+- **IDs must match exactly** across the Python stub function name and the native task ID, and across `@dag`/`dag_id` and the native DAG ID. Mismatches surface as "no DAGs" or missing-XCom errors.
+- **Both sides need the upstream reference.** Python declares the dependency by passing the upstream call; the native code retrieves the value via XCom.
+- **Set queue and retries on the stub**, never in the native code.
+- **Stub bodies must be empty.** An AST check enforces it — only `pass`, `...`, or a docstring is allowed in the body; any real logic is rejected.
+- **`retry_policy` is rejected on stubs** (`@task.stub` raises `ValueError`). Use `retries`/`retry_delay` instead — a retry-policy callable runs Python in-process and would never fire for a task executing in a native subprocess.
+- Assets, deferral, and some other Airflow features have limited or no support in the language SDKs today.
+
+---
+
+## Per-language skills
+
+- **authoring-go-sdk-tasks**: Go native API — task registration, dependency injection by parameter type, and client access.
+- *(Future language SDKs each add their own `authoring-<lang>-sdk-tasks` skill that builds on this one.)*
+
+## Related Skills
+
+- **configuring-airflow-language-sdks**: Route a queue to a coordinator and set runtime options.
+- **authoring-dags**: General Airflow DAG authoring (the Python side lives here too).
+- **deploying-go-sdk-bundles**: Build, pack, and ship the Go bundle (per-language deploy skills follow the same shape).
