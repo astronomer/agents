@@ -1,11 +1,11 @@
 ---
 name: authoring-java-sdk-tasks
-description: Write Airflow task logic in Java, Kotlin, or any JVM language using the Airflow Java SDK. Use when the user wants to implement Airflow tasks in Java/JVM, asks about `@Builder.Dag`/`@Builder.Task`/`@Builder.XCom`, the `Task`/`BundleBuilder` interfaces, reading connections/variables/XComs from Java, the JSON-to-Java type mapping, or logging from Java tasks. This skill covers the Java-specific native API; the shared Python-stub pattern and conceptual model live in authoring-language-sdk-tasks. For building/shipping the bundle see deploying-java-sdk-bundles; for coordinator config see configuring-airflow-language-sdks.
+description: Writes Airflow task logic in Java, Kotlin, or any JVM language using the Airflow Java SDK. Use when the user wants to implement Airflow tasks in Java/JVM, asks about `@Builder.Dag`/`@Builder.Task`/`@Builder.XCom`, the `Task`/`BundleBuilder` interfaces, reading connections/variables/XComs from Java, the JSON-to-Java type mapping, or logging from Java tasks. This skill covers the Java-specific native API; the shared Python-stub pattern and conceptual model live in authoring-language-sdk-tasks. For building/shipping the bundle see deploying-java-sdk-bundles; for coordinator config see configuring-airflow-language-sdks.
 ---
 
 # Authoring Java SDK Tasks
 
-The Airflow Java SDK implements the language-SDK model for the JVM: your Dag stays in Python, and each task instance runs in a short-lived JVM subprocess. This skill covers the **Java-specific** native API. The shared model — the Python `@task.stub` pattern, ID matching, and the XCom-as-JSON contract — lives in **authoring-language-sdk-tasks**; read that first if you're new to language SDKs.
+The Airflow Java SDK implements the language-SDK model for the JVM: your DAG stays in Python, and each task instance runs in a short-lived JVM subprocess. This skill covers the **Java-specific** native API. The shared model — the Python `@task.stub` pattern, ID matching, and the XCom-as-JSON contract — lives in **authoring-language-sdk-tasks**; read that first if you're new to language SDKs.
 
 > **Experimental.** The Java SDK is in preview. Artifact coordinates and APIs may change.
 
@@ -108,7 +108,7 @@ Register tasks manually in a `Dag` and expose it through a `BundleBuilder`:
 public class MyBundle implements BundleBuilder {
   @Override
   public Iterable<Dag> getDags() {
-    var dag = new Dag("sales_pipeline");      // Dag ID matches Python
+    var dag = new Dag("sales_pipeline");      // DAG ID matches Python
     dag.addTask("extract", ExtractTask.class);
     dag.addTask("transform", TransformTask.class);
     return java.util.List.of(dag);
@@ -116,13 +116,13 @@ public class MyBundle implements BundleBuilder {
 }
 ```
 
-Each `Task` class needs a public no-arg constructor. Task IDs must be unique within a Dag, and Dag IDs unique within a bundle.
+Each `Task` class needs a public no-arg constructor. Task IDs must be unique within a DAG, and DAG IDs unique within a bundle.
 
 ---
 
 ## The entry point
 
-Every bundle has a `main` that hands your Dags to the SDK server. The server connects to the coordinator, runs one task instance, and exits.
+Every bundle has a `main` that hands your DAGs to the SDK server. The server connects to the coordinator, runs one task instance, and exits.
 
 ```java
 import java.util.List;
@@ -147,13 +147,13 @@ public class Main implements BundleBuilder {
 
 ## Talking to Airflow from a task: `Client`
 
-A `Client` is passed into every task and is scoped to the current Dag run and task instance.
+A `Client` is passed into every task and is scoped to the current DAG run and task instance.
 
 | Call | Returns | Notes |
 |------|---------|-------|
 | `client.getConnection(id)` | `Connection` | Fields: `id`, `type`, `host`, `schema`, `login`, `password`, `port`, `extra`. Any unset field is `null`. Throws if the connection doesn't exist. |
 | `client.getVariable(key)` | `Object` (or `null`) | Cast to the type you expect, e.g. `(String) client.getVariable("threshold")`. |
-| `client.getXCom(taskId)` | `Object` (or `null`) | Reads another task's `return_value` by default. Overloads accept `key`, `dagId`, `runId`, `mapIndex`, and `includePriorDates` for cross-Dag/run reads and mapped tasks. |
+| `client.getXCom(taskId)` | `Object` (or `null`) | Reads another task's `return_value` by default. Overloads accept `key`, `dagId`, `runId`, `mapIndex`, and `includePriorDates` for cross-DAG/run reads and mapped tasks. |
 | `client.setXCom(value)` | — | Pushes the `return_value` XCom (interface API). Value must be JSON-serializable. With the annotation API, returning a value does this for you. |
 
 ### `Context`
@@ -196,10 +196,10 @@ For records to reach Airflow's task log store (and show in the UI), the bundle m
 
 The SDK repository includes a runnable example under `java-sdk/example/`:
 
-- `src/resources/dags/java_examples.py` — Python Dags pairing Python tasks with Java stubs, including a `load` stub with `retries=1`.
+- `src/resources/dags/java_examples.py` — Python DAGs pairing Python tasks with Java stubs, including a `load` stub with `retries=1`.
 - `src/java/.../AnnotationExample.java` — annotation API, including a task that fails on `tryNumber == 1` and succeeds on retry.
 - `src/java/.../InterfaceExampleBuilder.java` — the same tasks via the `Task` interface and `Dag.addTask(...)`.
-- `src/java/.../ExampleBundleBuilder.java` — a `BundleBuilder` returning both Dags plus the `main` entry point.
+- `src/java/.../ExampleBundleBuilder.java` — a `BundleBuilder` returning both DAGs plus the `main` entry point.
 
 Point users there for an end-to-end reference.
 

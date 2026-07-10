@@ -1,6 +1,6 @@
 ---
 name: configuring-airflow-language-sdks
-description: Configure Airflow to run language SDK tasks (Java and future native SDKs) — register a coordinator, map a queue to it, ensure the language runtime on workers, and tune coordinator options. Use when the user wants Airflow to route a queue to a native-language coordinator, asks about the `[sdk]` `coordinators`/`queue_to_coordinator` settings, `AIRFLOW__SDK__COORDINATORS`, `jars_root` or other coordinator `kwargs`, `task_startup_timeout`, or why their native tasks aren't being picked up. Covers the shared routing mechanism plus per-coordinator options (e.g. JavaCoordinator).
+description: Configures Airflow to run language SDK tasks (Java and future native SDKs) — register a coordinator, map a queue to it, ensure the language runtime on workers, and tune coordinator options. Use when the user wants Airflow to route a queue to a native-language coordinator, asks about the `[sdk]` `coordinators`/`queue_to_coordinator` settings, `AIRFLOW__SDK__COORDINATORS`, `jars_root` or other coordinator `kwargs`, `task_startup_timeout`, or why their native tasks aren't being picked up. Covers the shared routing mechanism plus per-coordinator options (e.g. JavaCoordinator).
 ---
 
 # Configuring Airflow for Language SDKs
@@ -96,7 +96,7 @@ coordinators = {
 
 1. Confirm the language runtime is present where workers run (e.g. `java -version` via `astro dev bash`, or `docker compose exec ... java -version`).
 2. Confirm the artifact directory referenced in `kwargs` (e.g. `jars_root`) actually contains your artifact on the worker filesystem.
-3. Trigger the Dag and open the native task's logs — you should see the subprocess start and your task output.
+3. Trigger the DAG and open the native task's logs — you should see the subprocess start and your task output.
 
 ### Troubleshooting
 
@@ -104,8 +104,8 @@ coordinators = {
 |---------|--------------------|
 | Task fails immediately mentioning coordinator or queue | `coordinators` / `queue_to_coordinator` not valid one-line JSON, or the queue name doesn't match the stub's `queue=`. Fix the JSON and restart. |
 | Runtime not found (e.g. `java: command not found`) | The language runtime isn't on the worker, or the executable path kwarg is wrong. Install the runtime and verify its version. |
-| "No artifact found" / "no Dags" | The artifact-directory kwarg points at the wrong place, or the artifact isn't there yet. Confirm the path and that it was copied in. |
-| Dag run hangs at the native task | Raise `task_startup_timeout` (e.g. `30.0`); first-run subprocess startup can be slow. |
+| "No artifact found" / "no DAGs" | The artifact-directory kwarg points at the wrong place, or the artifact isn't there yet. Confirm the path and that it was copied in. |
+| DAG run hangs at the native task | Raise `task_startup_timeout` (e.g. `30.0`); first-run subprocess startup can be slow. |
 | Wrong/ambiguous entry point (Java) | Multiple executable JARs under `jars_root`. Set `main_class` explicitly. |
 
 ---

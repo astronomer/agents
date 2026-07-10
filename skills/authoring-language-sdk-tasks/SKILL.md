@@ -1,11 +1,11 @@
 ---
 name: authoring-language-sdk-tasks
-description: The language-neutral foundation for Airflow language SDKs — implement task logic in a non-Python language while the Dag stays in Python. Use when the user wants to run an Airflow task in another language (Java, Kotlin, or other JVM/native languages), asks how the Python `@task.stub` pairs with native task code, how task/Dag IDs must match across the two sides, how data passes via XCom as JSON, or which language SDKs exist. This skill owns the shared Python-stub pattern and conceptual model; for a specific language's native API, build, and runtime, use that language's skill (e.g. authoring-java-sdk-tasks).
+description: The language-neutral foundation for Airflow language SDKs — implement task logic in a non-Python language while the DAG stays in Python. Use when the user wants to run an Airflow task in another language (Java, Kotlin, or other JVM/native languages), asks how the Python `@task.stub` pairs with native task code, how task/DAG IDs must match across the two sides, how data passes via XCom as JSON, or which language SDKs exist. This skill owns the shared Python-stub pattern and conceptual model; for a specific language's native API, build, and runtime, use that language's skill (e.g. authoring-java-sdk-tasks).
 ---
 
 # Authoring Language SDK Tasks (Shared Foundation)
 
-Airflow language SDKs let you implement task logic in a language other than Python while the Dag and its scheduling stay in Python. This skill describes the parts that are identical across every language SDK. Each language has its own companion skill for the native API, build tooling, and runtime — see [Per-language skills](#per-language-skills).
+Airflow language SDKs let you implement task logic in a language other than Python while the DAG and its scheduling stay in Python. This skill describes the parts that are identical across every language SDK. Each language has its own companion skill for the native API, build tooling, and runtime — see [Per-language skills](#per-language-skills).
 
 > **Experimental.** The language SDKs are in preview. APIs and artifact coordinates may change.
 
@@ -13,12 +13,12 @@ Airflow language SDKs let you implement task logic in a language other than Pyth
 
 ## The model
 
-A Dag is authored in Python as usual. Tasks that should run in another language are declared as **stubs** routed to a dedicated queue. At runtime, Airflow hands a stub task to a **coordinator** that launches a short-lived **native subprocess** for that one task instance, runs your compiled/native code, and shuts the subprocess down.
+A DAG is authored in Python as usual. Tasks that should run in another language are declared as **stubs** routed to a dedicated queue. At runtime, Airflow hands a stub task to a **coordinator** that launches a short-lived **native subprocess** for that one task instance, runs your compiled/native code, and shuts the subprocess down.
 
 Consequences that hold for every language SDK:
 
 - **One subprocess per task instance** — there is no shared in-process state between task instances. Pass data via XCom or an external store.
-- **The Dag, schedule, retries, and queue routing live in Python.** The native side only implements task logic.
+- **The DAG, schedule, retries, and queue routing live in Python.** The native side only implements task logic.
 - **Data crossing the boundary is JSON.** See [The XCom-as-JSON contract](#the-xcom-as-json-contract).
 
 ---
@@ -27,7 +27,7 @@ Consequences that hold for every language SDK:
 
 Every task has two halves that must agree:
 
-1. A **Python stub** in a normal Dag file — no logic; it declares the task, its queue, the dependency graph, and retry policy.
+1. A **Python stub** in a normal DAG file — no logic; it declares the task, its queue, the dependency graph, and retry policy.
 2. A **native implementation** (Java, etc.) whose IDs match the Python side and where the work happens.
 
 ### Python side (scheduling)
@@ -62,7 +62,7 @@ sales_pipeline()
 
 Rules that apply regardless of language:
 
-- The **stub function name is the task ID** and the `@dag` name (or `dag_id=`) is the Dag ID. The native side must use these exact IDs.
+- The **stub function name is the task ID** and the `@dag` name (or `dag_id=`) is the DAG ID. The native side must use these exact IDs.
 - An upstream argument on a stub (e.g. `transform(extracted)`) exists **only to declare the dependency** in Python. The value itself is fetched on the native side via XCom — passing it in Python does not hand it to the native code.
 - **Queue, retries, and other task arguments are set on the stub**, not in the native code. A native task that fails is reported back to Airflow, which then applies the stub's retry policy.
 - The `queue` value is what routes the task to a coordinator; the same string must appear in `queue_to_coordinator` (see **configuring-airflow-language-sdks**).
@@ -102,7 +102,7 @@ The Airflow-side wiring (which coordinator runs which queue) is shared in struct
 
 ## Language-agnostic pitfalls
 
-- **IDs must match exactly** across the Python stub function name and the native task ID, and across `@dag`/`dag_id` and the native Dag ID. Mismatches surface as "no Dags" or missing-XCom errors.
+- **IDs must match exactly** across the Python stub function name and the native task ID, and across `@dag`/`dag_id` and the native DAG ID. Mismatches surface as "no DAGs" or missing-XCom errors.
 - **Both sides need the upstream reference.** Python declares the dependency by passing the upstream call; the native code retrieves the value via XCom.
 - **Set queue and retries on the stub**, never in the native code.
 - Assets, deferral, and some other Airflow features have limited or no support in the language SDKs today.
