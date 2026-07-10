@@ -105,6 +105,8 @@ The Airflow-side wiring (which coordinator runs which queue) is shared in struct
 - **IDs must match exactly** across the Python stub function name and the native task ID, and across `@dag`/`dag_id` and the native DAG ID. Mismatches surface as "no DAGs" or missing-XCom errors.
 - **Both sides need the upstream reference.** Python declares the dependency by passing the upstream call; the native code retrieves the value via XCom.
 - **Set queue and retries on the stub**, never in the native code.
+- **Stub bodies must be empty.** An AST check enforces it — only `pass`, `...`, or a docstring is allowed in the body; any real logic is rejected.
+- **`retry_policy` is rejected on stubs** (`@task.stub` raises `ValueError`). Use `retries`/`retry_delay` instead — a retry-policy callable runs Python in-process and would never fire for a task executing in a native subprocess.
 - Assets, deferral, and some other Airflow features have limited or no support in the language SDKs today.
 
 ---

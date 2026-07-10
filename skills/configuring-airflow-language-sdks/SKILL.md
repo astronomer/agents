@@ -73,7 +73,7 @@ The `classpath` and `kwargs` are specific to each coordinator. Add a subsection 
 | `main_class` | *(auto-detect)* | Explicit entry-point class. If omitted, the coordinator scans `jars_root` for a JAR whose manifest declares `Main-Class`. **Set this explicitly if multiple executable JARs are present** — otherwise the choice is non-deterministic. |
 | `task_startup_timeout` | `10.0` | Seconds to wait for the subprocess to connect after launch. Increase it if JVM startup is slow (constrained hardware, large classpath, first cold start). |
 
-**Java logging via `java.util.logging`.** Most Java logging integrations need only a build dependency (see **deploying-java-sdk-bundles**). The exception is a JUL `logging.properties` file, wired through `jvm_args`:
+**Java logging via `java.util.logging`.** Of the SDK logging integrations, only JPL and SLF4J are zero-config build dependencies; Log4j 2 and JUL need extra setup — see the logging integration section in **deploying-java-sdk-bundles**. JUL's documented alternative to calling `AirflowJulHandler.setup()` in `main()` is a `logging.properties` file, wired through `jvm_args`:
 
 ```ini
 [sdk]

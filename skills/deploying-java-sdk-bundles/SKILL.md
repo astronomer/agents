@@ -1,13 +1,13 @@
 ---
 name: deploying-java-sdk-bundles
-description: Builds and deploys compiled Airflow Java SDK bundles so workers can run them. Use when the user wants to package a JVM task bundle into a JAR, asks about the `org.apache.airflow.sdk` Gradle plugin, `./gradlew bundle`, the Maven shade/BOM setup, fat vs thin JARs, snapshot repositories, or getting the JAR onto an Airflow worker (Docker, Kubernetes, or Astro). For the task code see authoring-java-sdk-tasks; for the Airflow coordinator settings see configuring-airflow-language-sdks.
+description: Builds and deploys compiled Airflow Java SDK bundles so workers can run them. Use when the user wants to package a JVM task bundle into a JAR, asks about the `org.apache.airflow.sdk` Gradle plugin, `./gradlew bundle`, the Maven shade/BOM setup, fat vs thin JARs, the logging integration artifacts (JPL, SLF4J, Log4j 2, JUL), preview/snapshot builds, or getting the JAR onto an Airflow worker (Docker, Kubernetes, or Astro). For the task code see authoring-java-sdk-tasks; for the Airflow coordinator settings see configuring-airflow-language-sdks.
 ---
 
 # Deploying Java SDK Bundles
 
 A Java SDK deployment has one artifact: a **bundle** — your compiled task classes plus the SDK, packaged as a JAR (or a thin JAR alongside its dependency JARs). You build it with Gradle or Maven, then place it in a directory that the `JavaCoordinator` scans (`jars_root`) on every worker. This skill is platform-neutral; it shows the build once, then both an open-source and an Astro deployment path.
 
-> **Experimental.** The Java SDK is in preview. Artifact versions below are shown as `${version}`; while the SDK is pre-release it may only be available as a `-SNAPSHOT` from Apache's snapshot repository (see the snapshot note).
+> **Experimental.** The Java SDK is in preview. Artifact versions below are shown as `${version}`; while the SDK is pre-release you may need to build the artifacts into your local Maven repository yourself (see the preview builds section).
 
 > **Order of operations:** build the bundle (this skill) → place it where `jars_root` points → configure the coordinator (**configuring-airflow-language-sdks**). The task code itself is **authoring-java-sdk-tasks**.
 
@@ -87,11 +87,64 @@ Unlike Gradle, Maven does **not** validate `mainClass` at build time; a wrong va
 
 ---
 
-## Snapshot repository (preview builds)
+## Logging integration
 
-**Skip this section if you depend on a stable release.** Once you pin a released version (e.g. `1.0.0`) published to Maven Central, the `mavenCentral()` repository in the build snippets above is enough — you do **not** need the Apache snapshots repository. It is required only while you depend on a `-SNAPSHOT` (preview) version.
+For task log records to reach Airflow's log store (and the task log view in the UI), the bundle must include **exactly one** SDK logging artifact per logging facade you use. Versions are managed by `airflow-sdk-bom`; Maven users apply the same artifact IDs.
 
-While the SDK is pre-release, the artifacts and the Gradle plugin may resolve only from Apache's snapshot Nexus. Add it in **both** `pluginManagement` (in `settings.gradle`) and project `repositories` (in `build.gradle`):
+| Facade | Artifact | Setup beyond the dependency |
+|--------|----------|-----------------------------|
+| `System.Logger` (JPL) | `airflow-sdk-jpl` | None — the provider is discovered via `ServiceLoader`. |
+| SLF4J 2.x | `airflow-sdk-slf4j` | None — the binding is discovered automatically (pulls in `slf4j-api` for you). |
+| Log4j 2 | `airflow-sdk-log4j2` | `log4j-core` on the runtime classpath + `AirflowAppender` declared in `log4j2.xml` (below). |
+| `java.util.logging` (JUL) | `airflow-sdk-jul` | Call `AirflowJulHandler.setup()` in `main()` (below), or use a `logging.properties` file (see **configuring-airflow-language-sdks**). |
+
+**Log4j 2** — `log4j-core` hosts the plugin loader that discovers the appender (`log4j-api` comes in transitively):
+
+```groovy
+implementation("org.apache.airflow:airflow-sdk-log4j2:${version}")
+runtimeOnly("org.apache.logging.log4j:log4j-core:${log4jVersion}")
+```
+
+```xml
+<Configuration>
+  <Appenders>
+    <AirflowAppender name="Airflow"/>
+  </Appenders>
+  <Loggers>
+    <Root level="info">
+      <AppenderRef ref="Airflow"/>
+    </Root>
+  </Loggers>
+</Configuration>
+```
+
+**JUL** — call `AirflowJulHandler.setup()` before any task runs. It clears the root logger's existing handlers (the default `ConsoleHandler` writes to stderr, which Airflow would otherwise capture as `task.stderr` at ERROR level, duplicating each record):
+
+```java
+public static void main(String[] args) {
+    AirflowJulHandler.setup();
+    Server.create(args).serve(new MyBundle().build());
+}
+```
+
+**Don't double up providers.** A second `System.LoggerFinder` implementation alongside `airflow-sdk-jpl`, or a second SLF4J binding (`logback-classic`, `slf4j-simple`) alongside `airflow-sdk-slf4j`, makes provider selection unpredictable.
+
+---
+
+## Preview builds (before a stable release)
+
+**Skip this section if you depend on a stable release.** Once you pin a released version (e.g. `1.0.0`) published to Maven Central, the `mavenCentral()` repository in the build snippets above is enough.
+
+While the SDK is pre-release, the documented path is to build the artifacts and the Gradle plugin from the Airflow repo into your local Maven repository:
+
+```bash
+# in apache/airflow's java-sdk/ directory
+./gradlew publishToMavenLocal -PskipSigning=true
+```
+
+Then add `mavenLocal()` in your project, in **both** `pluginManagement` (in `settings.gradle`) and project `repositories` (in `build.gradle`) — this is how the SDK's own example project resolves it.
+
+Once `-SNAPSHOT` artifacts are published to Apache's snapshot Nexus, that repository can stand in for the local build (same two places):
 
 ```groovy
 maven {

@@ -188,7 +188,7 @@ Declare a logger as a static field named after the class — the conventional pa
 private static final System.Logger log = System.getLogger(SalesPipeline.class.getName());
 ```
 
-For records to reach Airflow's task log store (and show in the UI), the bundle must include one of the SDK logging integration artifacts (`airflow-sdk-jpl`, `airflow-sdk-slf4j`, `airflow-sdk-log4j2`, or `airflow-sdk-jul`). Those are build-time dependencies and integration steps — see **deploying-java-sdk-bundles**. `System.Logger` (JPL) with `airflow-sdk-jpl` is the lightest option and needs no configuration.
+For records to reach Airflow's task log store (and show in the UI), the bundle must include one of the SDK logging integration artifacts (`airflow-sdk-jpl`, `airflow-sdk-slf4j`, `airflow-sdk-log4j2`, or `airflow-sdk-jul`). The dependencies and per-framework setup are in the logging integration section of **deploying-java-sdk-bundles**. `System.Logger` (JPL) with `airflow-sdk-jpl` is the lightest option and needs no configuration.
 
 ---
 
