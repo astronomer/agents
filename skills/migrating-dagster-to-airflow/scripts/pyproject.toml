@@ -1,0 +1,19 @@
+[project]
+name = "migrating-dagster-to-airflow-scripts"
+version = "0.0.0"
+description = "Inventory, validation, and status scripts for the Dagster to Airflow 3 migration skill."
+requires-python = ">=3.9"
+# The scripts are stdlib-only; validate_dag shells out to ruff/astro/airflow when
+# present but imports none of them. No runtime dependencies.
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[tool.uv]
+# Not an installable package (flat scripts + tests); uv provisions the test env
+# without trying to build the project. Tests import the scripts via conftest.
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
