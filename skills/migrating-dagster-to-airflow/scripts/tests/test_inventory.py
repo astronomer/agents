@@ -24,7 +24,9 @@ def test_import_based_detection_kinds(synth_project):
     recs = list(m["units"].values())
     assert m["modes"] == ["static"]
     # kinds are the RAW dagster symbol names (no internal remapping)
-    assert {"daily_sales", "raw_sales", "local_only_asset"} <= set(_names(recs, "asset"))
+    assert {"daily_sales", "raw_sales", "local_only_asset"} <= set(
+        _names(recs, "asset")
+    )
     assert _names(recs, "multi_asset") == ["multi_outs", "multi_specs"]
     assert _by_kind(recs, "op") and _by_kind(recs, "define_asset_job")
     assert _by_kind(recs, "component_instance")
@@ -96,8 +98,10 @@ def test_resource_dict_key_naming(synth_project):
 
 def test_multi_asset_outputs_are_fields(synth_project):
     m = _scan(synth_project)
-    outs = {r["name"]: [o["name"] for o in r.get("outputs", [])]
-            for r in _by_kind(list(m["units"].values()), "multi_asset")}
+    outs = {
+        r["name"]: [o["name"] for o in r.get("outputs", [])]
+        for r in _by_kind(list(m["units"].values()), "multi_asset")
+    }
     assert outs["multi_outs"] == ["out_a", "out_b"]
     # output names are not minted as standalone asset units
     assert not ({"out_a", "out_b"} & set(_names(list(m["units"].values()), "asset")))
@@ -122,7 +126,10 @@ def test_both_conditional_branches_visible(synth_project):
 
 def test_multidoc_component_yaml(synth_project):
     m = _scan(synth_project)
-    assert _names(list(m["units"].values()), "component_instance") == ["my_lib.ComponentA", "my_lib.ComponentB"]
+    assert _names(list(m["units"].values()), "component_instance") == [
+        "my_lib.ComponentA",
+        "my_lib.ComponentB",
+    ]
 
 
 def test_dagster_cloud_ref_and_coupling_field(synth_project):
@@ -148,4 +155,6 @@ def test_helper_calls_not_recorded(synth_project):
 def test_units_shape_for_downstream_scripts(synth_project):
     m = _scan(synth_project)
     assert m["units"] and all(":" in uid for uid in m["units"])
-    assert all("source_edges" in rec and "edges" not in rec for rec in m["units"].values())
+    assert all(
+        "source_edges" in rec and "edges" not in rec for rec in m["units"].values()
+    )

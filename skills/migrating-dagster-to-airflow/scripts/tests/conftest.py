@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 # A minimal Dagster project exercising the constructs the scanner must catch.
 # It is never imported or executed: the static scan only parses text, so the
 # `dagster` imports and decorators need not resolve.
-_ASSETS = '''\
+_ASSETS = """\
 import dagster as dg
 from dagster import asset, multi_asset, AssetOut, AssetSpec, op
 
@@ -52,9 +52,9 @@ def legacy_op(x):
 @solid
 def old_solid(x):
     return x
-'''
+"""
 
-_RESOURCES = '''\
+_RESOURCES = """\
 import dagster as dg
 
 
@@ -68,22 +68,22 @@ class BaseParquetIO(dg.ConfigurableIOManager):
 
 class DerivedParquetIO(BaseParquetIO):
     prefix: str = "x"
-'''
+"""
 
-_FRESHNESS = '''\
+_FRESHNESS = """\
 import dagster as dg
 
 NEW_FP = dg.FreshnessPolicy.cron(deadline_cron="0 9 * * *")
 LEGACY_FP = dg.LegacyFreshnessPolicy(maximum_lag_minutes=120)
-'''
+"""
 
-_CLOUD = '''\
+_CLOUD = """\
 import os
 
 IS_BRANCH = os.environ.get("DAGSTER_CLOUD_IS_BRANCH_DEPLOYMENT", "")
-'''
+"""
 
-_DEFINITIONS = '''\
+_DEFINITIONS = """\
 import dagster as dg
 from dagster import Definitions, ScheduleDefinition, define_asset_job
 
@@ -99,9 +99,9 @@ defs = Definitions(
     schedules=[ScheduleDefinition(job=warehouse_job, cron_schedule="@weekly")],
     resources=resources,
 )
-'''
+"""
 
-_BRANCHED = '''\
+_BRANCHED = """\
 import os
 import dagster as dg
 from dagster import define_asset_job
@@ -132,9 +132,9 @@ else:
     @dg.asset
     def local_only_asset():
         return 1
-'''
+"""
 
-_DEFS_YAML = '''\
+_DEFS_YAML = """\
 type: my_lib.ComponentA
 attributes:
   cron: "@daily"
@@ -143,7 +143,7 @@ attributes:
 type: my_lib.ComponentB
 attributes:
   key: beta
-'''
+"""
 
 
 @pytest.fixture()

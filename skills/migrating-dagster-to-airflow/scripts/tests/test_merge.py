@@ -8,25 +8,46 @@ import inventory
 
 
 def _rt(kind, name, **params):
-    return {"kind": kind, "name": name, "classification": "pending", "note": "",
-            "params": params, "source_edges": [], "status": "pending", "source": "runtime"}
+    return {
+        "kind": kind,
+        "name": name,
+        "classification": "pending",
+        "note": "",
+        "params": params,
+        "source_edges": [],
+        "status": "pending",
+        "source": "runtime",
+    }
 
 
 def _st(kind, name, **extra):
-    r = {"kind": kind, "name": name, "classification": "pending", "note": "",
-         "params": {}, "source_edges": [], "status": "pending"}
+    r = {
+        "kind": kind,
+        "name": name,
+        "classification": "pending",
+        "note": "",
+        "params": {},
+        "source_edges": [],
+        "status": "pending",
+    }
     r.update(extra)
     return r
 
 
 def test_runtime_primary_static_grafted():
     runtime = [_rt("asset", "AssetKey(['users'])")]
-    static = [_st("asset", "users",
-                  source_edges=[{"upstream": "raw", "io_manager": None}], location="a.py:1")]
+    static = [
+        _st(
+            "asset",
+            "users",
+            source_edges=[{"upstream": "raw", "io_manager": None}],
+            location="a.py:1",
+        )
+    ]
     combined = inventory._merge_runtime_first(runtime, static)
     assert len(combined) == 1
-    assert combined[0]["source"] == "runtime"          # runtime is primary
-    assert combined[0]["source_edges"]                 # static extras grafted on
+    assert combined[0]["source"] == "runtime"  # runtime is primary
+    assert combined[0]["source_edges"]  # static extras grafted on
     assert combined[0]["static_location"] == "a.py:1"
     assert not any(r.get("not_in_runtime") for r in combined)
 
@@ -67,7 +88,10 @@ def test_coarse_family_heuristic():
     assert f("ScheduleDefinition") == "schedule"
     assert f("run_status_sensor") == "sensor"
     assert f("multi_asset") == "asset" and f("dbt_assets") == "asset"
-    assert f("DuckDBPandasIOManager") == "resource" and f("DbtCloudWorkspace") == "resource"
+    assert (
+        f("DuckDBPandasIOManager") == "resource"
+        and f("DbtCloudWorkspace") == "resource"
+    )
 
 
 def test_runtime_check_pairs_extracts_check_name():
@@ -81,14 +105,19 @@ def test_runtime_check_pairs_extracts_check_name():
             self.check_keys = keys
 
     obj = _ChecksDef([_Key("row_count_positive", "AssetKey(['us_sector_etfs_raw'])")])
-    assert inventory._runtime_check_pairs(obj) == [("row_count_positive", "us_sector_etfs_raw")]
+    assert inventory._runtime_check_pairs(obj) == [
+        ("row_count_positive", "us_sector_etfs_raw")
+    ]
 
 
 def test_dagster_import_resolution():
     # module alias, from-import, aliased from-import, builder form
     mod = {"dg": "dagster", "ddbt": "dagster_dbt"}
-    sym = {"asset": ("dagster", "asset"), "a": ("dagster", "asset"),
-           "FreshnessPolicy": ("dagster", "FreshnessPolicy")}
+    sym = {
+        "asset": ("dagster", "asset"),
+        "a": ("dagster", "asset"),
+        "FreshnessPolicy": ("dagster", "FreshnessPolicy"),
+    }
     import ast
 
     def resolve(src):
@@ -98,7 +127,7 @@ def test_dagster_import_resolution():
     assert resolve("dg.asset") == "asset"
     assert resolve("dg.multi_asset()") == "multi_asset"
     assert resolve("asset") == "asset"
-    assert resolve("a") == "asset"                       # aliased import
-    assert resolve("FreshnessPolicy.cron()") == "FreshnessPolicy"   # builder form
-    assert resolve("ddbt.dbt_assets") == "dbt_assets"    # integration package
-    assert resolve("pandas.DataFrame") is None           # non-dagster origin
+    assert resolve("a") == "asset"  # aliased import
+    assert resolve("FreshnessPolicy.cron()") == "FreshnessPolicy"  # builder form
+    assert resolve("ddbt.dbt_assets") == "dbt_assets"  # integration package
+    assert resolve("pandas.DataFrame") is None  # non-dagster origin

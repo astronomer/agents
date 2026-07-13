@@ -78,8 +78,13 @@ DEPRECATED_SYMBOLS = {
 # class names are stable API (they do not rotate like the full symbol surface),
 # so this small set is safe to keep; transitive subclasses resolve via the
 # package-wide inheritance map.
-IO_MANAGER_BASES = {"IOManager", "ConfigurableIOManager", "ConfigurableIOManagerFactory",
-                    "UPathIOManager", "InputManager"}
+IO_MANAGER_BASES = {
+    "IOManager",
+    "ConfigurableIOManager",
+    "ConfigurableIOManagerFactory",
+    "UPathIOManager",
+    "InputManager",
+}
 RESOURCE_BASES = {"ConfigurableResource", "ConfigurableResourceFactory"}
 
 # Library builder helpers recorded even inside a factory body (every other call
@@ -93,9 +98,15 @@ FACTORY_HELPER_SYMBOLS = {"make_slack_on_run_failure_sensor", "make_values_resou
 # names do not rotate, and excluding them keeps the import-based net from
 # recording `logger = get_dagster_logger()` and friends as phantom units.
 DAGSTER_NON_DEFINITIONS = {
-    "get_dagster_logger", "get_current_context", "build_op_context",
-    "build_asset_context", "build_resources", "build_init_resource_context",
-    "materialize", "materialize_to_memory", "instance_for_test",
+    "get_dagster_logger",
+    "get_current_context",
+    "build_op_context",
+    "build_asset_context",
+    "build_resources",
+    "build_init_resource_context",
+    "materialize",
+    "materialize_to_memory",
+    "instance_for_test",
 }
 
 _DEFAULT_IO_MANAGER_KEY = "io_manager"  # Dagster's default IO manager resource key
@@ -111,6 +122,7 @@ LEGEND = {
 
 
 # ---------------------------------------------------------------- AST helpers
+
 
 def _callee_name(node):
     """Bare symbol name of a decorator or call target, or None."""
@@ -231,9 +243,11 @@ def _record_name(node, kind, fallback):
 
 # --------------------------------------------------- dagster import resolution
 
+
 def _is_dagster_module(mod):
-    return bool(mod) and (mod == "dagster" or mod.startswith("dagster.")
-                          or mod.startswith("dagster_"))
+    return bool(mod) and (
+        mod == "dagster" or mod.startswith("dagster.") or mod.startswith("dagster_")
+    )
 
 
 def _resolve_dagster_symbol(func_node, mod_aliases, sym_imports):
@@ -249,16 +263,17 @@ def _resolve_dagster_symbol(func_node, mod_aliases, sym_imports):
         n = n.value
     if not isinstance(n, ast.Name):
         return None
-    origin = sym_imports.get(n.id)          # from dagster[_x] import SYM [as n]
+    origin = sym_imports.get(n.id)  # from dagster[_x] import SYM [as n]
     if origin and _is_dagster_module(origin[0]):
-        return origin[1]                    # ignore builder attrs after the symbol
-    mod = mod_aliases.get(n.id)             # import dagster[_x] [as n]
+        return origin[1]  # ignore builder attrs after the symbol
+    mod = mod_aliases.get(n.id)  # import dagster[_x] [as n]
     if mod and _is_dagster_module(mod):
         return attrs[-1] if attrs else None
     return None
 
 
 # --------------------------------------------------------------- coarse family
+
 
 def _coarse_family(kind):
     """Group a raw dagster symbol name into a stable structural family for merge
@@ -310,6 +325,7 @@ def _resolves_to(class_name, targets, imap, seen=None):
 
 # --------------------------------------------------------------- static scanner
 
+
 def _tag_assignments(tree):
     for stmt in ast.walk(tree):
         if isinstance(stmt, ast.Assign) and isinstance(stmt.value, ast.Call):
@@ -321,8 +337,11 @@ def _tag_dict_keys(tree):
     for node in ast.walk(tree):
         if isinstance(node, ast.Dict):
             for k, v in zip(node.keys, node.values):
-                if (isinstance(k, ast.Constant) and isinstance(k.value, str)
-                        and isinstance(v, ast.Call)):
+                if (
+                    isinstance(k, ast.Constant)
+                    and isinstance(k.value, str)
+                    and isinstance(v, ast.Call)
+                ):
                     v._dagster_dict_key = k.value
 
 
@@ -344,8 +363,8 @@ class Scanner(ast.NodeVisitor):
         self.source = source
         self.records = []
         self.imap = imap or {}
-        self.mod_aliases = {}   # local alias -> module (import X as Y)
-        self.sym_imports = {}   # local name -> (module, symbol) (from X import S)
+        self.mod_aliases = {}  # local alias -> module (import X as Y)
+        self.sym_imports = {}  # local name -> (module, symbol) (from X import S)
         self._factory_stack = []
         self._cond_stack = []
 
@@ -402,8 +421,14 @@ class Scanner(ast.NodeVisitor):
                 continue
             kwargs = _kwargs_present(dec) if isinstance(dec, ast.Call) else {}
             extra = self._asset_extra(kind, kwargs, func_node=node)
-            self._add(kind, _declared_name(kwargs, dec, kind, node.name),
-                      dec, kwargs, extra, deprecated=dep)
+            self._add(
+                kind,
+                _declared_name(kwargs, dec, kind, node.name),
+                dec,
+                kwargs,
+                extra,
+                deprecated=dep,
+            )
         # descend into the body: factories define decorated defs (and call builder
         # helpers) inside a function; tag records with the enclosing function.
         self._factory_stack.append(node.name)
@@ -418,11 +443,19 @@ class Scanner(ast.NodeVisitor):
         """Custom IO managers / resources defined as subclasses (transitive)."""
         direct = [_callee_name(b) for b in node.bases]
         if _resolves_to(node.name, IO_MANAGER_BASES, self.imap):
-            self._add("io_manager", node.name, node,
-                      extra={"subclass_of": next((b for b in direct if b), None)})
+            self._add(
+                "io_manager",
+                node.name,
+                node,
+                extra={"subclass_of": next((b for b in direct if b), None)},
+            )
         elif _resolves_to(node.name, RESOURCE_BASES, self.imap):
-            self._add("resource", node.name, node,
-                      extra={"subclass_of": next((b for b in direct if b), None)})
+            self._add(
+                "resource",
+                node.name,
+                node,
+                extra={"subclass_of": next((b for b in direct if b), None)},
+            )
         # class bodies hold fields/methods (EnvVar defaults etc.), not definitions
 
     def visit_Call(self, node):
@@ -486,7 +519,9 @@ class Scanner(ast.NodeVisitor):
             edges.append({"upstream_ins": ins, "io_manager": None})
         if not deps and not ins and func_node is not None:
             for pname in _signature_deps(func_node):
-                edges.append({"upstream": pname, "io_manager": None, "from": "signature"})
+                edges.append(
+                    {"upstream": pname, "io_manager": None, "from": "signature"}
+                )
         if edges:
             extra["source_edges"] = edges
         outputs = _multi_asset_outputs(kwargs)
@@ -501,10 +536,19 @@ def scan_python_file(path, root, imap=None):
         source = path.read_text(encoding="utf-8")
         tree = ast.parse(source, filename=str(path))
     except (SyntaxError, UnicodeDecodeError) as exc:
-        return [{"kind": "parse_error", "name": path.name, "location": f"{rel}:0",
-                 "params": {"error": str(exc)}, "spelling": "unknown",
-                 "classification": "pending", "note": "file did not parse; inspect manually",
-                 "source_edges": [], "status": "pending"}]
+        return [
+            {
+                "kind": "parse_error",
+                "name": path.name,
+                "location": f"{rel}:0",
+                "params": {"error": str(exc)},
+                "spelling": "unknown",
+                "classification": "pending",
+                "note": "file did not parse; inspect manually",
+                "source_edges": [],
+                "status": "pending",
+            }
+        ]
     _tag_assignments(tree)
     _tag_dict_keys(tree)
     _tag_nested_calls(tree)
@@ -517,12 +561,23 @@ def scan_python_file(path, root, imap=None):
 # --------------------------------------------------- structural text tells
 
 TEXT_PATTERNS = [
-    (re.compile(r"DAGSTER_CLOUD_(?:IS_BRANCH_DEPLOYMENT|PULL_REQUEST_ID|DEPLOYMENT_NAME)"),
-     "branch_env_ref", "branch-deploy env var IN CODE (DB naming/URLs); find and rewrite for Astro"),
-    (re.compile(r"dagster-k8s/config"),
-     "k8s_config_tag", "per-job pod resources; map to per-task executor_config / pod_override"),
-    (re.compile(r"dagster/concurrency_key"),
-     "concurrency_tag", "tag-based op concurrency; map to Airflow Pools"),
+    (
+        re.compile(
+            r"DAGSTER_CLOUD_(?:IS_BRANCH_DEPLOYMENT|PULL_REQUEST_ID|DEPLOYMENT_NAME)"
+        ),
+        "branch_env_ref",
+        "branch-deploy env var IN CODE (DB naming/URLs); find and rewrite for Astro",
+    ),
+    (
+        re.compile(r"dagster-k8s/config"),
+        "k8s_config_tag",
+        "per-job pod resources; map to per-task executor_config / pod_override",
+    ),
+    (
+        re.compile(r"dagster/concurrency_key"),
+        "concurrency_tag",
+        "tag-based op concurrency; map to Airflow Pools",
+    ),
 ]
 
 
@@ -534,11 +589,19 @@ def text_findings(source, rel, records):
             if not match or (kind, match.group(0)) in seen:
                 continue
             seen.add((kind, match.group(0)))
-            records.append({
-                "kind": kind, "name": match.group(0), "location": f"{rel}:{line_no}",
-                "params": {}, "spelling": "current", "classification": "pending",
-                "note": note, "source_edges": [], "status": "pending",
-            })
+            records.append(
+                {
+                    "kind": kind,
+                    "name": match.group(0),
+                    "location": f"{rel}:{line_no}",
+                    "params": {},
+                    "spelling": "current",
+                    "classification": "pending",
+                    "note": note,
+                    "source_edges": [],
+                    "status": "pending",
+                }
+            )
 
 
 def _split_yaml_docs(text):
@@ -546,14 +609,14 @@ def _split_yaml_docs(text):
     docs, cur, start = [], [], 1
     for i, line in enumerate(text.splitlines(), start=1):
         if re.match(r"^---(\s|$)", line):
-            if any(l.strip() for l in cur):
+            if any(ln.strip() for ln in cur):
                 docs.append(("\n".join(cur), start))
             cur, start = [], i + 1
         else:
             if not cur:
                 start = i
             cur.append(line)
-    if any(l.strip() for l in cur):
+    if any(ln.strip() for ln in cur):
         docs.append(("\n".join(cur), start))
     return docs
 
@@ -583,6 +646,7 @@ def _parse_component_doc(doc_text):
     type_val, attributes = None, None
     try:
         import yaml  # optional; the scanner must run without it
+
         data = yaml.safe_load(doc_text)
         if isinstance(data, dict):
             type_val, attributes = data.get("type"), data.get("attributes")
@@ -608,17 +672,24 @@ def scan_component_yaml(path, root):
         params = {"type": type_val}
         if attributes is not None:
             params["attributes"] = attributes
-        records.append({
-            "kind": "component_instance", "name": type_val,
-            "location": f"{rel}:{start_line}", "params": params, "spelling": "current",
-            "classification": "pending",
-            "note": "unwrap YAML to the integration's mapping row; custom Component subclass ports build_defs output",
-            "source_edges": [], "status": "pending",
-        })
+        records.append(
+            {
+                "kind": "component_instance",
+                "name": type_val,
+                "location": f"{rel}:{start_line}",
+                "params": params,
+                "spelling": "current",
+                "classification": "pending",
+                "note": "unwrap YAML to the integration's mapping row; custom Component subclass ports build_defs output",
+                "source_edges": [],
+                "status": "pending",
+            }
+        )
     return records
 
 
 # --------------------------------------------------------- file discovery
+
 
 def _is_test_path(rel):
     """A test file or a file under a test package (relative to the project root)."""
@@ -626,11 +697,16 @@ def _is_test_path(rel):
         if part == "tests" or part.endswith("_tests") or part.startswith("test_"):
             return True
     name = rel.name
-    return name.startswith("test_") or name.endswith("_test.py") or name == "conftest.py"
+    return (
+        name.startswith("test_") or name.endswith("_test.py") or name == "conftest.py"
+    )
 
 
 def _skip_dir(path):
-    return any(p in (".venv", "venv", "__pycache__", ".tox", "node_modules") for p in path.parts)
+    return any(
+        p in (".venv", "venv", "__pycache__", ".tox", "node_modules")
+        for p in path.parts
+    )
 
 
 def _scannable_files(root):
@@ -657,7 +733,9 @@ def _build_inheritance_map(files):
             continue
         for node in ast.walk(tree):
             if isinstance(node, ast.ClassDef):
-                imap[node.name] = [b for b in (_callee_name(base) for base in node.bases) if b]
+                imap[node.name] = [
+                    b for b in (_callee_name(base) for base in node.bases) if b
+                ]
     return imap
 
 
@@ -675,7 +753,8 @@ def run_static(root):
 # Cross-domain dbt-manifest coupling (load-time). Hits OUTSIDE the dbt domain
 # dictate migration order (dbt first, or those edges get deferred).
 DBT_COUPLING_PATTERN = re.compile(
-    r"\b(get_asset_key_for_model|dbt_asset_key|DbtManifestAssetSelection)\b")
+    r"\b(get_asset_key_for_model|dbt_asset_key|DbtManifestAssetSelection)\b"
+)
 
 
 def _is_dbt_domain(path):
@@ -699,6 +778,7 @@ def _dbt_coupling_scan(root):
 
 # ------------------------------------------------------- runtime (primary)
 
+
 def run_runtime(root):
     """Import the project and enumerate resolved Definitions. Returns
     (records, error); on any failure returns ([], reason)."""
@@ -712,13 +792,17 @@ def run_runtime(root):
     except Exception as exc:
         return [], f"dagster not importable in this interpreter: {exc}"
     if not module_name:
-        return [], ("could not locate a Definitions entrypoint module "
-                    "(checked dagster_cloud.yaml, workspace.yaml, pyproject, definitions.py)")
+        return [], (
+            "could not locate a Definitions entrypoint module "
+            "(checked dagster_cloud.yaml, workspace.yaml, pyproject, definitions.py)"
+        )
     try:
         mod = importlib.import_module(module_name)
     except Exception as exc:
         return [], f"import of {module_name} failed: {exc}"
-    defs = next((a for a in vars(mod).values() if type(a).__name__ == "Definitions"), None)
+    defs = next(
+        (a for a in vars(mod).values() if type(a).__name__ == "Definitions"), None
+    )
     if defs is None:
         return [], f"no Definitions object found in {module_name}"
     records = []
@@ -762,7 +846,10 @@ def _resolve_entrypoint(root):
 def _discover_module(root):
     pyproject = root / "pyproject.toml"
     if pyproject.exists():
-        m = re.search(r"root_module\s*=\s*[\"']([^\"']+)[\"']", pyproject.read_text(encoding="utf-8"))
+        m = re.search(
+            r"root_module\s*=\s*[\"']([^\"']+)[\"']",
+            pyproject.read_text(encoding="utf-8"),
+        )
         if m:
             return m.group(1) + ".definitions"
     for candidate in root.rglob("definitions.py"):
@@ -786,13 +873,19 @@ def _runtime_obj_name(obj):
 
 def _runtime_check_pairs(obj):
     """(check_name, normalized_asset_key) per check in an AssetChecksDefinition."""
-    items = list(getattr(obj, "check_specs", None) or getattr(obj, "check_keys", None) or [])
+    items = list(
+        getattr(obj, "check_specs", None) or getattr(obj, "check_keys", None) or []
+    )
     pairs = []
     for it in items:
         cname = getattr(it, "name", None)
         akey = getattr(it, "asset_key", None)
-        pairs.append((str(cname).strip() if cname else None,
-                      _normalize_name(str(akey)) if akey is not None else None))
+        pairs.append(
+            (
+                str(cname).strip() if cname else None,
+                _normalize_name(str(akey)) if akey is not None else None,
+            )
+        )
     return pairs
 
 
@@ -800,12 +893,22 @@ def _enumerate(defs, module_name, records):
     """Enumerate resolved objects via dagster's public APIs. Captures structural
     facts (deps, partitions/automation presence, io_manager_key); classification
     stays pending for the agent."""
+
     def emit(kind, name, params=None):
-        records.append({
-            "kind": kind, "name": str(name).strip(), "location": f"{module_name} (runtime)",
-            "params": params or {}, "spelling": "current", "classification": "pending",
-            "note": "", "source_edges": [], "status": "pending", "source": "runtime",
-        })
+        records.append(
+            {
+                "kind": kind,
+                "name": str(name).strip(),
+                "location": f"{module_name} (runtime)",
+                "params": params or {},
+                "spelling": "current",
+                "classification": "pending",
+                "note": "",
+                "source_edges": [],
+                "status": "pending",
+                "source": "runtime",
+            }
+        )
 
     try:
         for spec in defs.resolve_all_asset_specs():
@@ -841,10 +944,16 @@ def _enumerate(defs, module_name, records):
                 io_key = io_by_out.get(out_name)
                 rec = by_name.get(str(akey))
                 if rec is not None and io_key and io_key != "io_manager":
-                    rec.setdefault("params", {}).setdefault("io_manager_key", str(io_key))
+                    rec.setdefault("params", {}).setdefault(
+                        "io_manager_key", str(io_key)
+                    )
     except Exception:
         pass
-    for attr, kind in (("jobs", "job"), ("schedules", "schedule"), ("sensors", "sensor")):
+    for attr, kind in (
+        ("jobs", "job"),
+        ("schedules", "schedule"),
+        ("sensors", "sensor"),
+    ):
         try:
             for obj in getattr(defs, attr, None) or []:
                 params = {}
@@ -859,20 +968,24 @@ def _enumerate(defs, module_name, records):
             pairs = _runtime_check_pairs(obj)
             if pairs:
                 for cname, akey in pairs:
-                    emit("asset_check", cname or _runtime_obj_name(obj),
-                         {"asset": akey} if akey else None)
+                    emit(
+                        "asset_check",
+                        cname or _runtime_obj_name(obj),
+                        {"asset": akey} if akey else None,
+                    )
             else:
                 emit("asset_check", _runtime_obj_name(obj))
     except Exception:
         pass
     try:
-        for key in (defs.resources or {}):
+        for key in defs.resources or {}:
             emit("resource", key)
     except Exception:
         pass
 
 
 # ---------------------------------------------------------- manifest assembly
+
 
 def _best_static_match(candidates, rt):
     """Which static record a runtime record aligns with; disambiguate checks by
@@ -881,7 +994,9 @@ def _best_static_match(candidates, rt):
     if rt_asset:
         for c in candidates:
             c_asset = (c.get("params") or {}).get("asset")
-            if c_asset is not None and _normalize_name(c_asset) == _normalize_name(rt_asset):
+            if c_asset is not None and _normalize_name(c_asset) == _normalize_name(
+                rt_asset
+            ):
                 return c
     for c in candidates:
         if c["kind"] == rt["kind"]:
@@ -897,7 +1012,9 @@ def _merge_runtime_first(runtime_records, static_records):
     `not_in_runtime` so the completeness net never drops them."""
     index = {}
     for s in static_records:
-        index.setdefault((_coarse_family(s["kind"]), _normalize_name(s["name"])), []).append(s)
+        index.setdefault(
+            (_coarse_family(s["kind"]), _normalize_name(s["name"])), []
+        ).append(s)
     used = set()
     combined = []
     for rt in runtime_records:
@@ -907,8 +1024,14 @@ def _merge_runtime_first(runtime_records, static_records):
         if cands:
             s = _best_static_match(cands, rt)
             used.add(id(s))
-            for f in ("source_edges", "spelling", "conditional", "factory",
-                      "deprecated_reason", "outputs"):
+            for f in (
+                "source_edges",
+                "spelling",
+                "conditional",
+                "factory",
+                "deprecated_reason",
+                "outputs",
+            ):
                 if s.get(f) and not rt.get(f):
                     rt[f] = s[f]
             rt["static_location"] = s.get("location")
@@ -939,9 +1062,11 @@ def _resolve_edge_io_managers(records):
     for r in records:
         consumer_key = (r.get("params") or {}).get("io_manager_key")
         for edge in r.get("source_edges", []):
-            keys = [producer[_normalize_name(n)] or _DEFAULT_IO_MANAGER_KEY
-                    for n in _edge_upstream_names(edge)
-                    if _normalize_name(n) in producer]
+            keys = [
+                producer[_normalize_name(n)] or _DEFAULT_IO_MANAGER_KEY
+                for n in _edge_upstream_names(edge)
+                if _normalize_name(n) in producer
+            ]
             edge["consumer_io_manager"] = consumer_key
             if keys:
                 uniq = sorted(set(keys))
@@ -974,7 +1099,7 @@ def build_manifest(root, use_runtime):
     counts = {}
     for rec in records:
         counts[rec["kind"]] = counts.get(rec["kind"], 0) + 1
-    manifest["counts"] = counts          # counts per KIND (classification is pending)
+    manifest["counts"] = counts  # counts per KIND (classification is pending)
     manifest["total"] = len(records)
     manifest["dbt_manifest_coupling"] = _dbt_coupling_scan(root)
 
@@ -994,11 +1119,23 @@ def build_manifest(root, use_runtime):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Read-only Dagster project inventory scanner.")
-    parser.add_argument("project_root", type=Path, help="path to the Dagster project root")
-    parser.add_argument("--runtime", action="store_true",
-                        help="runtime-first: import the project and enumerate Definitions")
-    parser.add_argument("--out", type=Path, default=None, help="write manifest JSON here (default: stdout)")
+    parser = argparse.ArgumentParser(
+        description="Read-only Dagster project inventory scanner."
+    )
+    parser.add_argument(
+        "project_root", type=Path, help="path to the Dagster project root"
+    )
+    parser.add_argument(
+        "--runtime",
+        action="store_true",
+        help="runtime-first: import the project and enumerate Definitions",
+    )
+    parser.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help="write manifest JSON here (default: stdout)",
+    )
     args = parser.parse_args(argv)
 
     root = args.project_root.resolve()
@@ -1014,8 +1151,12 @@ def main(argv=None):
             "    runtime inventory). Runtime mode imports the project in THIS\n"
             "    interpreter, so run the scanner with the project's own venv python:\n"
             "      <project-venv>/bin/python scripts/inventory.py "
-            + str(args.project_root) + " --runtime\n"
-            "      uv run python scripts/inventory.py " + str(args.project_root) + " --runtime\n\n")
+            + str(args.project_root)
+            + " --runtime\n"
+            "      uv run python scripts/inventory.py "
+            + str(args.project_root)
+            + " --runtime\n\n"
+        )
 
     text = json.dumps(manifest, indent=2, default=str)
     if args.out:

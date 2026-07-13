@@ -29,7 +29,10 @@ def _units():
 
 def test_advance_single(tmp_path):
     p = _write(tmp_path, _units())
-    assert status.main(["--manifest", p, "advance", "asset:a", "--evidence", "gate1.json"]) == 0
+    assert (
+        status.main(["--manifest", p, "advance", "asset:a", "--evidence", "gate1.json"])
+        == 0
+    )
     assert _state(p, "asset:a") == "translate"
 
 
@@ -53,7 +56,12 @@ def test_advance_already_complete_is_error(tmp_path):
 
 def test_target_none_advances_straight_to_complete(tmp_path):
     p = _write(tmp_path, _units())
-    assert status.main(["--manifest", p, "advance", "res:d", "--evidence", "lowered to include/"]) == 0
+    assert (
+        status.main(
+            ["--manifest", p, "advance", "res:d", "--evidence", "lowered to include/"]
+        )
+        == 0
+    )
     assert _state(p, "res:d") == "complete"
 
 
@@ -69,14 +77,27 @@ def test_reopen(tmp_path):
     units = _units()
     units["asset:a"]["status"] = {"state": "complete"}
     p = _write(tmp_path, units)
-    assert status.main(["--manifest", p, "reopen", "asset:a", "--reason", "rework"]) == 0
+    assert (
+        status.main(["--manifest", p, "reopen", "asset:a", "--reason", "rework"]) == 0
+    )
     assert _state(p, "asset:a") == "translate"
 
 
 def test_bulk_advance_where(tmp_path):
     p = _write(tmp_path, _units())
-    rc = status.main(["--manifest", p, "advance", "--where", "kind=op",
-                      "--from-state", "pending", "--evidence", "batch"])
+    rc = status.main(
+        [
+            "--manifest",
+            p,
+            "advance",
+            "--where",
+            "kind=op",
+            "--from-state",
+            "pending",
+            "--evidence",
+            "batch",
+        ]
+    )
     assert rc == 0
     assert _state(p, "op:b") == "translate"
     assert _state(p, "op:c") == "translate"
@@ -85,16 +106,39 @@ def test_bulk_advance_where(tmp_path):
 
 def test_bulk_dry_run_writes_nothing(tmp_path):
     p = _write(tmp_path, _units())
-    rc = status.main(["--manifest", p, "advance", "--where", "kind=op",
-                      "--evidence", "e", "--dry-run"])
+    rc = status.main(
+        [
+            "--manifest",
+            p,
+            "advance",
+            "--where",
+            "kind=op",
+            "--evidence",
+            "e",
+            "--dry-run",
+        ]
+    )
     assert rc == 0
     assert _state(p, "op:b") == "pending"
 
 
 def test_bulk_and_single_are_mutually_exclusive(tmp_path):
     p = _write(tmp_path, _units())
-    assert status.main(["--manifest", p, "advance", "op:b", "--where", "kind=op",
-                        "--evidence", "e"]) == 2
+    assert (
+        status.main(
+            [
+                "--manifest",
+                p,
+                "advance",
+                "op:b",
+                "--where",
+                "kind=op",
+                "--evidence",
+                "e",
+            ]
+        )
+        == 2
+    )
 
 
 def test_summary_exit_codes(tmp_path):
@@ -113,8 +157,10 @@ def test_summary_silent_omission_nonzero(tmp_path):
 
 
 def test_summary_surfaces_static_only_note(tmp_path, capsys):
-    manifest = {"units": {"asset:a": {"status": {"state": "complete"}}},
-                "runtime_error": "dagster not importable in this interpreter"}
+    manifest = {
+        "units": {"asset:a": {"status": {"state": "complete"}}},
+        "runtime_error": "dagster not importable in this interpreter",
+    }
     rc = status.cmd_summary(manifest)
     out = capsys.readouterr().out
     assert rc == 0

@@ -135,6 +135,7 @@ def cmd_show(manifest, by_state):
 # Transition planners: given a unit, return (target_state, current_state, error).
 # error is a human phrase when the transition is illegal (target is then None).
 
+
 def _plan_advance(unit):
     current = unit_state(unit)
     if current == "complete":
@@ -214,7 +215,11 @@ def _matches(unit, where, from_state):
 
 
 def _selected(units, where, from_state):
-    return [(uid, units[uid]) for uid in sorted(units) if _matches(units[uid], where, from_state)]
+    return [
+        (uid, units[uid])
+        for uid in sorted(units)
+        if _matches(units[uid], where, from_state)
+    ]
 
 
 def _filter_desc(where, from_state):
@@ -246,7 +251,9 @@ def run_transition(manifest, path, op, args):
 
     if args.unit_id is not None:
         if where or from_state is not None:
-            sys.stderr.write("error: pass a unit id OR --where/--from-state, not both\n")
+            sys.stderr.write(
+                "error: pass a unit id OR --where/--from-state, not both\n"
+            )
             return 2
         if args.unit_id not in units:
             sys.stderr.write("error: no such unit: " + args.unit_id + "\n")
@@ -254,7 +261,9 @@ def run_transition(manifest, path, op, args):
         targets, single = [(args.unit_id, units[args.unit_id])], True
     else:
         if not where and from_state is None:
-            sys.stderr.write("error: bulk mode needs at least one --where or --from-state filter\n")
+            sys.stderr.write(
+                "error: bulk mode needs at least one --where or --from-state filter\n"
+            )
             return 2
         targets, single = _selected(units, where, from_state), False
         if not targets:
@@ -267,7 +276,11 @@ def run_transition(manifest, path, op, args):
         target, current, err = planner(unit)
         if err is not None:
             if single:
-                sys.stderr.write("error: cannot {0} {1}: {2} (state={3})\n".format(op, uid, err, current))
+                sys.stderr.write(
+                    "error: cannot {0} {1}: {2} (state={3})\n".format(
+                        op, uid, err, current
+                    )
+                )
                 return 1
             print("  skip  {0}: {1} ({2})".format(uid, err, current))
             skipped += 1
@@ -276,8 +289,11 @@ def run_transition(manifest, path, op, args):
             print("  would-{0}  {1}: {2} -> {3}".format(op, uid, current, target))
         else:
             _commit(unit, target, current, op, evidence, reason)
-            print(_single_line(op, uid, current, target, evidence, reason) if single
-                  else "  {0}: {1} -> {2}".format(uid, current, target))
+            print(
+                _single_line(op, uid, current, target, evidence, reason)
+                if single
+                else "  {0}: {1} -> {2}".format(uid, current, target)
+            )
         applied += 1
 
     if not args.dry_run and applied:
@@ -300,8 +316,11 @@ def cmd_summary(manifest):
     # Surface a static-only manifest so a summary is never mistaken for a full
     # inventory (GAP-1): runtime mode was requested but did not run.
     if manifest.get("runtime_error"):
-        print("NOTE: manifest is STATIC-ONLY (runtime mode did not run: {0})".format(
-            manifest["runtime_error"]))
+        print(
+            "NOTE: manifest is STATIC-ONLY (runtime mode did not run: {0})".format(
+                manifest["runtime_error"]
+            )
+        )
     counts = {s: 0 for s in ALL_STATES}
     unknown = []
 
@@ -323,7 +342,9 @@ def cmd_summary(manifest):
     print("in flight: {0}".format(in_flight))
 
     if unknown:
-        print("SILENT OMISSION: {0} unit(s) with no recognized state".format(len(unknown)))
+        print(
+            "SILENT OMISSION: {0} unit(s) with no recognized state".format(len(unknown))
+        )
         for unit_id, state in unknown:
             print("  {0}  (state={1!r})".format(unit_id, state))
         return 1
@@ -336,36 +357,64 @@ def cmd_summary(manifest):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Per-unit migration state machine.")
-    parser.add_argument("--manifest", default=DEFAULT_MANIFEST,
-                        help="inventory manifest JSON (default: " + DEFAULT_MANIFEST + ")")
+    parser.add_argument(
+        "--manifest",
+        default=DEFAULT_MANIFEST,
+        help="inventory manifest JSON (default: " + DEFAULT_MANIFEST + ")",
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     def _add_filters(p):
         # bulk selection, shared by advance/defer/reopen (unit_id optional)
-        p.add_argument("unit_id", nargs="?", default=None,
-                       help="single unit id; omit and use --where/--from-state for bulk")
-        p.add_argument("--where", action="append", default=[], metavar="KEY=VALUE",
-                       help="bulk filter on a record field (e.g. kind=op); repeatable, ANDed")
-        p.add_argument("--from-state", dest="from_state", default=None,
-                       help="bulk filter: only units currently in this state")
-        p.add_argument("--dry-run", action="store_true",
-                       help="print the matches and planned transitions without writing")
+        p.add_argument(
+            "unit_id",
+            nargs="?",
+            default=None,
+            help="single unit id; omit and use --where/--from-state for bulk",
+        )
+        p.add_argument(
+            "--where",
+            action="append",
+            default=[],
+            metavar="KEY=VALUE",
+            help="bulk filter on a record field (e.g. kind=op); repeatable, ANDed",
+        )
+        p.add_argument(
+            "--from-state",
+            dest="from_state",
+            default=None,
+            help="bulk filter: only units currently in this state",
+        )
+        p.add_argument(
+            "--dry-run",
+            action="store_true",
+            help="print the matches and planned transitions without writing",
+        )
 
     p_show = sub.add_parser("show", help="list units and their states")
     p_show.add_argument("--by-state", action="store_true", help="group by state")
 
     p_adv = sub.add_parser("advance", help="advance a unit (or a --where set) one step")
     _add_filters(p_adv)
-    p_adv.add_argument("--evidence", required=True,
-                       help="path or command-output reference proving the gate passed")
+    p_adv.add_argument(
+        "--evidence",
+        required=True,
+        help="path or command-output reference proving the gate passed",
+    )
 
-    p_def = sub.add_parser("defer", help="mark a unit (or a --where set) deferred with a reason")
+    p_def = sub.add_parser(
+        "defer", help="mark a unit (or a --where set) deferred with a reason"
+    )
     _add_filters(p_def)
     p_def.add_argument("--reason", required=True, help="why the unit(s) are deferred")
 
-    p_reopen = sub.add_parser("reopen", help="move complete/deferred unit(s) back to translate")
+    p_reopen = sub.add_parser(
+        "reopen", help="move complete/deferred unit(s) back to translate"
+    )
     _add_filters(p_reopen)
-    p_reopen.add_argument("--reason", required=True, help="why the unit(s) are being reopened")
+    p_reopen.add_argument(
+        "--reason", required=True, help="why the unit(s) are being reopened"
+    )
 
     sub.add_parser("summary", help="counts per state and completeness check")
 

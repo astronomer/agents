@@ -251,14 +251,16 @@ def gate3_structure(dagbag, manifest, dag_id_filter):
 
     if dagbag is None:
         result["status"] = "skip"
-        result["details"]["error"] = "gate 3 needs an in-process DagBag; airflow not importable"
+        result["details"]["error"] = (
+            "gate 3 needs an in-process DagBag; airflow not importable"
+        )
         return result
 
     units = manifest.get("units", {})
     unit_reports = []
     probe = {"schedule_attr": None, "downstream_attr": None}
     any_fail = False
-    considered = 0          # units not filtered out by --dag-id
+    considered = 0  # units not filtered out by --dag-id
     skipped_no_dag_id = []  # considered units with no planned dag_id yet
 
     for unit_id, spec in units.items():
@@ -306,7 +308,9 @@ def gate3_structure(dagbag, manifest, dag_id_filter):
         if expected_count is not None:
             ok = len(tasks) == expected_count
             ur["checks"]["task_count"] = {
-                "expected": expected_count, "actual": len(tasks), "ok": ok,
+                "expected": expected_count,
+                "actual": len(tasks),
+                "ok": ok,
             }
             ur["status"] = ur["status"] if ok else "fail"
 
@@ -337,8 +341,10 @@ def gate3_structure(dagbag, manifest, dag_id_filter):
             actual = str(value)
             ok = actual == str(expected_schedule)
             ur["checks"]["schedule"] = {
-                "expected": expected_schedule, "actual": actual,
-                "attribute": attr, "ok": ok,
+                "expected": expected_schedule,
+                "actual": actual,
+                "attribute": attr,
+                "ok": ok,
             }
             ur["status"] = ur["status"] if ok else "fail"
 
@@ -349,11 +355,14 @@ def gate3_structure(dagbag, manifest, dag_id_filter):
         expected_asset_sched = spec.get("asset_schedule")
         if expected_asset_sched is not None:
             sched_repr = "{0} {1}".format(
-                getattr(dag, "schedule", ""), getattr(dag, "timetable", ""))
+                getattr(dag, "schedule", ""), getattr(dag, "timetable", "")
+            )
             missing = [a for a in expected_asset_sched if str(a) not in sched_repr]
             ok = not missing
             ur["checks"]["asset_schedule"] = {
-                "ok": ok, "missing": missing, "schedule_repr": sched_repr[:300],
+                "ok": ok,
+                "missing": missing,
+                "schedule_repr": sched_repr[:300],
             }
             ur["status"] = ur["status"] if ok else "fail"
 
@@ -364,7 +373,9 @@ def gate3_structure(dagbag, manifest, dag_id_filter):
             tt_name = type(getattr(dag, "timetable", None)).__name__
             ok = expected_tt in tt_name
             ur["checks"]["timetable_type"] = {
-                "expected": expected_tt, "actual": tt_name, "ok": ok,
+                "expected": expected_tt,
+                "actual": tt_name,
+                "ok": ok,
             }
             ur["status"] = ur["status"] if ok else "fail"
 
@@ -401,7 +412,8 @@ def gate3_structure(dagbag, manifest, dag_id_filter):
         result["status"] = "fail"
         result["details"]["error"] = (
             "all {0} considered unit(s) skipped: no dag_id "
-            "(plan phase incomplete)".format(len(skipped_no_dag_id)))
+            "(plan phase incomplete)".format(len(skipped_no_dag_id))
+        )
     elif any_fail:
         result["status"] = "fail"
     return result
@@ -410,9 +422,15 @@ def gate3_structure(dagbag, manifest, dag_id_filter):
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Run validation gates 1 to 3.")
     parser.add_argument("astro_project", help="path to the generated Astro project")
-    parser.add_argument("--manifest", help="inventory manifest JSON (required for gate 3)")
-    parser.add_argument("--gate", type=int, choices=[1, 2, 3],
-                        help="run only this gate (default: 1 through 3)")
+    parser.add_argument(
+        "--manifest", help="inventory manifest JSON (required for gate 3)"
+    )
+    parser.add_argument(
+        "--gate",
+        type=int,
+        choices=[1, 2, 3],
+        help="run only this gate (default: 1 through 3)",
+    )
     parser.add_argument("--dag-id", help="restrict gate 3 to a single dag_id")
     parser.add_argument("--out", help="write JSON report here instead of stdout")
     args = parser.parse_args(argv)
@@ -451,7 +469,11 @@ def main(argv=None):
         if gate == 3:
             n = r["details"].get("skipped_no_dag_id_count", 0)
             if n:
-                log("gate3: {0} unit(s) skipped (no dag_id; plan phase incomplete)".format(n))
+                log(
+                    "gate3: {0} unit(s) skipped (no dag_id; plan phase incomplete)".format(
+                        n
+                    )
+                )
         if r["status"] == "fail" and first_failed == 0:
             first_failed = gate
 
