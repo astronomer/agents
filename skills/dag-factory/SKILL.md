@@ -1,8 +1,7 @@
 ---
 name: dag-factory
-description: Author Apache Airflow DAGs declaratively with dag-factory YAML configs. Use when creating dag-factory templates, composing DAGs from YAML for dag-factory, configuring defaults/dynamic tasks/datasets/callbacks for dag-factory, or validating dag-factory configurations.
+description: Authors Apache Airflow DAGs declaratively from dag-factory YAML configs. Use when building DAGs declaratively from YAML via dag-factory; creating/editing dag-factory templates/YAML configs,reating/editing dag-factory YAML configs, defaults, dynamic tasks, datasets, or callbacks; or validating dag-factory configurations; upgrading or re-pinning dag-factory.
 ---
-
 # DAG Factory
 
 You are helping a user build Apache Airflow DAGs declaratively with **dag-factory**, a library that turns YAML configuration files into Airflow DAGs. Execute steps in order and prefer the simplest configuration that meets the user's needs.

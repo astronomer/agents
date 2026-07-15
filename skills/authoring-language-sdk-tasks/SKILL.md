@@ -1,6 +1,6 @@
 ---
 name: authoring-language-sdk-tasks
-description: The language-neutral foundation for Airflow language SDKs — implement task logic in a non-Python language while the DAG stays in Python. Use when the user wants to run an Airflow task in another language (Java, Kotlin, or other JVM/native languages), asks how the Python `@task.stub` pairs with native task code, how task/DAG IDs must match across the two sides, how data passes via XCom as JSON, or which language SDKs exist. This skill owns the shared Python-stub pattern and conceptual model; for a specific language's native API, build, and runtime, use that language's skill (e.g. authoring-java-sdk-tasks).
+description: The language-neutral foundation for Airflow language SDKs — implement task logic in a non-Python language while the DAG stays in Python. Use when the user wants to run an Airflow task in another language (Java, Kotlin, Go, or other JVM/native languages), asks how the Python `@task.stub` pairs with native task code, how task/DAG IDs must match across the two sides, how data passes via XCom as JSON, or which language SDKs exist. This skill owns the shared Python-stub pattern and conceptual model; for a specific language's native API, build, and runtime, use that language's skill (e.g. authoring-java-sdk-tasks, authoring-go-sdk-tasks).
 ---
 
 # Authoring Language SDK Tasks (Shared Foundation)
@@ -28,11 +28,11 @@ Consequences that hold for every language SDK:
 Every task has two halves that must agree:
 
 1. A **Python stub** in a normal DAG file — no logic; it declares the task, its queue, the dependency graph, and retry policy.
-2. A **native implementation** (Java, etc.) whose IDs match the Python side and where the work happens.
+2. A **native implementation** (Java, Go, etc.) whose IDs match the Python side and where the work happens.
 
 ### Python side (scheduling)
 
-The example below uses the Java SDK to be concrete, but the Python side is **identical for every language SDK**. The queue name (`"java"` here) is an arbitrary label you choose — it just has to match a key in `queue_to_coordinator` (see **configuring-airflow-language-sdks**). Pick whatever name fits the SDK you're routing to.
+The example below uses the Go SDK to be concrete, but the Python side is **identical for every language SDK**. The queue name (`"golang"` here) is an arbitrary label you choose — it just has to match a key in `queue_to_coordinator` (see **configuring-airflow-language-sdks**). Pick whatever name fits the SDK you're routing to.
 
 ```python
 from datetime import timedelta
@@ -41,13 +41,13 @@ from airflow.sdk import dag, task
 
 @dag
 def sales_pipeline():
-    @task.stub(queue="java")            # queue selects the coordinator (see configuring-airflow-language-sdks)
+    @task.stub(queue="golang")          # queue selects the coordinator (see configuring-airflow-language-sdks)
     def extract(): ...
 
-    @task.stub(queue="java")
+    @task.stub(queue="golang")
     def transform(extracted): ...        # arg only declares the dependency
 
-    @task.stub(queue="java", retries=1, retry_delay=timedelta(seconds=5))
+    @task.stub(queue="golang", retries=1, retry_delay=timedelta(seconds=5))
     def load(transformed): ...
 
     @task()                              # an ordinary Python task can sit downstream
@@ -83,7 +83,7 @@ XCom values are stored as JSON in Airflow's metadata database, so the boundary b
 | `list` | array |
 | `dict` | object |
 
-Each language SDK maps these JSON types onto its own native types (e.g. a JSON integer becomes a Java `Long`). The native-type column lives in that language's skill. The key portability rule: a value pushed by one task is read by another **as JSON**, so the consuming side must expect a type compatible with what was stored.
+Each language SDK maps these JSON types onto its own native types (e.g. a JSON integer becomes a Java `Long`). The native-type mapping lives in that language's skill. The key portability rule: a value pushed by one task is read by another **as JSON**, so the consuming side must expect a type compatible with what was stored.
 
 ---
 
@@ -94,7 +94,7 @@ This skill deliberately stops at the shared concepts. The following differ per l
 - **Native task API** — how you declare tasks, read connections/variables/XComs, and push results (annotations, interfaces, function registration, etc.).
 - **Native type mapping** — the native column of the JSON table above.
 - **Build and packaging** — how the artifact is compiled and bundled.
-- **Runtime prerequisite** — what must be installed on the worker (e.g. a JRE).
+- **Runtime prerequisite** — what must be present on the worker (a language runtime for some SDKs, e.g. a JRE for the Java SDK; none for the Go SDK's self-contained bundles).
 
 The Airflow-side wiring (which coordinator runs which queue) is shared in structure but has per-coordinator options; it lives in **configuring-airflow-language-sdks**.
 
@@ -114,10 +114,12 @@ The Airflow-side wiring (which coordinator runs which queue) is shared in struct
 ## Per-language skills
 
 - **authoring-java-sdk-tasks**: Java/Kotlin/JVM native API, type mapping, and logging.
+- **authoring-go-sdk-tasks**: Go native API — task registration, dependency injection by parameter type, and client access.
 - *(Future language SDKs each add their own `authoring-<lang>-sdk-tasks` skill that builds on this one.)*
 
 ## Related Skills
 
 - **configuring-airflow-language-sdks**: Route a queue to a coordinator and set runtime options.
 - **authoring-dags**: General Airflow DAG authoring (the Python side lives here too).
-- **deploying-java-sdk-bundles**: Build and ship the Java artifact (per-language deploy skills follow the same shape).
+- **deploying-java-sdk-bundles**: Build and ship the Java artifact.
+- **deploying-go-sdk-bundles**: Build, pack, and ship the Go bundle (per-language deploy skills follow the same shape).

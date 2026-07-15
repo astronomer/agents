@@ -1,6 +1,6 @@
 ---
 name: authoring-dags
-description: Workflow and best practices for writing Apache Airflow DAGs. Use when the user wants to create a new DAG, write pipeline code, or asks about DAG patterns and conventions. For testing and debugging DAGs, see the testing-dags skill.
+description: Workflow and best practices for writing Apache Airflow DAGs. Use when creating a new DAG, write pipeline code, handling questions about DAG patterns and conventions or extending an existing DAG with a follow-up/downstream task. ANY request shaped like 'add a DAG named X', 'write a pipeline', 'add a task that runs after Y', or 'extend the DAG'. For testing and debugging DAGs, see the testing-dags skill.
 hooks:
   Stop:
     - hooks:

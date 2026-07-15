@@ -1,6 +1,6 @@
 ---
 name: configuring-airflow-language-sdks
-description: Configures Airflow to run language SDK tasks (Java and future native SDKs) — register a coordinator, map a queue to it, ensure the language runtime on workers, and tune coordinator options. Use when the user wants Airflow to route a queue to a native-language coordinator, asks about the `[sdk]` `coordinators`/`queue_to_coordinator` settings, `AIRFLOW__SDK__COORDINATORS`, `jars_root` or other coordinator `kwargs`, `task_startup_timeout`, or why their native tasks aren't being picked up. Covers the shared routing mechanism plus per-coordinator options (e.g. JavaCoordinator).
+description: Configures Airflow to run language SDK tasks (Java, Go, and future native SDKs) — register a coordinator, map a queue to it, ensure the runtime/artifact on workers, and tune coordinator options. Use when the user wants Airflow to route a queue to a native-language coordinator, asks about the `[sdk]` `coordinators`/`queue_to_coordinator` settings, `AIRFLOW__SDK__COORDINATORS`, `jars_root`, `executables_root` or other coordinator `kwargs`, `task_startup_timeout`, or why their native tasks aren't being picked up. Covers the shared routing mechanism plus per-coordinator options (e.g. JavaCoordinator, ExecutableCoordinator).
 ---
 
 # Configuring Airflow for Language SDKs
@@ -9,13 +9,13 @@ To run language SDK tasks, Airflow needs to know two things: which **coordinator
 
 > **Experimental.** The language SDKs are in preview; configuration keys may change.
 
-> For the task code, see **authoring-language-sdk-tasks** (and the per-language authoring skill). For building and shipping the artifact, see the per-language deploy skill (e.g. **deploying-java-sdk-bundles**).
+> For the task code, see **authoring-language-sdk-tasks** (and the per-language authoring skill, e.g. **authoring-java-sdk-tasks**, **authoring-go-sdk-tasks**). For building and shipping the artifact, see the per-language deploy skill (e.g. **deploying-java-sdk-bundles**, **deploying-go-sdk-bundles**).
 
 ---
 
 ## Prerequisites on the worker
 
-- The **language runtime** for the SDK you're using must be on the worker nodes, because the coordinator spawns a native subprocess per task instance. The exact runtime is per-SDK — see [Per-coordinator options](#per-coordinator-options) (for example, the Java SDK needs a **JRE 17+**).
+- The **runtime or artifact the SDK needs** must be present on the worker nodes, because the coordinator spawns a native subprocess per task instance. The exact requirement is per-SDK — see [Per-coordinator options](#per-coordinator-options) (the Java SDK needs a **JRE 17+**; the Go SDK needs no language runtime — the bundle is a self-contained native executable, but it must be built for the worker's OS/arch).
 - The compiled/native **artifact(s)** must be reachable on the worker. See the per-language deploy skill.
 - The coordinators ship with the Airflow Task SDK (`apache-airflow-task-sdk`, installed with Airflow). **No extra Python package is required.**
 
@@ -38,9 +38,13 @@ coordinators = {
   "java-jdk17": {
     "classpath": "airflow.sdk.coordinators.java.JavaCoordinator",
     "kwargs": {"jars_root": ["/opt/airflow/jars"]}
+  },
+  "go": {
+    "classpath": "airflow.sdk.coordinators.executable.ExecutableCoordinator",
+    "kwargs": {"executables_root": ["/opt/airflow/executable-bundles"]}
   }
 }
-queue_to_coordinator = {"java": "java-jdk17"}
+queue_to_coordinator = {"java": "java-jdk17", "golang": "go"}
 ```
 
 ### Option B: environment variables
@@ -48,11 +52,11 @@ queue_to_coordinator = {"java": "java-jdk17"}
 Each value must be **valid one-line JSON**. This form is convenient for containers, `.env` files, Docker Compose, and Helm.
 
 ```bash
-export AIRFLOW__SDK__COORDINATORS='{"java-jdk17": {"classpath": "airflow.sdk.coordinators.java.JavaCoordinator", "kwargs": {"jars_root": ["/opt/airflow/jars"]}}}'
-export AIRFLOW__SDK__QUEUE_TO_COORDINATOR='{"java": "java-jdk17"}'
+export AIRFLOW__SDK__COORDINATORS='{"java-jdk17": {"classpath": "airflow.sdk.coordinators.java.JavaCoordinator", "kwargs": {"jars_root": ["/opt/airflow/jars"]}}, "go": {"classpath": "airflow.sdk.coordinators.executable.ExecutableCoordinator", "kwargs": {"executables_root": ["/opt/airflow/executable-bundles"]}}}'
+export AIRFLOW__SDK__QUEUE_TO_COORDINATOR='{"java": "java-jdk17", "golang": "go"}'
 ```
 
-You can register **multiple coordinators** at once (e.g. one per language) and map different queues to each.
+The examples above register **multiple coordinators** at once (one per language) and map a different queue to each — register only the ones you use.
 
 ---
 
@@ -88,14 +92,24 @@ coordinators = {
 }
 ```
 
+### ExecutableCoordinator (Go and other self-contained-executable SDKs)
+
+- **`classpath`**: `airflow.sdk.coordinators.executable.ExecutableCoordinator`
+- **Worker runtime**: none beyond the bundle itself. The bundle is a self-contained native executable (AFBNDL01), so it needs no language runtime, but it must be built for the worker's OS/arch (a mismatch fails with `exec format error`).
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `executables_root` | *(required)* | One or more directories scanned **recursively** for executable bundles (AFBNDL01-trailered native binaries). Accepts a string or a list of strings/paths. Bundles are identified by the trailer magic, not by filename. The coordinator matches an incoming `dag_id` against each bundle's embedded manifest and verifies its integrity hash before launching. |
+| `task_startup_timeout` | `10.0` | Seconds to wait for the subprocess to connect after launch. Increase it if bundle startup is slow (constrained hardware, first cold start). |
+
 *(Future coordinators — for other languages — will list their own `classpath`, runtime, and `kwargs` here.)*
 
 ---
 
 ## Verifying the configuration
 
-1. Confirm the language runtime is present where workers run (e.g. `java -version` via `astro dev bash`, or `docker compose exec ... java -version`).
-2. Confirm the artifact directory referenced in `kwargs` (e.g. `jars_root`) actually contains your artifact on the worker filesystem.
+1. Confirm the runtime/artifact is usable where workers run — for the Java SDK, `java -version` via `astro dev bash` or `docker compose exec ...`; for the Go SDK, the packed bundle exists and matches the worker's OS/arch.
+2. Confirm the artifact directory referenced in `kwargs` (e.g. `jars_root`, `executables_root`) actually contains your artifact on the worker filesystem.
 3. Trigger the DAG and open the native task's logs — you should see the subprocess start and your task output.
 
 ### Troubleshooting
@@ -104,9 +118,11 @@ coordinators = {
 |---------|--------------------|
 | Task fails immediately mentioning coordinator or queue | `coordinators` / `queue_to_coordinator` not valid one-line JSON, or the queue name doesn't match the stub's `queue=`. Fix the JSON and restart. |
 | Runtime not found (e.g. `java: command not found`) | The language runtime isn't on the worker, or the executable path kwarg is wrong. Install the runtime and verify its version. |
-| "No artifact found" / "no DAGs" | The artifact-directory kwarg points at the wrong place, or the artifact isn't there yet. Confirm the path and that it was copied in. |
-| DAG run hangs at the native task | Raise `task_startup_timeout` (e.g. `30.0`); first-run subprocess startup can be slow. |
+| "No artifact found" / "no DAGs" / "no bundle contains dag_id" | The artifact-directory kwarg points at the wrong place, the artifact isn't there yet, or its `dag_id` doesn't match the stub. Confirm the path and the IDs. |
 | Wrong/ambiguous entry point (Java) | Multiple executable JARs under `jars_root`. Set `main_class` explicitly. |
+| Go bundle is skipped silently | Not a valid AFBNDL01 bundle, or its integrity hash failed (re-pack after any strip/sign/rebuild). |
+| `exec format error` on the Go bundle | Built for a different OS/arch than the worker. Cross-compile with `--goos`/`--goarch` (see **deploying-go-sdk-bundles**). |
+| DAG run hangs at the native task | Raise `task_startup_timeout` (e.g. `30.0`); first-run subprocess startup can be slow. |
 
 ---
 
@@ -115,4 +131,6 @@ coordinators = {
 - **authoring-language-sdk-tasks**: The shared Python-stub pattern and conceptual model.
 - **authoring-java-sdk-tasks**: Java task code and matching Python stubs.
 - **deploying-java-sdk-bundles**: Build the bundle and put the artifact where the coordinator scans.
+- **authoring-go-sdk-tasks**: Go task code and matching Python stubs.
+- **deploying-go-sdk-bundles**: Build/pack the Go bundle and place it where the coordinator scans.
 - **deploying-airflow**: General deployment of Airflow on Astro, Docker Compose, or Kubernetes.

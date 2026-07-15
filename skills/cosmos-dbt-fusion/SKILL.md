@@ -1,6 +1,6 @@
 ---
 name: cosmos-dbt-fusion
-description: Use when running a dbt Fusion project with Astronomer Cosmos. Covers Cosmos 1.11+ configuration for Fusion on Snowflake/Databricks with ExecutionMode.LOCAL. Before implementing, verify dbt engine is Fusion (not Core), warehouse is supported, and local execution is acceptable. Does not cover dbt Core.
+description: Run a dbt Fusion project with Astronomer Cosmos. Use when running a dbt Fusion project with Astronomer Cosmos (Cosmos 1.11+, ExecutionMode.LOCAL on Snowflake/Databricks). Before implementing, verify dbt engine is Fusion (not Core), the warehouse is supported, and local execution is acceptable. Does not cover dbt Core.
 ---
 
 # Cosmos + dbt Fusion: Implementation Checklist

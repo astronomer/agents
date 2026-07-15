@@ -1,6 +1,6 @@
 ---
 name: airflow-hitl
-description: Use when the user needs human-in-the-loop workflows in Airflow (approval/reject, form input, or human-driven branching). Covers ApprovalOperator, HITLOperator, HITLBranchOperator, HITLEntryOperator, HITLTrigger. Requires Airflow 3.1+. Does not cover AI/LLM calls (see airflow-ai).
+description: Builds human-in-the-loop (HITL) Airflow workflows - approval gates, form input, and human-driven branching. Use when a DAG needs a human in the loop - an approval or reject step, sign-off before a task runs, a decision or approval UI, branching on a human choice, or collecting form input mid-run; also on mentions of ApprovalOperator, HITLOperator, HITLBranchOperator, HITLEntryOperator, or HITLTrigger. Requires Airflow 3.1+. Not for AI/LLM task calls (see migrating-ai-sdk-to-common-ai).
 ---
 
 # Airflow Human-in-the-Loop Operators
@@ -11,7 +11,7 @@ Pause a DAG until a human responds via the Airflow UI or REST API. HITL operator
 >
 > **UI location**: Browse → Required Actions. Respond from the task instance page's Required Actions tab.
 >
-> **Cross-references**: `airflow-ai` for AI/LLM task decorators; `airflow` for registry and API discovery commands used below.
+> **Cross-references**: `migrating-ai-sdk-to-common-ai` for AI/LLM task decorators; `airflow` for registry and API discovery commands used below.
 
 ---
 
@@ -179,6 +179,6 @@ af registry modules standard \
 ## Related skills
 
 - **airflow** — `af registry`, `af api`, `af config` command reference.
-- **airflow-ai** — AI/LLM task decorators and GenAI patterns.
+- **migrating-ai-sdk-to-common-ai** — AI/LLM task decorators and GenAI patterns (common-ai provider).
 - **authoring-dags** — general DAG writing best practices.
 - **testing-dags** — iterative test → debug → fix cycles.
