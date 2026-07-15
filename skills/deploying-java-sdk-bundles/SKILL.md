@@ -91,6 +91,8 @@ Unlike Gradle, Maven does **not** validate `mainClass` at build time; a wrong va
 
 For task log records to reach Airflow's log store (and the task log view in the UI), the bundle must include **exactly one** SDK logging artifact per logging facade you use. Versions are managed by `airflow-sdk-bom`; Maven users apply the same artifact IDs.
 
+**Choosing a facade.** For a greenfield project, prefer JPL (`System.Logger`) — it is built into the JDK, so your tasks need no extra logging API. Pick another facade only when the libraries you integrate with already log through it, so their records reach Airflow too. Preference order: JPL > SLF4J = Log4j 2 > JUL; treat JUL as legacy integration only, not a choice for new code.
+
 | Facade | Artifact | Setup beyond the dependency |
 |--------|----------|-----------------------------|
 | `System.Logger` (JPL) | `airflow-sdk-jpl` | None — the provider is discovered via `ServiceLoader`. |
