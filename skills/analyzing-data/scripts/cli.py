@@ -9,6 +9,13 @@
 #     "python-dotenv>=1.0.0",
 #     "cryptography>=41.0.0",
 # ]
+#
+# [tool.ty.rules]
+# # Same reason as ty.toml: ty does not install dependencies, so the imports
+# # above never resolve. ty 0.0.62 started reading rules from PEP 723 metadata,
+# # and for a script that carries its own metadata this block wins over ty.toml,
+# # so the suppression has to be repeated here.
+# unresolved-import = "ignore"
 # ///
 """CLI for the analyzing-data skill.
 
