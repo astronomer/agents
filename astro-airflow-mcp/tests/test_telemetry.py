@@ -88,6 +88,7 @@ class TestDetectInvocationContext:
     def clean_env(self, monkeypatch):
         """Clear all agent/CI env vars so tests control the environment."""
         for var in (
+            "OTTO",
             "CLAUDECODE",
             "CLAUDE_CODE_ENTRYPOINT",
             "CURSOR_TRACE_ID",
@@ -119,6 +120,24 @@ class TestDetectInvocationContext:
         monkeypatch.setenv("CLAUDECODE", "1")
         _, agent, _ = telemetry._detect_invocation_context()
         assert agent == "claude-code"
+
+    def test_detects_otto(self, monkeypatch):
+        """Test detects Otto agent."""
+        monkeypatch.setenv("OTTO", "1")
+        _, agent, _ = telemetry._detect_invocation_context()
+        assert agent == "otto"
+
+    def test_otto_wins_over_inherited_marker(self, monkeypatch):
+        """Otto passes its environment through to every command it runs, so an
+        Otto session started from inside another agent still carries that
+        agent's marker. Otto is the proximate caller and must win."""
+        monkeypatch.setenv("CLAUDECODE", "1")
+        _, agent, _ = telemetry._detect_invocation_context()
+        assert agent == "claude-code"
+
+        monkeypatch.setenv("OTTO", "1")
+        _, agent, _ = telemetry._detect_invocation_context()
+        assert agent == "otto"
 
     def test_detects_cursor(self, monkeypatch):
         """Test detects Cursor agent."""

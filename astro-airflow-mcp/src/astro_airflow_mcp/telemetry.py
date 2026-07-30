@@ -80,8 +80,12 @@ def _detect_invocation_context() -> tuple[str, str | None, str | None]:
     agent_name: str | None = None
     ci_system: str | None = None
 
-    # Check for known AI agent environment variables
+    # Check for known AI agent environment variables. Order matters: the first
+    # match wins. Otto is first because it passes its own environment through to
+    # every command it runs, so an Otto session started from inside another
+    # agent still carries that agent's marker. Otto is the proximate caller.
     agent_env_vars = {
+        "OTTO": "otto",
         "CLAUDECODE": "claude-code",
         "CLAUDE_CODE_ENTRYPOINT": "claude-code",
         "CURSOR_TRACE_ID": "cursor",
