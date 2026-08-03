@@ -80,8 +80,12 @@ def _detect_invocation_context() -> tuple[str, str | None, str | None]:
     agent_name: str | None = None
     ci_system: str | None = None
 
-    # Check for known AI agent environment variables
+    # Check for known AI agent environment variables. Order matters: the first
+    # match wins. Otto is first because it passes its own environment through to
+    # every command it runs, so an Otto session started from inside another
+    # agent still carries that agent's marker. Otto is the proximate caller.
     agent_env_vars = {
+        "OTTO": "otto",
         "CLAUDECODE": "claude-code",
         "CLAUDE_CODE_ENTRYPOINT": "claude-code",
         "CURSOR_TRACE_ID": "cursor",
@@ -92,11 +96,37 @@ def _detect_invocation_context() -> tuple[str, str | None, str | None]:
         "GEMINI_CLI": "gemini-cli",
         "OPENCODE": "opencode",
         "CODEX_API_KEY": "codex",
+        # GitHub Copilot. COPILOT_CLI is set by the Copilot CLI, which is also
+        # the harness behind the cloud coding agent and, as of 2026, Copilot for
+        # JetBrains; github's own gh keys on it (cli/cli internal/agents/
+        # detect.go). COPILOT_AGENT is set on terminals VS Code creates for
+        # agent mode (microsoft/vscode toolTerminalCreator.ts), where it is
+        # described as backward compatibility for exactly this kind of
+        # detection.
+        "COPILOT_CLI": "github-copilot",
+        "COPILOT_AGENT": "github-copilot",
     }
     for var, name in agent_env_vars.items():
         if os.environ.get(var):
             agent_name = name
             break
+
+    # AI_AGENT is a cross-vendor convention where the value names the agent
+    # rather than the variable: VS Code sets AI_AGENT=github_copilot_vscode_agent
+    # for agent sessions and the Copilot desktop app sets github_copilot_app_agent
+    # (microsoft/vscode aiAgentEnv.ts). gh reads it too.
+    #
+    # Checked after the list above so a specific marker still wins, and only
+    # prefixes we recognise are mapped. Values are not passed through: some
+    # vendors put a version in theirs (claude-code_2-1-156_agent), which would
+    # spray one agent across dozens of distinct values in the telemetry. A new
+    # vendor adopting the convention is a one-line addition here.
+    if agent_name is None:
+        ai_agent = os.environ.get("AI_AGENT", "").lower()
+        for prefix, name in {"github_copilot": "github-copilot"}.items():
+            if ai_agent.startswith(prefix):
+                agent_name = name
+                break
 
     # Check for CI/CD environments
     ci_env_vars = {
