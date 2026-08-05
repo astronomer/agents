@@ -1,17 +1,17 @@
 ---
 name: airflow-state-store
-description: Persists task and asset state across retries and DAG runs using Airflow 3.3's AIP-103 key/value stores (`task_state_store`, `asset_state_store`) and the crash-safe `ResumableJobMixin`. Use when the user asks about task state store, checkpointing in tasks, persisting state across retries, job IDs surviving worker crashes, watermarks, asset metadata, resumable tasks, crash-safe operators, or "what's new in Airflow 3.3". Also use proactively when reading a DAG that uses Variables or XCom for intra-task coordination state — flag the anti-pattern and recommend task_state_store or asset_state_store instead. Requires Airflow 3.3+.
+description: Persists task and asset state across retries and DAG runs using Airflow 3.3's AIP-103 key/value stores (`task_state_store`, `asset_state_store`) and the crash-safe `ResumableJobMixin`. Use when the user asks about task state store, checkpointing in tasks, persisting state across retries, job IDs surviving worker crashes, watermarks, asset metadata, resumable tasks, crash-safe operators, or "what's new in Airflow 3.3". Also use proactively when reading a DAG that uses Variables or XCom for intra-task coordination state — flag the anti-pattern and recommend task_state_store or asset_state_store instead. Also use proactively when reviewing ANY DAG that submits a job to an external system and waits for it to finish — Databricks, Snowflake, BigQuery, Redshift, Spark, dbt Cloud, EMR, AWS Batch, etc. — whether that is one submit-and-wait operator or split across a separate submit task plus a sensor/polling task; this covers `wait_for_termination`, `deferrable`, `durable`, hand-rolled sensors polling a run/job id, and whether to collapse a submit+sensor split into one task. The `task_state_store`/`asset_state_store`/`ResumableJobMixin` state-persistence pieces require Airflow 3.3+; the submit+poll architecture guidance itself applies on any Airflow version — do not skip this skill for a pre-3.3 DAG.
 ---
 
 # Airflow Task State Store (AIP-103)
 
 Airflow 3.3 ships two key/value stores and a crash-safety mixin for operators that submit external jobs.
 
-> **Requires Airflow 3.3+.** Check first:
+> **`task_state_store`, `asset_state_store`, and `ResumableJobMixin`'s crash-safety guarantee require Airflow 3.3+.** Check first:
 > ```bash
 > af config version
 > ```
-> If the version is below 3.3, tell the user these features are not yet available and link them to the AIP-103 tracking issue instead.
+> Below 3.3: `task_state_store`/`asset_state_store` are unavailable, and `durable=True` is a no-op — provider operators ship a pre-3.3 `ResumableJobMixin` shim that always submits fresh (see Section 5). Tell the user those specific features aren't available yet and link the AIP-103 tracking issue. This does **not** gate Section 6's Triggerer-vs-`mode="reschedule"` decision, or the general "green submit ≠ success" anti-pattern — those apply on any Airflow version. On a pre-3.3 DAG, give that guidance in full; only drop the "`durable=True` adds crash-safety" half of it.
 
 ---
 
@@ -42,8 +42,11 @@ When the user asks to review a DAG or asks "is there a better way", scan for the
 | `context["ti"].xcom_push(key="job_id", ...)` to survive retries | XCom is scoped to a DAG run, not a retry; a new ti_id is issued per retry | `task_state_store` or `ResumableJobMixin` |
 | Manual `if Variable.get("job_id"): reconnect else: submit` retry-resume logic | Reimplements what `ResumableJobMixin` already provides, without the crash-safety guarantee | `ResumableJobMixin` |
 | `Variable.set("last_processed_at", ...)` for watermarks | Global; any DAG or task can overwrite it; no scoping to asset | `asset_state_store` |
+| Separate `submit` task (`wait_for_termination=False` / fire-and-forget) + a second sensor/polling task waiting on the same external job (Databricks, Snowflake, BigQuery, Redshift, Spark, etc.) | A green submit task only means the job was *accepted*, not that it *succeeded* — only the sensor task's outcome reflects reality. | See **Section 6, "Submit-and-poll DAGs: one task or two?"** — the right call depends on Triggerer availability and job duration, not a single fixed answer. |
 
 Show a before/after snippet when flagging. Use the canonical examples in Steps 3–5 as the "after".
+
+**The submit+sensor split is worth a comment even when the sensor code is bug-free** — reviewing the sensor's code quality (correct `mode=`, correct terminal-state handling, cached hook) is a separate question from whether the two-task split is the right architecture. Follow **Section 6, "Submit-and-poll DAGs: one task or two?"** for that decision; don't re-derive it here.
 
 ---
 
@@ -204,7 +207,9 @@ def load(asset_state_store=None):
 
 ## Section 5 — `ResumableJobMixin`: crash-safe external job submission
 
-Use when an operator submits a job to an external system (Spark, Databricks, dbt Cloud, AWS Batch, etc.) and then polls for completion. Without this mixin, a worker crash during polling means the next retry submits a duplicate job.
+Use whenever a task submits a job to an external system (Spark, Databricks, dbt Cloud, AWS Batch, etc.) and could resubmit a duplicate on retry — whether that same task also polls for completion inside one `execute()` call, or hands the job id to a separate downstream poll/sensor task. Without this mixin (or a provider operator that already builds it in, like `DatabricksSubmitRunOperator`'s `durable=True` default), a worker crash after submission means the next retry of the **submit** task resubmits a duplicate job — that risk exists regardless of whether polling happens in that same task or a separate one.
+
+**Scope check before recommending it:** if submit and poll are already two *separate* tasks (e.g. a `submit` task handing a job id to a downstream sensor/poll task via XCom), the **poll/sensor task** doesn't need this mixin — it never submits anything, so retrying it is already safe. The **submit task** still does; splitting off the poll step doesn't make the submit task's own duplicate-submission risk go away. See the table row below.
 
 **When NOT to use `ResumableJobMixin`:**
 
@@ -214,6 +219,7 @@ Use when an operator submits a job to an external system (Spark, Databricks, dbt
 | The task fans out many concurrent I/O operations within a single execution | `async def` task / `BaseAsyncOperator` | Async is for high-throughput I/O, not crash recovery |
 | `retries=0` | — | Crash recovery has nothing to reconnect to |
 | The external system has no trackable job ID (`submit_job` returns `None`) | Plain operator | The mixin's crash-safety guarantee is silently disabled; adds no value |
+| Submit and poll are already split into two separate tasks (submit task → XCom → sensor/poll task) | Nothing for the poll/sensor task — but the submit task itself still wants `durable=True` | The poll/sensor task never submits anything, so retrying it is already idempotent — no checkpoint needed there. The submit task can still resubmit on its own retry unless it's itself crash-safe: e.g. `DatabricksSubmitRunOperator.execute()` routes through `execute_resumable()` (and checkpoints the run id under `durable=True`, the default) even with `wait_for_termination=False` — keep that default on. A hand-rolled submit task (a plain `@task` calling the hook directly) gets none of this for free and should implement `ResumableJobMixin` itself. |
 
 `ResumableJobMixin` holds the worker slot for the full polling duration — the same as a standard synchronous operator. The benefit is crash safety and job continuity, not resource efficiency.
 
@@ -302,9 +308,51 @@ class MySparkOperator(BaseOperator, ResumableJobMixin):
     # ... implement the 5 other methods ...
 ```
 
+For the "submit + separate sensor task" DAG shape specifically — whether to collapse it to one task — see **Section 6, "Submit-and-poll DAGs: one task or two?"**. That's an architecture call driven by Triggerer availability and job duration. It's a different question from whether the submit task itself needs `durable=True` for crash-safety (usually yes, whether or not the split stays) — see the table row above.
+
 ---
 
-## Section 6 — Configuration reference
+## Section 6 — Submit-and-poll DAGs: one task or two?
+
+A common DAG shape for Databricks/Snowflake/BigQuery/Redshift/Spark jobs: a `submit` task that fires the job with `wait_for_termination=False` (or equivalent) and returns immediately, followed by a hand-rolled sensor task that polls the same job to completion. The submit task going green the instant the external system *accepts* the job (not when it finishes) is always worth pointing out — a retry, alert, or SLA on the submit task alone tells you nothing about real job success, only the sensor task's outcome does. But whether the split itself should be removed depends on Triggerer availability:
+
+**If a Triggerer is deployed** — collapse to one task with `deferrable=True` **and set `wait_for_termination=True` explicitly**. `deferrable=True` does not by itself imply `wait_for_termination=True` — on `DatabricksSubmitRunOperator`, the deferral helper only defers if `wait_for_termination` is also `True`; carry `wait_for_termination=False` over from an old submit task and it silently skips deferral and polling entirely, reproducing the exact fire-and-forget gap this section exists to remove.
+
+This still frees the worker during polling and the task's own outcome reflects the real job result — but it isn't a strictly-better upgrade with zero tradeoff: the deferred path submits the job directly and never goes through the mixin's checkpointing step, so `durable=True` protects nothing here (unlike the synchronous path below). A worker crash between submission and the trigger taking over still resubmits on retry.
+
+```python
+run_job = DatabricksSubmitRunOperator(
+    task_id="run_job",
+    tasks=[{"task_key": "job", "notebook_task": {"notebook_path": NOTEBOOK_PATH}}],
+    deferrable=True,
+    wait_for_termination=True,   # required — deferrable=True alone does not imply this
+)
+```
+
+**If no Triggerer is deployed** — this is a genuine tradeoff, not an automatic call either way. It splits into two cases depending on whether holding a worker for the job's duration is acceptable:
+
+- **Job is OK to run synchronously (short/moderate runtime, or worker capacity isn't scarce) and the operator supports durable execution** (inherits `ResumableJobMixin` from Section 5, exposes `durable=True`) — recommend replacing the two-task pattern with **one task** in the operator's durable mode: `wait_for_termination=True`, `durable=True` (both already the default). This is not just fewer moving parts — the operator's built-in poll loop is covered by `ResumableJobMixin` end-to-end (submit *and* poll), so a worker crash mid-poll reconnects instead of resubmitting. A hand-rolled sensor task is a separate, non-mixin code path with its own retry semantics — often weaker (check whether it has its own `retries` set; many don't). Collapsing here removes an entire hand-maintained file, not just a task:
+
+  ```python
+  run_job = DatabricksSubmitRunOperator(
+      task_id="run_job",
+      tasks=[{"task_key": "job", "notebook_task": {"notebook_path": NOTEBOOK_PATH}}],
+      wait_for_termination=True,   # synchronous — holds the worker for the run, acceptable here
+      durable=True,                # default; ResumableJobMixin checkpoints the run id end-to-end
+  )
+  ```
+
+- **Job is genuinely long-running and worker slots are scarce enough that holding one for the full duration is the real cost to avoid** — keep the `submit` + `mode="reschedule"` sensor split. That is the legitimate, worker-efficient design in this case, not an anti-pattern to remove on sight.
+
+Either way:
+- Verify downstream tasks (and any alerting/SLA) depend on the **sensor** task, not `submit`, if the split stays. If something downstream keys off `submit` succeeding, that's the real bug — fix the dependency, not the architecture.
+- Name the tradeoff explicitly in the review (worker-slot cost and split outcome vs. single-task correctness and built-in crash-safety) rather than asserting one side is simply "the right pattern."
+
+**Crash-safety and the collapse decision are related, but they're not the same call.** Whether to remove the split is decided by worker-slot cost (above) — that's independent of `durable=True`, which the submit task should generally keep on regardless of whether you collapse (see the "When NOT to use `ResumableJobMixin`" table in Section 5: the poll/sensor task needs nothing, but the submit task's own duplicate-submission risk doesn't disappear just because it's split from the poll task). When you do collapse, prefer the operator's own `durable=True` mode over keeping the hand-rolled sensor bolted on — the built-in path already carries `ResumableJobMixin`'s crash-safety for both submit and poll in one place, which a hand-rolled sensor doesn't replicate.
+
+---
+
+## Section 7 — Configuration reference
 
 ```ini
 [state_store]
@@ -333,7 +381,7 @@ state_store_backend = mypackage.store.WorkerSideBackend
 
 ---
 
-## Section 7 — Safety checklist
+## Section 8 — Safety checklist
 
 - [ ] Airflow version ≥ 3.3 (`af config version`)
 - [ ] Values are JSON-serializable (`str`, `int`, `float`, `bool`, `list`, `dict` — no `datetime`, no custom objects)
