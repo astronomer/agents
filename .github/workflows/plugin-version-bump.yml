@@ -1,0 +1,95 @@
+name: "astronomer-data: Auto-bump plugin version"
+
+# Why this exists:
+# The astronomer-data plugin's version lives in .claude-plugin/plugin.json and is
+# read verbatim by Claude Code at whatever commit a marketplace pins. Both our own
+# marketplace (source "./") and the official Anthropic marketplace
+# (anthropics/claude-plugins-official, which lists us with "version": null) resolve
+# the plugin version from this file. Claude Code's update detection SKIPS a plugin
+# when the resolved version matches what a user already has -- so if this string
+# never changes, users never receive new skills, even when the pinned sha moves.
+#
+# This workflow guarantees the version advances on every content change to main, so
+# updates actually propagate. Minor/major bumps are still done by hand in the PR
+# (edit plugin.json); this only fills in the automatic patch increment when a content
+# change lands without one.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "skills/**"
+      - ".claude-plugin/marketplace.json"
+      # plugin.json is deliberately NOT a trigger path: the bump commit below only
+      # touches plugin.json, so excluding it here stops this workflow from
+      # retriggering itself.
+
+permissions:
+  contents: write
+
+concurrency:
+  group: plugin-version-bump
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    name: Bump patch version
+    runs-on: ubuntu-latest
+    # Belt-and-suspenders against self-retrigger.
+    if: github.actor != 'github-actions[bot]'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: true # needed so the bump commit can be pushed
+
+      - name: Bump patch version unless this push already changed it
+        id: bump
+        run: |
+          set -euo pipefail
+          manifest=.claude-plugin/plugin.json
+
+          read_version() { grep -oE '"version"[[:space:]]*:[[:space:]]*"[^"]+"' | head -1 | sed -E 's/.*"([0-9]+\.[0-9]+\.[0-9]+)".*/\1/'; }
+
+          current=$(read_version < "$manifest")
+
+          # Version on the previous main tip. If the push already advanced it (a
+          # deliberate minor/major bump in the merged PR), respect that and stop.
+          before='${{ github.event.before }}'
+          previous=""
+          if git cat-file -e "${before}:${manifest}" 2>/dev/null; then
+            previous=$(git show "${before}:${manifest}" | read_version)
+          fi
+          echo "current=${current} previous=${previous:-<none>}"
+
+          if [ -n "$previous" ] && [ "$current" != "$previous" ]; then
+            echo "Version already changed (${previous} -> ${current}); nothing to do."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          IFS=. read -r major minor patch <<< "$current"
+          next="${major}.${minor}.$((patch + 1))"
+
+          # Format-preserving: replace only the first version value, leaving
+          # indentation and the trailing comma untouched.
+          sed -i -E "0,/\"version\"[[:space:]]*:[[:space:]]*\"[0-9]+\.[0-9]+\.[0-9]+\"/s//\"version\": \"${next}\"/" "$manifest"
+          echo "Bumped ${current} -> ${next}"
+          echo "next=${next}" >> "$GITHUB_OUTPUT"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Commit and push bump
+        if: steps.bump.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .claude-plugin/plugin.json
+          git commit -m "chore: Bump astronomer-data plugin to ${{ steps.bump.outputs.next }}"
+          # Rebase-retry once in case main advanced while this job ran.
+          git push origin HEAD:main \
+            || { git fetch origin main && git rebase origin/main && git push origin HEAD:main; }
+
+      # If main is protected against direct pushes by Actions, grant
+      # github-actions[bot] a bypass, or replace the step above with a PR via
+      # peter-evans/create-pull-request. See the PR description for details.
