@@ -4,6 +4,7 @@ from astro_airflow_mcp.config.layered import LayeredConfig
 from astro_airflow_mcp.config.loader import (
     ConfigError,
     ConfigManager,
+    ConfigWriteError,
     ResolvedConfig,
     legacy_default_path,
 )
@@ -15,6 +16,7 @@ __all__ = [
     "Auth",
     "ConfigError",
     "ConfigManager",
+    "ConfigWriteError",
     "Instance",
     "LayeredConfig",
     "ResolvedConfig",

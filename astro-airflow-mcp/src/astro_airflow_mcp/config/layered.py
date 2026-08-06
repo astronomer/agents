@@ -181,7 +181,13 @@ class LayeredConfig:
 
     # --- write paths ---------------------------------------------------
 
-    def assert_writable(self, scope: Scope) -> None:
+    def assert_writable(
+        self,
+        scope: Scope,
+        *,
+        command_name: str = "configuration command",
+        prefer_local_in_project: bool = False,
+    ) -> None:
         """Raise ``ConfigError`` if ``scope`` can't be written from here.
 
         Used by ``af instance discover`` to fail fast — discovery does
@@ -189,7 +195,10 @@ class LayeredConfig:
         scope mismatch to surface before any of that happens, not at
         write time.
         """
-        self._resolve_write_scope(scope)
+        _, manager = self._resolve_write_scope(
+            scope, prefer_local_in_project=prefer_local_in_project
+        )
+        manager.require_writable(command_name)
 
     def _manager_for(self, scope: Scope) -> ConfigManager | None:
         """Return the manager for an explicit scope, or None if it's
@@ -245,6 +254,7 @@ class LayeredConfig:
         appropriate only for the global file, never project files.
         """
         target_scope, manager = self._resolve_write_scope(scope)
+        manager.require_writable("af instance add")
         config = self._safe_load(manager)
         config.add_instance(
             name,
@@ -275,10 +285,14 @@ class LayeredConfig:
         this within its own file; layered needs to scan siblings.
         """
         if scope == Scope.AUTO:
+            scopes = self._scopes_in_priority_order()
+            if len(scopes) == 1:
+                scopes[0][1].require_writable("af instance delete")
             target_scope: Scope | None = None
-            for found_scope, manager in self._scopes_in_priority_order():
+            for found_scope, manager in scopes:
                 config = self._safe_load(manager)
                 if config.get_instance(name) is not None:
+                    manager.require_writable("af instance delete")
                     config.delete_instance(name)
                     manager.save(config)
                     target_scope = found_scope
@@ -287,6 +301,7 @@ class LayeredConfig:
                 raise ValueError(f"Instance '{name}' does not exist")
         else:
             target_scope, manager = self._resolve_write_scope(scope)
+            manager.require_writable("af instance delete")
             config = self._safe_load(manager)
             config.delete_instance(name)
             manager.save(config)
@@ -316,9 +331,11 @@ class LayeredConfig:
         against the merged view (so ``use`` can switch to an instance
         defined in any sibling scope).
         """
+        self.assert_writable(scope, command_name="af instance use", prefer_local_in_project=True)
         if not self.get_instance(name):
             raise ValueError(f"Instance '{name}' does not exist")
         target_scope, manager = self._resolve_write_scope(scope, prefer_local_in_project=True)
+        manager.require_writable("af instance use")
         # No auto-create on miss; mutate current_instance directly
         # (ConfigManager.use_instance would re-validate against the
         # single file's instances).
@@ -329,4 +346,5 @@ class LayeredConfig:
 
     def set_telemetry_disabled(self, disabled: bool) -> None:
         # Telemetry is always global — never project-scoped.
+        self._global.require_writable("af telemetry")
         self._global.set_telemetry_disabled(disabled)

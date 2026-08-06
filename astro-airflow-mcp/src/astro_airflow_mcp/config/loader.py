@@ -34,6 +34,10 @@ class ConfigError(Exception):
     """Error raised for configuration issues."""
 
 
+class ConfigWriteError(ConfigError):
+    """Error raised when an explicit config mutation cannot be persisted."""
+
+
 @dataclass
 class ResolvedConfig:
     """Resolved configuration ready for use."""
@@ -112,6 +116,15 @@ class ConfigManager:
         # O_CREAT raises EPERM. Treat it as "no config": load() returns
         # an empty config, save() is a no-op.
         self._null_path = self.config_path.exists() and not self.config_path.is_file()
+
+    def require_writable(self, command_name: str) -> None:
+        """Raise when an explicit command would be lost to a neutralized config path."""
+        if self._null_path:
+            raise ConfigWriteError(
+                f"{command_name} cannot persist: {self.CONFIG_ENV_VAR} points to "
+                f"a non-regular path ({self.config_path}).\n"
+                f"Unset {self.CONFIG_ENV_VAR} or point it at a writable file."
+            )
 
     def _ensure_dir(self) -> None:
         """Ensure the config directory exists."""
