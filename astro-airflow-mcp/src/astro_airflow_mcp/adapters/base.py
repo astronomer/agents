@@ -345,7 +345,17 @@ class AirflowAdapter(ABC):
 
     # DAG Operations
     @abstractmethod
-    def list_dags(self, limit: int = 100, offset: int = 0, **kwargs: Any) -> dict[str, Any]:
+    def list_dags(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        order_by: str = "-dag_id",
+        tags: list[str] | None = None,
+        dag_id_pattern: str | None = None,
+        only_active: bool = True,
+        paused: bool | None = None,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
         """List all DAGs."""
 
     @abstractmethod
@@ -381,7 +391,15 @@ class AirflowAdapter(ABC):
     # DAG Run Operations
     @abstractmethod
     def list_dag_runs(
-        self, dag_id: str | None = None, limit: int = 100, offset: int = 0, **kwargs: Any
+        self,
+        dag_id: str | None = None,
+        limit: int = 100,
+        offset: int = 0,
+        order_by: str = "-start_date",
+        state: list[str] | None = None,
+        start_date_gte: str | None = None,
+        start_date_lte: str | None = None,
+        **kwargs: Any,
     ) -> dict[str, Any]:
         """List DAG runs."""
 

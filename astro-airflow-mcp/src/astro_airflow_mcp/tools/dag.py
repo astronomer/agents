@@ -70,19 +70,37 @@ def get_dag_details(dag_id: str) -> str:
 def _list_dags_impl(
     limit: int = DEFAULT_LIMIT,
     offset: int = DEFAULT_OFFSET,
+    order_by: str = "-dag_id",
+    tags: list[str] | None = None,
+    dag_id_pattern: str | None = None,
+    only_active: bool = True,
+    paused: bool | None = None,
 ) -> str:
     """Internal implementation for listing DAGs from Airflow.
 
     Args:
         limit: Maximum number of DAGs to return (default: 100)
         offset: Offset for pagination (default: 0)
+        order_by: Sort field. Prefix with '-' for descending (default: '-dag_id')
+        tags: Filter by tag labels
+        dag_id_pattern: Filter DAGs by ID pattern match
+        only_active: Only return active DAGs (default: True)
+        paused: Filter by paused state. None returns both.
 
     Returns:
         JSON string containing the list of DAGs with their metadata
     """
     try:
         adapter = _get_adapter()
-        data = adapter.list_dags(limit=limit, offset=offset)
+        data = adapter.list_dags(
+            limit=limit,
+            offset=offset,
+            order_by=order_by,
+            tags=tags,
+            dag_id_pattern=dag_id_pattern,
+            only_active=only_active,
+            paused=paused,
+        )
 
         if "dags" in data:
             return _wrap_list_response(data["dags"], "dags", data)
@@ -92,8 +110,16 @@ def _list_dags_impl(
 
 
 @mcp.tool(annotations=read_only())
-def list_dags() -> str:
-    """Get information about all Apache Airflow DAGs (Directed Acyclic Graphs).
+def list_dags(
+    dag_id_pattern: str | None = None,
+    tags: list[str] | None = None,
+    paused: bool | None = None,
+    only_active: bool = True,
+    order_by: str = "-dag_id",
+    limit: int = 100,
+    offset: int = 0,
+) -> str:
+    """Get information about Apache Airflow DAGs (Directed Acyclic Graphs).
 
     Use this tool when the user asks about:
     - "What DAGs are available?" or "List all DAGs"
@@ -112,10 +138,28 @@ def list_dags() -> str:
     - owners: Who maintains the DAG
     - file_token: Location of the DAG file
 
+    Args:
+        dag_id_pattern: Filter DAGs whose dag_id matches this pattern (e.g. 'etl_' to find all ETL DAGs).
+        tags: Filter by tag labels (e.g. ['production', 'team_data']).
+        paused: Filter by paused state. True=only paused, False=only unpaused, None=both (default).
+        only_active: Only return DAGs currently seen by the scheduler (default: True).
+        order_by: Sort field. Prefix with '-' for descending order.
+            Common values: '-dag_id' (default), 'dag_id', '-last_parsed_time'.
+        limit: Maximum number of DAGs to return (default: 100).
+        offset: Number of DAGs to skip for pagination (default: 0).
+
     Returns:
-        JSON with list of all DAGs and their complete metadata
+        JSON with list of DAGs and their complete metadata
     """
-    return _list_dags_impl()
+    return _list_dags_impl(
+        limit=limit,
+        offset=offset,
+        order_by=order_by,
+        tags=tags,
+        dag_id_pattern=dag_id_pattern,
+        only_active=only_active,
+        paused=paused,
+    )
 
 
 def _get_dag_source_impl(dag_id: str) -> str:
