@@ -430,6 +430,28 @@ class AirflowAdapter(ABC):
             offset: Offset for pagination
         """
 
+    def get_all_task_instances(
+        self, dag_id: str, dag_run_id: str, page_size: int = 100
+    ) -> dict[str, Any]:
+        """Return every task instance for a DAG run, paging past the limit.
+
+        ``get_task_instances`` returns a single page (``page_size`` 100 by
+        default). On a run with many dynamically mapped instances, a failure at
+        a high ``map_index`` falls past the first page and is silently missed.
+        This pages through ``get_task_instances`` until a short page is
+        returned, so it works unchanged for every adapter version.
+        """
+        merged: list[dict[str, Any]] = []
+        offset = 0
+        while True:
+            page = self.get_task_instances(dag_id, dag_run_id, limit=page_size, offset=offset)
+            batch = page.get("task_instances", [])
+            merged.extend(batch)
+            offset += len(batch)
+            if len(batch) < page_size:
+                break
+        return {"task_instances": merged, "total_entries": len(merged)}
+
     @abstractmethod
     def get_task_logs(
         self,

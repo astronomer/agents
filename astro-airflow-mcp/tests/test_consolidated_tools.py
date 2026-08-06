@@ -85,7 +85,7 @@ class TestDiagnoseDagRun:
         # Create mock adapter
         mock_adapter = MagicMock()
         mock_adapter.get_dag_run.return_value = mock_run
-        mock_adapter.get_task_instances.return_value = mock_task_instances
+        mock_adapter.get_all_task_instances.return_value = mock_task_instances
 
         mocker.patch("astro_airflow_mcp.tools.diagnostic._get_adapter", return_value=mock_adapter)
 
@@ -103,6 +103,48 @@ class TestDiagnoseDagRun:
         assert data["summary"]["state_counts"]["failed"] == 1
         assert data["summary"]["state_counts"]["upstream_failed"] == 1
         assert len(data["summary"]["failed_tasks"]) == 2
+
+    def test_diagnose_dag_run_surfaces_failed_mapped_instance_beyond_first_page(self, mocker):
+        """A failed mapped instance past the first page must appear in failed_tasks.
+
+        Regression test: diagnose_dag_run must page through every task instance
+        (via get_all_task_instances), otherwise a failure at a high map_index on
+        a large DAG run is silently dropped and the run looks healthy.
+        """
+        mock_run = {"dag_run_id": "scheduled__2026-06-16", "state": "running"}
+        # Simulate the merged result of paging: 100 successful instances plus a
+        # failed mapped instance that lived on a later page (map_index 14).
+        merged = {
+            "task_instances": (
+                [
+                    {"task_id": "lake_load.events_pagepath", "map_index": i, "state": "success"}
+                    for i in range(100)
+                ]
+                + [
+                    {
+                        "task_id": "lake_load.events_pagepath",
+                        "map_index": 14,
+                        "state": "failed",
+                        "try_number": 3,
+                    }
+                ]
+            )
+        }
+
+        mock_adapter = MagicMock()
+        mock_adapter.get_dag_run.return_value = mock_run
+        mock_adapter.get_all_task_instances.return_value = merged
+
+        mocker.patch("astro_airflow_mcp.tools.diagnostic._get_adapter", return_value=mock_adapter)
+
+        diagnose_fn = get_tool_fn(diagnostic_module, "diagnose_dag_run")
+        data = json.loads(diagnose_fn("dwh_analytics_12h", "scheduled__2026-06-16"))
+
+        failed = data["summary"]["failed_tasks"]
+        assert len(failed) == 1
+        assert failed[0]["task_id"] == "lake_load.events_pagepath"
+        assert failed[0]["map_index"] == 14
+        assert data["summary"]["total_tasks"] == 101
 
     def test_diagnose_dag_run_not_found(self, mocker):
         """Test diagnose_dag_run handles missing run."""

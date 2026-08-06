@@ -109,7 +109,9 @@ def _get_failed_task_instances(
     """
     try:
         adapter = _get_adapter()
-        data = adapter.get_task_instances(dag_id, dag_run_id)
+        # Page through all task instances so failures past the first page
+        # (e.g. a high map_index on a large mapped DAG run) are not missed.
+        data = adapter.get_all_task_instances(dag_id, dag_run_id)
         task_instances = data.get("task_instances", [])
         return extract_failed_tasks(task_instances)
     except Exception:
