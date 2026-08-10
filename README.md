@@ -196,6 +196,12 @@ The `astronomer-data` plugin bundles an MCP server and skills into a single inst
 | [cosmos-dbt-core](./skills/cosmos-dbt-core/) | Run dbt Core projects as Airflow DAGs using [Astronomer Cosmos](https://github.com/astronomer/astronomer-cosmos) |
 | [cosmos-dbt-fusion](./skills/cosmos-dbt-fusion/) | Run dbt Fusion projects with Cosmos (Snowflake/Databricks only) |
 
+#### Other Orchestration Integrations
+
+| Skill | Description |
+|-------|-------------|
+| [sqlmesh-airflow](./skills/sqlmesh-airflow/) | Orchestrate a SQLMesh project from Airflow (CLI/Python API, gateway wiring, plan vs run) |
+
 #### Migration
 
 | Skill | Description |
