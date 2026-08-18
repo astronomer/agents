@@ -1,5 +1,10 @@
 # ty type checker configuration
 # https://docs.astral.sh/ty/
+#
+# These rules do not reach scripts that carry PEP 723 inline metadata. Since
+# ty 0.0.62 such a script is configured by its own metadata block instead, so
+# cli.py repeats the unresolved-import suppression in its header. Any new
+# inline-metadata script in this directory needs the same.
 
 [rules]
 # Ignore unresolved imports for third-party libraries

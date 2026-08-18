@@ -88,6 +88,7 @@ class TestDetectInvocationContext:
     def clean_env(self, monkeypatch):
         """Clear all agent/CI env vars so tests control the environment."""
         for var in (
+            "OTTO",
             "CLAUDECODE",
             "CLAUDE_CODE_ENTRYPOINT",
             "CURSOR_TRACE_ID",
@@ -98,6 +99,9 @@ class TestDetectInvocationContext:
             "GEMINI_CLI",
             "OPENCODE",
             "CODEX_API_KEY",
+            "COPILOT_CLI",
+            "COPILOT_AGENT",
+            "AI_AGENT",
             "GITHUB_ACTIONS",
             "GITLAB_CI",
             "JENKINS_URL",
@@ -119,6 +123,62 @@ class TestDetectInvocationContext:
         monkeypatch.setenv("CLAUDECODE", "1")
         _, agent, _ = telemetry._detect_invocation_context()
         assert agent == "claude-code"
+
+    def test_detects_otto(self, monkeypatch):
+        """Test detects Otto agent."""
+        monkeypatch.setenv("OTTO", "1")
+        _, agent, _ = telemetry._detect_invocation_context()
+        assert agent == "otto"
+
+    def test_otto_wins_over_inherited_marker(self, monkeypatch):
+        """Otto passes its environment through to every command it runs, so an
+        Otto session started from inside another agent still carries that
+        agent's marker. Otto is the proximate caller and must win."""
+        monkeypatch.setenv("CLAUDECODE", "1")
+        _, agent, _ = telemetry._detect_invocation_context()
+        assert agent == "claude-code"
+
+        monkeypatch.setenv("OTTO", "1")
+        _, agent, _ = telemetry._detect_invocation_context()
+        assert agent == "otto"
+
+    def test_detects_copilot_cli(self, monkeypatch):
+        """Test detects the GitHub Copilot CLI harness."""
+        monkeypatch.setenv("COPILOT_CLI", "1")
+        _, agent, _ = telemetry._detect_invocation_context()
+        assert agent == "github-copilot"
+
+    def test_detects_copilot_vscode_agent_mode(self, monkeypatch):
+        """Test detects Copilot agent mode terminals in VS Code."""
+        monkeypatch.setenv("COPILOT_AGENT", "1")
+        _, agent, _ = telemetry._detect_invocation_context()
+        assert agent == "github-copilot"
+
+    @pytest.mark.parametrize("value", ["github_copilot_vscode_agent", "github_copilot_app_agent"])
+    def test_detects_copilot_via_ai_agent_convention(self, monkeypatch, value):
+        """Test the cross-vendor AI_AGENT convention, where the value names the agent."""
+        monkeypatch.setenv("AI_AGENT", value)
+        _, agent, _ = telemetry._detect_invocation_context()
+        assert agent == "github-copilot"
+
+    def test_ignores_unrecognised_ai_agent_value(self, monkeypatch):
+        """Unknown AI_AGENT values are not passed through — some carry a version,
+        which would spray one agent across many distinct telemetry values."""
+        monkeypatch.setenv("AI_AGENT", "some_other_agent")
+        _, agent, _ = telemetry._detect_invocation_context()
+        assert agent is None
+
+    def test_specific_marker_beats_ai_agent(self, monkeypatch):
+        """AI_AGENT is the fallback, so a specific marker still decides. VS Code
+        sets both AI_AGENT and COPILOT_AGENT, and Otto inside a VS Code agent
+        terminal carries both plus its own."""
+        monkeypatch.setenv("AI_AGENT", "github_copilot_vscode_agent")
+        _, agent, _ = telemetry._detect_invocation_context()
+        assert agent == "github-copilot"
+
+        monkeypatch.setenv("OTTO", "1")
+        _, agent, _ = telemetry._detect_invocation_context()
+        assert agent == "otto"
 
     def test_detects_cursor(self, monkeypatch):
         """Test detects Cursor agent."""
