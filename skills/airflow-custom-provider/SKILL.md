@@ -1,32 +1,35 @@
 ---
 name: airflow-custom-provider
-description: Builds a custom Apache Airflow provider package - hooks, operators, sensors, the `get_provider_info()` contract, and the `apache_airflow_provider` entry point that registers connection types in the Airflow UI. Use when the user wants to package Airflow integration code for a third-party system into an installable `airflow-provider-<name>` package, add a custom connection type to the Airflow UI's connection form, or asks about `get_provider_info`, provider discovery, or turning a one-off operator into something pip-installable and shareable. Not for embedding custom UI pages or FastAPI apps into Airflow itself (see airflow-plugins), and not for a one-off operator meant to live inside a single DAG repo (see Step 1).
+description: Builds a custom Apache Airflow provider package - hooks, operators, sensors, get_provider_info(), the apache_airflow_provider entry point, and custom connection types in the Airflow UI. Use when the user wants to package integration code for a third-party system as a pip-installable Airflow provider, mentions get_provider_info, apache_airflow_provider, provider.yaml, "build a provider package", "airflow-provider-<name>", or wants a custom connection type to appear in the Airflow UI connection form. Not for a one-off operator used inside a single DAG repo (see the decision table below) or for Airflow 3.1+ UI/FastAPI plugins (see airflow-plugins).
 ---
 
 # Airflow Custom Provider Packages
 
-A provider package is a pip-installable Python package that Airflow discovers automatically at startup and that bundles hooks, operators, sensors, and (optionally) a custom connection type for one external system. Build one when the integration needs to be versioned, released, and reused outside a single DAG repo — not for logic that only ever lives in one project.
+Package a hook, operator, or sensor for a third-party system into an independently distributed, pip-installable Airflow provider — the same mechanism every official Apache provider (`apache-airflow-providers-amazon`, `-snowflake`, etc.) uses. Any DAG repo can then `pip install` it and get the operators, sensors, and a custom connection type in the UI.
 
-> **Cross-references**: `airflow` for the `af config` / `af registry` discovery commands used throughout this skill; `airflow-plugins` for embedding UI pages or FastAPI apps into Airflow itself (a different extension mechanism); `setting-up-astro-project` and `managing-astro-local-env` for the Astro CLI commands used in the functional test loop below.
+> **Canonical template**: [astronomer/airflow-provider-sample](https://github.com/astronomer/airflow-provider-sample). Clone it fresh before starting — this skill explains the parts of that template that are easy to get subtly wrong, not a frozen copy of its files.
+>
+> **Cross-references**: `setting-up-astro-project` for `include/`/`plugins/` (lighter-weight alternative below); `airflow-plugins` for Airflow 3.1+ FastAPI/UI plugins (a different "plugin" concept entirely); `airflow` for the `af registry` / `af config providers` discovery commands used below; `managing-astro-local-env` for `astro dev` lifecycle commands.
 
 ---
 
-## Step 1 — Decide: provider package, or just an operator in this repo?
+## Step 1 — Decide: provider package, or something lighter?
 
-| Situation | Build |
+| Situation | Reach for |
 |---|---|
-| The integration will be reused across two or more DAG repos/projects, needs its own version and release cadence, or is meant to be published (internally or to PyPI) | A provider package (`airflow-provider-<name>`) |
-| The logic is used only inside this one DAG repo and nobody else needs it | A plain hook/operator module under `include/` (or `plugins/` for a one-off registration), imported directly into DAGs |
-| Needs a custom connection type to appear in the Airflow UI's connection dropdown | A provider package — only providers that declare `connection-types` in `get_provider_info()` can register a connection type |
-| Needs a custom UI page, nav entry, or FastAPI route inside Airflow itself | Not this skill — that is an Airflow plugin, see `airflow-plugins` |
+| Integration code will be shared across 2+ DAG repos, released independently, or installed by other teams (or the public) | A provider package (this skill) |
+| A one-off integration used by a single DAG in one repo, not meant to be reused elsewhere | A plain Python class in `include/` of that repo (or a legacy `plugins/` registration) — see `setting-up-astro-project` |
+| A custom UI page, FastAPI endpoint, or React app embedded in the Airflow webserver | Not this skill — see `airflow-plugins` |
 
-A hook or operator that sits in a DAG repo's `include/`/`plugins/` directory with no `pyproject.toml` and no entry point is an unfinished provider: it gets none of the discovery benefits below (no connection form, no `af config providers` visibility, no independent versioning) while still carrying packaging-shaped code. Either finish the packaging or don't start it — don't leave it half-built.
+A sign you should have built a provider package: the same hook or operator class gets copy-pasted into a second DAG repo.
+
+A common mistake going the other direction: dropping a `provider.yaml` manifest with an `airflow.providers.<name>` import path into a single project's `plugins/` folder. That manifest format is for providers vendored inside the `apache/airflow` source tree itself and is discovered from that source tree at build time — it does nothing for an independently pip-installed package sitting in `plugins/`. An externally distributed provider needs `get_provider_info()` plus the `apache_airflow_provider` entry point (Step 3), not a YAML manifest.
 
 ---
 
 ## Step 2 — Package skeleton
 
-Naming convention: the top-level package (and PyPI name, if published) is `airflow-provider-<name>`; the importable Python package inside it uses underscores, e.g. `<name>_provider`.
+Directory layout, verified against the canonical template:
 
 ```
 airflow-provider-<name>/
@@ -34,50 +37,48 @@ airflow-provider-<name>/
 ├── README.md
 ├── pyproject.toml
 ├── <name>_provider/
-│   ├── __init__.py          # get_provider_info() lives here
-│   ├── example_dags/
-│   │   └── example.py
+│   ├── __init__.py          # __version__ + get_provider_info()
 │   ├── hooks/
 │   │   ├── __init__.py
 │   │   └── <name>.py
 │   ├── operators/
 │   │   ├── __init__.py
 │   │   └── <name>.py
-│   └── sensors/
-│       ├── __init__.py
+│   ├── sensors/
+│   │   ├── __init__.py
+│   │   └── <name>.py
+│   └── example_dags/
 │       └── <name>.py
 └── tests/
     ├── __init__.py
     ├── hooks/
-    │   └── test_<name>_hook.py
     ├── operators/
-    │   └── test_<name>_operator.py
     └── sensors/
-        └── test_<name>_sensor.py
 ```
 
-This mirrors [astronomer/airflow-provider-sample](https://github.com/astronomer/airflow-provider-sample), Astronomer's public reference template — clone it to see a complete working example end to end, and to check whether the layout has changed since this was written:
+Naming convention: the distributed package name is hyphenated, `airflow-provider-<name>`; the importable Python module is underscored, `<name>_provider` (not `airflow_provider_<name>`). This split is consistent across the ecosystem's provider packages — don't merge the two.
+
+Layouts drift less than code, but don't take this listing as gospel forever. Before scaffolding a new provider, re-clone the template and diff:
 
 ```bash
 git clone --depth 1 https://github.com/astronomer/airflow-provider-sample /tmp/airflow-provider-sample-ref
+find /tmp/airflow-provider-sample-ref -type f -not -path '*/.git/*'
 ```
 
 ---
 
-## Step 3 — The `get_provider_info()` contract and entry point
+## Step 3 — `get_provider_info()` and the entry point (the part that silently breaks)
 
-> **This is the easiest thing to get subtly wrong.** A wrong entry-point group name, a typo in the dotted path, or a missing required field in the returned dict does not raise an error — Airflow just silently fails to discover the provider. There's no traceback to chase; the symptom is "my hook/connection type doesn't show up anywhere." Verify the exact current shape against the cloned sample repo's `pyproject.toml` and `<package>/__init__.py` rather than trusting that the snippets below haven't drifted.
+Two files have to agree. Using a fictitious "Acme" integration:
 
 `pyproject.toml`:
 
 ```toml
 [project.entry-points.apache_airflow_provider]
-provider_info = "<name>_provider.__init__:get_provider_info"
+provider_info = "acme_provider.__init__:get_provider_info"
 ```
 
-The entry-point **group name must be exactly `apache_airflow_provider`** — that literal string, not your package name, is what Airflow's provider manager scans installed distributions for at startup.
-
-`<name>_provider/__init__.py`:
+`acme_provider/__init__.py`:
 
 ```python
 __version__ = "1.0.0"
@@ -85,111 +86,136 @@ __version__ = "1.0.0"
 
 def get_provider_info():
     return {
-        "package-name": "airflow-provider-<name>",  # required
-        "name": "<Name>",                            # required
-        "description": "A short description of the integration.",  # required
-        "versions": [__version__],                   # required
+        "package-name": "airflow-provider-acme",  # required
+        "name": "Acme",  # required
+        "description": "Apache Airflow provider for the Acme API.",  # required
+        "versions": [__version__],  # required
         "connection-types": [
-            {
-                "connection-type": "<name>",
-                "hook-class-name": "<name>_provider.hooks.<name>.<Name>Hook",
-            }
+            {"connection-type": "acme", "hook-class-name": "acme_provider.hooks.acme.AcmeHook"}
         ],
+        "extra-links": ["acme_provider.operators.acme.AcmeOperatorExtraLink"],
     }
 ```
 
-The four required fields above (`package-name`, `name`, `description`, `versions`) are the baseline every provider must return. `connection-types` and other optional keys (e.g. `extra-links` for custom operator links) are additive — omit them if there's nothing to register, but don't guess at additional keys from memory: check the current sample repo or the [Apache Airflow provider packages documentation](https://airflow.apache.org/docs/apache-airflow-providers/) for what your Airflow version actually supports. Keep `versions` in sync with `__version__` on every release (Step 4).
+Two ways this fails discovery with no error and no log line:
 
-To make a connection type appear in the UI's connection form, the hook referenced in `connection-types` needs the standard discovery attributes plus two optional classmethods Airflow looks for:
+- **Wrong entry-point group name.** It must be exactly `apache_airflow_provider` — not `apache-airflow-provider`, not `airflow.providers`. Airflow's provider manager scans installed distributions for that exact group string. Get it wrong and the package still `pip install`s cleanly, still imports cleanly — Airflow just never lists it as a provider.
+- **Missing a required metadata field, or a typo in the entry-point target.** `package-name`, `name`, `description`, and `versions` are required; `connection-types` and `extra-links` are optional additions that unlock specific UI features. If the target function (`module:function`) doesn't resolve, or the dict is missing a required key, the failure mode is the same: silent absence, not an exception surfaced to the user.
+
+Verify instead of trusting the file:
+
+```bash
+# Does Python even see the entry point?
+python -c "from importlib.metadata import entry_points; print(list(entry_points(group='apache_airflow_provider')))"
+
+# Does Airflow list it as a provider? (af is the Airflow MCP CLI - see the `airflow` skill)
+af config providers | jq '.providers[] | select(.package_name == "airflow-provider-acme")'
+```
+
+If the first command comes back empty, the entry point in `pyproject.toml` is wrong. If the first succeeds but the second doesn't, the entry point resolved but `get_provider_info()` likely raised or returned a dict missing a required key.
+
+**Making the connection type show up in the UI's connection form.** Declaring `connection-types` in `get_provider_info()` is necessary but not sufficient for a good form — the hook needs the standard discovery attributes plus two optional classmethods Airflow looks for when rendering the "Add Connection" screen:
 
 ```python
-class <Name>Hook(BaseHook):
-    conn_name_attr = "<name>_conn_id"
-    default_conn_name = "<name>_default"
-    conn_type = "<name>"
-    hook_name = "<Name>"
+from airflow.hooks.base import BaseHook
+
+
+class AcmeHook(BaseHook):
+    conn_name_attr = "acme_conn_id"
+    default_conn_name = "acme_default"
+    conn_type = "acme"
+    hook_name = "Acme"
 
     @staticmethod
     def get_connection_form_widgets() -> dict:
-        ...  # extra form fields, e.g. via flask_appbuilder / wtforms
+        ...  # extra form fields, via flask_appbuilder / wtforms
 
     @staticmethod
     def get_ui_field_behaviour() -> dict:
-        ...  # hide, relabel, or set placeholders on the standard fields
+        ...  # hide, relabel, or placeholder the standard fields
+```
+
+Verify the registered connection type the same way as the provider itself, rather than only eyeballing the UI:
+
+```bash
+af config connections | jq '.connections[] | select(.conn_type == "acme")'
 ```
 
 ---
 
 ## Step 4 — Constraints that cause real bugs if skipped
 
-- **No network or I/O calls in `__init__`.** The scheduler re-parses every DAG file on a fixed interval, which re-imports and re-instantiates every operator referenced in it. A hook or operator that touches the network (or a database, or the filesystem) in its constructor turns every DAG parse into a live call to that system — this shows up as scheduler slowness or parse timeouts, not an obvious stack trace pointing at your code.
-- **`__init__` must never call anything that only resolves to a valid value at runtime** (for example, pulling a connection or a runtime-only variable). Resolve those inside `execute()`/`poke()`, or via Jinja-templated `template_fields`, not in the constructor — otherwise DAG parsing fails outright whenever that runtime dependency isn't available yet.
-- **Every operator must implement `execute(self, context)`.** A `BaseOperator` subclass without it raises `NotImplementedError` the first time a task instance actually runs.
-- **Sensors implement `poke(self, context)`** (or the deferrable/async equivalent), not `execute()`.
-- **Use semantic versioning**, and bump `__version__` on every release so it stays in sync with the `versions` list returned by `get_provider_info()`.
-- **Keep dependency bounds relaxed**: pin a minimum minor version and leave the upper bound open at the next major (`>=2.0.0,<3`), not an exact pin. An exact pin on a widely shared library — `requests`, or `apache-airflow` itself — will eventually conflict with core Airflow's own dependency pin or another installed provider's pin, and the environment will fail to resolve.
+- **No network or I/O calls inside `__init__`.** Hook, operator, and sensor constructors run every time the scheduler parses the DAG file — by default every ~30 seconds, for every DAG that imports them. An `__init__` that opens a connection hammers the target system and can stall DAG parsing entirely. Store the `conn_id` in `__init__`; resolve the real connection only inside `execute()` / `poke()` / `get_conn()`.
+- **`__init__` must not call anything that only returns valid objects at runtime.** That breaks DAG import outright, not just performance, because operators are constructed at parse time. Anything only known at task-run time belongs in a templated field (Jinja), not a constructor call.
+- **Every operator implements `execute(self, context)`.** This is what Airflow calls at task-run time; skip it and every task instance fails with `NotImplementedError` from `BaseOperator`.
+- **Every sensor implements `poke(self, context)`** returning a bool (or uses the deferrable/trigger pattern) — same contract via `BaseSensorOperator`.
+- **Semantic versioning, read from one place.** Bump `__version__` in `__init__.py`; wire `pyproject.toml` to read it (`[tool.setuptools.dynamic]` / `version = { attr = "acme_provider.__version__" }`) rather than hardcoding the version a second time.
+- **Relaxed dependency bounds.** Pin a floor, leave the ceiling open: `depx>=2.0,<3`, not `depx==2.3.1`. This applies doubly to `apache-airflow` itself — declare a floor (e.g. `apache-airflow>=2.9`) and let the runtime supply the actual version. A tightly pinned or exact-match dependency is the most common cause of "provider X conflicts with provider Y" install failures.
 
 ---
 
 ## Step 5 — Functional testing loop
 
-Unit tests live under `tests/`, mirroring the package layout (`tests/hooks/`, `tests/operators/`, `tests/sensors/`) — one test module per source module. Mock the external system (e.g. `requests_mock`, or `unittest.mock`) and mock the Airflow connection via the `AIRFLOW_CONN_<CONN_ID>` environment variable so these tests never need a live Airflow instance:
+Two layers: unit tests (fast, every commit) and a functional test that confirms Airflow actually discovers the package (unit tests can't catch a broken entry point).
 
-```python
-@mock.patch.dict("os.environ", AIRFLOW_CONN_<NAME>_DEFAULT="http://...")
-class Test<Name>Hook:
-    def test_run(self, requests_mock):
-        ...
+**Unit tests mirror the package structure:**
+
+```
+tests/
+├── hooks/test_acme_hook.py
+├── operators/test_acme_operator.py
+└── sensors/test_acme_sensor.py
 ```
 
-Unit tests confirm the code works; they don't confirm Airflow can *discover* the package. For that, build and install the wheel into a real Airflow environment:
+Mock the network boundary (e.g. `requests_mock`, or mock the underlying client) and mock the Airflow connection rather than requiring a live one. Test `get_provider_info()` itself too — assert the required keys are present and that every `hook-class-name` / `extra-links` string actually imports.
+
+**Functional test via the Astro CLI** — the only step that proves real discovery, not just importability:
 
 ```bash
-python3 -m pip install build
-python3 -m build              # produces dist/<name>-<version>-py3-none-any.whl
+# 1. Build the wheel
+python -m build
+
+# 2. Drop it into an Astro project and declare it as a dependency
+cp dist/*.whl <astro-project>/
+echo "./$(basename dist/*.whl)" >> <astro-project>/requirements.txt
+
+# 3. Start Airflow and confirm discovery
+cd <astro-project> && astro dev start
+af config providers | jq '.providers[] | select(.package_name == "airflow-provider-acme")'
+
+# 4. If a connection-type was registered, confirm it in the UI too:
+#    Admin -> Connections -> Add -> Connection Type dropdown should list it
 ```
 
-Then, in an Astro project (see `setting-up-astro-project` if you don't have one yet):
-
-1. Copy the `.whl` into the project root.
-2. Install it in the Dockerfile — the exact syntax (`RUN pip install`, a local wheel entry in `requirements.txt`, etc.) depends on your Astro CLI/runtime version, so check `astro dev init --help` or the current Astro docs rather than assuming one form.
-3. Drop an example DAG that imports from your provider into `dags/`.
-4. Run `astro dev start` (see `managing-astro-local-env` for start/stop/logs).
-5. Confirm discovery explicitly — don't just eyeball the UI:
-
-```bash
-af config providers | jq '.providers[] | select(.package_name == "airflow-provider-<name>")'
-af config connections | jq '.connections[] | select(.conn_type == "<name>")'   # only if you registered a connection type
-```
-
-If the package doesn't show up here, revisit Step 3 — this is the silent discovery failure described there, not a Docker or `astro dev start` problem.
+After changing the wheel, `astro dev restart`; for a clean slate, `astro dev kill` (see `managing-astro-local-env` for the full lifecycle reference).
 
 ---
 
 ## Step 6 — Safety checklist
 
-- [ ] `get_provider_info()` returns `package-name`, `name`, `description`, and `versions` — all four, every release.
-- [ ] The entry-point group in `pyproject.toml` is exactly `[project.entry-points.apache_airflow_provider]`, pointing at the real dotted path to `get_provider_info`.
-- [ ] No network/IO/runtime-only resolution inside any `__init__`.
-- [ ] Every operator implements `execute()`; every sensor implements `poke()` (or its deferrable equivalent).
-- [ ] Dependency bounds are relaxed (`>=x,<y`), not exact pins — especially for `apache-airflow` itself and any library likely shared with other installed providers.
-- [ ] `__version__` bumped and reflected in `versions` for this release.
-- [ ] Wheel built, installed into a real Astro/Airflow environment, and discovery confirmed via `af config providers` (and `af config connections` if a connection type was registered) — not just "it imported without error."
-- [ ] Unit tests exist under `tests/{hooks,operators,sensors}/` mirroring the package structure and pass without a live Airflow instance.
+- [ ] Distributed name is `airflow-provider-<name>`; importable module is `<name>_provider` — no drift between the two.
+- [ ] `pyproject.toml` entry-point group is exactly `apache_airflow_provider`, target resolves to a real `module:function`.
+- [ ] `get_provider_info()` returns `package-name`, `name`, `description`, and `versions` — confirmed with the `importlib.metadata` + `af config providers` pair from Step 3, not assumed from reading the code.
+- [ ] No network/IO and nothing runtime-only inside any `__init__`.
+- [ ] Every operator implements `execute()`; every sensor implements `poke()` or a deferrable trigger.
+- [ ] Dependency bounds are relaxed (`>=x,<y`), especially for `apache-airflow` itself — no exact pins.
+- [ ] `__version__` bumped following semver; `pyproject.toml` reads it via `dynamic`, not a second hardcoded copy.
+- [ ] Unit tests exist under `tests/{hooks,operators,sensors}/`, mirroring the package tree.
+- [ ] Confirmed via `astro dev start` + `af config providers` that Airflow lists the package as a provider — `pip install` succeeding is not sufficient proof.
 
 ---
 
 ## References
 
-- [astronomer/airflow-provider-sample](https://github.com/astronomer/airflow-provider-sample) — canonical reference template; clone it fresh rather than trusting this skill's snippets to still be current.
-- [Apache Airflow provider packages documentation](https://airflow.apache.org/docs/apache-airflow-providers/) — upstream conventions for provider metadata, capabilities, and installation.
+- Canonical template: [astronomer/airflow-provider-sample](https://github.com/astronomer/airflow-provider-sample) — directory layout, `get_provider_info()` shape, and dependency-bound guidance above were verified directly against this repo's `pyproject.toml`, `__init__.py`, and README. Re-clone it if anything here looks stale; it is the source of truth, not this file.
+- [Apache Airflow provider packages documentation](https://airflow.apache.org/docs/apache-airflow-providers/) — upstream conventions for provider metadata and capabilities beyond what this skill covers.
 - The Airflow Registry (`af registry providers`, or `airflow.apache.org/registry`) — browse published providers for comparison patterns.
 
 ## Related skills
 
-- **airflow** — `af config` / `af registry` command reference used for the discovery verification in Step 5.
-- **airflow-plugins** — embedding custom UI pages, FastAPI apps, or middleware into Airflow itself; a different extension point from provider packages.
-- **setting-up-astro-project** — initializing the Astro project used in the functional testing loop.
-- **managing-astro-local-env** — starting, stopping, and inspecting the local Airflow environment during testing.
-- **authoring-dags** — general DAG-writing conventions for using the finished provider's operators.
+- **setting-up-astro-project** — `include/`/`plugins/` for one-off operators that don't warrant their own package.
+- **airflow-plugins** — Airflow 3.1+ FastAPI/UI plugins (a different "plugin" concept from a provider package).
+- **airflow** — `af registry` / `af config providers` command reference used for discovery verification above.
+- **managing-astro-local-env** — `astro dev start` / `stop` / `restart` / `kill` lifecycle for the functional testing loop.
+- **authoring-dags** — general DAG writing conventions once the provider is installed.
 - **testing-dags** — iterative test/debug/fix cycles once the provider is installed in a project.
