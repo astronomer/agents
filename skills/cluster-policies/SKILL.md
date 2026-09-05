@@ -11,7 +11,7 @@ Cluster policies are plain Python functions that Airflow calls automatically whi
 >
 > **Verify your installed version first**: `af config version`, then match it against the versioned docs in Step 2 below. Cluster policy hook signatures have changed across Airflow releases (for example, whether `task_instance_mutation_hook` also receives the `DagRun`). Do not assume the shape below is exact for your version.
 >
-> **Cross-references**: `airflow` for `af config`/`af registry`/`af api` discovery commands; `airflow-plugins` for the plugin entry-point mechanism reused in Step 7.
+> **Cross-references**: `airflow` for the `af config version` discovery command used in Step 2; `airflow-plugins` for the `AirflowPlugin`/`plugins/`-folder auto-discovery mechanism also used to register a policy in Step 7b.
 
 ---
 
@@ -19,12 +19,12 @@ Cluster policies are plain Python functions that Airflow calls automatically whi
 
 | Hook | Object it receives | Fires when | Example governance use case |
 |---|---|---|---|
-| `dag_policy` | `DAG` | Once per DAG file, after the `DAG` object is fully built during DAG processing | Reject any DAG where `catchup=True` and `max_active_runs != 1`; require an owner email inside `tags` |
+| `dag_policy` | `DAG` | Once per `DAG` object, after it's fully built during DAG processing (a file defining several DAGs triggers this once per DAG, not once per file) | Reject any DAG where `catchup=True` and `max_active_runs != 1`; require an owner email inside `tags` |
 | `task_policy` | `BaseOperator` | Once per task, during the same DAG-processing pass: mutates the shared task template, so the change applies to every run of that task | Force every `KubernetesPodOperator` or `deferrable=True` task onto a dedicated lightweight queue; restrict which connections a task may reference |
 | `task_instance_mutation_hook` | `TaskInstance` | Scheduler-side, when a task instance row is created or reconciled: may run more than once for the same instance as it moves through scheduling | Route only high map-index dynamic-mapped instances to a bigger-resource queue; drop success callbacks on manually-triggered or backfill runs |
 | `pod_mutation_hook` | `kubernetes.client.models.V1Pod` | Once per worker pod, immediately before the `KubernetesExecutor` or `KubernetesPodOperator` submits it | Add a toleration or `nodeSelector` so Kubernetes-run tasks land on a specific node pool |
 
-This table is an anchor, not a contract: the exact parameters accepted by each hook can gain optional arguments across Airflow releases. Confirm the live signature with Step 2 before writing code against it.
+This table is an anchor, not a contract: the exact parameters accepted by each hook can gain optional arguments across Airflow releases.
 
 ---
 
@@ -42,7 +42,7 @@ python -c "import inspect, airflow.policies as p; print(inspect.getsource(p))"
 
 Cross-check against the docs page for that exact version. Swap `stable` for the version string from `af config version`:
 
-```
+```text
 https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/cluster-policies.html
 ```
 
@@ -52,7 +52,7 @@ If the introspected source shows a parameter this skill doesn't mention (for exa
 
 ## Step 3: Canonical example (a governance policy module)
 
-One module implementing all four hooks together: the shape to drop into `airflow_local_settings.py` (Step 5a) or a plugin module (Step 5b) unmodified. Adapt the conditions to your own rules; verify attribute names against Step 2 first.
+One module implementing all four hooks together: the shape to drop into `airflow_local_settings.py` (Step 5a) or a plugin module (Step 5b) unmodified. Adapt the conditions to your own rules.
 
 ```python
 from __future__ import annotations
@@ -64,7 +64,7 @@ from airflow.exceptions import AirflowClusterPolicyViolation
 
 if TYPE_CHECKING:
     from airflow.models.baseoperator import BaseOperator
-    from airflow.models.dag import DAG
+    from airflow.models.dag import DAG  # import from here, not top-level airflow, to avoid a circular import at startup
     from airflow.models.taskinstance import TaskInstance
     from kubernetes.client.models import V1Pod
 
@@ -91,7 +91,7 @@ def task_policy(task: BaseOperator) -> None:
 
 
 def task_instance_mutation_hook(task_instance: TaskInstance) -> None:
-    if task_instance.map_index is not None and task_instance.map_index > 5:
+    if task_instance.map_index > 5:
         task_instance.queue = "spare-high-resource-queue"
         log.info(
             "cluster_policy: %s map_index=%s routed to %s",
@@ -122,9 +122,6 @@ def pod_mutation_hook(pod: V1Pod) -> None:
 ### Two exceptions, two outcomes
 - Raise `AirflowClusterPolicyViolation` (`airflow.exceptions`) to reject a DAG or task outright. It is recorded in the metadata database's import-error table and shown to every user as a DAG Import Error in the Airflow UI. The DAG stays broken until the author fixes it.
 - Raise `AirflowClusterPolicySkipDag` instead when you want to deliberately exclude a DAG (for example, an opt-in beta tag) without it looking broken: it is not recorded as an import error and does not appear in the UI's error list. Default to `AirflowClusterPolicyViolation`; reach for the skip variant only when silent exclusion is the intended behavior.
-
-### Import hygiene
-When type-hinting `dag: DAG` at module scope in a policy module, import `DAG` from `airflow.models.dag` rather than the top-level `airflow` package, to avoid a circular import during Airflow's own startup.
 
 ---
 
@@ -168,7 +165,7 @@ Cluster policies do not run in a sandbox. They execute inline, synchronously, in
 
 ## Step 7: Two implementation paths
 
-**(a) `airflow_local_settings.py`: single project.** Place the module at `$AIRFLOW_HOME/config/airflow_local_settings.py` with plain functions named `dag_policy`, `task_policy`, `task_instance_mutation_hook`, `pod_mutation_hook`. On Astro, this is the project's `config/` directory, picked up by the Dockerfile's build (confirm your Dockerfile actually copies `config/` if it was customized away from the default). Use this when the policy only needs to apply to one project/deployment.
+**(a) `airflow_local_settings.py`: single project.** Place the module at `$AIRFLOW_HOME/config/airflow_local_settings.py` with plain functions named `dag_policy`, `task_policy`, `task_instance_mutation_hook`, `pod_mutation_hook`. On Astro, this is the project's `config/` folder, picked up by the Dockerfile's build (confirm your Dockerfile actually copies `config/` if it was customized away from the default). Use this when the policy only needs to apply to one project/deployment.
 
 **(b) A shared, `@hookimpl`-decorated module: many projects.** Decorate functions with `@hookimpl` from `airflow.policies` instead of relying on the bare function name:
 
@@ -181,7 +178,7 @@ def task_policy(task) -> None:
     ...
 ```
 
-Either drop this module inside a project's `plugins/` directory (Airflow's plugin manager auto-discovers `@hookimpl` functions there, no `AirflowPlugin` subclass required), or ship it as a proper pip-installed package that registers the `airflow.policy` setuptools entry point so every project that installs the package gets the same governance for free:
+Either drop this module inside a project's `plugins/` folder (Airflow's plugin manager auto-discovers `@hookimpl` functions there, no `AirflowPlugin` subclass required), or ship it as a proper pip-installed package that registers the `airflow.policy` setuptools entry point so every project that installs the package gets the same governance for free:
 
 ```toml
 [project.entry-points."airflow.policy"]
@@ -205,12 +202,11 @@ Multiple registered implementations of the same hook are all called (pluggy chai
 
 ## References
 
-- [Apache Airflow: Cluster Policies](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/cluster-policies.html). Swap `stable` for the version from `af config version` to see the exact signatures and exceptions for that release.
-- `python -c "import inspect, airflow.policies as p; print(inspect.getsource(p))"`: the hookspecs for the Airflow version actually installed.
+- [Apache Airflow: Cluster Policies](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/cluster-policies.html): swap `stable` for the version from `af config version` (see Step 2) to see the exact signatures and exceptions for that release.
 
 ## Related skills
 
-- **airflow**: `af config`, `af registry`, and `af api` command reference used for discovery in Step 2.
-- **airflow-plugins**: building Airflow plugins with `plugins/`-directory modules and setuptools entry points; the same mechanism used to share a policy in Step 7b.
+- **airflow**: `af config` command reference used for discovery in Step 2.
+- **airflow-plugins**: the `AirflowPlugin`/`plugins/`-folder auto-discovery mechanism also used to register a policy in Step 7b (not the setuptools entry-point path, which is specific to this skill).
 - **authoring-dags**: general DAG writing conventions a cluster policy might enforce.
-- **setting-up-astro-project**: project structure, including the `config/` directory used for `airflow_local_settings.py` on Astro.
+- **setting-up-astro-project**: project structure, including the `config/` folder used for `airflow_local_settings.py` on Astro.
