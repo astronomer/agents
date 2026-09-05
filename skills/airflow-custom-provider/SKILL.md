@@ -169,23 +169,56 @@ tests/
 
 Mock the network boundary (for example `requests_mock`, or mock the underlying client) and mock the Airflow connection rather than requiring a live one. Test `get_provider_info()` itself too: assert the required keys are present and that every `hook-class-name` / `extra-links` string actually imports.
 
-**Functional test via the Astro CLI** (the only step that proves real discovery, not just importability):
+**Functional test via the Astro CLI** (the only step that proves real discovery, not just importability). Build the wheel first, then install it either of two ways depending on what you're testing for:
 
 ```bash
-# 1. Build the wheel
-python -m build
+python -m build   # produces dist/<name>-<version>-py3-none-any.whl
+```
 
-# 2. Drop it into an Astro project and declare it as a dependency
+**Option A — install the wheel directly (fastest, for local iteration).** Do not add a local wheel path to `requirements.txt` — every current Astro Runtime image's `ONBUILD` chain installs `requirements.txt` before it copies the rest of the project into the image, so a relative `./<wheel>` reference fails at build time with `Distribution not found`. Verified against `astrocrpublic.azurecr.io/runtime:3.3-7`. Instead, copy the wheel into the project and install it explicitly in the Dockerfile, on a line after `FROM` — by the time your own instructions run, the base image's own final `COPY --chown=astro:0 . .` has already placed the wheel in `/usr/local/airflow/`:
+
+```dockerfile
+FROM astrocrpublic.azurecr.io/runtime:<tag>
+
+USER root
+RUN uv pip install --system --no-cache-dir /usr/local/airflow/<wheel-name>.whl
+USER astro
+```
+
+```bash
 cp dist/*.whl <astro-project>/
-echo "./$(basename dist/*.whl)" >> <astro-project>/requirements.txt
-
-# 3. Start Airflow and confirm discovery
 cd <astro-project> && astro dev start
+```
+
+**Option B — publish and install from an index (for sharing the provider across projects or teams).** Publish the wheel, then reference the package name normally in `requirements.txt` instead of copying a file around:
+
+```bash
+# Public PyPI
+twine upload dist/*
+echo "airflow-provider-acme>=1.0.0" >> <astro-project>/requirements.txt
+```
+
+For a private index, the flag differs by Airflow major version — `--index-url` on Airflow 3, `--extra-index-url` on Airflow 2:
+
+```text
+--index-url https://<user>:<token>@<your-index-host>/simple   # Airflow 3
+--extra-index-url https://<user>:<token>@<your-index-host>/simple   # Airflow 2
+airflow-provider-acme>=1.0.0
+```
+
+Embedding the token in the URL puts it in a file you commit. To keep it out of git instead, mount it as a build secret the same way private Git installs do — `astro dev start --build-secret id=netrc,env=NETRC_CONTENT` locally, with `NETRC_CONTENT="machine <your-index-host> login <user> password <token>"` — and reference only the bare `--index-url`/`--extra-index-url`, no credentials, in `requirements.txt`. Read [Astronomer's private Python packages guide](https://www.astronomer.io/docs/cli/v1.44/private-python-packages) before setting this up; it also covers the `astro deploy`-side equivalent.
+
+**Then confirm discovery, whichever option you used:**
+
+```bash
+astro dev start   # or astro dev restart if already running
 af config providers | jq '.providers[] | select(.package_name == "airflow-provider-acme")'
 
-# 4. If a connection-type was registered, confirm it in the UI too:
-#    Admin -> Connections -> Add -> Connection Type dropdown should list it
+# If af isn't available in your environment, check the running scheduler directly:
+docker exec "$(docker ps -qf name=scheduler)" airflow providers list | grep airflow-provider-acme
 ```
+
+If a connection-type was registered, confirm it in the UI too: Admin -> Connections -> Add -> Connection Type dropdown should list it.
 
 After changing the wheel, `astro dev restart`; for a clean slate, `astro dev kill` (see `managing-astro-local-env` for the full lifecycle reference).
 
@@ -198,6 +231,7 @@ After changing the wheel, `astro dev restart`; for a clean slate, `astro dev kil
 - [ ] `get_provider_info()` returns `package-name`, `name`, `description`, and `versions`: confirmed with the `importlib.metadata` + `af config providers` pair from Step 3, not assumed from reading the code.
 - [ ] No network/IO and nothing runtime-only inside any `__init__`.
 - [ ] Every operator implements `execute()`; every sensor implements `poke()` or a deferrable trigger.
+- [ ] A local wheel is installed via an explicit Dockerfile `RUN` after `FROM`, not a relative path in `requirements.txt` — the Astro Runtime image's `ONBUILD` chain installs `requirements.txt` before it copies the wheel into the image.
 - [ ] Dependency bounds are relaxed (`>=x,<y`), especially for `apache-airflow` itself: no exact pins.
 - [ ] `__version__` bumped following semver; `pyproject.toml` reads it via `dynamic`, not a second hardcoded copy.
 - [ ] Unit tests exist under `tests/{hooks,operators,sensors}/`, mirroring the package tree.
