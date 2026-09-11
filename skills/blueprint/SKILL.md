@@ -1,22 +1,16 @@
 ---
 name: blueprint
-description: Define reusable Airflow task group templates with Pydantic validation and compose DAGs from YAML. Use when creating blueprint templates, composing DAGs from YAML, validating configurations, or enabling no-code DAG authoring for non-engineers.
+description: Define reusable Airflow task group templates with Pydantic validation and compose DAGs from YAML. Use when creating blueprint templates, composing DAGs from YAML, declaring shared variables or per-environment profiles, validating configurations, sharing templates as an installable package, or enabling no-code DAG authoring for non-engineers.
 ---
 
 # Blueprint Implementation
 
 You are helping a user work with Blueprint, a system for composing Airflow DAGs from YAML using reusable Python templates. Execute steps in order and prefer the simplest configuration that meets the user's needs.
 
-> **Package**: `airflow-blueprint` on PyPI
+> **Package**: `airflow-blueprint` on PyPI — this skill documents **0.5.0**
 > **Repo**: https://github.com/astronomer/blueprint
-> **Requires**: Python 3.10+, Airflow 2.5+, Blueprint 0.3.0+
-
-## Before Starting
-
-Confirm with the user:
-1. **Airflow version** ≥2.5
-2. **Python version** ≥3.10
-3. **Use case**: Blueprint is for standardized, validated templates. If user needs full Airflow flexibility, suggest writing DAGs directly or using DAG Factory instead.
+> **Requires**: Python 3.10+, Airflow 2.5+
+> **Cross-references**: the `airflow` skill for Astro CLI, registry, and REST API discovery commands; `authoring-dags` or `dag-factory` when the user needs full Airflow flexibility instead of validated templates.
 
 ---
 
@@ -27,10 +21,12 @@ Confirm with the user:
 | "Create a blueprint" / "Define a template" | Go to **Creating Blueprints** |
 | "Build a template from other templates" | Go to **Composing Templates** |
 | "Create a DAG from YAML" / "Compose steps" | Go to **Composing DAGs in YAML** |
+| "Reuse a value across steps or DAGs" / "Different value per environment" | Go to **Variables and Profiles** |
 | "Use a blueprint in an existing Python DAG" / "Generate DAGs in a loop" | Go to **Blueprints in Python DAGs** |
-| "Customize DAG args" / "Add tags to DAG" | Go to **Customizing DAG-Level Configuration** |
+| "Customize DAG args" / "Add tags to DAG" / "Different DAG defaults per folder" | Go to **Customizing DAG-Level Configuration** |
+| "Share templates across repos" / "Install blueprints from a package" | Go to **Sharing Blueprints as a Package** |
 | "Override config at runtime" / "Trigger with params" | Go to **Runtime Parameter Overrides** |
-| "Post-process DAGs" / "Add callback" | Go to **Post-Build Callbacks** |
+| "Post-process DAGs" / "Add callback" / "Don't let one bad file break everything" | Go to **Loader Options** |
 | "Validate my YAML" / "Lint blueprint" | Go to **Validation Commands** |
 | "Set up blueprint in my project" | Go to **Project Setup** |
 | "Version my blueprint" | Go to **Versioning** |
@@ -45,49 +41,33 @@ If the user is starting fresh, guide them through setup:
 
 ### 1. Install the Package
 
-```bash
-# Add to requirements.txt
-airflow-blueprint>=0.3.0
-
-# Or install directly
-pip install airflow-blueprint
-```
+Add `airflow-blueprint>=0.5.0` to `requirements.txt`.
 
 ### 2. Create the Loader
 
 Create `dags/loader.py`:
 
 ```python
-from blueprint import build_all_dags
+from blueprint import build_all_airflow_dags
 
-build_all_dags()
+build_all_airflow_dags()
 ```
 
-> **Use `build_all_dags`, not `build_all`.** The function was renamed in 0.3.0 so the loader's import line contains the substring `dag`, which Airflow's safe-mode DAG file processor requires — otherwise the file is silently skipped and no DAGs appear. `build_all` still works as a deprecated alias (emits `DeprecationWarning`); migrate existing loaders.
+> **The function name matters.** Airflow's safe-mode DAG file processor only parses files containing both `airflow` and `dag`, so the import line itself is what makes the loader discoverable. `build_all` and `build_all_dags` still work as deprecated aliases that emit `DeprecationWarning`; migrate existing loaders to `build_all_airflow_dags`.
 
 DAG-level configuration (schedule, description, tags, default_args, etc.) is handled via YAML fields and `BlueprintDagArgs` templates — see **Customizing DAG-Level Configuration**.
 
 ### 3. Verify Installation
 
-```bash
-uvx --from airflow-blueprint blueprint list
-```
-
-If no blueprints found, user needs to create blueprint classes first.
-
-> **Provider operators in the CLI.** The `uvx --from airflow-blueprint` environment is isolated and does **not** include the Airflow provider packages your Astro Runtime project has. If your templates import provider operators (BigQuery, Snowflake, etc.), add `--with` so the CLI can import them — otherwise `list`/`lint`/`schema` fail with `ModuleNotFoundError: No module named 'airflow.providers.X'`:
->
-> ```bash
-> uvx --from airflow-blueprint --with apache-airflow-providers-google blueprint list --template-dir dags/templates
-> ```
+Run `blueprint list` from the project root. If no blueprints are found, the user needs to create blueprint classes first.
 
 ---
 
 ## Creating Blueprints
 
-When user wants to create a new blueprint template:
+### Canonical Example
 
-### Blueprint Structure
+Config model, generic base class, and a `render()` returning a task or group keyed on `self.step_id`. Adapt this rather than inventing a different structure:
 
 ```python
 # dags/templates/my_blueprints.py
@@ -96,9 +76,7 @@ from airflow.utils.task_group import TaskGroup
 from blueprint import Blueprint, BaseModel, Field
 
 class MyConfig(BaseModel):
-    # Required field with description (used in CLI output and JSON schema)
     source_table: str = Field(description="Source table name")
-    # Optional field with default and validation
     batch_size: int = Field(default=1000, ge=1)
 
 class MyBlueprint(Blueprint[MyConfig]):
@@ -125,14 +103,14 @@ class MyBlueprint(Blueprint[MyConfig]):
 
 ### Config Field Types Must Be YAML-Compatible
 
-As of 0.3.0, config fields must be single-typed. Multi-type unions like `str | int` or `Union[A, B]` are **rejected at class-definition time** (raises `TypeError`) because they produce ambiguous YAML parsing and `anyOf` schemas. The check recurses through nested models, list items, and dict values.
+Config fields must be single-typed. Multi-type unions like `str | int` or `Union[A, B]` are **rejected at class-definition time** (raises `TypeError`) because they produce ambiguous YAML parsing and `anyOf` schemas. The check recurses through nested models, list items, and dict values.
 
 - **Allowed**: scalars (`str`, `int`, `float`, `bool`), `Literal[...]`, `list[X]`, `dict[str, V]`, nested `BaseModel`, and `Optional[X]` / `X | None` (the nullable pattern).
 - **Rejected**: `str | int`, `Union[A, B]`, or any union with more than one non-`None` arm. Bare `Any` and `dict[str, Any]` are rejected for the same reason — use an explicit single type for the value.
 
 ### Internal Fields Not Settable from YAML
 
-Use `Field(default=..., init=False)` for fields used inside `render()` that should not be overridable from YAML. They are excluded from the constructor (always use their default) and omitted from JSON Schema output:
+Use `Field(default=..., init=False)` for fields used inside `render()` that should not be overridable from YAML. They are excluded from the constructor and omitted from JSON Schema output:
 
 ```python
 class ExtractConfig(BaseModel):
@@ -140,17 +118,17 @@ class ExtractConfig(BaseModel):
     _internal_batch_multiplier: int = Field(default=4, init=False)
 ```
 
-### Recommend Strict Validation
+### Recommend Strict Validation for Step Configs
 
-Suggest adding `extra="forbid"` to catch YAML typos:
+A **step** config model inherits Pydantic's default `extra="ignore"`, so a misspelled field in a step's YAML is silently dropped rather than reported. Suggest `model_config = ConfigDict(extra="forbid")` to turn those typos into errors:
 
 ```python
-from pydantic import ConfigDict
-
 class MyConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    # fields...
+    source_table: str
 ```
+
+DAG args config models are the opposite and need no such setting — Blueprint makes them strict for you (see **Customizing DAG-Level Configuration**).
 
 ---
 
@@ -161,10 +139,6 @@ A blueprint can instantiate and render **other blueprints** inside its `render()
 Inside `render()`, instantiate each child blueprint, set its `step_id`, call `render(...)` with a config you construct, and wire the results together inside a parent `TaskGroup`:
 
 ```python
-class QualityGateConfig(BaseModel):
-    checks: list[str] = Field(default=["nulls", "duplicates"])
-    report_channel: str = Field(default="data-alerts")
-
 class QualityGate(Blueprint[QualityGateConfig]):
     """Run checks then send a report — composed from Validate and Report."""
 
@@ -182,21 +156,11 @@ class QualityGate(Blueprint[QualityGateConfig]):
         return group
 ```
 
-YAML authors then see a single step with a flat config:
-
-```yaml
-steps:
-  quality:
-    blueprint: quality_gate
-    checks: [nulls, duplicates, freshness]
-    report_channel: "#data-alerts"
-```
+YAML authors then see a single step with a flat config, and the composed children stay invisible to them.
 
 ---
 
 ## Composing DAGs in YAML
-
-When user wants to create a DAG from blueprints:
 
 ### YAML Structure
 
@@ -227,27 +191,23 @@ By default, only `schedule` and `description` are supported as DAG-level fields 
 | `blueprint` | Template name (required) |
 | `depends_on` | List of upstream step names |
 | `version` | Pin to specific blueprint version |
-| `trigger_rule` | Airflow trigger rule for the step (e.g. `all_done`, `one_success`); validated against the installed Airflow version |
+| `trigger_rule` | Airflow trigger rule for the step; validated against the installed Airflow version |
 
 Everything else passes to the blueprint's config.
 
-### Trigger Rules (0.3.0)
+### Trigger Rules
 
 Use `trigger_rule` to control when a step runs relative to its upstream dependencies — for example, to run a notification step even if an upstream step failed:
 
 ```yaml
 steps:
-  analyze:
-    blueprint: analyze
-    depends_on: [extract]
-
   notify:
     blueprint: notify
     depends_on: [analyze]
     trigger_rule: all_done   # run regardless of whether analyze succeeded
 ```
 
-Valid values are validated dynamically against the installed Airflow's `TriggerRule` enum (`all_success`, `all_done`, `one_success`, `none_failed`, etc.). When the step's blueprint renders a `TaskGroup`, the rule is applied only to the group's **root** tasks (those with no internal upstream), preserving the blueprint author's internal wiring.
+Values are validated dynamically against the installed Airflow's `TriggerRule` enum, so the accepted set follows your Airflow version rather than this skill. When the step's blueprint renders a `TaskGroup`, the rule applies only to the group's **root** tasks (those with no internal upstream), preserving the blueprint author's internal wiring.
 
 ### Jinja2 Support
 
@@ -261,24 +221,83 @@ steps:
   extract:
     blueprint: extract
     output_path: "/data/{{ context.ds_nodash }}/output.csv"
-    run_id: "{{ context.dag_run.run_id }}"
 ```
 
 Available template variables:
+
 - `env` — environment variables
 - `var` — Airflow Variables
 - `conn` — Airflow Connections
 - `context` — proxy that generates Airflow template expressions for runtime macros (e.g. `context.ds_nodash`, `context.dag_run.conf`, `context.task_instance.xcom_pull(...)`)
+- `profile` — the active variable profile name, or nothing when none is selected. Useful for deriving a value from the profile rather than enumerating it per profile: `dag_id: "pipeline_{{ profile }}"`
+
+For values that are fixed at parse time and shared across steps or DAGs, prefer **Variables and Profiles** over a Jinja `{% set %}` block — variables are scoped, shareable, and visible to `blueprint lint`.
+
+---
+
+## Variables and Profiles
+
+DAG YAML can declare variables and reference them as `${name}`. Use this to stop repeating a value across steps and DAGs.
+
+Declare them in a `blueprint.vars.yaml` shared by every DAG beneath it, in a DAG's own `vars:` block, or both — nearer declarations override further ones:
+
+```yaml
+# dags/blueprint.vars.yaml — shared by every DAG beneath it
+vars:
+  landing_dataset: raw_events
+  warehouse_db: analytics
+```
+
+```yaml
+# dags/customer_etl.dag.yaml
+vars:
+  stream: customer_events
+  retention_days: 90
+
+steps:
+  load:
+    blueprint: load
+    target_table: ${warehouse_db}.${landing_dataset}.${stream}
+    expiration_days: ${retention_days}
+```
+
+Substitution runs after YAML parsing, so `expiration_days` stays an `int` rather than becoming the string `"90"`. Values are scalars or lists, and variables may compose (`base: ${db}.${schema}`).
+
+Variable names match `^[A-Za-z_][A-Za-z0-9_-]*$` — hyphens are allowed, and periods are reserved so dotted namespaces can be added later without ambiguity.
+
+> **`${...}` is always a variable reference.** Anything else that uses that syntax — most often a shell variable in a `bash_command` — must be escaped as `$${...}`, or Blueprint tries to resolve it as a variable. Only `$$` immediately before `{` is treated as an escape, so a bare `$$` (a shell PID, an awk field) needs no change. `blueprint lint` reports each unescaped occurrence and names the escape in the error, so lint the project after adopting variables.
+
+### Profiles
+
+A variable can carry a different value per named profile, selected at build time. Environments are the obvious use, but the mechanism is just named selection:
+
+```yaml
+profiles: [prod, dev]
+vars:
+  warehouse_db:
+    prod: analytics
+    dev: sandbox
+```
+
+```python
+build_all_airflow_dags(profile="prod" if is_production else "dev")
+```
+
+Every profile a DAG declares must give the variable a value; a partial mapping is an error rather than a silent fallback.
+
+### Inspecting Variables
+
+`blueprint vars <path>` shows the resolved value of each variable and where it came from, and flags variables a DAG never references. `blueprint lint` validates every declared profile unless `--profile` narrows it to one. Pass `--root` to match the path the loader builds from, or resolution differs between lint and runtime.
 
 ---
 
 ## Blueprints in Python DAGs
 
-Blueprints aren't tied to the YAML composition flow. Two patterns (both 0.3.0) let you use them from Python — useful for incremental adoption or data-driven DAG generation.
+Blueprints aren't tied to the YAML composition flow. Two patterns let you use them from Python — useful for incremental adoption or data-driven DAG generation.
 
 ### Inside a Hand-Written DAG
 
-To drop a blueprint-rendered step into an existing Python DAG, instantiate the Blueprint class, set its `step_id`, call `render()`, and wire it in with `>>`:
+Instantiate the Blueprint class, set its `step_id`, call `render()`, and wire it in with `>>`:
 
 ```python
 # dags/hybrid_dag.py
@@ -287,29 +306,23 @@ from datetime import datetime
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 
-from dags.etl_blueprints import Extract, ExtractConfig, Load, LoadConfig
+from dags.etl_blueprints import Extract, ExtractConfig
 
 with DAG(dag_id="hybrid_python_dag", start_date=datetime(2024, 1, 1), schedule=None, catchup=False) as dag:
     setup = BashOperator(task_id="setup", bash_command="echo 'setup'")
 
     extract = Extract()
     extract.step_id = "extract"
-    extract_group = extract.render(ExtractConfig(source_table="raw.events", batch_size=100))
+    extract_group = extract.render(ExtractConfig(source_table="raw.events"))
 
-    load = Load()
-    load.step_id = "load"
-    load_task = load.render(LoadConfig(target_table="warehouse.events", mode="append"))
-
-    finalize = BashOperator(task_id="finalize", bash_command="echo 'done'")
-
-    setup >> extract_group >> load_task >> finalize
+    setup >> extract_group
 ```
 
 The `step_id` you set determines the `task_id` / `group_id` the blueprint renders under.
 
 ### Programmatic Building with `Builder` / `DAGConfig`
 
-For data-driven DAG generation (one DAG per region, tenant, etc.), build DAGs in a loop with `Builder` and `DAGConfig`, then register each in `globals()` so Airflow discovers them:
+For data-driven DAG generation (one DAG per region, tenant, etc.), build DAGs in a loop and register each in `globals()` so Airflow discovers them:
 
 ```python
 from blueprint import Builder, DAGConfig
@@ -322,178 +335,194 @@ for region in ["us", "eu", "apac"]:
         schedule="@hourly",
         steps={
             "extract": {"blueprint": "extract", "source_table": f"raw.{region}"},
-            "load": {"blueprint": "load", "depends_on": ["extract"], "target_table": f"out.{region}"},
         },
     )
-    dag = builder.build(config)
+    dag = builder.build(config, source_path=__file__)
     globals()[dag.dag_id] = dag
 ```
 
-`DAGConfig` accepts the same fields you would write in YAML (`dag_id`, `steps`, plus any fields your `BlueprintDagArgs` consumes). `Builder`, `DAGConfig`, and `StepConfig` are all exported from `blueprint`. See `examples/advanced/dags/programmatic_dags.py` in the repo.
+`DAGConfig` accepts the same fields you would write in YAML. Pass `source_path=__file__` so the DAG args template is resolved from this file's directory the same way a YAML file's would be — without it, resolution falls back to the project-wide default (see **Customizing DAG-Level Configuration**).
 
 ---
 
 ## Customizing DAG-Level Configuration
 
-By default, Blueprint supports `schedule` and `description` as DAG-level YAML fields. To use other DAG constructor arguments (tags, default_args, catchup, etc.), define a `BlueprintDagArgs` subclass.
-
-### When to Use
-
-- User wants `tags`, `default_args`, `catchup`, `start_date`, or any other DAG kwargs in YAML
-- User wants to derive DAG properties from config (e.g. team name → owner, tier → retries)
-
-### Defining a BlueprintDagArgs Subclass
+By default, Blueprint supports `schedule` and `description` as DAG-level YAML fields. To use other DAG constructor arguments (tags, default_args, catchup, etc.), define a `BlueprintDagArgs` subclass. Its `render()` returns a dict of kwargs passed to the Airflow `DAG()` constructor, so the accepted keys are whatever your Airflow version's `DAG` accepts.
 
 ```python
-# dags/templates/my_dag_args.py
+# dags/dag_args.py
+from typing import Any
+
 from pydantic import BaseModel
 from blueprint import BlueprintDagArgs
 
-class MyDagArgsConfig(BaseModel):
+class ProjectDagArgsConfig(BaseModel):
     schedule: str | None = None
-    description: str | None = None
     tags: list[str] = []
     owner: str = "data-team"
-    retries: int = 2
 
-class MyDagArgs(BlueprintDagArgs[MyDagArgsConfig]):
-    def render(self, config: MyDagArgsConfig) -> dict[str, Any]:
+class ProjectDagArgs(BlueprintDagArgs[ProjectDagArgsConfig]):
+    def render(self, config: ProjectDagArgsConfig) -> dict[str, Any]:
         return {
             "schedule": config.schedule,
-            "description": config.description,
             "tags": config.tags,
-            "default_args": {
-                "owner": config.owner,
-                "retries": config.retries,
-            },
+            "default_args": {"owner": config.owner},
         }
 ```
 
-Then in YAML, the extra fields are validated by the config model:
+The declared fields then become valid DAG-level YAML keys, validated by the config model.
 
-```yaml
-dag_id: my_pipeline
-schedule: "@daily"
-tags: [etl, production]
-owner: data-team
-retries: 3
+### Several Templates per Project
 
-steps:
-  extract:
-    blueprint: extract
-    source_table: raw.data
+A project may define more than one template. Each DAG uses the template defined **closest above it**: resolution starts in the DAG file's own directory and walks up parent directories, so a subdirectory overrides its parents.
+
+```
+dags/
+  dag_args.py             ProjectDagArgs
+  customer.dag.yaml       -> ProjectDagArgs
+  sandbox/
+    dag_args.py           SandboxDagArgs
+    probe.dag.yaml        -> SandboxDagArgs
+```
+
+A DAG with no template above it falls back to the one declared `default=True`, then to the sole registered template, then to the built-in `DefaultDagArgs`. A template is scoped to the directory holding the `.py` file that defines it, so **moving that file rescopes it** — the most common surprise in this feature.
+
+Nothing in the DAG YAML changes: a DAG never names its template. Run `blueprint list` to see which template applies to which path, which one is the fallback, and where each is defined; `blueprint lint` names the resolved template per DAG.
+
+A template registers under the snake_case form of its class name — `ProjectDagArgs` becomes `project_dag_args` — which is the name `blueprint schema --dag-args <name>` expects. Setting `name = "..."` overrides it, and must itself be snake_case.
+
+### Undeclared Fields Are Rejected
+
+A DAG args config model defines the DAG YAML's top-level surface, so Blueprint applies `extra="forbid"` to it automatically — an undeclared top-level key is an error rather than a silently ignored one. **This is the opposite default from step configs**, which ignore unknown keys unless you opt in.
+
+This shows up in the generated schema as `additionalProperties: false`, so editors and the Astro IDE reject unknown top-level keys too.
+
+Setting `extra` yourself on the model leaves your choice intact. To defer to the model's own policy instead, pass `allow_extra=True` on the class:
+
+```python
+class LooseDagArgs(BlueprintDagArgs[LooseConfig], allow_extra=True):
+    ...
 ```
 
 ### Rules
 
-- Only **one** `BlueprintDagArgs` subclass per project (raises `MultipleDagArgsError` if more than one exists)
-- The `render()` method returns a dict of kwargs passed to the Airflow `DAG()` constructor
-- If no custom subclass exists, the built-in `DefaultDagArgs` is used (supports only `schedule` and `description`)
+- Two templates in the same directory is an error, as is two sharing a name (`name = "..."` on the class renames one) or more than one declaring `default=True`.
+- If no subclass exists anywhere, the built-in `DefaultDagArgs` is used (`schedule` and `description` only).
+
+---
+
+## Sharing Blueprints as a Package
+
+Blueprints can be shared across repositories as an installable package instead of copied files. The package advertises itself under the `airflow_blueprint.blueprints` entry-point group, and Blueprint discovers it once installed, with no per-repo configuration:
+
+```toml
+# pyproject.toml of the shared package
+[project.entry-points."airflow_blueprint.blueprints"]
+company_blueprints = "company_blueprints"
+```
+
+The value must be a plain dotted module or package path. The advertised module — and every submodule, if it is a package — is scanned exactly like a locally discovered file, so any `Blueprint` or `BlueprintDagArgs` subclass defined in it is registered.
+
+Consumers install the package and the blueprints appear in `blueprint list` alongside local ones, with the source column distinguishing them. A package that fails to import raises `EntryPointLoadError` rather than silently vanishing from the registry.
+
+To turn discovery off, pass `discover_entry_points=False` to the loader, or the corresponding `--no-entry-points` flag to the CLI (`--help` confirms which commands accept it).
 
 ---
 
 ## Runtime Parameter Overrides
 
-Blueprint config fields can be overridden at DAG trigger time using Airflow params. This enables users to customize behavior when manually triggering DAGs from the Airflow UI.
+Blueprint config fields can be overridden at DAG trigger time using Airflow params, letting users customize behavior when manually triggering DAGs.
 
 ### Opt In with `supports_params = True`
 
 A blueprint must set the class attribute `supports_params = True` for its config fields to register as Airflow params (namespaced as `{step}__{field}`). **Without it, `self.param()` / `self.resolve_config()` do nothing and no fields appear in the trigger form.** Only opt in for blueprints that actually use those methods — otherwise dead params clutter the form with no effect.
 
-### Using `self.param()` in Template Fields
+### Canonical Example
 
-Use `self.param("field")` in operator template fields to make a config field overridable at runtime. Airflow renders the actual value at execution time:
-
-```python
-class ExtractConfig(BaseModel):
-    query: str = Field(description="SQL query to run")
-    batch_size: int = Field(default=1000, ge=1)
-
-class Extract(Blueprint[ExtractConfig]):
-    supports_params = True
-
-    def render(self, config: ExtractConfig) -> TaskGroup:
-        with TaskGroup(group_id=self.step_id) as group:
-            BashOperator(
-                task_id="run_query",
-                bash_command=f"run-etl --query {self.param('query')} --batch {self.param('batch_size')}"
-            )
-        return group
-```
-
-### Using `self.resolve_config()` in Python Callables
-
-For `@task` or `PythonOperator` callables, use `self.resolve_config()` to merge runtime params into config. It returns a new validated config instance:
+Use `self.param()` in operator template fields, where Airflow renders the value at execution time; use `self.resolve_config()` in Python callables, where you need a validated config object. Both can appear in one blueprint:
 
 ```python
 class Extract(Blueprint[ExtractConfig]):
     supports_params = True
 
     def render(self, config: ExtractConfig) -> TaskGroup:
-        bp = self  # capture reference for closure
+        bp = self  # capture reference for the closure
 
         @task(task_id="run_query")
         def run_query(**context):
             resolved = bp.resolve_config(config, context)
-            # resolved.query has the runtime override if one was provided
             execute(resolved.query, resolved.batch_size)
 
         with TaskGroup(group_id=self.step_id) as group:
+            BashOperator(
+                task_id="shell_step",
+                bash_command=f"run-etl --query {self.param('query')}",
+            )
             run_query()
         return group
 ```
-
-Use `self.param()` for operators with template fields and `self.resolve_config()` for Python logic in `@task` functions; both can be combined in one blueprint.
 
 ### How It Works
 
 - Params are **auto-generated** from Pydantic config models and namespaced per step (e.g. `step_name__field`)
 - YAML values become param defaults; Pydantic metadata (description, constraints, enum values) flows through to the Airflow trigger form
 - Invalid overrides raise `ValidationError` at execution time
+- Override them from the trigger form, or by posting `conf` with the namespaced names to the DAG run endpoint (`af api ls --filter dagRun` finds the current path — see the `airflow` skill)
 
 ### Trigger Form Customization
 
-Pydantic field schema flows through to Airflow's trigger form. Control how each field renders with `json_schema_extra`:
+Pydantic field schema flows through to Airflow's trigger form; `json_schema_extra` controls how each field renders (`format` values such as multiline and date pickers, `examples`, `values_display`, `description_md`). The Airflow version determines which are honoured, so check against the form rather than assuming.
 
-```python
-class LoadConfig(BaseModel):
-    query: str = Field(description="SQL to execute", json_schema_extra={"format": "multiline"})
-    schedule_date: str = Field(default="2024-01-01", json_schema_extra={"format": "date"})
-```
-
-Supported `format` values include `"multiline"` (textarea), `"date"`, `"date-time"`, and `"time"` (pickers). Also usable: `examples` (dropdown with free text), `values_display` (human-readable labels for enum/example values), and `description_md` (Markdown descriptions).
-
-**Validation nuance:** only `Field` constraints that map to JSON Schema (`ge`, `le`, `pattern`, `min_length`, `max_length`, `Literal` enums) are enforced in the trigger form. Custom `@field_validator` / `@model_validator` logic does **not** map to JSON Schema, so it runs only at build time and inside `resolve_config()` — not in the form. If custom validators enforce important constraints, call `self.resolve_config()` in your `@task` function so they run on overridden values.
-
-### Triggering with Overrides
-
-Override params via the Airflow UI trigger form, or via the API using `conf` with the namespaced names:
-
-```bash
-curl -X POST /api/v2/dags/customer_pipeline/dagRuns \
-  -d '{"conf": {"load__target_table": "staging.customers", "load__mode": "append"}}'
-```
+**Validation nuance:** only `Field` constraints that map to JSON Schema (`ge`, `le`, `pattern`, `min_length`, `max_length`, `Literal` enums) are enforced in the trigger form. Custom `@field_validator` / `@model_validator` logic does **not** map to JSON Schema, so it runs only at build time and inside `resolve_config()`. If custom validators enforce important constraints, call `self.resolve_config()` in your `@task` function so they run on overridden values.
 
 ---
 
-## Post-Build Callbacks
+## Loader Options
 
-Use `on_dag_built` to post-process DAGs after they are constructed. This is useful for adding tags, access controls, audit metadata, or any cross-cutting concern.
+`build_all_airflow_dags()` takes the options that govern a whole project. The ones that change behaviour materially:
+
+| Option | Effect |
+|---|---|
+| `profile=` | Selects which profile's values the `${...}` variables resolve to (see **Variables and Profiles**) |
+| `skip_invalid_dags=True` | Renders the valid YAML files and skips faulty ones instead of failing the import |
+| `discover_entry_points=False` | Turns off discovery of blueprints installed as packages |
+| `on_dag_built=` | Callback to post-process each DAG after construction |
+
+`discover_entry_points` is ignored when `bp_registry` is supplied directly, since that registry has already run discovery.
+
+The rest of the signature is plumbing that rarely needs changing: `search_path` and `pattern` control YAML discovery, `register_globals` overrides the caller's `globals()`, `render_templates` and `template_context` govern Jinja, and `bp_registry` supplies a pre-built registry.
+
+### Excluding Files with `.airflowignore`
+
+YAML discovery honours `.airflowignore`, using Airflow's own ignore-file walker — so the syntax, the `core.dag_ignore_file_syntax` setting, and nested ignore files behave exactly as they do for the DAG processor. `blueprint lint` honours it too when scanning a directory, so a draft excluded from Airflow is also excluded from lint; passing that file explicitly still lints it, which is how you check a draft on purpose.
+
+Patterns are matched against the tail of each path, so name patterns like `*.dag.yaml` behave as with `rglob`. `**` is not supported before Python 3.13.
+
+### Post-Build Callbacks
+
+Use `on_dag_built` to post-process DAGs after construction — adding tags, access controls, or audit metadata:
 
 ```python
 from pathlib import Path
-from blueprint import build_all_dags
+from blueprint import build_all_airflow_dags
 
 def add_audit_tags(dag, yaml_path: Path) -> None:
     dag.tags.append("managed-by-blueprint")
     dag.tags.append(f"source:{yaml_path.name}")
 
-build_all_dags(on_dag_built=add_audit_tags)
+build_all_airflow_dags(on_dag_built=add_audit_tags)
 ```
 
-The callback receives:
-- `dag` — the constructed Airflow `DAG` object (mutable)
-- `yaml_path` — the `Path` to the YAML file that defined the DAG
+The callback receives the constructed Airflow `DAG` (mutable) and the `Path` of the YAML file that defined it.
+
+### Skipping Invalid Files
+
+`skip_invalid_dags=True` stops one bad YAML file from taking down every other DAG in the folder. Explain both costs before recommending it:
+
+- Errors no longer surface as Airflow import errors, because the loader itself parses cleanly. They go to the DAG processor log instead, which is a much less visible place to look.
+- Duplicate DAG ids stop being an error — every such file parses, and the first DAG wins.
+
+Pair it with `blueprint lint` in CI, so invalid files are caught somewhere visible.
 
 ---
 
@@ -507,56 +536,42 @@ uvx --from airflow-blueprint blueprint <command>
 
 | Command | When to Use |
 |---------|-------------|
-| `blueprint list` | Show available blueprints |
-| `blueprint describe <name>` | Show config schema for a blueprint |
-| `blueprint describe <name> -v N` | Show schema for specific version |
-| `blueprint lint` | Validate all `*.dag.yaml` files |
-| `blueprint lint <path>` | Validate specific file |
-| `blueprint schema <name>` | Generate JSON schema for a blueprint (step template) |
-| `blueprint schema --dag-args` | Generate JSON schema for DAG-level YAML fields |
-| `blueprint new` | Interactive DAG YAML creation |
+| `list` | Show available blueprints, versions, sources, and DAG args templates |
+| `describe <name>` | Show config schema for a blueprint |
+| `lint` | Validate DAG YAML — bare to scan recursively, or pass one file |
+| `vars <path>` | Show resolved variables for a DAG and where each came from |
+| `schema` | Generate JSON Schema for a blueprint or for DAG-level fields |
+| `new` | Interactive DAG YAML creation. `--output-dir` picks where the file lands, which also selects the DAG args template it is validated against |
 
-### Validation Workflow
+Every command takes `--help`, and `-h` / `-v` work as shorthands for `--help` / `--version`.
 
-```bash
-# Check all YAML files
-uvx --from airflow-blueprint blueprint lint
+Run them from the **project root**, not from inside `dags/` — a bare invocation resolves `dags/` relative to the working directory, so running from within it finds no blueprints. Use `--template-dir` for any other layout.
 
-# Expected output for valid files:
-# PASS customer_pipeline.dag.yaml (dag_id=customer_pipeline)
-```
+> **Provider operators in the CLI.** The `uvx --from airflow-blueprint` environment is isolated and does **not** include the Airflow provider packages your Astro Runtime project has. If templates import provider operators, add `--with <provider-package>` so the CLI can import them — otherwise `list`/`lint`/`schema` fail with `ModuleNotFoundError`:
+>
+> ```bash
+> uvx --from airflow-blueprint --with apache-airflow-providers-google blueprint list --template-dir dags/templates
+> ```
 
 ---
 
 ## Versioning
 
-When user needs to version blueprints for backwards compatibility:
-
 ### Version Naming Convention
 
-- v1: `MyBlueprint` (no suffix)
-- v2: `MyBlueprintV2`
-- v3: `MyBlueprintV3`
+Versions are separate classes with a `V{N}` suffix: `Extract` is v1, `ExtractV2` is v2, and each carries its own config model. A blueprint's discovered versions must form a contiguous `1..N` sequence.
 
 ```python
-# v1 - original
-class ExtractConfig(BaseModel):
-    source_table: str
-
-class Extract(Blueprint[ExtractConfig]):
+class Extract(Blueprint[ExtractConfig]):        # v1
     def render(self, config): ...
 
-# v2 - breaking changes, new class
-class ExtractV2Config(BaseModel):
-    sources: list[dict]  # Different schema
-
-class ExtractV2(Blueprint[ExtractV2Config]):
+class ExtractV2(Blueprint[ExtractV2Config]):    # v2, breaking changes
     def render(self, config): ...
 ```
 
 ### Explicit Name and Version
 
-As an alternative to the class name convention, blueprints can set `name` and `version` directly:
+When the class name doesn't follow the convention, set them directly:
 
 ```python
 class MyCustomExtractor(Blueprint[ExtractV3Config]):
@@ -566,62 +581,39 @@ class MyCustomExtractor(Blueprint[ExtractV3Config]):
     def render(self, config): ...
 ```
 
-This is useful when the class name doesn't follow the `NameV{N}` convention or when you want clearer control.
+An explicit `name` must be snake_case (`^[a-z][a-z0-9_]*$`) or the class raises `ValueError` at definition time. Without one, the name is the snake_case form of the class name.
 
 ### Using Versions in YAML
 
+Omit `version` to get the latest; pin it to hold a step on an older one:
+
 ```yaml
 steps:
-  # Pin to v1
   legacy_extract:
     blueprint: extract
     version: 1
     source_table: raw.data
-
-  # Use latest (v2)
-  new_extract:
-    blueprint: extract
-    sources: [{table: orders}]
 ```
 
-### Version Rules
-
-- A blueprint's discovered versions must form a contiguous `1..N` sequence. A gap (e.g. v1 and v3 with no v2) raises `NonContiguousVersionError` during discovery.
-- Pinning a version that doesn't exist in YAML raises `InvalidVersionError`.
+`blueprint list` shows the discovered versions of each blueprint.
 
 ---
 
 ## Schema Generation
 
-Generate JSON schemas for editor autocompletion or external tooling:
+Generate JSON schemas for editor autocompletion or external tooling. `blueprint schema <name>` emits a step template's config; `blueprint schema --dag-args` emits the DAG-level fields (`dag_id`, `steps`, and whatever your `BlueprintDagArgs` exposes). With multiple DAG args templates, `--dag-args` takes an optional template name.
 
-```bash
-# Generate schema for a blueprint (step template)
-uvx --from airflow-blueprint blueprint schema extract -o extract.schema.json
+Each emitted schema includes a top-level `templateType` field — `"blueprint"` for a step template, `"dag_args"` for DAG-level fields — so consumers can tell them apart. The command emits raw JSON when piped or written with `-o/--output`, and pretty, highlighted JSON when run interactively.
 
-# Generate schema for DAG-level YAML fields (dag_id, steps, + custom BlueprintDagArgs fields)
-uvx --from airflow-blueprint blueprint schema --dag-args -o dag-args.schema.json
-```
+> **Write with `-o/--output`, not `>`.** Importing a template can print warnings to stdout — an Airflow deprecation warning from an operator import is the common case — and those interleave with the JSON, leaving redirected output unparseable. `-o` writes the schema alone.
 
-Use `--dag-args` (with no blueprint name) to generate the schema for **DAG-level** YAML fields — `dag_id`, `steps`, and any fields your custom `BlueprintDagArgs` exposes — rather than a single step template's config.
-
-As of 0.3.0, each emitted schema includes a top-level `templateType` field — `"blueprint"` for a step template, `"dag_args"` for DAG-level fields — so consumers can tell them apart. The command emits raw JSON when piped or written via `-o/--output` (and pretty, syntax-highlighted JSON when run interactively), so `>` redirection produces valid JSON.
+> **Optional fields emit a plain type.** An optional config field is published as `{"type": "string"}`, not an `anyOf` with a null branch — optionality is carried by the schema's `required` array alone. This keeps generated clients and form renderers from producing a union wrapper type for every optional field. Airflow params deliberately differ and keep a nullable type, because an unset optional param is an explicit null rather than an absent key; do not "fix" one to match the other.
 
 ### Astro Project Auto-Detection
 
-After creating or modifying a blueprint, **automatically check** if the project is an Astro project by looking for a `.astro/` directory (created by `astro dev init`).
+After creating or modifying a blueprint, **automatically check** whether the project is an Astro project by looking for a `.astro/` directory (created by `astro dev init`).
 
-If the project is an Astro project, **automatically regenerate schemas** without prompting:
-
-```bash
-mkdir -p blueprint/generated-schemas
-# For each name from `blueprint list`:
-#   uvx --from airflow-blueprint blueprint schema NAME -o blueprint/generated-schemas/NAME.schema.json
-# Also emit the DAG-level args schema:
-#   uvx --from airflow-blueprint blueprint schema --dag-args -o blueprint/generated-schemas/dag-args.schema.json
-```
-
-The Astro IDE reads `blueprint/generated-schemas/` to render configuration forms. Keeping schemas in sync ensures the visual builder always reflects the latest blueprint configs.
+If it is, **automatically regenerate schemas** without prompting, writing one file per blueprint from `blueprint list` plus the DAG-level args schema, into `blueprint/generated-schemas/`. The Astro IDE reads that directory to render configuration forms, so keeping it in sync ensures the visual builder reflects the latest configs.
 
 If you cannot determine whether the project is an Astro project, ask the user once and remember for the rest of the session.
 
@@ -629,43 +621,73 @@ If you cannot determine whether the project is an Astro project, ask the user on
 
 ## Troubleshooting
 
+Error messages carry their own remediation hints; read the message before applying anything here.
+
 ### "Blueprint not found"
 
 **Cause**: Blueprint class not in Python path.
 
-**Fix**: Check template directory or use `--template-dir`:
-```bash
-uvx --from airflow-blueprint blueprint list --template-dir dags/templates/
-```
+**Fix**: Point the CLI at the right directory with `--template-dir`, and check `blueprint list` for what is actually discovered. If the blueprint is meant to come from an installed package, confirm entry-point discovery is on.
 
 ### "Extra inputs are not permitted"
 
 **Cause**: YAML field name typo with `extra="forbid"` enabled.
 
-**Fix**: Run `uvx --from airflow-blueprint blueprint describe <name>` to see valid field names.
+**Fix**: Run `blueprint describe <name>` to see valid field names.
 
 ### DAG not appearing in Airflow
 
-**Cause**: Missing or broken loader — including a loader that imports the deprecated `build_all`, which Airflow safe-mode may skip.
+**Cause**: Missing or broken loader — including a loader that imports a deprecated alias, which Airflow safe-mode may skip.
 
-**Fix**: Ensure `dags/loader.py` exists and calls `build_all_dags()`:
-```python
-from blueprint import build_all_dags
-build_all_dags()
-```
+**Fix**: Ensure `dags/loader.py` calls `build_all_airflow_dags()`. If `skip_invalid_dags=True` is set, the file parses even when a DAG is broken, so check the DAG processor log rather than the import errors view.
 
-### "ModuleNotFoundError: No module named 'airflow.providers.X'" from `blueprint list`/`lint`/`schema`
+### "ModuleNotFoundError: No module named 'airflow.providers.X'" from the CLI
 
-**Cause**: The standalone `uvx --from airflow-blueprint` CLI environment doesn't include Airflow provider packages that your Astro Runtime project has. A template importing provider operators can't be imported by the CLI. This is the CLI's isolated environment, not your project.
+**Cause**: The standalone `uvx --from airflow-blueprint` environment doesn't include the Airflow provider packages your project has, so a template importing provider operators can't be imported. This is the CLI's isolated environment, not your project.
 
-**Fix**: Add `--with apache-airflow-providers-X` to the uvx invocation (common: `apache-airflow-providers-standard`, `-google`, `-snowflake`):
-```bash
-uvx --from airflow-blueprint --with apache-airflow-providers-snowflake blueprint lint
-```
+**Fix**: Add `--with apache-airflow-providers-X` to the uvx invocation.
 
-### Validation errors shown as Airflow import errors
+### Unresolved or unexpected `${...}`
 
-As of v0.2.0, Pydantic validation errors are surfaced as Airflow import errors with actionable messages instead of being silently swallowed. The error message includes details on missing fields, unexpected fields, and type mismatches, along with guidance to run `blueprint lint` or `blueprint describe`.
+**Cause**: A `${...}` that is not a declared variable — commonly a shell variable in a `bash_command`, or a variable declared in a `blueprint.vars.yaml` outside the search root.
+
+**Fix**: Escape non-variable occurrences as `$${...}`. For genuinely missing variables, run `blueprint vars <path>` to see what resolves and `blueprint lint` for the full list; check that `--root` matches the path the loader uses.
+
+### "CyclicVariableError" / "CompositionDepthError"
+
+**Cause**: Variables that reference each other in a loop, or a composition chain deeper than the resolver's limit.
+
+**Fix**: The error names the cycle or the chain. Break it by inlining one value; `blueprint vars <path>` shows what each variable resolves to.
+
+### "MultipleDagArgsError" / "DuplicateDagArgsError" / "MultipleDefaultDagArgsError"
+
+**Cause**: Not that several templates exist — that is supported. These fire when resolution is ambiguous: two templates in one directory, two sharing a name, or more than one declaring `default=True`.
+
+**Fix**: Move one template to the directory whose DAGs should use it, rename one with `name = "..."`, or leave only one `default=True`. `blueprint list` shows which template applies where.
+
+### "DagArgsNotFoundError"
+
+**Cause**: A named DAG args template was requested that isn't registered.
+
+**Fix**: Check the name against `blueprint list`.
+
+### "EntryPointLoadError"
+
+**Cause**: An installed package advertising blueprints failed to import.
+
+**Fix**: Import the module directly to see the real traceback, and confirm the package and its dependencies are installed in the same environment as Airflow.
+
+### "NonContiguousVersionError" / "InvalidVersionError"
+
+**Cause**: A blueprint's versions don't form a contiguous `1..N` sequence, or YAML pins a version that doesn't exist.
+
+**Fix**: Ensure versions increment by one with no gaps; run `blueprint list` to see available versions.
+
+### "non-YAML-compatible fields" (TypeError at import)
+
+**Cause**: A config field uses a type Blueprint rejects — a multi-type union (e.g. `str | int`), bare `Any`, or `dict[str, Any]`.
+
+**Fix**: Use a single, explicit type. `Optional[X]` / `X | None` is still allowed. See **Creating Blueprints → Config Field Types Must Be YAML-Compatible**.
 
 ### "Cyclic dependency detected"
 
@@ -673,39 +695,23 @@ As of v0.2.0, Pydantic validation errors are surfaced as Airflow import errors w
 
 **Fix**: Review step dependencies and remove cycles.
 
-### "MultipleDagArgsError"
-
-**Cause**: More than one `BlueprintDagArgs` subclass discovered in the project.
-
-**Fix**: Only one `BlueprintDagArgs` subclass is allowed. Remove or merge duplicates.
-
-### "NonContiguousVersionError" / "InvalidVersionError"
-
-**Cause**: A blueprint's versions don't form a contiguous `1..N` sequence (`NonContiguousVersionError`), or YAML pins a version that doesn't exist (`InvalidVersionError`).
-
-**Fix**: Ensure versions increment by one with no gaps; run `uvx --from airflow-blueprint blueprint list` to see available versions.
-
-### "non-YAML-compatible fields" (TypeError at import)
-
-**Cause**: A config field uses a type Blueprint rejects since 0.3.0 — a multi-type union (e.g. `str | int`), bare `Any`, or `dict[str, Any]`.
-
-**Fix**: Use a single, explicit type. `Optional[X]` / `X | None` is still allowed. See **Creating Blueprints → Config Field Types Must Be YAML-Compatible**.
-
 ### Debugging in Airflow UI
 
 Every Blueprint task has extra fields in **Rendered Template**:
-- `blueprint_step_config` - resolved YAML config
-- `blueprint_step_code` - Python source of blueprint
+
+- `blueprint_step_config` — resolved YAML config
+- `blueprint_step_code` — Python source of the blueprint
 
 ---
 
 ## Verification Checklist
 
-Before finishing, verify with user:
+Before finishing, verify with the user:
 
-- [ ] `blueprint list` shows their templates
-- [ ] `blueprint lint` passes (run it bare to scan all `*.dag.yaml` recursively, or pass a specific file — passing a directory path fails with `Is a directory`)
-- [ ] `dags/loader.py` exists with `build_all_dags()`
+- [ ] `blueprint list` shows their templates, and the expected DAG args template applies to each path
+- [ ] `blueprint lint` passes (bare to scan all `*.dag.yaml` recursively, or pass a specific file — passing a directory path fails with `Is a directory`)
+- [ ] `blueprint vars` resolves as expected, if variables or profiles are in use
+- [ ] `dags/loader.py` exists and calls `build_all_airflow_dags()`
 - [ ] DAG appears in Airflow UI without parse errors
 
 ---
