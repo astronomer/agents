@@ -18,3 +18,4 @@ with DAG(
         task_id="quick_task",
         bash_command="echo 'Integration test task completed!'",
     )
+    task >> BashOperator(task_id="after_quick_task", bash_command="true")

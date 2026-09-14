@@ -9,7 +9,7 @@ import typer
 from astro_airflow_mcp.cli.context import get_adapter
 from astro_airflow_mcp.cli.output import output_error, output_json, wrap_list_response
 from astro_airflow_mcp.constants import TERMINAL_DAG_RUN_STATES
-from astro_airflow_mcp.utils import extract_failed_tasks
+from astro_airflow_mcp.utils import extract_failed_tasks, summarize_task_instances
 
 app = typer.Typer(help="DAG run management commands", no_args_is_help=True)
 
@@ -222,13 +222,14 @@ def trigger_dag_and_wait(
         # Step 2: Poll for completion
         start_time = time.time()
         current_state = trigger_data.get("state", "queued")
+        result: dict[str, Any]
 
         while True:
             elapsed = time.time() - start_time
 
             # Check timeout
             if elapsed >= timeout:
-                result: dict[str, Any] = {
+                result = {
                     "dag_id": dag_id,
                     "dag_run_id": dag_run_id,
                     "state": current_state,
@@ -256,9 +257,12 @@ def trigger_dag_and_wait(
 
                 # Fetch failed task details if not successful
                 if current_state != "success":
-                    failed_tasks = _get_failed_task_instances(adapter, dag_id, dag_run_id)
-                    if failed_tasks:
-                        result["failed_tasks"] = failed_tasks
+                    try:
+                        result["failed_tasks"] = _get_failed_task_instances(
+                            adapter, dag_id, dag_run_id
+                        )
+                    except Exception as e:
+                        result["failed_tasks_error"] = {"error": str(e)}
 
                 output_json(result)
                 return
@@ -277,12 +281,8 @@ def _get_failed_task_instances(
     dag_run_id: str,
 ) -> list[dict[str, Any]]:
     """Fetch task instances that failed in a DAG run."""
-    try:
-        data = adapter.get_task_instances(dag_id, dag_run_id)
-        task_instances = data.get("task_instances", [])
-        return extract_failed_tasks(task_instances)
-    except Exception:
-        return []
+    data = adapter.get_all_task_instances(dag_id, dag_run_id)
+    return extract_failed_tasks(data["task_instances"])
 
 
 @app.command("delete")
@@ -354,8 +354,9 @@ def diagnose_dag_run(
 ) -> None:
     """Diagnose issues with a specific DAG run.
 
-    Returns run details, all task instances with their states,
-    and highlights any failed tasks.
+    Returns run details, complete state counts and failed-task details,
+    and up to 100 full task instances with explicit sample metadata.
+    Retrieval errors are reported instead of an incomplete summary.
     """
     result: dict[str, Any] = {"dag_id": dag_id, "dag_run_id": dag_run_id}
     adapter = get_adapter()
@@ -370,32 +371,8 @@ def diagnose_dag_run(
 
     # Get task instances for this run
     try:
-        tasks_data = adapter.get_task_instances(dag_id, dag_run_id)
-        task_instances = tasks_data.get("task_instances", [])
-        result["task_instances"] = task_instances
-
-        # Summarize task states
-        state_counts: dict[str, int] = {}
-        failed_tasks = []
-        for ti in task_instances:
-            state = ti.get("state", "unknown")
-            state_counts[state] = state_counts.get(state, 0) + 1
-            if state in ("failed", "upstream_failed"):
-                failed_tasks.append(
-                    {
-                        "task_id": ti.get("task_id"),
-                        "state": state,
-                        "start_date": ti.get("start_date"),
-                        "end_date": ti.get("end_date"),
-                        "try_number": ti.get("try_number"),
-                    }
-                )
-
-        result["summary"] = {
-            "total_tasks": len(task_instances),
-            "state_counts": state_counts,
-            "failed_tasks": failed_tasks,
-        }
+        tasks_data = adapter.get_all_task_instances(dag_id, dag_run_id)
+        result.update(summarize_task_instances(tasks_data["task_instances"]))
     except Exception as e:
         result["task_instances"] = {"error": str(e)}
 

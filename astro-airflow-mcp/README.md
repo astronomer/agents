@@ -200,8 +200,24 @@ claude mcp add airflow -e AIRFLOW_API_URL=https://your-airflow.example.com -e AI
 | Tool | Description |
 |------|-------------|
 | `explore_dag` | Get comprehensive DAG info: metadata, tasks, recent runs, source code |
-| `diagnose_dag_run` | Debug a DAG run: run details, failed task instances, logs |
+| `diagnose_dag_run` | Debug a DAG run: run details, complete task-state counts and failed task instances |
 | `get_system_health` | System overview: health status, import errors, warnings, DAG stats |
+
+`diagnose_dag_run` and `af runs diagnose` paginate through task instances before
+building their summaries. `summary.total_tasks`, `summary.state_counts`, and
+`summary.failed_tasks` cover the complete listing; failed instances include
+`map_index` so mapped failures can be distinguished. The full `task_instances`
+details are limited to the first 100 instances, with `task_instances_returned`
+and `task_instances_truncated` describing that sample. Use `get_task_logs` with
+the reported `task_id`, `try_number`, and `map_index` to investigate a failure.
+
+Failed-task retrieval for `trigger_dag_and_wait` and `af runs trigger-wait` also
+uses pagination. Retrieval errors, invalid totals, duplicate task instances, or
+the 1,000-page safety limit produce an explicit error instead of a partial failure
+list. Diagnostics omit the summary on failure; trigger-wait retains the final run
+status and adds `failed_tasks_error`. Pagination works with both Airflow 2 and 3.
+Overlapping pages are rejected; pagination does not provide an atomic snapshot
+of a changing run.
 
 ### Core Tools
 
