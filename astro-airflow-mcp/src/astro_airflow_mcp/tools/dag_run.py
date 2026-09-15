@@ -20,6 +20,11 @@ def _list_dag_runs_impl(
     limit: int = DEFAULT_LIMIT,
     offset: int = DEFAULT_OFFSET,
     order_by: str | None = None,
+    state: str | None = None,
+    start_date_gte: str | None = None,
+    start_date_lte: str | None = None,
+    end_date_gte: str | None = None,
+    end_date_lte: str | None = None,
 ) -> str:
     """Internal implementation for listing DAG runs from Airflow.
 
@@ -29,13 +34,28 @@ def _list_dag_runs_impl(
         offset: Offset for pagination (default: 0)
         order_by: Sort field; prefix with '-' for descending. ``None`` falls back
                   to the Airflow API default (``id`` ascending, i.e. oldest first).
+        state: Optional DAG run state to filter by
+        start_date_gte: Optional inclusive lower bound for the run start date
+        start_date_lte: Optional inclusive upper bound for the run start date
+        end_date_gte: Optional inclusive lower bound for the run end date
+        end_date_lte: Optional inclusive upper bound for the run end date
 
     Returns:
         JSON string containing the list of DAG runs with their metadata
     """
     try:
         adapter = _get_adapter()
-        data = adapter.list_dag_runs(dag_id=dag_id, limit=limit, offset=offset, order_by=order_by)
+        data = adapter.list_dag_runs(
+            dag_id=dag_id,
+            limit=limit,
+            offset=offset,
+            order_by=order_by,
+            state=state,
+            start_date_gte=start_date_gte,
+            start_date_lte=start_date_lte,
+            end_date_gte=end_date_gte,
+            end_date_lte=end_date_lte,
+        )
 
         if "dag_runs" in data:
             return _wrap_list_response(data["dag_runs"], "dag_runs", data)
@@ -238,6 +258,11 @@ def list_dag_runs(
     limit: int = DEFAULT_LIMIT,
     offset: int = DEFAULT_OFFSET,
     order_by: str = "-start_date",
+    state: str | None = None,
+    start_date_gte: str | None = None,
+    start_date_lte: str | None = None,
+    end_date_gte: str | None = None,
+    end_date_lte: str | None = None,
 ) -> str:
     """Get execution history and status of DAG runs (workflow executions).
 
@@ -248,6 +273,10 @@ def list_dag_runs(
     - "When did DAG X last run?"
     - Execution times, durations, or states
     - Finding runs by date or status
+
+    Use the date bounds to restrict results on the Airflow server instead of
+    paginating through the full run history. Dates should be ISO 8601 timestamps,
+    for example ``2024-01-01T00:00:00Z``.
 
     Returns execution metadata including:
     - dag_run_id: Unique identifier for this execution
@@ -269,6 +298,12 @@ def list_dag_runs(
                   Defaults to '-start_date' so the most recent runs are
                   returned first. The Airflow API default would be 'id'
                   ascending (oldest first), which is rarely what callers want.
+        state: Optional run state, such as ``running``, ``success``, ``failed``,
+               or ``queued``.
+        start_date_gte: Return runs that started at or after this ISO 8601 timestamp.
+        start_date_lte: Return runs that started at or before this ISO 8601 timestamp.
+        end_date_gte: Return runs that ended at or after this ISO 8601 timestamp.
+        end_date_lte: Return runs that ended at or before this ISO 8601 timestamp.
 
     Returns:
         JSON with list of DAG runs, sorted most-recent-first by default
@@ -278,6 +313,11 @@ def list_dag_runs(
         limit=limit,
         offset=offset,
         order_by=order_by,
+        state=state,
+        start_date_gte=start_date_gte,
+        start_date_lte=start_date_lte,
+        end_date_gte=end_date_gte,
+        end_date_lte=end_date_lte,
     )
 
 
