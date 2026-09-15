@@ -140,6 +140,11 @@ class TestListDagRunsTool:
             limit=100,
             offset=0,
             order_by="-start_date",
+            state=None,
+            start_date_gte=None,
+            start_date_lte=None,
+            end_date_gte=None,
+            end_date_lte=None,
         )
 
     def test_list_dag_runs_passes_limit_and_offset(self, mocker):
@@ -157,6 +162,11 @@ class TestListDagRunsTool:
             limit=25,
             offset=50,
             order_by="-start_date",
+            state=None,
+            start_date_gte=None,
+            start_date_lte=None,
+            end_date_gte=None,
+            end_date_lte=None,
         )
 
     def test_list_dag_runs_custom_order_by_overrides_default(self, mocker):
@@ -174,6 +184,39 @@ class TestListDagRunsTool:
             limit=100,
             offset=0,
             order_by="id",
+            state=None,
+            start_date_gte=None,
+            start_date_lte=None,
+            end_date_gte=None,
+            end_date_lte=None,
+        )
+
+    def test_list_dag_runs_passes_filters(self, mocker):
+        """Caller-supplied state and date bounds are forwarded to the adapter."""
+        mock_adapter = MagicMock()
+        mock_adapter.list_dag_runs.return_value = {"dag_runs": [], "total_entries": 0}
+
+        mocker.patch("astro_airflow_mcp.tools.dag_run._get_adapter", return_value=mock_adapter)
+
+        list_fn = get_tool_fn(dag_run_module, "list_dag_runs")
+        list_fn(
+            state="failed",
+            start_date_gte="2026-09-14T00:00:00Z",
+            start_date_lte="2026-09-14T06:00:00Z",
+            end_date_gte="2026-09-14T00:00:00Z",
+            end_date_lte="2026-09-14T06:00:00Z",
+        )
+
+        mock_adapter.list_dag_runs.assert_called_once_with(
+            dag_id=None,
+            limit=100,
+            offset=0,
+            order_by="-start_date",
+            state="failed",
+            start_date_gte="2026-09-14T00:00:00Z",
+            start_date_lte="2026-09-14T06:00:00Z",
+            end_date_gte="2026-09-14T00:00:00Z",
+            end_date_lte="2026-09-14T06:00:00Z",
         )
 
     def test_list_dag_runs_impl_passes_order_by_none(self, mocker):
@@ -190,6 +233,11 @@ class TestListDagRunsTool:
             limit=100,
             offset=0,
             order_by=None,
+            state=None,
+            start_date_gte=None,
+            start_date_lte=None,
+            end_date_gte=None,
+            end_date_lte=None,
         )
 
     def test_list_dag_runs_no_dag_runs_key(self, mocker):
