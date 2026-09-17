@@ -25,7 +25,7 @@
   "hooks": {
     "version": 1,
     "hooks": {
-      "stop": [
+      "sessionEnd": [
         {
           "command": "uv run ./skills/analyzing-data/scripts/cli.py stop"
         }
