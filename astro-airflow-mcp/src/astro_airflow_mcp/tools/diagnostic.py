@@ -11,6 +11,7 @@ from astro_airflow_mcp.server import (
 )
 from astro_airflow_mcp.tool_annotations import read_only
 from astro_airflow_mcp.tool_errors import error_payload, tool_error
+from astro_airflow_mcp.utils import get_all_task_instances
 
 
 def _list_dag_warnings_impl(
@@ -205,8 +206,7 @@ def diagnose_dag_run(dag_id: str, dag_run_id: str) -> str:
 
     # Get task instances for this run
     try:
-        tasks_data = adapter.get_task_instances(dag_id, dag_run_id)
-        task_instances = tasks_data.get("task_instances", [])
+        task_instances = get_all_task_instances(adapter, dag_id, dag_run_id)
         result["task_instances"] = task_instances
 
         # Summarize task states

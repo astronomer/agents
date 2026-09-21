@@ -118,6 +118,49 @@ class TestDiagnoseDagRun:
 
         assert "error" in data["run_info"]
 
+    def test_diagnose_dag_run_paginates_beyond_first_page(self, mocker):
+        """A run with more task instances than one page must not be truncated.
+
+        Regression test: get_task_instances defaults to limit=100, and the API
+        response's total_entries was previously ignored entirely, so any DAG run
+        with more than 100 tasks (e.g. a fleet DAG with a task per pod per phase)
+        silently lost everything past the first page, with no signal in the
+        output that truncation happened -- `total_tasks` just reported the
+        truncated count as if it were the real total.
+        """
+        mock_run = {"dag_run_id": "manual__2024-01-01", "state": "success"}
+
+        # A full first page (matches the default page size exactly) plus a
+        # second, smaller page -- this is what a real >100-task DAG run looks
+        # like, and is what previously never got fetched.
+        page_1 = {
+            "task_instances": [{"task_id": f"task{i}", "state": "success"} for i in range(100)],
+            "total_entries": 101,
+        }
+        page_2 = {
+            "task_instances": [{"task_id": "task100", "state": "failed", "try_number": 1}],
+            "total_entries": 101,
+        }
+
+        mock_adapter = MagicMock()
+        mock_adapter.get_dag_run.return_value = mock_run
+        mock_adapter.get_task_instances.side_effect = [page_1, page_2]
+
+        mocker.patch("astro_airflow_mcp.tools.diagnostic._get_adapter", return_value=mock_adapter)
+
+        diagnose_fn = get_tool_fn(diagnostic_module, "diagnose_dag_run")
+        result = diagnose_fn("example_dag", "manual__2024-01-01")
+        data = json.loads(result)
+
+        assert data["summary"]["total_tasks"] == 101
+        assert len(data["task_instances"]) == 101
+        assert len(data["summary"]["failed_tasks"]) == 1
+
+        assert mock_adapter.get_task_instances.call_count == 2
+        # Second call must ask for the next page, not repeat the first.
+        second_call_kwargs = mock_adapter.get_task_instances.call_args_list[1].kwargs
+        assert second_call_kwargs["offset"] == 100
+
 
 class TestListDagRunsTool:
     """Tests for list_dag_runs MCP tool."""
