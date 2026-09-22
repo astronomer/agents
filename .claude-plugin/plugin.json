@@ -2,6 +2,10 @@
   "name": "astronomer-data",
   "version": "0.1.0",
   "description": "Data engineering plugin - warehouse exploration, pipeline authoring, Airflow integration",
+  "author": {
+    "name": "Astronomer",
+    "email": "support@astronomer.io"
+  },
   "hooks": {
     "SessionStart": [
       {
