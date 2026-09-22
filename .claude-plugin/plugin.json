@@ -6,6 +6,10 @@
     "name": "Astronomer",
     "email": "support@astronomer.io"
   },
+  "interface": {
+    "logo": "./assets/astronomer.png",
+    "composerIcon": "./assets/astronomer.png"
+  },
   "hooks": {
     "SessionStart": [
       {
