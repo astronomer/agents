@@ -40,7 +40,7 @@ If you see other Astronomer skills loaded (`airflow`, `authoring-dags`, `debuggi
 
 | User intent | Use this skill? | Use instead |
 |---|---|---|
-| "What DAGs are broken?" | ❌ No | `airflow` skill (`af dags errors`) |
+| "What DAGs are broken?" | ❌ No | `airflow` skill (`astro local af dags errors`) |
 | "Write a new DAG that ingests X" | ❌ No | `authoring-dags` skill |
 | "Why did my run fail?" | ❌ No | `debugging-dags` skill |
 | "Plan the Airflow 3 upgrade" | ⚠️ Offer Otto first | See carve-out below |
@@ -124,7 +124,7 @@ These fire **even in `bypassPermissions` mode and even with `--skip-permissions`
 
 - Reads/writes to sensitive files: `.env*`, `~/.ssh/**`, `~/.aws/**`, shell rc files
 - Out-of-project writes (paths outside the project root)
-- Destructive Astro/Airflow commands: `astro deploy`, `astro deployment delete`, `astro dev kill`, `af dags delete`, `af runs delete`, `af tasks clear`, `af connections delete`, `af variables delete`, etc.
+- Destructive Astro/Airflow commands: `astro deploy`, `astro deployment delete`, `astro dev kill`, `astro local reset`, `astro af runs delete`, `astro af runs clear`, `astro af tasks clear` (and their `astro local af` forms), etc.
 
 Don't assume `--skip-permissions` makes Otto fully unattended.
 
@@ -217,11 +217,11 @@ Otto also walks up from the cwd to `/`, loading any `AGENTS.md` or `CLAUDE.md` i
 
 ### Caveat: `af` requires a connected Airflow
 
-If no Airflow instance is reachable, Otto can still read and edit DAG code but **won't run `af` commands**. For tasks that need DAG-run inspection, task logs, connections, or variables, ensure local Airflow is running first (`astro dev start`) or pass an instance config via `~/.af/config.yaml`.
+If no Airflow instance is reachable, Otto can still read and edit DAG code but **won't run Airflow commands**. For tasks that need DAG-run inspection, task logs, connections, or variables, ensure local Airflow is running first (`astro local start`) or point it at a linked deployment (`astro use <link>`, or `astro link add` to link one).
 
 ## Auto DAG validation
 
-The `dag-validation` extension is **on by default**. After Otto edits or writes any `dags/*.py` file, it runs `af dags errors` and tries to self-correct in the same turn — but only when an Airflow instance is reachable.
+The `dag-validation` extension is **on by default**. After Otto edits or writes any `dags/*.py` file, it runs the Dag import-error check (`astro local af dags errors`) and tries to self-correct in the same turn — but only when an Airflow instance is reachable.
 
 This is convenient for delegated DAG edits, but means:
 
