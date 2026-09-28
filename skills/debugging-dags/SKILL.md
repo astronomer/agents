@@ -123,6 +123,6 @@ How to prevent this from happening again:
 
 ### Quick Commands
 Provide ready-to-use commands:
-- To clear and rerun the entire DAG run: `astro local af runs clear <dag_id> <run_id> --dry-run` to preview, then `astro local af runs clear <dag_id> <run_id> --yes`
-- To clear and rerun specific failed tasks: `astro local af tasks clear <dag_id> <run_id> <task_id>... --dry-run` to preview, then the same with `--yes` instead of `--dry-run` (task ids are space-separated)
-- To delete a stuck or unwanted run: `astro local af runs delete <dag_id> <run_id> --yes`
+- To clear and rerun the entire DAG run: `astro local af runs clear <dag_id> <run_id> --dry-run` to preview, then, after the user confirms, `astro local af runs clear <dag_id> <run_id> --yes`
+- To clear and rerun specific failed tasks: `astro local af tasks clear <dag_id> <run_id> <task_id>... --dry-run` to preview, then, after the user confirms, the same with `--yes` instead of `--dry-run` (task ids are space-separated)
+- To delete a stuck or unwanted run: `astro local af runs delete <dag_id> <run_id> --yes`, after the user confirms

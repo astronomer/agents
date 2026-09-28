@@ -141,8 +141,8 @@ Two short flags differ from the standalone `af` CLI: `-d` is **deployment** and 
 - "Run DAG X" / "Trigger the pipeline" -> `astro local af runs trigger <dag_id>`
 - "Run DAG X and wait" -> `astro local af runs trigger-wait <dag_id>`
 - "Why did this run fail?" -> `astro local af runs diagnose <dag_id> <run_id>`
-- "Delete this run" / "Remove stuck run" -> `astro local af runs delete <dag_id> <run_id>`
-- "Clear this run" / "Retry this run" / "Re-run this" -> `astro local af runs clear <dag_id> <run_id> --dry-run` to preview, then again with `--yes` instead of `--dry-run`
+- "Delete this run" / "Remove stuck run" -> `astro local af runs delete <dag_id> <run_id> --yes`, after the user confirms
+- "Clear this run" / "Retry this run" / "Re-run this" -> `astro local af runs clear <dag_id> <run_id> --dry-run` to preview, then, after the user confirms, again with `--yes` instead of `--dry-run`
 - "Test this DAG and fix if it fails" -> use the **testing-dags** skill
 
 ### Task Operations
@@ -303,11 +303,13 @@ astro local af dags list -o json
 
 Rows carry a curated set of fields (for example `schedule`, not `timetable_summary`, and `tags` as plain strings). A failure prints `{"error": ..., "code": ...}` and exits non-zero.
 
+List commands return one page, 100 rows by default. When there are more, the output is cut at the cap and a `showing N of M; use --offset ... or --limit ...` hint goes to stderr, not into the JSON. Pass `-l <n>` (`--limit`) when a skill needs more rows, or name a DAG to narrow the list.
+
 Use `jq -s` to collect the rows, or filter them one at a time:
 
 ```bash
-# Find failed runs
-astro local af runs list -o json | jq -s '.[] | select(.state == "failed")'
+# Find failed runs (across every DAG, so raise the page size)
+astro local af runs list -l 500 -o json | jq -s '.[] | select(.state == "failed")'
 
 # Get DAG IDs only
 astro local af dags list -o json | jq -r '.dag_id'
