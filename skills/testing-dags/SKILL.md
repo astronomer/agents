@@ -5,11 +5,11 @@ description: Complex DAG testing workflows with debugging and fixing cycles. Use
 
 # DAG Testing Skill
 
-Use `af` commands to test, debug, and fix DAGs in iterative cycles.
+Use `astro local af` commands to test, debug, and fix DAGs in iterative cycles.
 
 ## Running the CLI
 
-These commands assume `af` is on PATH. Run via `astro otto` to get it automatically, or install standalone with `uv tool install astro-airflow-mcp`.
+These commands use the Astro CLI against this project's local Airflow (`astro local af ...`). To test against a deployment instead, swap `astro local af` for `astro af` and add `-d <link>`.
 
 ---
 
@@ -34,13 +34,13 @@ Use these for quick validation during development. For full end-to-end testing a
 When the user asks to test a DAG, your **FIRST AND ONLY action** should be:
 
 ```bash
-af runs trigger-wait <dag_id>
+astro local af runs trigger-wait <dag_id>
 ```
 
 **DO NOT:**
-- Call `af dags list` first
-- Call `af dags get` first
-- Call `af dags errors` first
+- Call `astro local af dags list` first
+- Call `astro local af dags get` first
+- Call `astro local af dags errors` first
 - Use `grep` or `ls` or any other bash command
 - Do any "pre-flight checks"
 
@@ -80,18 +80,18 @@ af runs trigger-wait <dag_id>
 
 ## Phase 1: Trigger and Wait
 
-Use `af runs trigger-wait` to test the DAG:
+Use `astro local af runs trigger-wait` to test the DAG:
 
 ### Primary Method: Trigger and Wait
 
 ```bash
-af runs trigger-wait <dag_id> --timeout 300
+astro local af runs trigger-wait <dag_id> --timeout 300
 ```
 
 **Example:**
 
 ```bash
-af runs trigger-wait my_dag --timeout 300
+astro local af runs trigger-wait my_dag --timeout 300
 ```
 
 **Why this is the preferred method:**
@@ -102,27 +102,37 @@ af runs trigger-wait my_dag --timeout 300
 
 ### Response Interpretation
 
-**Success:**
+The exit status tells you how the run ended, and the output (with `-o json`) is the run as it last stood:
+
+| Exit | Meaning | Next step |
+|------|---------|-----------|
+| `0` | Run succeeded | Summarize and stop |
+| `1` | Run failed (or the command itself failed, e.g. DAG not found) | Read `failed_tasks`, then go to Phase 2 |
+| `2` | Wait timed out; the run is **still going** | See "If Timed Out" below |
+
+Don't chain the next command with `&&` after `trigger-wait`: a failed run exits 1, and that is exactly when you need the debugging commands to run.
+
+**Success (exit 0):**
 ```json
 {
-  "dag_run": {
-    "dag_id": "my_dag",
-    "dag_run_id": "manual__2025-01-14T...",
-    "state": "success",
-    "start_date": "...",
-    "end_date": "..."
-  },
+  "dag_id": "my_dag",
+  "dag_run_id": "manual__2025-01-14T...",
+  "state": "success",
+  "start_date": "...",
+  "end_date": "...",
+  "duration_seconds": 44,
+  "unpaused": false,
   "timed_out": false,
   "elapsed_seconds": 45.2
 }
 ```
 
-**Failure:**
+**Failure (exit 1):**
 ```json
 {
-  "dag_run": {
-    "state": "failed"
-  },
+  "dag_id": "my_dag",
+  "dag_run_id": "manual__2025-01-14T...",
+  "state": "failed",
   "timed_out": false,
   "elapsed_seconds": 30.1,
   "failed_tasks": [
@@ -135,15 +145,14 @@ af runs trigger-wait my_dag --timeout 300
 }
 ```
 
-**Timeout:**
+**Timeout (exit 2):**
 ```json
 {
   "dag_id": "my_dag",
   "dag_run_id": "manual__...",
   "state": "running",
   "timed_out": true,
-  "elapsed_seconds": 300.0,
-  "message": "Timed out after 300 seconds. DAG run is still running."
+  "elapsed_seconds": 300.0
 }
 ```
 
@@ -153,11 +162,11 @@ Use this only when you need more control:
 
 ```bash
 # Step 1: Trigger
-af runs trigger my_dag
-# Returns: {"dag_run_id": "manual__...", "state": "queued"}
+astro local af runs trigger my_dag -o json
+# Returns: {"dag_id": "my_dag", "dag_run_id": "manual__...", "state": "queued", ...}
 
 # Step 2: Check status
-af runs get my_dag manual__2025-01-14T...
+astro local af runs get my_dag manual__2025-01-14T...
 # Returns current state
 ```
 
@@ -176,8 +185,8 @@ The DAG ran successfully. Summarize for the user:
 
 ### If Timed Out
 
-The DAG is still running. Options:
-1. Check current status: `af runs get <dag_id> <dag_run_id>`
+The DAG is still running (exit 2; stopping the wait does not stop the run). Options:
+1. Check current status: `astro local af runs get <dag_id> <dag_run_id>`
 2. Ask user if they want to continue waiting
 3. Increase timeout and try again
 
@@ -194,7 +203,7 @@ When a DAG run fails, use these commands to diagnose:
 ### Get Comprehensive Diagnosis
 
 ```bash
-af runs diagnose <dag_id> <dag_run_id>
+astro local af runs diagnose <dag_id> <dag_run_id>
 ```
 
 Returns in one call:
@@ -206,19 +215,19 @@ Returns in one call:
 ### Get Task Logs
 
 ```bash
-af tasks logs <dag_id> <dag_run_id> <task_id>
+astro local af tasks logs <dag_id> <dag_run_id> <task_id>
 ```
 
 **Example:**
 
 ```bash
-af tasks logs my_dag manual__2025-01-14T... extract_data
+astro local af tasks logs my_dag manual__2025-01-14T... extract_data
 ```
 
 **For specific retry attempt:**
 
 ```bash
-af tasks logs my_dag manual__2025-01-14T... extract_data --try 2
+astro local af tasks logs my_dag manual__2025-01-14T... extract_data --try 2
 ```
 
 **Look for:**
@@ -230,14 +239,14 @@ af tasks logs my_dag manual__2025-01-14T... extract_data --try 2
 
 ### Check Upstream Tasks
 
-If a task shows `upstream_failed`, the root cause is in an upstream task. Use `af runs diagnose` to find which task actually failed.
+If a task shows `upstream_failed`, the root cause is in an upstream task. Use `astro local af runs diagnose` to find which task actually failed.
 
 ### Check Import Errors (If DAG Didn't Run)
 
 If the trigger failed because the DAG doesn't exist:
 
 ```bash
-af dags errors
+astro local af dags errors
 ```
 
 This reveals syntax errors or missing dependencies that prevented the DAG from loading.
@@ -254,15 +263,15 @@ Once you identify the issue:
 |-------|-----|
 | Missing import | Add to DAG file |
 | Missing package | Add to `requirements.txt` |
-| Connection error | Check `af config connections`, verify credentials |
-| Variable missing | Check `af config variables`, create if needed |
+| Connection error | Check `astro local af connections list`, verify credentials |
+| Variable missing | Check `astro local af variables list` (keys only; `variables get <key>` for a value), create if needed |
 | Timeout | Increase task timeout or optimize query |
 | Permission error | Check credentials in connection |
 
 ### After Fixing
 
 1. Save the file
-2. **Retest:** `af runs trigger-wait <dag_id>`
+2. **Retest:** `astro local af runs trigger-wait <dag_id>`
 
 **Repeat the test → debug → fix loop until the DAG succeeds.**
 
@@ -272,16 +281,16 @@ Once you identify the issue:
 
 | Phase | Command | Purpose |
 |-------|---------|---------|
-| Test | `af runs trigger-wait <dag_id>` | **Primary test method — start here** |
-| Test | `af runs trigger <dag_id>` | Start run (alternative) |
-| Test | `af runs get <dag_id> <run_id>` | Check run status |
-| Debug | `af runs diagnose <dag_id> <run_id>` | Comprehensive failure diagnosis |
-| Debug | `af tasks logs <dag_id> <run_id> <task_id>` | Get task output/errors |
-| Debug | `af dags errors` | Check for parse errors (if DAG won't load) |
-| Debug | `af dags get <dag_id>` | Verify DAG config |
-| Debug | `af dags explore <dag_id>` | Full DAG inspection |
-| Config | `af config connections` | List connections |
-| Config | `af config variables` | List variables |
+| Test | `astro local af runs trigger-wait <dag_id>` | **Primary test method — start here** |
+| Test | `astro local af runs trigger <dag_id>` | Start run (alternative) |
+| Test | `astro local af runs get <dag_id> <run_id>` | Check run status |
+| Debug | `astro local af runs diagnose <dag_id> <run_id>` | Comprehensive failure diagnosis |
+| Debug | `astro local af tasks logs <dag_id> <run_id> <task_id>` | Get task output/errors |
+| Debug | `astro local af dags errors` | Check for parse errors (if DAG won't load) |
+| Debug | `astro local af dags get <dag_id>` | Verify DAG config |
+| Debug | `astro local af dags explore <dag_id>` | Full DAG inspection |
+| Config | `astro local af connections list` | List connections |
+| Config | `astro local af variables list` | List variable keys |
 
 ---
 
@@ -290,7 +299,7 @@ Once you identify the issue:
 ### Scenario 1: Test a DAG (Happy Path)
 
 ```bash
-af runs trigger-wait my_dag
+astro local af runs trigger-wait my_dag
 # Success! Done.
 ```
 
@@ -298,66 +307,66 @@ af runs trigger-wait my_dag
 
 ```bash
 # 1. Run and wait
-af runs trigger-wait my_dag
-# Failed...
+astro local af runs trigger-wait my_dag
+# Failed (exit 1)...
 
 # 2. Find failed tasks
-af runs diagnose my_dag manual__2025-01-14T...
+astro local af runs diagnose my_dag manual__2025-01-14T...
 
 # 3. Get error details
-af tasks logs my_dag manual__2025-01-14T... extract_data
+astro local af tasks logs my_dag manual__2025-01-14T... extract_data
 
 # 4. [Fix the issue in DAG code]
 
 # 5. Retest
-af runs trigger-wait my_dag
+astro local af runs trigger-wait my_dag
 ```
 
 ### Scenario 3: DAG Doesn't Exist / Won't Load
 
 ```bash
 # 1. Trigger fails - DAG not found
-af runs trigger-wait my_dag
+astro local af runs trigger-wait my_dag
 # Error: DAG not found
 
 # 2. Find parse error
-af dags errors
+astro local af dags errors
 
 # 3. [Fix the issue in DAG code]
 
 # 4. Retest
-af runs trigger-wait my_dag
+astro local af runs trigger-wait my_dag
 ```
 
 ### Scenario 4: Debug a Failed Scheduled Run
 
 ```bash
 # 1. Get failure summary
-af runs diagnose my_dag scheduled__2025-01-14T...
+astro local af runs diagnose my_dag scheduled__2025-01-14T...
 
 # 2. Get error from failed task
-af tasks logs my_dag scheduled__2025-01-14T... failed_task_id
+astro local af tasks logs my_dag scheduled__2025-01-14T... failed_task_id
 
 # 3. [Fix the issue]
 
 # 4. Retest
-af runs trigger-wait my_dag
+astro local af runs trigger-wait my_dag
 ```
 
 ### Scenario 5: Test with Custom Configuration
 
 ```bash
-af runs trigger-wait my_dag --conf '{"env": "staging", "batch_size": 100}' --timeout 600
+astro local af runs trigger-wait my_dag --conf '{"env": "staging", "batch_size": 100}' --timeout 600
 ```
 
 ### Scenario 6: Long-Running DAG
 
 ```bash
 # Wait up to 1 hour
-af runs trigger-wait my_dag --timeout 3600
+astro local af runs trigger-wait my_dag --timeout 3600
 
 # If timed out, check current state
-af runs get my_dag manual__2025-01-14T...
+astro local af runs get my_dag manual__2025-01-14T...
 ```
 
 ---
@@ -367,7 +376,7 @@ af runs get my_dag manual__2025-01-14T...
 ### Common Error Patterns
 
 **Connection Refused / Timeout:**
-- Check `af config connections` for correct host/port
+- Check `astro local af connections list` for correct host/port
 - Verify network connectivity to external system
 - Check if connection credentials are correct
 
