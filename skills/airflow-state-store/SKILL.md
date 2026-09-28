@@ -9,7 +9,7 @@ Airflow 3.3 ships two key/value stores and a crash-safety mixin for operators th
 
 > **`task_state_store`, `asset_state_store`, and `ResumableJobMixin`'s crash-safety guarantee require Airflow 3.3+.** Check first:
 > ```bash
-> af config version
+> astro local af version
 > ```
 > Below 3.3: `task_state_store`/`asset_state_store` are unavailable, and `durable=True` is a no-op — provider operators ship a pre-3.3 `ResumableJobMixin` shim that always submits fresh (see Section 5). Tell the user those specific features aren't available yet and link the AIP-103 tracking issue. This does **not** gate Section 6's Triggerer-vs-`mode="reschedule"` decision, or the general "green submit ≠ success" anti-pattern — those apply on any Airflow version. On a pre-3.3 DAG, give that guidance in full; only drop the "`durable=True` adds crash-safety" half of it.
 
@@ -383,7 +383,7 @@ state_store_backend = mypackage.store.WorkerSideBackend
 
 ## Section 8 — Safety checklist
 
-- [ ] Airflow version ≥ 3.3 (`af config version`)
+- [ ] Airflow version ≥ 3.3 (`astro local af version`)
 - [ ] Values are JSON-serializable (`str`, `int`, `float`, `bool`, `list`, `dict` — no `datetime`, no custom objects)
 - [ ] `task_state_store` keys are short, descriptive strings (avoid dots and slashes)
 - [ ] Mapped tasks writing to `asset_state_store`: use distinct keys per index or accept last-writer-wins semantics
@@ -399,4 +399,4 @@ state_store_backend = mypackage.store.WorkerSideBackend
 
 - **authoring-dags** — general DAG writing patterns and conventions.
 - **airflow-hitl** — pausing a DAG for human approval (Airflow 3.1+).
-- **airflow** — `af config`, `af registry`, and general Airflow CLI reference.
+- **airflow** — `astro local af`, `astro local api`, `af registry`, and general Airflow CLI reference.

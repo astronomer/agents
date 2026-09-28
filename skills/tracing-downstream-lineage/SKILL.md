@@ -18,8 +18,8 @@ Find everything that reads from this target:
 **For Tables:**
 
 1. **Search DAG source code**: Look for DAGs that SELECT from this table
-   - Use `af dags list` to get all DAGs
-   - Use `af dags source <dag_id>` to search for table references
+   - Use `astro local af dags list` to get all DAGs
+   - Use `astro local af dags source <dag_id>` to search for table references
    - Look for: `FROM target_table`, `JOIN target_table`
 
 2. **Check for dependent views**:
@@ -41,7 +41,7 @@ If you're running on Astro, the **Lineage tab** in the Astro UI provides visual 
 
 **For DAGs:**
 
-1. **Check what the DAG produces**: Use `af dags source <dag_id>` to find output tables
+1. **Check what the DAG produces**: Use `astro local af dags source <dag_id>` to find output tables
 2. **Then trace those tables' consumers** (recursive)
 
 ### Step 2: Build Dependency Tree
