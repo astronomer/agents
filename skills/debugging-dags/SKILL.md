@@ -9,19 +9,19 @@ You are a data engineer debugging a failed Airflow DAG. Follow this systematic a
 
 ## Running the CLI
 
-These commands assume `af` is on PATH. Run via `astro otto` to get it automatically, or install standalone with `uv tool install astro-airflow-mcp`.
+These commands use the Astro CLI against this project's local Airflow (`astro local af ...`). For a deployment, swap `astro local af` for `astro af` and add `-d <link>`.
 
 ---
 
 ## Step 1: Identify the Failure
 
 If a specific DAG was mentioned:
-- Run `af runs diagnose <dag_id> <dag_run_id>` (if run_id is provided)
-- If no run_id specified, run `af dags stats` to find recent failures
+- Run `astro local af runs diagnose <dag_id> <dag_run_id>` (if run_id is provided)
+- If no run_id specified, run `astro local af dags stats` to find recent failures
 
 If no DAG was specified:
-- Run `af health` to find recent failures across all DAGs
-- Check for import errors with `af dags errors`
+- Run `astro local af health` to find recent failures across all DAGs
+- Check for import errors with `astro local af dags errors`
 - Show DAGs with recent failures
 - Ask which DAG to investigate further
 
@@ -29,7 +29,7 @@ If no DAG was specified:
 
 Once you have identified a failed task:
 
-1. **Get task logs** using `af tasks logs <dag_id> <dag_run_id> <task_id>`
+1. **Get task logs** using `astro local af tasks logs <dag_id> <dag_run_id> <task_id>`
 2. **Look for the actual exception** - scroll past the Airflow boilerplate to find the real error
 3. **Categorize the failure type**:
    - **Data issue**: Missing data, schema change, null values, constraint violation
@@ -48,7 +48,7 @@ Gather additional context to understand WHY this happened:
 5. **Historical pattern**: Is this a recurring failure? Check if same task failed before
 6. **Timing**: Did this fail at an unusual time? (resource contention, maintenance windows)
 
-Use `af runs get <dag_id> <dag_run_id>` to compare the failed run against recent successful runs.
+Use `astro local af runs get <dag_id> <dag_run_id>` to compare the failed run against recent successful runs.
 
 ### Package version changes
 
@@ -60,7 +60,7 @@ A common cause of failures with no git activity is dependency drift — the user
    docker run --rm <previous_image> pip freeze > /tmp/prev.txt
    diff /tmp/prev.txt /tmp/now.txt
    ```
-   Also compare `docker run --rm <image> python --version` between the two — a Python minor-version bump (3.11 → 3.12, or even a patch) can break wheel compatibility even when `pip freeze` looks identical. `af config providers` lists currently installed provider versions, useful for cross-checking against modules named in the traceback.
+   Also compare `docker run --rm <image> python --version` between the two — a Python minor-version bump (3.11 → 3.12, or even a patch) can break wheel compatibility even when `pip freeze` looks identical. `astro local af providers` lists currently installed provider versions, useful for cross-checking against modules named in the traceback.
 
 2. **Venv-style operators bypass the worker image.** `@task.virtualenv`, `PythonVirtualenvOperator`, `ExternalPythonOperator`, and `KubernetesPodOperator` build their environment per task run, so an image diff won't catch failures inside them. If the failed task is one of these, read its `requirements` / `image` / `python_version` / `python` args directly:
    - Unbounded specifier (e.g. `pandas>=2.0.0` with no upper bound, or no specifier at all) → a new upstream release is the prime suspect.
@@ -123,6 +123,6 @@ How to prevent this from happening again:
 
 ### Quick Commands
 Provide ready-to-use commands:
-- To clear and rerun the entire DAG run: `af runs clear <dag_id> <run_id>`
-- To clear and rerun specific failed tasks: `af tasks clear <dag_id> <run_id> <task_ids> -D`
-- To delete a stuck or unwanted run: `af runs delete <dag_id> <run_id>`
+- To clear and rerun the entire DAG run: `astro local af runs clear <dag_id> <run_id> --dry-run` to preview, then `astro local af runs clear <dag_id> <run_id> --yes`
+- To clear and rerun specific failed tasks: `astro local af tasks clear <dag_id> <run_id> <task_id>... --dry-run` to preview, then the same with `--yes` instead of `--dry-run` (task ids are space-separated)
+- To delete a stuck or unwanted run: `astro local af runs delete <dag_id> <run_id> --yes`
