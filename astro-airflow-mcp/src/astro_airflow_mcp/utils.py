@@ -77,6 +77,45 @@ def extract_failed_tasks(task_instances: list[dict[str, Any]]) -> list[dict[str,
     ]
 
 
+def get_all_task_instances(
+    adapter: Any, dag_id: str, dag_run_id: str, page_size: int = 100
+) -> list[dict[str, Any]]:
+    """Fetch every task instance for a DAG run, following pagination.
+
+    A DAG run can have more task instances than the API's default page size
+    (Airflow's `taskInstances` endpoint defaults to a limit of 100). Calling
+    the adapter once and trusting the result silently drops every task past
+    the first page -- with no indication anything was cut, since the caller's
+    own `len(task_instances)` still looks like a plausible total. This loops
+    on `total_entries` until every page has been collected.
+
+    Args:
+        adapter: An Airflow adapter exposing get_task_instances(dag_id, dag_run_id, limit, offset)
+        dag_id: DAG ID
+        dag_run_id: DAG run ID
+        page_size: Page size to request per call
+
+    Returns:
+        The complete list of task instance dicts for the run
+    """
+    task_instances: list[dict[str, Any]] = []
+    offset = 0
+    while True:
+        page_data = adapter.get_task_instances(dag_id, dag_run_id, limit=page_size, offset=offset)
+        page = page_data.get("task_instances", [])
+        task_instances.extend(page)
+
+        total_entries = page_data.get("total_entries")
+        # No total to compare against (e.g. a minimal/mocked adapter response),
+        # or the API returned fewer than a full page -- either way, there's
+        # nothing more to fetch.
+        if total_entries is None or len(page) < page_size or len(task_instances) >= total_entries:
+            break
+        offset += page_size
+
+    return task_instances
+
+
 def wrap_list_response(
     items: list[dict[str, Any]], key_name: str, data: dict[str, Any]
 ) -> dict[str, Any]:

@@ -1,5 +1,7 @@
 """Tests for shared utility functions."""
 
+from unittest.mock import MagicMock
+
 from astro_airflow_mcp.constants import (
     DEFAULT_AIRFLOW_URL,
     DEFAULT_LIMIT,
@@ -10,6 +12,7 @@ from astro_airflow_mcp.constants import (
 from astro_airflow_mcp.utils import (
     extract_failed_tasks,
     filter_connection_passwords,
+    get_all_task_instances,
     normalize_airflow_url,
     wrap_list_response,
 )
@@ -158,6 +161,72 @@ class TestExtractFailedTasks:
         assert len(result) == 1
         assert result[0]["task_id"] is None
         assert result[0]["state"] == "failed"
+
+
+class TestGetAllTaskInstances:
+    """Tests for get_all_task_instances utility."""
+
+    def test_single_page_no_total_entries(self):
+        """A minimal adapter response with no total_entries returns as-is."""
+        adapter = MagicMock()
+        adapter.get_task_instances.return_value = {
+            "task_instances": [{"task_id": "task1"}, {"task_id": "task2"}]
+        }
+
+        result = get_all_task_instances(adapter, "example_dag", "run1")
+
+        assert len(result) == 2
+        adapter.get_task_instances.assert_called_once_with(
+            "example_dag", "run1", limit=100, offset=0
+        )
+
+    def test_single_page_under_page_size(self):
+        """A page smaller than page_size is the last page, even if total_entries is higher."""
+        adapter = MagicMock()
+        adapter.get_task_instances.return_value = {
+            "task_instances": [{"task_id": "task1"}],
+            "total_entries": 1,
+        }
+
+        result = get_all_task_instances(adapter, "example_dag", "run1", page_size=5)
+
+        assert len(result) == 1
+        adapter.get_task_instances.assert_called_once()
+
+    def test_follows_pagination_across_multiple_pages(self):
+        """Every page must be fetched until total_entries worth of tasks are collected."""
+        adapter = MagicMock()
+        adapter.get_task_instances.side_effect = [
+            {
+                "task_instances": [{"task_id": f"task{i}"} for i in range(3)],
+                "total_entries": 7,
+            },
+            {
+                "task_instances": [{"task_id": f"task{i}"} for i in range(3, 6)],
+                "total_entries": 7,
+            },
+            {
+                "task_instances": [{"task_id": "task6"}],
+                "total_entries": 7,
+            },
+        ]
+
+        result = get_all_task_instances(adapter, "example_dag", "run1", page_size=3)
+
+        assert [t["task_id"] for t in result] == [f"task{i}" for i in range(7)]
+        assert adapter.get_task_instances.call_count == 3
+        offsets = [c.kwargs["offset"] for c in adapter.get_task_instances.call_args_list]
+        assert offsets == [0, 3, 6]
+
+    def test_handles_empty_run(self):
+        """A run with zero task instances doesn't loop forever."""
+        adapter = MagicMock()
+        adapter.get_task_instances.return_value = {"task_instances": [], "total_entries": 0}
+
+        result = get_all_task_instances(adapter, "example_dag", "run1")
+
+        assert result == []
+        adapter.get_task_instances.assert_called_once()
 
 
 class TestWrapListResponse:

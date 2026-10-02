@@ -9,7 +9,7 @@ import typer
 from astro_airflow_mcp.cli.context import get_adapter
 from astro_airflow_mcp.cli.output import output_error, output_json, wrap_list_response
 from astro_airflow_mcp.constants import TERMINAL_DAG_RUN_STATES
-from astro_airflow_mcp.utils import extract_failed_tasks
+from astro_airflow_mcp.utils import extract_failed_tasks, get_all_task_instances
 
 app = typer.Typer(help="DAG run management commands", no_args_is_help=True)
 
@@ -370,8 +370,7 @@ def diagnose_dag_run(
 
     # Get task instances for this run
     try:
-        tasks_data = adapter.get_task_instances(dag_id, dag_run_id)
-        task_instances = tasks_data.get("task_instances", [])
+        task_instances = get_all_task_instances(adapter, dag_id, dag_run_id)
         result["task_instances"] = task_instances
 
         # Summarize task states
