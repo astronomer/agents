@@ -286,11 +286,13 @@ def load_concepts_from_warehouse_md(path: Path | None = None) -> int:
     """
     import re
 
+    from config import get_config_dir
+
     # Find warehouse.md if not provided
     if path is None:
         locations = [
             Path(".astro/warehouse.md"),
-            Path.home() / ".astro" / "agents" / "warehouse.md",
+            get_config_dir() / "warehouse.md",
             Path("warehouse.md"),
         ]
         for loc in locations:

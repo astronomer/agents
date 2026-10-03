@@ -1,8 +1,14 @@
 """Configuration utilities for the analyzing-data skill."""
 
+import os
 import sys
 import warnings
 from pathlib import Path
+
+# When set and non-empty, this directory holds warehouse.yml, .env and
+# warehouse.md instead of ~/.astro/agents, so concurrent sessions can each
+# point at their own warehouses.
+CONFIG_DIR_ENV_VAR = "ASTRO_AGENTS_CONFIG_DIR"
 
 # Legacy path (deprecated)
 _LEGACY_CONFIG_DIR = Path.home() / ".astro" / "ai" / "config"
@@ -56,7 +62,15 @@ def get_kernel_connection_file() -> Path:
 
 
 def get_config_dir() -> Path:
-    """Get the path to the config directory."""
+    """Get the path to the config directory.
+
+    ``ASTRO_AGENTS_CONFIG_DIR`` wins when set and non-empty (``~`` is
+    expanded). Otherwise ``~/.astro/agents``, or the legacy
+    ``~/.astro/ai/config`` when only that exists.
+    """
+    override = os.environ.get(CONFIG_DIR_ENV_VAR, "").strip()
+    if override:
+        return Path(override).expanduser()
     legacy = _check_legacy_path()
     if legacy:
         return legacy

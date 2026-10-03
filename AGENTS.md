@@ -86,3 +86,5 @@ Use `${CLAUDE_PLUGIN_ROOT}` to reference files within the plugin (required becau
 ## Config Location
 
 This plugin uses `~/.astro/agents/` for user configuration (warehouse credentials, etc.).
+
+Set `ASTRO_AGENTS_CONFIG_DIR` to move the warehouse config (`warehouse.yml`, `.env`, `warehouse.md`) elsewhere, e.g. one directory per session. The kernel venv and `kernel.json` stay under `~/.astro/agents/`.

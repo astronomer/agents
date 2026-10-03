@@ -37,6 +37,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+from config import get_config_dir
 from kernel import KernelManager
 from warehouse import WarehouseConfig
 import cache
@@ -78,7 +79,7 @@ def warehouse_list():
             marker = " (default)" if name == default_name else ""
             click.echo(f"{name}: {conn.connector_type()}{marker}")
     except FileNotFoundError:
-        click.echo("No warehouse config found at ~/.astro/agents/warehouse.yml")
+        click.echo(f"No warehouse config found at {get_config_dir() / 'warehouse.yml'}")
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
 
@@ -105,7 +106,7 @@ def start(warehouse: str | None):
     except FileNotFoundError as e:
         click.echo(f"Error: {e}", err=True)
         click.echo(
-            "Create ~/.astro/agents/warehouse.yml with your Snowflake credentials",
+            f"Create {get_config_dir() / 'warehouse.yml'} with your Snowflake credentials",
             err=True,
         )
         sys.exit(1)

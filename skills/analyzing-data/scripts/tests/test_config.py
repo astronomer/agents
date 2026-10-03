@@ -142,3 +142,48 @@ class TestLegacyPathFallback:
                 # Should be under ~/.astro/ai/ (legacy parent)
                 assert venv_dir.parts[-3:] == (".astro", "ai", "kernel_venv")
                 assert conn_file.parts[-3:] == (".astro", "ai", "kernel.json")
+
+
+class TestConfigDirOverride:
+    """Tests for the ASTRO_AGENTS_CONFIG_DIR override."""
+
+    def test_set_uses_override_without_creating_it(self, monkeypatch, tmp_path):
+        import config as config_module
+
+        session_dir = tmp_path / "session"
+        monkeypatch.setenv("ASTRO_AGENTS_CONFIG_DIR", str(session_dir))
+        assert config_module.get_config_dir() == session_dir
+        assert not session_dir.exists()
+
+    def test_override_beats_legacy(self, monkeypatch, tmp_path):
+        import config as config_module
+
+        monkeypatch.setenv("ASTRO_AGENTS_CONFIG_DIR", str(tmp_path))
+        with patch.object(Path, "exists", return_value=True):
+            assert config_module.get_config_dir() == tmp_path
+
+    def test_unset_uses_default(self, monkeypatch):
+        import config as config_module
+
+        monkeypatch.delenv("ASTRO_AGENTS_CONFIG_DIR", raising=False)
+        with patch.object(Path, "exists", return_value=False):
+            assert config_module.get_config_dir() == Path.home() / ".astro" / "agents"
+
+    def test_empty_uses_default(self, monkeypatch):
+        import config as config_module
+
+        monkeypatch.setenv("ASTRO_AGENTS_CONFIG_DIR", "")
+        with patch.object(Path, "exists", return_value=False):
+            assert config_module.get_config_dir() == Path.home() / ".astro" / "agents"
+
+    def test_tilde_is_expanded(self, monkeypatch):
+        import config as config_module
+
+        monkeypatch.setenv("ASTRO_AGENTS_CONFIG_DIR", "~/proj/agents")
+        assert config_module.get_config_dir() == Path.home() / "proj" / "agents"
+
+    def test_warehouse_config_path_follows_override(self, monkeypatch, tmp_path):
+        import warehouse
+
+        monkeypatch.setenv("ASTRO_AGENTS_CONFIG_DIR", str(tmp_path))
+        assert warehouse.get_warehouse_config_path() == tmp_path / "warehouse.yml"
