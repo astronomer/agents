@@ -45,8 +45,18 @@ def _check_legacy_path() -> Path | None:
     return None
 
 
+def _config_dir_override() -> Path | None:
+    """Return ``ASTRO_AGENTS_CONFIG_DIR`` (``~`` expanded) if set and non-empty."""
+    value = os.environ.get(CONFIG_DIR_ENV_VAR, "").strip()
+    return Path(value).expanduser() if value else None
+
+
 def get_kernel_venv_dir() -> Path:
-    """Get the path to the kernel virtual environment directory."""
+    """Get the path to the kernel virtual environment directory.
+
+    Shared across sessions even when ``ASTRO_AGENTS_CONFIG_DIR`` is set: it
+    holds only the Python environment, no warehouse state.
+    """
     legacy = _check_legacy_path()
     if legacy:
         return legacy.parent / "kernel_venv"
@@ -54,7 +64,14 @@ def get_kernel_venv_dir() -> Path:
 
 
 def get_kernel_connection_file() -> Path:
-    """Get the path to the kernel connection file."""
+    """Get the path to the kernel connection file.
+
+    Follows ``ASTRO_AGENTS_CONFIG_DIR`` so each config dir gets its own
+    kernel, which carries that dir's warehouse connection.
+    """
+    override = _config_dir_override()
+    if override:
+        return override / "kernel.json"
     legacy = _check_legacy_path()
     if legacy:
         return legacy.parent / "kernel.json"
@@ -68,9 +85,9 @@ def get_config_dir() -> Path:
     expanded). Otherwise ``~/.astro/agents``, or the legacy
     ``~/.astro/ai/config`` when only that exists.
     """
-    override = os.environ.get(CONFIG_DIR_ENV_VAR, "").strip()
+    override = _config_dir_override()
     if override:
-        return Path(override).expanduser()
+        return override
     legacy = _check_legacy_path()
     if legacy:
         return legacy

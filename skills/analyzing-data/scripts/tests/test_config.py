@@ -182,6 +182,15 @@ class TestConfigDirOverride:
         monkeypatch.setenv("ASTRO_AGENTS_CONFIG_DIR", "~/proj/agents")
         assert config_module.get_config_dir() == Path.home() / "proj" / "agents"
 
+    def test_kernel_connection_file_follows_override(self, monkeypatch):
+        import config as config_module
+
+        monkeypatch.setenv("ASTRO_AGENTS_CONFIG_DIR", "~/proj/agents")
+        assert (
+            config_module.get_kernel_connection_file()
+            == Path.home() / "proj" / "agents" / "kernel.json"
+        )
+
     def test_warehouse_config_path_follows_override(self, monkeypatch, tmp_path):
         import warehouse
 
