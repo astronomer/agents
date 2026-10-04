@@ -51,6 +51,15 @@ def get_config_dir_override() -> Path | None:
     return Path(value).expanduser() if value else None
 
 
+def warehouse_yml_hint() -> str:
+    """Where warehouse.yml is expected, for messages: the override dir's when
+    ``ASTRO_AGENTS_CONFIG_DIR`` is set, else the wording it always had."""
+    override = get_config_dir_override()
+    if override:
+        return str(override / "warehouse.yml")
+    return "~/.astro/agents/warehouse.yml"
+
+
 def get_default_config_dir() -> Path:
     """The config directory with no override: ``~/.astro/agents``, or the
     legacy ``~/.astro/ai/config`` when only that exists.

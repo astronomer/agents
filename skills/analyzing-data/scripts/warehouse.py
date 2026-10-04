@@ -19,9 +19,9 @@ def _load_env_file() -> None:
     # key wins: the process, then the override dir's .env, then the user's own
     # .env in the default dir (which a session dir does not carry). A .env in
     # the working directory then overrides all of them.
-    env_paths = [get_config_dir() / ".env"]
-    if get_config_dir_override():
-        env_paths.append(get_default_config_dir() / ".env")
+    override = get_config_dir_override()
+    env_paths = [override / ".env"] if override else []
+    env_paths.append(get_default_config_dir() / ".env")
     for env_path in env_paths:
         if env_path.exists():
             load_dotenv(env_path)

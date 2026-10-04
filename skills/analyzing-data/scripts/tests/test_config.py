@@ -196,3 +196,19 @@ class TestConfigDirOverride:
 
         monkeypatch.setenv("ASTRO_AGENTS_CONFIG_DIR", str(tmp_path))
         assert warehouse.get_warehouse_config_path() == tmp_path / "warehouse.yml"
+
+
+class TestWarehouseYmlHint:
+    """The path cli.py names when warehouse.yml is missing."""
+
+    def test_unset_keeps_the_original_wording(self, monkeypatch):
+        import config as config_module
+
+        monkeypatch.delenv("ASTRO_AGENTS_CONFIG_DIR", raising=False)
+        assert config_module.warehouse_yml_hint() == "~/.astro/agents/warehouse.yml"
+
+    def test_set_names_the_override_dir(self, monkeypatch, tmp_path):
+        import config as config_module
+
+        monkeypatch.setenv("ASTRO_AGENTS_CONFIG_DIR", str(tmp_path))
+        assert config_module.warehouse_yml_hint() == str(tmp_path / "warehouse.yml")

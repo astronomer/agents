@@ -171,7 +171,6 @@ class TestEnvFileLoading:
         default, _ = dirs
         self._env(default, "from-default")
         assert self._load() == "from-default"
-        monkeypatch.delenv(self.KEY)
 
     def test_override_env_wins_over_the_default_dir(self, dirs, monkeypatch):
         default, session = dirs
@@ -179,14 +178,12 @@ class TestEnvFileLoading:
         self._env(session, "from-session")
         monkeypatch.setenv("ASTRO_AGENTS_CONFIG_DIR", str(session))
         assert self._load() == "from-session"
-        monkeypatch.delenv(self.KEY)
 
     def test_override_falls_back_to_the_default_dir(self, dirs, monkeypatch):
         default, session = dirs
         self._env(default, "from-default")
         monkeypatch.setenv("ASTRO_AGENTS_CONFIG_DIR", str(session))
         assert self._load() == "from-default"
-        monkeypatch.delenv(self.KEY)
 
     def test_process_env_wins_over_both(self, dirs, monkeypatch):
         default, session = dirs
