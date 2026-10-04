@@ -55,8 +55,9 @@ The examples below use `astro local af`. To run any of them against a deployment
 astro use
 astro use prod
 
-# Link a deployment the project doesn't know yet
-astro link add
+# Link a deployment the project doesn't know yet (bare `astro link add` asks which,
+# but only in a terminal; a script names it)
+astro link add prod --deployment <deployment-id>
 
 # Act on one deployment for a single command
 astro af dags list -d staging
