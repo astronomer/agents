@@ -2,7 +2,7 @@
 
 Direct REST API access for Airflow endpoints not covered by high-level commands.
 
-`astro local api` reaches this project's local Airflow. For a deployment, use `astro api airflow <endpoint> -d <link>`, which takes the same `-X`, `-F`, `-H`, and `-i` flags (it spells the string field `-f`/`--raw-field`).
+`astro local api` reaches this project's local Airflow. For a deployment, use `astro api airflow <endpoint> -d <link>`, which takes the same `-X`, `-F`, `-H`, and `-i` flags (it spells the string field `-f`/`--raw-field`). It has no `--body` or `--root`: pass a body with `--input <file>` (`-` for stdin).
 
 ## Endpoint Discovery
 

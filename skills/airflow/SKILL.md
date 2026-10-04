@@ -55,8 +55,9 @@ The examples below use `astro local af`. To run any of them against a deployment
 astro use
 astro use prod
 
-# Link a deployment the project doesn't know yet (bare `astro link add` asks which,
-# but only in a terminal; a script names it)
+# Link a deployment the project doesn't know yet. This writes the link into the
+# project's committed pyproject.toml, so get the user's go-ahead first. Bare
+# `astro link add` asks which deployment, but only in a terminal; a script names it.
 astro link add prod --deployment <deployment-id>
 
 # Act on one deployment for a single command
@@ -178,7 +179,7 @@ Two short flags differ from the standalone `af` CLI: `-d` is **deployment** and 
 
 ### Registry Discovery
 
-The Astro CLI has no registry command, so these use the standalone `af` CLI (`uvx --from astro-airflow-mcp af registry ...` if `af` is not on PATH). They read the public Airflow Registry, not your Airflow, so no project or deployment is involved.
+These use the standalone `af` CLI (`uvx --from astro-airflow-mcp af registry ...` if `af` is not on PATH). They read the public Airflow Registry, not your Airflow, so no project or deployment is involved.
 
 - "What operators does provider X have?" -> `af registry modules <provider>`
 - "What are the constructor params for operator Y?" -> `af registry parameters <provider>`
@@ -209,7 +210,7 @@ astro local af dags warnings   # Check for deprecation warnings
 
 ### Discover Operator Signatures Before Writing Code
 
-The Airflow Registry at `airflow.apache.org/registry` is the authoritative source for provider classes and their current constructor signatures. Prefer it over memory or stale documentation when authoring DAGs — the registry reflects the live provider release. The Astro CLI has no registry command; these use the standalone `af` CLI, whose output is a single JSON object (not NDJSON rows).
+The Airflow Registry at `airflow.apache.org/registry` is the authoritative source for provider classes and their current constructor signatures. Prefer it over memory or stale documentation when authoring DAGs — the registry reflects the live provider release. These use the standalone `af` CLI, whose output is a single JSON object (not NDJSON rows).
 
 ```bash
 # List all providers and pick the one you need
@@ -234,7 +235,7 @@ Results are cached locally: 1 hour for the latest version, 30 days for pinned ve
 
 ```bash
 # 1. List recent runs to find failure
-astro local af runs list my_dag
+astro local af runs list --dag-id my_dag
 
 # 2. Diagnose the specific run
 astro local af runs diagnose my_dag manual__2024-01-15T10:00:00+00:00
@@ -277,7 +278,7 @@ astro local af dags get my_dag
 astro local af dags errors
 
 # Check recent runs
-astro local af runs list my_dag
+astro local af runs list --dag-id my_dag
 ```
 
 ### Trigger and Monitor
@@ -304,7 +305,7 @@ astro local af dags list -o json
 
 Rows carry a curated set of fields (for example `schedule`, not `timetable_summary`, and `tags` as plain strings). A failure prints `{"error": ..., "code": ...}` and exits non-zero.
 
-List commands return one page, 100 rows by default. When there are more, the output is cut at the cap and a `showing N of M; use --offset ... or --limit ...` hint goes to stderr, not into the JSON. Pass `-l <n>` (`--limit`) when a skill needs more rows, or name a DAG to narrow the list.
+List commands return one page, 100 rows by default, and with `-o json` a longer list is cut at the cap with no sign that it was (the `showing N of M` hint is printed only for the text table). Pass `-l <n>` (`--limit`) when a skill needs more rows, or name a DAG to narrow the list.
 
 Use `jq -s` to collect the rows, or filter them one at a time:
 
@@ -331,7 +332,7 @@ astro local af tasks logs my_dag run_id task_id --map-index 5
 
 ## Direct API Access with `astro local api`
 
-Use `astro local api` for endpoints not covered by high-level commands (XCom, event-logs, backfills, etc). For a deployment, `astro api airflow <endpoint> -d <link>` is the same idea.
+Use `astro local api` for endpoints not covered by high-level commands (XCom, event-logs, backfills, etc). For a deployment, `astro api airflow <endpoint> -d <link>` is the same idea, but it takes a body with `--input <file>` (no `--body`) and has no `--root`.
 
 ```bash
 # Discover available endpoints

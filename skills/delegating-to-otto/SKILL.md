@@ -124,7 +124,7 @@ These fire **even in `bypassPermissions` mode and even with `--skip-permissions`
 
 - Reads/writes to sensitive files: `.env*`, `~/.ssh/**`, `~/.aws/**`, shell rc files
 - Out-of-project writes (paths outside the project root)
-- Destructive Astro/Airflow commands: `astro deploy`, `astro deployment delete`, `astro dev kill`, `astro local reset`, `astro af runs delete`, `astro af runs clear`, `astro af tasks clear` (and their `astro local af` forms), etc.
+- Destructive Astro/Airflow commands: `astro deploy`, `astro deployment delete`, `astro dev kill`, `astro local reset`, `astro af runs delete`, `astro af runs clear`, `astro af tasks clear` (and their `astro local af` forms), and in v1 projects `af dags delete`, `af runs delete`, `af tasks clear`, `af connections delete`, `af variables delete`, etc.
 
 Don't assume `--skip-permissions` makes Otto fully unattended.
 
