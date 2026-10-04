@@ -134,3 +134,64 @@ second_connector:
         config = WarehouseConfig(connectors={})
         with pytest.raises(ValueError, match="No warehouse configs"):
             config.get_default()
+
+
+class TestEnvFileLoading:
+    """Which .env files _load_env_file reads, and which value wins."""
+
+    KEY = "AGENTS_TEST_WAREHOUSE_PASSWORD"
+
+    @pytest.fixture
+    def dirs(self, tmp_path, monkeypatch):
+        import config
+
+        default = tmp_path / "default"
+        default.mkdir()
+        monkeypatch.setattr(config, "_NEW_CONFIG_DIR", default)
+        monkeypatch.setattr(config, "_LEGACY_CONFIG_DIR", tmp_path / "no-legacy")
+        work = tmp_path / "work"
+        work.mkdir()
+        monkeypatch.chdir(work)
+        monkeypatch.delenv(self.KEY, raising=False)
+        return default, tmp_path / "session"
+
+    def _env(self, directory, value):
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / ".env").write_text(f"{self.KEY}={value}\n")
+
+    def _load(self):
+        import os
+
+        from warehouse import _load_env_file
+
+        _load_env_file()
+        return os.environ.get(self.KEY)
+
+    def test_unset_reads_the_default_dir(self, dirs, monkeypatch):
+        default, _ = dirs
+        self._env(default, "from-default")
+        assert self._load() == "from-default"
+        monkeypatch.delenv(self.KEY)
+
+    def test_override_env_wins_over_the_default_dir(self, dirs, monkeypatch):
+        default, session = dirs
+        self._env(default, "from-default")
+        self._env(session, "from-session")
+        monkeypatch.setenv("ASTRO_AGENTS_CONFIG_DIR", str(session))
+        assert self._load() == "from-session"
+        monkeypatch.delenv(self.KEY)
+
+    def test_override_falls_back_to_the_default_dir(self, dirs, monkeypatch):
+        default, session = dirs
+        self._env(default, "from-default")
+        monkeypatch.setenv("ASTRO_AGENTS_CONFIG_DIR", str(session))
+        assert self._load() == "from-default"
+        monkeypatch.delenv(self.KEY)
+
+    def test_process_env_wins_over_both(self, dirs, monkeypatch):
+        default, session = dirs
+        self._env(default, "from-default")
+        self._env(session, "from-session")
+        monkeypatch.setenv("ASTRO_AGENTS_CONFIG_DIR", str(session))
+        monkeypatch.setenv(self.KEY, "from-process")
+        assert self._load() == "from-process"

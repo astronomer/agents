@@ -286,13 +286,16 @@ def load_concepts_from_warehouse_md(path: Path | None = None) -> int:
     """
     import re
 
-    from config import get_config_dir
+    from config import get_config_dir_override
 
-    # Find warehouse.md if not provided
+    # Find warehouse.md if not provided. An override dir is searched before the
+    # user's own ~/.astro/agents, which a session dir does not carry.
     if path is None:
+        override = get_config_dir_override()
         locations = [
             Path(".astro/warehouse.md"),
-            get_config_dir() / "warehouse.md",
+            *([override / "warehouse.md"] if override else []),
+            Path.home() / ".astro" / "agents" / "warehouse.md",
             Path("warehouse.md"),
         ]
         for loc in locations:
