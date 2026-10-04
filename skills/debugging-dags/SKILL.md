@@ -12,8 +12,8 @@ You are a data engineer debugging a failed Airflow DAG. Follow this systematic a
 Commands here are written for Astro CLI v2. Run `astro local af --help` once: it succeeds only on v2.
 
 - **v2:** run them as written.
-- **v1** (Astro CLI 1.x, or no Astro CLI): use the standalone `af` CLI (`uvx --from astro-airflow-mcp af` if `af` is not on PATH). Write `af` for `astro local af` and `af api` for `astro local api`, and drop `-o json` (`af` always prints JSON). Where a command needs more than that, its v1 form is given beside it, marked `v1:`.
-- If a v2 command reports an Astro v1 project, use the v1 forms. Upgrading the project (`astro init`) is the user's call.
+- **v1** (Astro CLI 1.x, or no Astro CLI): use the standalone `af` CLI (`uvx --from astro-airflow-mcp af` if `af` is not on PATH). Write `af` for `astro local af` and `af api` for `astro local api`, and drop `-o json` (`af` prints JSON, except `af instance` commands, which print tables). Where a command needs more than that, its v1 form is given beside it, marked `v1:`.
+- If a v2 command reports an Astro v1 project, the v2 CLI cannot run that project: `af` still reaches an Airflow that is already running, but starting or parsing it (`astro dev ...`) needs Astro CLI 1.x. Tell the user; upgrading the project (`astro init`) is their call.
 
 To debug a deployment instead of the local Airflow, see "Choosing Which Airflow" in the **airflow** skill.
 

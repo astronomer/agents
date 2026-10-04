@@ -17,7 +17,8 @@ These are written for Astro CLI v2. On v1 (see "Astro CLI v1 or v2" in the airfl
 # List all available endpoints
 astro local api ls
 
-# Filter endpoints by pattern
+# Filter endpoints by pattern. v1 `af api ls` prints paths with the `/api/v2`
+# (or `/api/v1`) prefix: drop it when you pass a path to `af api`, which adds it
 astro local api ls --filter variable
 astro local api ls --filter xcom
 
@@ -109,9 +110,10 @@ astro local api connections/my_conn
 # Include HTTP status and headers
 astro local api dags -i
 
-# A path given from the server root, outside the API version prefix
-astro local api --root /api/v2/monitor/health
-# v1: af api /api/v2/monitor/health --raw
+# A path outside the API version prefix, given from the server root (Airflow 2's /health;
+# Airflow 3 serves health inside the prefix, as monitor/health)
+astro local api --root /health
+# v1: af api health --raw
 ```
 
 ## When to Use astro local api

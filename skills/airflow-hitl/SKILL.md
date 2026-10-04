@@ -150,7 +150,8 @@ HOST = os.environ["AIRFLOW_HOST"]
 TOKEN = os.environ["AIRFLOW_API_TOKEN"]
 HEADERS = {"Authorization": f"Bearer {TOKEN}"}
 
-# List pending — use the path from `astro local api ls --filter hitl` (v1: `af api ls --filter hitl`)
+# List pending — use the path from `astro local api ls --filter hitl` (v1: `af api ls --filter hitl`).
+# v2 lists paths relative to the API base, so HOST must end in /api/v2; v1 prints the full /api/v2/... path.
 requests.get(f"{HOST}/<path>", headers=HEADERS, params={"state": "pending"})
 
 # Respond — same discovered path family, PATCH
