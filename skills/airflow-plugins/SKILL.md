@@ -533,13 +533,16 @@ MYPLUGIN_USERNAME=admin
 MYPLUGIN_PASSWORD=admin
 ```
 
-```bash
-astro dev restart              # required after any Python plugin change
+Commands below are Astro CLI v2 forms with the v1 (`astro dev`) form beside them; `astro local af --help` succeeds only on v2.
 
-# Check logs by component (Astro CLI):
-astro dev logs --api-server    # FastAPI apps, external_views — plugin import errors show here
-astro dev logs --scheduler     # macros, timetables, listeners, operator links
-astro dev logs --dag-processor # DAG parsing errors
+```bash
+astro local restart    # required after any Python plugin change   v1: astro dev restart
+astro local logs       # plugin import errors show here            v1: astro dev logs
+
+# Logs by component (v1 filters only in Docker mode):
+astro local logs --component api-server      # FastAPI apps, external_views   v1: astro dev logs --api-server
+astro local logs --component scheduler       # macros, timetables, listeners, operator links   v1: astro dev logs --scheduler
+astro local logs --component dag-processor   # DAG parsing errors   v1: astro dev logs --dag-processor
 
 # Non-Astro:
 airflow plugins                # CLI — lists all loaded plugins
@@ -577,7 +580,7 @@ AIRFLOW__CORE__LAZY_LOAD_PLUGINS=False
 | Event loop freezes under load | Sync SDK called directly in `async def` | Wrap with `asyncio.to_thread()` |
 | 401 errors after 1 hour | JWT expires with no refresh | Use the 5-minute pre-expiry refresh pattern |
 | `StaticFiles` raises on startup | Directory missing | Create `assets/` and `static/` before starting |
-| Plugin not showing up | Python file changed without restart | `astro dev restart` |
+| Plugin not showing up | Python file changed without restart | `astro local restart` (v1: `astro dev restart`) |
 | Endpoints accessible without login | FastAPI apps are not auto-authenticated | Add FastAPI security (e.g. OAuth2, API key) if endpoints must be private |
 | Middleware affecting wrong routes | Middleware applies to all API traffic | Filter by `request.url.path` inside `dispatch()` |
 | JS `fetch()` breaks on Astro | Absolute path in `fetch()` | Always use relative paths: `fetch('api/dags')` |

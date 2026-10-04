@@ -28,6 +28,8 @@ astro deploy            # Full deploy (image + DAGs)
 astro deploy --dags     # DAG-only deploy (fast, no image build)
 ```
 
+A new v2 project has no pytest: add it once with `uv add --dev pytest`.
+
 For more details:
 - **New project?** See the **setting-up-astro-project** skill
 - **Local environment?** See the **managing-astro-local-env** skill
@@ -225,6 +227,8 @@ Without a running Airflow:
 astro local check     # Parse DAGs: import errors, syntax issues   v1: astro dev parse
 uv run pytest         # Run the project's tests                    v1: astro dev pytest
 ```
+
+A new v2 project has no pytest: add it once with `uv add --dev pytest`.
 
 Against a running Airflow:
 

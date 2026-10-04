@@ -124,7 +124,7 @@ These fire **even in `bypassPermissions` mode and even with `--skip-permissions`
 
 - Reads/writes to sensitive files: `.env*`, `~/.ssh/**`, `~/.aws/**`, shell rc files
 - Out-of-project writes (paths outside the project root)
-- Destructive Astro/Airflow commands: `astro deploy`, `astro deployment delete`, `astro dev kill`, `af dags delete`, `af runs delete`, `af runs clear`, `af tasks clear`, `af connections delete`, `af variables delete`, etc. The `af` patterns also match the Astro CLI v2 spellings (`astro af ...`, `astro local af ...`); Otto builds with v2 support add `astro local reset`.
+- Destructive Astro/Airflow commands: `astro deploy`, `astro deployment delete`, `astro dev kill` (v1), `af dags delete`, `af runs delete`, `af runs clear`, `af tasks clear`, `af connections delete`, `af variables delete`, etc. The `af` patterns also match the Astro CLI v2 spellings (`astro af ...`, `astro local af ...`); Otto builds with v2 support add `astro local reset`.
 
 Don't assume `--skip-permissions` makes Otto fully unattended.
 
@@ -210,8 +210,8 @@ When you launch `astro otto` from an Astro project, the CLI sets these for you. 
 | Variable | Set from |
 |---|---|
 | `ASTRO_TOKEN`, `ASTRO_DOMAIN`, `ASTRO_ORGANIZATION` | Current `astro login` context (auto-refreshed in the background) |
-| `AIRFLOW_API_URL` | Local Airflow proxy if `astro dev start` is running |
-| `AIRFLOW_USERNAME`, `AIRFLOW_PASSWORD` | Default to `admin/admin` when local Airflow is connected |
+| `AIRFLOW_API_URL` | This project's local Airflow, if it is running (`astro local start`; Astro CLI v1: `astro dev start`) |
+| `AIRFLOW_USERNAME`, `AIRFLOW_PASSWORD` | Default to `admin/admin` when a v1 project's local Airflow is connected (not set for a v2 project's) |
 
 Otto also walks up from the cwd to `/`, loading any `AGENTS.md` or `CLAUDE.md` it finds (plus `~/.astro/otto/AGENTS.md`). When both files exist in the same folder, `AGENTS.md` wins. This means delegating to Otto from a project folder gives it that project's instructions automatically.
 

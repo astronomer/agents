@@ -212,7 +212,7 @@ If the user is on Astronomer's Astro CLI, the same idea maps onto an Astro proje
    ```
 
 3. Put the coordinator config in the project's `.env` (loaded automatically) — see **configuring-airflow-language-sdks** for the `AIRFLOW__SDK__*` values.
-4. `astro dev start` (or `astro dev restart` after changes) builds the image and starts Airflow locally; deploy with `astro deploy` as usual.
+4. Build the image and start Airflow locally. Astro CLI v2: declare the Dockerfile in `pyproject.toml` (`[tool.astro]` `dockerfile = "Dockerfile"`) and run `astro local start --docker` (`astro local restart` after changes; standalone mode builds no image). v1: `astro dev start` (or `astro dev restart`). Deploy with `astro deploy` as usual.
 
 > Don't pin Astro Runtime / Airflow versions from memory — read the generated `Dockerfile` or check current docs. While the SDK and Airflow 3.3 are in preview, a beta/dev Astro Runtime image may be required.
 

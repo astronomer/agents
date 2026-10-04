@@ -24,10 +24,10 @@ Format per entry: symptom (the error or misbehavior as observed), class (what is
 
 - **Symptom**: intermittent `IOException: Could not set lock on file "....duckdb": Conflicting lock is held in airflow worker (PID ...)` on tasks that write to a shared DuckDB file; may pass on lucky timing.
 - **Class**: concurrency contract change. Dagster ran sibling asset writes through one process pool where collisions were rare, and dbt was ONE `dbt build` process; Airflow runs sibling tasks in parallel workers and Cosmos runs one dbt process per model, so a single-writer database gets concurrent writers.
-- **Fix (pattern)**: a 1-slot Airflow pool on every task that opens the file — `pool=` on @task, `operator_args={"pool": ...}` on DbtTaskGroup. Declare it in `airflow_settings.yaml` (astro dev applies pools on start) and create the same pool on the Deployment.
+- **Fix (pattern)**: a 1-slot Airflow pool on every task that opens the file — `pool=` on @task, `operator_args={"pool": ...}` on DbtTaskGroup. Declare it so local Airflow creates it on start (Astro CLI v2: `[tool.astro.pools.<name>]` with `slots = 1` in `pyproject.toml`; v1: `airflow_settings.yaml`) and create the same pool on the Deployment.
 - **Origin**: test migration (`project_fully_featured`), comments/stories view creation race; independently hit and pool-pattern-verified in testing (gauntlet) under parallel asset-triggered DAGs. Applies to any single-writer local store (DuckDB, SQLite); keep connections short-lived (open-write-close per task). Reference home: io-and-data-passing.md, "Single-writer stores under Airflow parallelism".
 
-## `astro dev parse` fails from the CLI's own bundled integrity test on Airflow 3.3
+## `astro dev parse` (Astro CLI 1.x) fails from the CLI's own bundled integrity test on Airflow 3.3
 
 - **Symptom**: `astro dev parse` exits nonzero with `TypeError: DagBag.__init__() got an unexpected keyword argument 'include_examples'` in `.astro/test_dag_integrity_default.py`, regardless of your DAGs.
 - **Class**: tooling incompatibility. Airflow 3.3 removed `include_examples` from `DagBag.__init__`; astro CLI (<= 1.43.1) scaffolds an integrity test that still passes it.
@@ -60,7 +60,7 @@ Format per entry: symptom (the error or misbehavior as observed), class (what is
 
 - **Symptom**: `validate_dag.py` (or any in-process `DagBag(dag_folder=...)`) in a clean venv/AIRFLOW_HOME dies with `sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such table: dag` on Airflow 3.3.0.
 - **Class**: environment, not DAG code. DagBag population on 3.3 touches the metadata DB even without `get_dag()`; a fresh AIRFLOW_HOME has no schema.
-- **Fix (pattern)**: run `airflow db migrate` once in the AIRFLOW_HOME used for gates, before any DagBag-based gate. Containers built by `astro dev` already have a migrated DB; this bites only local-venv gate runs.
+- **Fix (pattern)**: run `airflow db migrate` once in the AIRFLOW_HOME used for gates, before any DagBag-based gate. Containers and environments started by the Astro CLI (`astro local start`; v1: `astro dev start`) already have a migrated DB; this bites only local-venv gate runs.
 - **Origin**: test migration (dagster-open-platform), Airflow 3.3.0 / py3.12 venv.
 
 ## Migration input artifact ungenerable from the source repo (public mirror strips content)

@@ -430,8 +430,8 @@ After installing, the `dagfactory` CLI is on PATH:
 dagfactory lint dags/
 
 # 2. Have Airflow parse to catch operator/import errors
-#    (Astro CLI users)
-astro dev parse
+#    (Astro CLI users; `astro local af --help` succeeds only on v2)
+astro local check    # v1: astro dev parse
 ```
 
 `dagfactory lint` only checks YAML syntax — operator import errors and missing kwargs surface at Airflow parse time.
@@ -450,7 +450,7 @@ astro dev parse
 
 **Cause**: Loader file missing or `globals_dict=globals()` not passed.
 
-**Fix**: Ensure a Python file in `dags/` calls `load_yaml_dags(globals_dict=globals(), ...)`. Check `astro dev parse` (or `airflow dags list-import-errors`) for parse errors.
+**Fix**: Ensure a Python file in `dags/` calls `load_yaml_dags(globals_dict=globals(), ...)`. Check `astro local check` (Astro CLI v1: `astro dev parse`; or `airflow dags list-import-errors`) for parse errors.
 
 ### "Argument is not JSON-serializable" / wrong kwarg type
 

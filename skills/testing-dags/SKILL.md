@@ -31,6 +31,8 @@ astro local check     # v1: astro dev parse
 uv run pytest         # v1: astro dev pytest
 ```
 
+A new v2 project has no pytest: add it once with `uv add --dev pytest`.
+
 Use these for quick validation during development. For full end-to-end testing against a live Airflow instance, continue to the trigger-and-wait workflow below.
 
 ---

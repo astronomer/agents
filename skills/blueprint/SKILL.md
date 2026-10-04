@@ -611,7 +611,7 @@ Each emitted schema includes a top-level `templateType` field — `"blueprint"` 
 
 ### Astro Project Auto-Detection
 
-After creating or modifying a blueprint, **automatically check** whether the project is an Astro project by looking for a `.astro/` directory (created by `astro dev init`).
+After creating or modifying a blueprint, **automatically check** whether the project is an Astro project: a `pyproject.toml` with a `[tool.astro]` table (Astro CLI v2, created by `astro init`) or a `.astro/` directory (v1, created by `astro dev init`).
 
 If it is, **automatically regenerate schemas** without prompting, writing one file per blueprint from `blueprint list` plus the DAG-level args schema, into `blueprint/generated-schemas/`. The Astro IDE reads that directory to render configuration forms, so keeping it in sync ensures the visual builder reflects the latest configs.
 

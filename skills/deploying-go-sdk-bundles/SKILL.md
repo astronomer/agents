@@ -76,7 +76,7 @@ On the Helm chart, bake the bundle into a custom image as above or mount it via 
 1. Build/pack the bundle, then stage it in the project: `mkdir -p include/executable-bundles && cp ../go-bundle/<packed-bundle> include/executable-bundles/`.
 2. In the project `Dockerfile`, copy the bundle to the coordinator's directory: `COPY include/executable-bundles/ /opt/airflow/executable-bundles/`.
 3. Put the coordinator config in the project `.env` (loaded automatically): the `AIRFLOW__SDK__*` JSON values (see **configuring-airflow-language-sdks**).
-4. `astro dev start` (or `astro dev restart` after changes); deploy with `astro deploy`.
+4. Start it with the image build. Astro CLI v2: declare the Dockerfile in `pyproject.toml` (`[tool.astro]` `dockerfile = "Dockerfile"`) and run `astro local start --docker` (`astro local restart` after changes; standalone mode builds no image). v1: `astro dev start` (or `astro dev restart`). Deploy with `astro deploy`.
 
 > Don't pin Astro Runtime / Airflow versions from memory; read the generated `Dockerfile` or current docs. While the Go SDK is in preview, a beta/dev image may be required.
 

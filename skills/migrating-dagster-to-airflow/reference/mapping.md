@@ -206,8 +206,8 @@ Target Astro Runtime 3.3+ to get the full surface. Pre-3.2 fallback is logical-d
 
 | Dagster | Airflow 3 / Astro target | Class | Notes |
 |---|---|---|---|
-| `dagster dev` | `astro dev start` | MECH | Different feel; set expectations |
-| `dagster definitions validate` | `astro dev parse` (DagBag import check) | MECH | First rung of the validation ladder |
-| `materialize()` in unit tests | `dag.test()` (in-file) / `astro dev pytest` | JUDG | See `validation.md` |
+| `dagster dev` | `astro local start` (Astro CLI v1: `astro dev start`) | MECH | Different feel; set expectations |
+| `dagster definitions validate` | `astro local check` (v1: `astro dev parse`) (DagBag import check) | MECH | First rung of the validation ladder |
+| `materialize()` in unit tests | `dag.test()` (in-file) / `uv run pytest` (once: `uv add --dev pytest`; v1: `astro dev pytest`) | JUDG | See `validation.md` |
 | `build_asset_context()` etc. | Plain function tests of task callables | JUDG | |
-| `dagster asset materialize` CLI | `astro run <dag-id>` (single DAG, one worker container) | MECH | |
+| `dagster asset materialize` CLI | v1: `astro run <dag-id>` (single DAG, one worker container). v2 has no `astro run`: `astro local run airflow dags test <dag-id>` runs it in the project environment | MECH | |

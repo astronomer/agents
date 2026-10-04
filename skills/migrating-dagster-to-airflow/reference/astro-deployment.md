@@ -101,7 +101,7 @@ Astronomer's Airflow-migration methodology (Prepare → metadata → code → cu
 
 1. Freeze new pipeline development on Dagster (freeze-old/build-new).
 2. Create Workspace + Deployments (per env, per region) on Astro.
-3. `astro dev init` the project(s); wire CI/CD (`astro deploy`, preview Deployments).
+3. `astro init` the project(s) (Astro CLI v1: `astro dev init`); wire CI/CD (`astro deploy`, preview Deployments).
 4. Build the secrets/connection naming map; create Connections + env vars per Deployment.
 5. Migrate code domain-by-domain per the skill workflow (SKILL.md), validating each unit through the ladder in `validation.md`.
 6. Run side-by-side: Dagster remains authoritative; Airflow DAGs run paused-or-shadowed until parity per domain.

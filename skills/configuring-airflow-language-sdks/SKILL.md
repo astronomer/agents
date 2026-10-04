@@ -108,7 +108,7 @@ coordinators = {
 
 ## Verifying the configuration
 
-1. Confirm the runtime/artifact is usable where workers run — for the Java SDK, `java -version` via `astro dev bash` or `docker compose exec ...`; for the Go SDK, the packed bundle exists and matches the worker's OS/arch.
+1. Confirm the runtime/artifact is usable where workers run — for the Java SDK, `java -version` via `astro local shell` (Astro CLI v1: `astro dev bash`) or `docker compose exec ...`; for the Go SDK, the packed bundle exists and matches the worker's OS/arch.
 2. Confirm the artifact directory referenced in `kwargs` (e.g. `jars_root`, `executables_root`) actually contains your artifact on the worker filesystem.
 3. Trigger the DAG and open the native task's logs — you should see the subprocess start and your task output.
 
