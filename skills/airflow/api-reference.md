@@ -12,7 +12,7 @@ astro local api ls
 
 # Filter endpoints by pattern
 astro local api ls --filter variable
-astro local api ls xcom
+astro local api ls --filter xcom
 
 # Get full OpenAPI spec (for detailed method/parameter info)
 astro local api spec
@@ -47,7 +47,6 @@ astro local api variables/old_var -X DELETE
 | `--raw-field key=value` | Keeps value as raw string | Values that look like numbers but should be strings |
 | `--body '{}'` | Raw JSON body | Complex nested objects |
 | `-F key=@file` | Read value from file | Large values, configs |
-| `--input file.json` | Raw JSON body from a file (`-` for stdin) | Bodies too big to inline |
 
 ```bash
 # Type conversion examples

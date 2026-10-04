@@ -217,7 +217,7 @@ Otto also walks up from the cwd to `/`, loading any `AGENTS.md` or `CLAUDE.md` i
 
 ### Caveat: `af` requires a connected Airflow
 
-If no Airflow instance is reachable, Otto can still read and edit DAG code but **won't run Airflow commands**. For tasks that need DAG-run inspection, task logs, connections, or variables, ensure local Airflow is running first (`astro local start`) or point it at a linked deployment (`astro use <link>`, or `astro link add` to link one).
+If no Airflow instance is reachable, Otto can still read and edit DAG code but **won't run Airflow commands**. For tasks that need DAG-run inspection, task logs, connections, or variables, ensure local Airflow is running first (`astro local start`, or `astro dev start` in an Astro CLI v1 project) or, in a v2 project, point it at a linked deployment (`astro use <link>`, or `astro link add` to link one).
 
 ## Auto DAG validation
 
