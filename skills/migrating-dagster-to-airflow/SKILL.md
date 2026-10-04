@@ -89,7 +89,7 @@ The gate's outcome is three-valued, and the middle one is the common case:
 - **Per-edge IO decisions** via the tree in `reference/io-and-data-passing.md` (fuse / explicit storage / XCom).
 - **Order**: leaf domains first, dependency order after; the platform layer last.
 - **Fill each planned unit's target expectations into the manifest**: `dag_id`, `task_count`, `edges`, `schedule`, `asset_outlets` per unit. Gate 3 asserts against exactly these fields; a unit without them is skipped by validation, so an unenriched manifest means Gate 3 checks nothing (validate_dag reports skipped counts loudly, do not ignore them).
-- Scaffold the target: `astro init` (Astro CLI v1: `astro dev init`; `astro local af --help` succeeds only on v2), shared helpers under `include/`. House conventions the scaffold imposes (e.g. a test demanding `retries >= 2`) do NOT override source fidelity: source behavior wins; convention adoption is a post-cutover improvement listed in the report, and the scaffold test gets skipped with an explicit reason.
+- Scaffold the target: `astro init` (Astro CLI v1: `astro dev init`; check first, on its own: `astro local af --help >/dev/null 2>&1 && echo v2 || echo v1`), shared helpers under `include/`. House conventions the scaffold imposes (e.g. a test demanding `retries >= 2`) do NOT override source fidelity: source behavior wins; convention adoption is a post-cutover improvement listed in the report, and the scaffold test gets skipped with an explicit reason.
 
 ### Phase 3: Trial
 

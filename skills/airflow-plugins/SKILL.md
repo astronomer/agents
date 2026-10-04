@@ -533,7 +533,7 @@ MYPLUGIN_USERNAME=admin
 MYPLUGIN_PASSWORD=admin
 ```
 
-Commands below are Astro CLI v2 forms with the v1 (`astro dev`) form beside them; `astro local af --help` succeeds only on v2.
+Commands below are Astro CLI v2 forms with the v1 (`astro dev`) form beside them; check which applies first, on its own: `astro local af --help >/dev/null 2>&1 && echo v2 || echo v1`.
 
 ```bash
 astro local restart    # required after any Python plugin change   v1: astro dev restart

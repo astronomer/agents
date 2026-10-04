@@ -430,7 +430,8 @@ After installing, the `dagfactory` CLI is on PATH:
 dagfactory lint dags/
 
 # 2. Have Airflow parse to catch operator/import errors
-#    (Astro CLI users; `astro local af --help` succeeds only on v2)
+#    (Astro CLI users; check first, on its own:
+#    `astro local af --help >/dev/null 2>&1 && echo v2 || echo v1`)
 astro local check    # v1: astro dev parse
 ```
 

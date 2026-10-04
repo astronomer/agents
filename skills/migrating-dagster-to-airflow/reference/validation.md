@@ -46,7 +46,7 @@ Ported source code can violate the target lint even though Dagster shipped it fi
 
 A file can be valid Python and still fail to produce a DAG (bad imports, top-level exceptions, duplicate DAG ids). Two equivalent checks; run both, they catch different things.
 
-The Astro CLI parse check (whole project, no running env; `astro local af --help` succeeds only on Astro CLI v2):
+The Astro CLI parse check (whole project, no running env; check the CLI version first, on its own: `astro local af --help >/dev/null 2>&1 && echo v2 || echo v1`):
 
 ```bash
 astro local check    # v1: astro dev parse

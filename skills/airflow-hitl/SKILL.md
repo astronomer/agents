@@ -7,7 +7,7 @@ description: Builds human-in-the-loop (HITL) Airflow workflows - approval gates,
 
 Pause a DAG until a human responds via the Airflow UI or REST API. HITL operators are deferrable — they release their worker slot while waiting.
 
-> **Requires Airflow 3.1+** (`astro local af version` on Astro CLI v2; `af config version` on v1, where `astro local af --help` fails).
+> **Requires Airflow 3.1+** (`astro local af version` on Astro CLI v2; `af config version` on v1; check first, on its own: `astro local af --help >/dev/null 2>&1 && echo v2 || echo v1`).
 >
 > **UI location**: Browse → Required Actions. Respond from the task instance page's Required Actions tab.
 >

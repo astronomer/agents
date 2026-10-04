@@ -61,7 +61,7 @@ Report status using this scale:
 
 Check Airflow for the source pipeline:
 
-> Airflow commands in this skill are Astro CLI v2 forms. On v1 (where `astro local af --help` fails), run the same command with `af` in place of `astro local af` (`uvx --from astro-airflow-mcp af` if `af` is not on PATH).
+> Airflow commands in this skill are Astro CLI v2 forms. Check first, on its own: `astro local af --help >/dev/null 2>&1 && echo v2 || echo v1`. On v1, run the same command with `af` in place of `astro local af`. If `af` is not on PATH, write `uvx --from astro-airflow-mcp af <args>` out in full in every command, never in a shell variable or alias.
 
 1. **Find the DAG**: Which DAG populates this table? Use `astro local af dags list` and look for matching names.
 
