@@ -256,10 +256,7 @@ astro deployment variable update --deployment-id <DEPLOYMENT_ID> \
 
 ### Delete Variables
 
-```bash
-# Delete variable
-astro deployment variable delete --deployment-id <DEPLOYMENT_ID> --key OLD_KEY
-```
+The CLI has no command to delete a deployment variable (`astro deployment variable` has only `list`, `create`, and `update`); remove it in the Astro UI, from the deployment's environment variables.
 
 **Note**: Variables are available to DAGs as environment variables. Changes require no redeployment.
 

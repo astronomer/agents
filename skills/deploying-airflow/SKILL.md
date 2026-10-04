@@ -22,7 +22,7 @@ Astro provides CLI commands and GitHub integration for deploying Airflow project
 | `astro deploy` | Full project deploy — builds Docker image and deploys DAGs |
 | `astro deploy --dags` | DAG-only deploy — pushes only DAG files (fast, no image build) |
 | `astro deploy --image` | Image-only deploy — pushes only the Docker image (for multi-repo CI/CD) |
-| `astro deploy --dbt` | dbt project deploy — deploys a dbt project to run alongside Airflow |
+| `astro dbt deploy <DEPLOYMENT_ID>` | dbt project deploy — deploys a dbt project to run alongside Airflow |
 
 ### Full Project Deploy
 
@@ -59,7 +59,7 @@ This is useful in multi-repo setups where DAGs are deployed separately from the 
 Deploys a dbt project to run with Cosmos on an Astro deployment:
 
 ```bash
-astro deploy --dbt
+astro dbt deploy <DEPLOYMENT_ID>
 ```
 
 ### GitHub Integration
@@ -434,6 +434,6 @@ kubectl exec -it deployment/airflow-scheduler -n airflow -- airflow dags list
 ## Related Skills
 
 - **setting-up-astro-project**: For initializing a new Astro project
-- **managing-astro-local-env**: For local development with `astro dev`
+- **managing-astro-local-env**: For local development with `astro local` (Astro CLI v1: `astro dev`)
 - **authoring-dags**: For writing DAGs before deployment
 - **testing-dags**: For testing DAGs before deployment

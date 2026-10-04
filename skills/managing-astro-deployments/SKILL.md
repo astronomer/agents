@@ -79,8 +79,8 @@ astro deployment inspect --deployment-name data-service-stg
 astro deployment create
 
 # Create with specific executor
-astro deployment create --label production --executor celery
-astro deployment create --label staging --executor kubernetes
+astro deployment create --name production --executor CeleryExecutor
+astro deployment create --name staging --executor KubernetesExecutor
 
 # Executor options:
 #   - celery: Best for most production workloads
@@ -94,7 +94,7 @@ astro deployment create --label staging --executor kubernetes
 
 ```bash
 # Enable DAG-only deploys (faster iteration)
-astro deployment update <DEPLOYMENT_ID> --dag-deploy-enabled
+astro deployment update <DEPLOYMENT_ID> --dag-deploy enable
 
 # Update other settings (use --help for full options)
 astro deployment update <DEPLOYMENT_ID> --help
@@ -141,14 +141,14 @@ Use when:
 - Quick iteration during development
 - Much faster than full deploy (seconds vs minutes)
 
-**Requires**: `--dag-deploy-enabled` flag set on deployment (see Update Deployments)
+**Requires**: DAG-only deploys enabled on the deployment (`--dag-deploy enable`) (see Update Deployments)
 
 ### Image-Only Deploy
 
 Deploy only Docker image, skip DAG sync:
 
 ```bash
-astro deploy <DEPLOYMENT_ID> --image-only
+astro deploy <DEPLOYMENT_ID> --image
 ```
 
 Use when:
@@ -210,7 +210,7 @@ astro workspace list
 astro workspace switch <PROD_WORKSPACE_ID>
 
 # 3. Create deployment
-astro deployment create --label production --executor celery
+astro deployment create --name production --executor CeleryExecutor
 
 # 4. Note the deployment ID, then deploy
 astro deploy <DEPLOYMENT_ID>
@@ -220,7 +220,7 @@ astro deploy <DEPLOYMENT_ID>
 
 ```bash
 # 1. Enable fast deploys (one-time setup)
-astro deployment update <DEPLOYMENT_ID> --dag-deploy-enabled
+astro deployment update <DEPLOYMENT_ID> --dag-deploy enable
 
 # 2. Make DAG changes locally
 
@@ -256,8 +256,8 @@ astro config set <KEY> <VALUE>
 # Check CLI version
 astro version
 
-# Upgrade CLI to latest version
-astro upgrade
+# Upgrade the CLI: there is no `astro upgrade` command; reinstall the CLI the way it was installed
+# (for example `brew upgrade astro`)
 ```
 
 ---
@@ -269,7 +269,7 @@ astro upgrade
 - Use `deployment inspect` to verify deployment health before deploying
 - Deployment IDs are permanent, names can change
 - Most commands work with deployment ID; `inspect` also accepts `--deployment-name`
-- Set `--dag-deploy-enabled` once per deployment for fast deploys
+- Enable DAG-only deploys (`--dag-deploy enable`) once per deployment for fast deploys
 - Keep workspace context visible with `astro workspace list` (shows asterisk for current)
 
 ---
