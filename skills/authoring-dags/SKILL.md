@@ -10,15 +10,19 @@ hooks:
 
 # DAG Authoring Skill
 
-This skill guides you through creating and validating Airflow DAGs using best practices and Astro CLI commands (`astro local af ...`).
+This skill guides you through creating and validating Airflow DAGs using best practices and Airflow CLI commands.
 
 > **For testing and debugging DAGs**, see the **testing-dags** skill which covers the full test -> debug -> fix -> retest workflow.
 
 ---
 
-## Running the CLI
+## Astro CLI v1 or v2
 
-These commands use the Astro CLI against this project's local Airflow (`astro local af ...`). For a deployment, swap `astro local af` for `astro af` and add `-d <link>`.
+Commands here are written for Astro CLI v2. Run `astro local af --help` once: it succeeds only on v2.
+
+- **v2:** run them as written.
+- **v1** (Astro CLI 1.x, or no Astro CLI): use the standalone `af` CLI (`uvx --from astro-airflow-mcp af` if `af` is not on PATH). Write `af` for `astro local af` and `af api` for `astro local api`, and drop `-o json` (`af` always prints JSON). Where a command needs more than that, its v1 form is given beside it, marked `v1:`.
+- If a v2 command reports an Astro v1 project, use the v1 forms. Upgrading the project (`astro init`) is the user's call.
 
 ---
 
@@ -71,21 +75,21 @@ Use file tools to find existing patterns:
 
 ### Query the Airflow Environment
 
-Use `astro local af` commands to understand what's available:
+Use these commands to understand what's available:
 
 | Command | Purpose |
 |---------|---------|
-| `astro local af connections list` | What external systems are configured |
-| `astro local af variables list` | What configuration values exist (keys only; `variables get <key>` reads a value) |
-| `astro local af providers` | What operator packages are installed |
-| `astro local af version` | Version constraints and features |
+| `astro local af connections list` (v1: `af config connections`) | What external systems are configured |
+| `astro local af variables list` (v1: `af config variables`) | What configuration values exist (v2 lists keys only; `variables get <key>` reads one) |
+| `astro local af providers` (v1: `af config providers`) | What operator packages are installed |
+| `astro local af version` (v1: `af config version`) | Version constraints and features |
 | `astro local af dags list` | Existing DAGs and naming conventions |
-| `astro local af pools list` | Resource pools for concurrency |
+| `astro local af pools list` (v1: `af config pools`) | Resource pools for concurrency |
 
 **Example discovery questions:**
-- "Is there a Snowflake connection?" -> `astro local af connections list`
-- "What Airflow version?" -> `astro local af version`
-- "Are S3 operators available?" -> `astro local af providers`
+- "Is there a Snowflake connection?" -> `astro local af connections list` (v1: `af config connections`)
+- "What Airflow version?" -> `astro local af version` (v1: `af config version`)
+- "Are S3 operators available?" -> `astro local af providers` (v1: `af config providers`)
 
 ---
 
@@ -115,7 +119,7 @@ Write the DAG following best practices (see below). Key steps:
 
 ## Phase 4: Validate
 
-**Use `astro local af` as a feedback loop to validate your DAG.**
+**Use the Airflow CLI as a feedback loop to validate your DAG.**
 
 ### Step 1: Check Import Errors
 
@@ -158,7 +162,7 @@ Returns in one call: metadata, tasks, dependencies, source code.
 
 If you're running on Astro, you can also validate locally before deploying:
 
-- **Parse check**: Run `astro dev parse` to catch import errors and DAG-level issues without starting a full Airflow environment
+- **Parse check**: Run `astro local check` (v1: `astro dev parse`) to catch import errors and DAG-level issues without starting a full Airflow environment
 - **DAG-only deploy**: Once validated, use `astro deploy --dags` for fast DAG-only deploys that skip the Docker image build — ideal for iterating on DAG code
 
 ---
@@ -170,8 +174,8 @@ If you're running on Astro, you can also validate locally before deploying:
 Once validation passes, test the DAG using the workflow in the **testing-dags** skill:
 
 1. **Get user consent** -- Always ask before triggering
-2. **Trigger and wait** -- `astro local af runs trigger-wait <dag_id> --timeout 300` (exit 0 succeeded, 1 failed, 2 timed out with the run still going)
-3. **Analyze results** -- Check success/failure status
+2. **Trigger and wait** -- `astro local af runs trigger-wait <dag_id> --timeout 300`
+3. **Analyze results** -- Check success/failure status (see "Response Interpretation" in **testing-dags**: the two versions report it differently)
 4. **Debug if needed** -- `astro local af runs diagnose <dag_id> <run_id>` and `astro local af tasks logs <dag_id> <run_id> <task_id>`
 
 ### Quick Test (Minimal)
@@ -199,10 +203,10 @@ If issues found:
 
 | Phase | Command | Purpose |
 |-------|---------|---------|
-| Discover | `astro local af connections list` | Available connections |
-| Discover | `astro local af variables list` | Configuration values |
-| Discover | `astro local af providers` | Installed operators |
-| Discover | `astro local af version` | Version info |
+| Discover | `astro local af connections list` (v1: `af config connections`) | Available connections |
+| Discover | `astro local af variables list` (v1: `af config variables`) | Configuration values |
+| Discover | `astro local af providers` (v1: `af config providers`) | Installed operators |
+| Discover | `astro local af version` (v1: `af config version`) | Version info |
 | Validate | `astro local af dags errors` | Parse errors (check first!) |
 | Validate | `astro local af dags get <dag_id>` | Verify DAG config |
 | Validate | `astro local af dags warnings` | Configuration warnings |

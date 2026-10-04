@@ -5,24 +5,30 @@ description: Complex DAG testing workflows with debugging and fixing cycles. Use
 
 # DAG Testing Skill
 
-Use `astro local af` commands to test, debug, and fix DAGs in iterative cycles.
+Use the Airflow CLI to test, debug, and fix DAGs in iterative cycles.
 
-## Running the CLI
+## Astro CLI v1 or v2
 
-These commands use the Astro CLI against this project's local Airflow (`astro local af ...`). To test against a deployment instead, swap `astro local af` for `astro af` and add `-d <link>`.
+Commands here are written for Astro CLI v2. Run `astro local af --help` once: it succeeds only on v2.
+
+- **v2:** run them as written.
+- **v1** (Astro CLI 1.x, or no Astro CLI): use the standalone `af` CLI (`uvx --from astro-airflow-mcp af` if `af` is not on PATH). Write `af` for `astro local af` and `af api` for `astro local api`, and drop `-o json` (`af` always prints JSON). Where a command needs more than that, its v1 form is given beside it, marked `v1:`.
+- If a v2 command reports an Astro v1 project, use the v1 forms. Upgrading the project (`astro init`) is the user's call.
+
+To test against a deployment instead of the local Airflow, see "Choosing Which Airflow" in the **airflow** skill.
 
 ---
 
 ## Quick Validation with Astro CLI
 
-If the user has the Astro CLI available, these commands provide fast feedback without needing a running Airflow instance:
+These give fast feedback without a running Airflow instance:
 
 ```bash
 # Parse DAGs to catch import errors, syntax issues, and DAG-level problems
-astro dev parse
+astro local check     # v1: astro dev parse
 
-# Run pytest against DAGs (runs tests in tests/ directory)
-astro dev pytest
+# Run the project's tests (tests/ directory)
+uv run pytest         # v1: astro dev pytest
 ```
 
 Use these for quick validation during development. For full end-to-end testing against a live Airflow instance, continue to the trigger-and-wait workflow below.
@@ -102,17 +108,25 @@ astro local af runs trigger-wait my_dag --timeout 300
 
 ### Response Interpretation
 
-The exit status tells you how the run ended, and the output (with `-o json`) is the run as it last stood:
+Read the JSON the command prints (v2: add `-o json`). The two versions shape it differently:
 
-| Exit | Meaning | Next step |
-|------|---------|-----------|
-| `0` | Run succeeded | Summarize and stop |
-| `1` | Run failed (or the command itself failed, e.g. DAG not found) | Read `failed_tasks`, then go to Phase 2 |
-| `2` | Wait timed out; the run is **still going** | See "If Timed Out" below |
+| | v2 | v1 |
+|---|---|---|
+| Run state | top-level `state` | `dag_run.state` |
+| Timed out | `timed_out: true` | `timed_out: true`, and `state` at the top level |
+| Failed tasks | `failed_tasks` | `failed_tasks` |
+| Exit status | 0 succeeded, 1 failed (or the command itself failed, e.g. DAG not found), 2 timed out | 0 whenever the wait finished or timed out; 1 only when the command itself failed |
 
-Don't chain the next command with `&&` after `trigger-wait`: a failed run exits 1, and that is exactly when you need the debugging commands to run.
+| Result | Next step |
+|------|-----------|
+| State `success` | Summarize and stop |
+| State `failed` | Read `failed_tasks`, then go to Phase 2 |
+| `timed_out: true` | The run is **still going**; see "If Timed Out" below |
+| Error JSON, no run (e.g. DAG not found) | See "Check Import Errors" below |
 
-**Success (exit 0):**
+Don't chain the next command with `&&` after `trigger-wait`: on v2 a failed run exits 1, and that is exactly when the debugging commands need to run.
+
+**Success (v2):**
 ```json
 {
   "dag_id": "my_dag",
@@ -127,7 +141,7 @@ Don't chain the next command with `&&` after `trigger-wait`: a failed run exits 
 }
 ```
 
-**Failure (exit 1):**
+**Failure (v2; v1 has the same fields under `dag_run`, with `timed_out`, `elapsed_seconds`, and `failed_tasks` beside it):**
 ```json
 {
   "dag_id": "my_dag",
@@ -145,7 +159,7 @@ Don't chain the next command with `&&` after `trigger-wait`: a failed run exits 
 }
 ```
 
-**Timeout (exit 2):**
+**Timeout (both versions):**
 ```json
 {
   "dag_id": "my_dag",
@@ -185,7 +199,7 @@ The DAG ran successfully. Summarize for the user:
 
 ### If Timed Out
 
-The DAG is still running (exit 2; stopping the wait does not stop the run). Options:
+The DAG is still running (stopping the wait does not stop the run). Options:
 1. Check current status: `astro local af runs get <dag_id> <dag_run_id>`
 2. Ask user if they want to continue waiting
 3. Increase timeout and try again
@@ -263,8 +277,8 @@ Once you identify the issue:
 |-------|-----|
 | Missing import | Add to DAG file |
 | Missing package | Add to `requirements.txt` |
-| Connection error | Check `astro local af connections list`, verify credentials |
-| Variable missing | Check `astro local af variables list` (keys only; `variables get <key>` for a value), create if needed |
+| Connection error | Check `astro local af connections list` (v1: `af config connections`), verify credentials |
+| Variable missing | Check `astro local af variables list` (v2 shows keys only; `variables get <key>` reads one) (v1: `af config variables`), create if needed |
 | Timeout | Increase task timeout or optimize query |
 | Permission error | Check credentials in connection |
 
@@ -289,8 +303,8 @@ Once you identify the issue:
 | Debug | `astro local af dags errors` | Check for parse errors (if DAG won't load) |
 | Debug | `astro local af dags get <dag_id>` | Verify DAG config |
 | Debug | `astro local af dags explore <dag_id>` | Full DAG inspection |
-| Config | `astro local af connections list` | List connections |
-| Config | `astro local af variables list` | List variable keys |
+| Config | `astro local af connections list` (v1: `af config connections`) | List connections |
+| Config | `astro local af variables list` (v1: `af config variables`) | List variables |
 
 ---
 
@@ -308,7 +322,7 @@ astro local af runs trigger-wait my_dag
 ```bash
 # 1. Run and wait
 astro local af runs trigger-wait my_dag
-# Failed (exit 1)...
+# Failed...
 
 # 2. Find failed tasks
 astro local af runs diagnose my_dag manual__2025-01-14T...
@@ -376,7 +390,7 @@ astro local af runs get my_dag manual__2025-01-14T...
 ### Common Error Patterns
 
 **Connection Refused / Timeout:**
-- Check `astro local af connections list` for correct host/port
+- Check `astro local af connections list` (v1: `af config connections`) for correct host/port
 - Verify network connectivity to external system
 - Check if connection credentials are correct
 

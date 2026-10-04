@@ -7,9 +7,15 @@ description: Comprehensive DAG failure diagnosis and root-cause analysis  with s
 
 You are a data engineer debugging a failed Airflow DAG. Follow this systematic approach to identify the root cause and provide actionable remediation.
 
-## Running the CLI
+## Astro CLI v1 or v2
 
-These commands use the Astro CLI against this project's local Airflow (`astro local af ...`). For a deployment, swap `astro local af` for `astro af` and add `-d <link>`.
+Commands here are written for Astro CLI v2. Run `astro local af --help` once: it succeeds only on v2.
+
+- **v2:** run them as written.
+- **v1** (Astro CLI 1.x, or no Astro CLI): use the standalone `af` CLI (`uvx --from astro-airflow-mcp af` if `af` is not on PATH). Write `af` for `astro local af` and `af api` for `astro local api`, and drop `-o json` (`af` always prints JSON). Where a command needs more than that, its v1 form is given beside it, marked `v1:`.
+- If a v2 command reports an Astro v1 project, use the v1 forms. Upgrading the project (`astro init`) is the user's call.
+
+To debug a deployment instead of the local Airflow, see "Choosing Which Airflow" in the **airflow** skill.
 
 ---
 
@@ -60,7 +66,7 @@ A common cause of failures with no git activity is dependency drift — the user
    docker run --rm <previous_image> pip freeze > /tmp/prev.txt
    diff /tmp/prev.txt /tmp/now.txt
    ```
-   Also compare `docker run --rm <image> python --version` between the two — a Python minor-version bump (3.11 → 3.12, or even a patch) can break wheel compatibility even when `pip freeze` looks identical. `astro local af providers` lists currently installed provider versions, useful for cross-checking against modules named in the traceback.
+   Also compare `docker run --rm <image> python --version` between the two — a Python minor-version bump (3.11 → 3.12, or even a patch) can break wheel compatibility even when `pip freeze` looks identical. `astro local af providers` (v1: `af config providers`) lists currently installed provider versions, useful for cross-checking against modules named in the traceback.
 
 2. **Venv-style operators bypass the worker image.** `@task.virtualenv`, `PythonVirtualenvOperator`, `ExternalPythonOperator`, and `KubernetesPodOperator` build their environment per task run, so an image diff won't catch failures inside them. If the failed task is one of these, read its `requirements` / `image` / `python_version` / `python` args directly:
    - Unbounded specifier (e.g. `pandas>=2.0.0` with no upper bound, or no specifier at all) → a new upstream release is the prime suspect.
@@ -122,7 +128,7 @@ How to prevent this from happening again:
 - Pin dependencies (constraints file, lockfile, or upper-bound specifiers on venv/external/pod operators) to avoid silent upstream drift?
 
 ### Quick Commands
-Provide ready-to-use commands:
-- To clear and rerun the entire DAG run: `astro local af runs clear <dag_id> <run_id> --dry-run` to preview, then, after the user confirms, `astro local af runs clear <dag_id> <run_id> --yes`
-- To clear and rerun specific failed tasks: `astro local af tasks clear <dag_id> <run_id> <task_id>... --dry-run` to preview, then, after the user confirms, the same with `--yes` instead of `--dry-run` (task ids are space-separated)
-- To delete a stuck or unwanted run: `astro local af runs delete <dag_id> <run_id> --yes`, after the user confirms
+Provide ready-to-use commands, for the version the user has. Get the user's go-ahead before running any of them, and preview first:
+- To clear and rerun the entire DAG run: `astro local af runs clear <dag_id> <run_id> --dry-run`, then the same with `--yes` instead of `--dry-run` (same flags on v1)
+- To clear and rerun specific failed tasks: `astro local af tasks clear <dag_id> <run_id> <task_id> <task_id> --dry-run`, then the same with `--yes` instead of `--dry-run` (v1: `af tasks clear <dag_id> <run_id> <task_id>,<task_id> --dry-run`, then `--no-dry-run` instead of `--dry-run`; v1 never prompts)
+- To delete a stuck or unwanted run: `astro local af runs delete <dag_id> <run_id> --yes` (same flags on v1)
