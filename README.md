@@ -266,6 +266,9 @@ See the [full CLI documentation](./astro-airflow-mcp/README.md#airflow-cli-tool)
 
 Configure data warehouse connections at `~/.astro/agents/warehouse.yml`:
 
+> [!TIP]
+> Set `ASTRO_AGENTS_CONFIG_DIR` to an absolute path to read `warehouse.yml`, `.env` and `warehouse.md` from another directory instead of `~/.astro/agents` (`~` is expanded; empty means unset). Use it to give each session its own warehouses. `warehouse.yml` comes only from that directory, while `~/.astro/agents/.env` and `warehouse.md` are still read after that directory's own. The kernel's connection file follows the same directory, so each directory gets its own kernel; the kernel's Python venv stays shared in `~/.astro/agents/kernel_venv`, since it holds no warehouse state.
+
 ```yaml
 my_warehouse:
   type: snowflake

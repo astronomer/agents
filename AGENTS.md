@@ -86,3 +86,5 @@ Use `${CLAUDE_PLUGIN_ROOT}` to reference files within the plugin (required becau
 ## Config Location
 
 This plugin uses `~/.astro/agents/` for user configuration (warehouse credentials, etc.).
+
+Set `ASTRO_AGENTS_CONFIG_DIR` (an absolute path) to move the warehouse config (`warehouse.yml`, `.env`, `warehouse.md`) and the kernel's `kernel.json`/`kernel.pid` elsewhere, e.g. one directory per session. `warehouse.yml` is read only from that directory; the `.env` and `warehouse.md` in `~/.astro/agents` are still read after that directory's, so a user's own secrets and notes keep working. Each directory then gets its own kernel, so a session never connects to a kernel holding another directory's warehouse. The kernel venv (`~/.astro/agents/kernel_venv`) stays shared: it is only the Python environment and holds no warehouse state.
