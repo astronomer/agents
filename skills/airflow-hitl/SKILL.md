@@ -7,7 +7,7 @@ description: Builds human-in-the-loop (HITL) Airflow workflows - approval gates,
 
 Pause a DAG until a human responds via the Airflow UI or REST API. HITL operators are deferrable — they release their worker slot while waiting.
 
-> **Requires Airflow 3.1+** (`astro local af version`).
+> **Requires Airflow 3.1+** (`astro local af version` on Astro CLI v2; `af config version` on v1, where `astro local af --help` fails).
 >
 > **UI location**: Browse → Required Actions. Respond from the task instance page's Required Actions tab.
 >
@@ -42,9 +42,12 @@ af registry modules standard \
 af registry parameters standard \
   | jq '.classes | to_entries[] | select(.key | test("\\.hitl\\.")) | {fqn: .key, parameters: .value.parameters}'
 
-# Pin to the exact installed provider version
+# Pin to the exact installed provider version (Astro CLI v2)
 astro local af providers -o json \
   | jq -r 'select(.package_name == "apache-airflow-providers-standard") | .version'
+# v1:
+af config providers \
+  | jq -r '.providers[] | select(.package_name == "apache-airflow-providers-standard") | .version'
 # then: af registry parameters standard --version <VERSION>
 ```
 
@@ -117,8 +120,11 @@ HITL operators accept a `notifiers` list. Inside a notifier's `notify(context)` 
 The parameter name and accepted identifier format depend on the active auth manager. Do **not** hardcode — check which one is active and which kwarg the current provider exposes:
 
 ```bash
+# Astro CLI v2
 astro local af config --section core -o json | jq -r 'select(.key == "auth_manager") | .value'
-# Refused unless Airflow exposes its config ([api] expose_config); then read AIRFLOW__CORE__AUTH_MANAGER from the project's env instead
+# v1:
+af config show | jq -r '.sections[] | select(.name == "core") | .options[] | select(.key == "auth_manager") | .value'
+# Both are refused unless Airflow exposes its config ([api] expose_config); then read AIRFLOW__CORE__AUTH_MANAGER from the project's env instead
 ```
 
 Then look up the current kwarg in Step 2 (at the time of writing it is `assigned_users`, accepting identifiers in whatever format the active auth manager uses — Astro uses the Astro user ID, FabAuthManager uses email, SimpleAuthManager uses username).
@@ -130,9 +136,9 @@ Then look up the current kwarg in Step 2 (at the time of writing it is `assigned
 For Slack bots, custom apps, or scripts. Discover the live endpoint rather than hardcoding a path:
 
 ```bash
-astro local api ls --filter hitl           # live endpoint list
+astro local api ls --filter hitl           # live endpoint list   v1: af api ls --filter hitl
 astro local api spec \
-  | jq '.paths | to_entries[] | select(.key | test("hitl"))'   # request/response schemas
+  | jq '.paths | to_entries[] | select(.key | test("hitl"))'   # request/response schemas   v1: af api spec
 ```
 
 The PATCH-to-respond pattern is stable; the exact path is discovered. Typical shape:
@@ -144,7 +150,7 @@ HOST = os.environ["AIRFLOW_HOST"]
 TOKEN = os.environ["AIRFLOW_API_TOKEN"]
 HEADERS = {"Authorization": f"Bearer {TOKEN}"}
 
-# List pending — use the path from `astro local api ls --filter hitl`
+# List pending — use the path from `astro local api ls --filter hitl` (v1: `af api ls --filter hitl`)
 requests.get(f"{HOST}/<path>", headers=HEADERS, params={"state": "pending"})
 
 # Respond — same discovered path family, PATCH
@@ -159,7 +165,7 @@ requests.patch(
 
 ## Step 6 — Safety checks
 
-- [ ] Airflow version ≥ 3.1 (`astro local af version`).
+- [ ] Airflow version ≥ 3.1 (`astro local af version`; v1: `af config version`).
 - [ ] Constructor kwargs match the current registry output from Step 2 — no `respondents`-vs-`assigned_users` style drift.
 - [ ] For branching: every option resolves to a downstream task id (directly or via the mapping kwarg from Step 2).
 - [ ] Every value in `defaults` is also in `options`.

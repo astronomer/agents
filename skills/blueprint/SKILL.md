@@ -467,7 +467,7 @@ class Extract(Blueprint[ExtractConfig]):
 - Params are **auto-generated** from Pydantic config models and namespaced per step (e.g. `step_name__field`)
 - YAML values become param defaults; Pydantic metadata (description, constraints, enum values) flows through to the Airflow trigger form
 - Invalid overrides raise `ValidationError` at execution time
-- Override them from the trigger form, or by posting `conf` with the namespaced names to the DAG run endpoint (`astro local api ls --filter dagRun` finds the current path — see the `airflow` skill)
+- Override them from the trigger form, or by posting `conf` with the namespaced names to the DAG run endpoint (`astro local api ls --filter dagRun`, or `af api ls --filter dagRun` on Astro CLI v1, finds the current path — see the `airflow` skill)
 
 ### Trigger Form Customization
 

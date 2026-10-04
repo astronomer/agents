@@ -15,6 +15,8 @@ Use this BEFORE making changes to understand the blast radius.
 
 Find everything that reads from this target:
 
+> Airflow commands in this skill are Astro CLI v2 forms. On v1 (where `astro local af --help` fails), run the same command with `af` in place of `astro local af` (`uvx --from astro-airflow-mcp af` if `af` is not on PATH).
+
 **For Tables:**
 
 1. **Search DAG source code**: Look for DAGs that SELECT from this table
