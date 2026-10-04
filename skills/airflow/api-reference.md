@@ -2,7 +2,14 @@
 
 Direct REST API access for Airflow endpoints not covered by high-level commands.
 
-`astro local api` reaches this project's local Airflow. For a deployment, use `astro api airflow <endpoint> -d <link>`, which takes the same `-X`, `-F`, `-H`, and `-i` flags (it spells the string field `-f`/`--raw-field`). It has no `--body` or `--root`: pass a body with `--input <file>` (`-` for stdin).
+These are written for Astro CLI v2. On v1 (see "Astro CLI v1 or v2" in the airflow skill), write `af api` for `astro local api`; the flags below are the same, except where a `v1:` form is given.
+
+| Target | v2 | v1 |
+|---|---|---|
+| This project's local Airflow | `astro local api <endpoint>` | `af api <endpoint>` |
+| A deployment | `astro api airflow <endpoint> -d <link>` | `af instance use <name>`, then `af api <endpoint>` |
+
+`astro api airflow` takes the same `-X`, `-F`, `--raw-field`, `-H`, and `-i` flags, but has no `--body` or `--root`: pass a body with `--input <file>` (`-` for stdin).
 
 ## Endpoint Discovery
 
@@ -62,16 +69,16 @@ astro local api variables -X POST -F key=port --raw-field value=8080
 
 ### XCom Values
 ```bash
-astro local api xcom-entries -F dag_id=my_dag -F dag_run_id=manual__2024-01-15 -F task_id=my_task
+astro local api dags/my_dag/dagRuns/manual__2024-01-15/taskInstances/my_task/xcomEntries
 ```
 
 ### Event Logs / Audit Trail
 ```bash
-astro local api event-logs -F dag_id=my_dag -F limit=50
-astro local api event-logs -F event=trigger
+astro local api eventLogs -F dag_id=my_dag -F limit=50
+astro local api eventLogs -F event=trigger
 ```
 
-### Backfills (Airflow 2.10+)
+### Backfills (Airflow 3+)
 ```bash
 # Create backfill
 astro local api backfills -X POST --body '{
@@ -91,7 +98,7 @@ astro local api dags/my_dag/dagRuns/manual__2024-01-15/taskInstances
 
 ### Connections (passwords exposed)
 ```bash
-# Warning: Use 'astro local af connections list' for output without passwords
+# Warning: use 'astro local af connections list' (v1: 'af config connections') for output without passwords
 astro local api connections
 astro local api connections/my_conn
 ```
@@ -102,8 +109,9 @@ astro local api connections/my_conn
 # Include HTTP status and headers
 astro local api dags -i
 
-# Access non-versioned endpoints
-astro local api --root /health
+# A path given from the server root, outside the API version prefix
+astro local api --root /api/v2/monitor/health
+# v1: af api /api/v2/monitor/health --raw
 ```
 
 ## When to Use astro local api

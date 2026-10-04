@@ -1,30 +1,29 @@
 ---
 name: airflow
-description: Queries, manages, and troubleshoots Apache Airflow using the Astro CLI (`astro local af`, `astro af`). Use when working with anything related to Airflow - a DAG, a DAG run, a task log, an import or parse error, a broken DAG, or any Airflow operation. Covers listing and triggering DAGs, retrying runs, reading task logs, diagnosing failures, debugging import and parse errors, checking connections, variables and pools, exploring the REST API, and monitoring health (for example "trigger a pipeline", "retry a run", "list connections", "check Airflow health", "why did my DAG fail"). This is the entrypoint that routes to sibling skills for authoring, testing, deploying, and migrating Airflow 2 to 3. Not for warehouse/SQL analytics on Airflow metadata tables (use analyzing-data); for deep root-cause reports use debugging-dags or airflow-investigation.
+description: Queries, manages, and troubleshoots Apache Airflow using the Astro CLI (`astro local af`, `astro af`) or, on Astro CLI v1, the standalone `af` CLI. Use when working with anything related to Airflow - a DAG, a DAG run, a task log, an import or parse error, a broken DAG, or any Airflow operation. Covers listing and triggering DAGs, retrying runs, reading task logs, diagnosing failures, debugging import and parse errors, checking connections, variables and pools, exploring the REST API, and monitoring health (for example "trigger a pipeline", "retry a run", "list connections", "check Airflow health", "why did my DAG fail"). This is the entrypoint that routes to sibling skills for authoring, testing, deploying, and migrating Airflow 2 to 3. Not for warehouse/SQL analytics on Airflow metadata tables (use analyzing-data); for deep root-cause reports use debugging-dags or airflow-investigation.
 ---
 
 # Airflow Operations
 
-Use `astro local af` (this project's Airflow) and `astro af` (a deployment) to query, manage, and troubleshoot Airflow workflows.
+Query, manage, and troubleshoot Airflow from the command line.
+
+## Astro CLI v1 or v2
+
+Commands here are written for Astro CLI v2. Run `astro local af --help` once: it succeeds only on v2.
+
+- **v2:** run them as written.
+- **v1** (Astro CLI 1.x, or no Astro CLI): use the standalone `af` CLI (`uvx --from astro-airflow-mcp af` if `af` is not on PATH). Write `af` for `astro local af` and `af api` for `astro local api`, and drop `-o json` (`af` always prints JSON). Where a command needs more than that, its v1 form is given beside it, marked `v1:`.
+- If a v2 command reports an Astro v1 project, use the v1 forms. Upgrading the project (`astro init`) is the user's call.
 
 ## Astro CLI
 
-The [Astro CLI](https://www.astronomer.io/docs/astro/cli/overview) is the recommended way to run Airflow locally and deploy to production. It provides a containerized Airflow environment that works out of the box:
+The [Astro CLI](https://www.astronomer.io/docs/astro/cli/overview) is the recommended way to run Airflow locally and deploy to production:
 
 ```bash
-# Initialize a new project
-astro dev init
-
-# Start local Airflow (webserver at http://localhost:8080)
-astro dev start
-
-# Parse DAGs to catch errors quickly (no need to start Airflow)
-astro dev parse
-
-# Run pytest against your DAGs
-astro dev pytest
-
-# Deploy to production
+astro init              # Initialize a new project              v1: astro dev init
+astro local start       # Start local Airflow                   v1: astro dev start
+astro local check       # Parse DAGs without starting Airflow   v1: astro dev parse
+uv run pytest           # Run the project's tests               v1: astro dev pytest
 astro deploy            # Full deploy (image + DAGs)
 astro deploy --dags     # DAG-only deploy (fast, no image build)
 ```
@@ -36,19 +35,17 @@ For more details:
 
 ---
 
-## Running the CLI
-
-These commands use the [Astro CLI](https://www.astronomer.io/docs/astro/cli/overview). One command tree, `af` (alias `airflow`), reaches three kinds of Airflow:
-
-| Target | Spelling |
-|---|---|
-| This project's local Airflow | `astro local af <cmd>` |
-| A deployment the project links | `astro af <cmd> -d <link>` |
-| Any other Airflow, by URL | `astro af <cmd> --url <url>` |
-
-The examples below use `astro local af`. To run any of them against a deployment, swap `astro local af` for `astro af` and add `-d <link>`.
-
 ## Choosing Which Airflow
+
+| Target | v2 | v1 |
+|---|---|---|
+| This project's local Airflow | `astro local af <cmd>` | `af <cmd>` |
+| A deployment | `astro af <cmd> -d <link>` | `af instance use <name>`, then `af <cmd>` |
+| Any Airflow, by URL | `ASTRO_AIRFLOW_TOKEN=<token> astro af <cmd> --url <url>` | `AIRFLOW_API_URL=<url> AIRFLOW_AUTH_TOKEN=<token> af <cmd>` |
+
+The examples below use the local form. For a deployment on v2, swap `astro local af` for `astro af` and add `-d <link>`.
+
+**v2.** `astro af` never falls back to the local Airflow; that one is always `astro local af`.
 
 ```bash
 # See which deployments the project links, and pin the one bare `astro af` uses
@@ -60,18 +57,31 @@ astro use prod
 # `astro link add` asks which deployment, but only in a terminal; a script names it.
 astro link add prod --deployment <deployment-id>
 
-# Act on one deployment for a single command
-astro af dags list -d staging
-
-# Reach an Airflow no project declares
+# Reach an Airflow no project declares (or ASTRO_AIRFLOW_USERNAME + ASTRO_AIRFLOW_PASSWORD)
 ASTRO_AIRFLOW_TOKEN="$TOKEN" astro af dags list --url https://airflow.example.com
-# Or username/password:
-ASTRO_AIRFLOW_USERNAME=admin ASTRO_AIRFLOW_PASSWORD=admin astro af dags list --url http://localhost:8080
 ```
 
-A bare `astro af <cmd>` resolves its deployment as `-d` > `ASTRO_DEPLOYMENT` > the `astro use` pin > the manifest's default link, and errors naming the options when none applies. It never falls back to the local Airflow: that one is always `astro local af`.
+A bare `astro af <cmd>` resolves its deployment as `-d` > `ASTRO_DEPLOYMENT` > the `astro use` pin > the manifest's default link, and errors naming the options when none applies.
 
-Two short flags differ from the standalone `af` CLI: `-d` is **deployment** and `-o` is **output**. Pass a DAG id positionally (or with `--dag-id`), and an offset with `--offset`.
+**v1.** `af` acts on its *current instance*: the local Airflow at `http://localhost:8080` until `af instance use` picks another, so check `af instance current` before acting.
+
+```bash
+af instance list
+af instance current
+af instance use prod      # persists until you switch back
+af instance add prod --url https://airflow.example.com --token "$API_TOKEN"
+
+# Preview discoverable Astro deployments and local Airflows. Without --dry-run,
+# discover creates API tokens in Astro, so get the user's go-ahead first.
+af instance discover --dry-run
+
+# One command against another Airflow (or AIRFLOW_USERNAME + AIRFLOW_PASSWORD)
+AIRFLOW_API_URL=https://airflow.example.com AIRFLOW_AUTH_TOKEN="$TOKEN" af dags list
+```
+
+Instances live in the project's `.astro/config.yaml` (committed) and `.astro/config.local.yaml` (gitignored), and in `~/.astro/config.yaml`; `--project`, `--local`, and `--global` choose where `add` and `use` write.
+
+**Use long flags.** `-d` and `-o` mean deployment and output in v2, but DAG id and offset in v1. `--dag-id`, `--offset`, `--limit`, `--state`, and `--timeout` mean the same in both.
 
 ## Quick Reference
 
@@ -87,39 +97,49 @@ Two short flags differ from the standalone `af` CLI: `-d` is **deployment** and 
 | `astro local af dags errors` | List import errors |
 | `astro local af dags warnings` | List DAG warnings |
 | `astro local af dags stats` | DAG run statistics |
-| `astro local af runs list [dag_id]` | List DAG runs |
+| `astro local af runs list --dag-id <dag_id>` | List DAG runs |
 | `astro local af runs get <dag_id> <run_id>` | Get run details |
 | `astro local af runs trigger <dag_id>` | Trigger a DAG run |
 | `astro local af runs trigger-wait <dag_id>` | Trigger and wait for completion |
-| `astro local af runs delete <dag_id> <run_id>` | Permanently delete a DAG run |
-| `astro local af runs clear <dag_id> <run_id>` | Clear a run for re-execution (`--dry-run` to preview) |
+| `astro local af runs delete <dag_id> <run_id>` | Permanently delete a DAG run (see "Clearing and deleting") |
+| `astro local af runs clear <dag_id> <run_id>` | Clear a run for re-execution (see "Clearing and deleting") |
 | `astro local af runs diagnose <dag_id> <run_id>` | Diagnose failed run |
 | `astro local af tasks list <dag_id>` | List tasks in DAG |
 | `astro local af tasks get <dag_id> <task_id>` | Get task definition |
 | `astro local af tasks instance <dag_id> <run_id> <task_id>` | Get task instance |
 | `astro local af tasks logs <dag_id> <run_id> <task_id>` | Get task logs |
-| `astro local af tasks clear <dag_id> <run_id> <task_id>...` | Clear task instances (`--dry-run` to preview) |
-| `astro local af version` | Airflow version |
-| `astro local af config` | Full configuration (needs `expose_config` on) |
-| `astro local af connections list` | List connections (no passwords) |
-| `astro local af connections get <conn_id>` | Get one connection |
-| `astro local af variables list` | List variable keys (no values) |
-| `astro local af variables get <key>` | Get specific variable and its value |
-| `astro local af pools list` | List pools |
-| `astro local af pools get <name>` | Get pool details |
-| `astro local af plugins` | List plugins |
-| `astro local af providers` | List installed providers |
+| `astro local af tasks clear <dag_id> <run_id> <task_id>...` | Clear task instances (differs in v1, see "Clearing and deleting") |
+| `astro local af version` | Airflow version (v1: `af config version`) |
+| `astro local af config` | Full configuration, if Airflow exposes it (v1: `af config show`) |
+| `astro local af connections list` | List connections, no passwords (v1: `af config connections`) |
+| `astro local af connections get <conn_id>` | Get one connection (v1: find it in `af config connections`) |
+| `astro local af variables list` | List variables; v2 shows keys only (v1: `af config variables`) |
+| `astro local af variables get <key>` | Get one variable and its value (v1: `af config variable <key>`) |
+| `astro local af pools list` | List pools (v1: `af config pools`) |
+| `astro local af pools get <name>` | Get pool details (v1: `af config pool <name>`) |
+| `astro local af plugins` | List plugins (v1: `af config plugins`) |
+| `astro local af providers` | List installed providers (v1: `af config providers`) |
 | `astro local af assets list` | List assets/datasets |
 | `astro local af assets events` | List asset updates and the runs they started |
-| `astro local api <endpoint>` | Direct REST API access (`astro api airflow <endpoint> -d <link>` for a deployment) |
+| `astro local api <endpoint>` | Direct REST API access (see "Direct API Access") |
 | `astro local api ls` | List available API endpoints |
 | `astro local api ls --filter X` | List endpoints matching pattern |
-| `af registry providers` | List providers in the Airflow Registry (standalone `af` only, see below) |
+| `af registry providers` | List providers in the Airflow Registry (standalone `af` on both versions, see below) |
 | `af registry modules <provider>` | List operators/hooks/sensors/transfers in a provider |
 | `af registry parameters <provider>` | Constructor signatures (name, type, default, required) for a provider's classes |
 | `af registry connections <provider>` | Connection types a provider exposes |
 
-`runs delete`, `runs clear`, and `tasks clear` ask for confirmation, and fail in a non-interactive shell unless you pass `--yes`. Get the user's go-ahead first, then pass `--yes`.
+### Clearing and deleting
+
+Get the user's go-ahead before any of these, and preview first where you can:
+
+| Action | v2 | v1 |
+|---|---|---|
+| Delete a run | `astro local af runs delete <dag_id> <run_id> --yes` | `af runs delete <dag_id> <run_id> --yes` |
+| Clear a run | `astro local af runs clear <dag_id> <run_id> --dry-run`, then `--yes` instead of `--dry-run` | `af runs clear <dag_id> <run_id> --dry-run`, then `--yes` instead of `--dry-run` |
+| Clear tasks | `astro local af tasks clear <dag_id> <run_id> <id> <id> --dry-run`, then `--yes` instead of `--dry-run` | `af tasks clear <dag_id> <run_id> <id>,<id> --dry-run`, then `--no-dry-run` instead of `--dry-run` |
+
+`runs delete` and `runs clear` prompt on both versions, and fail in a non-interactive shell without `--yes`. `tasks clear` differs: v2 clears unless `--dry-run` and prompts unless `--yes`; v1 only previews unless `--no-dry-run`, never prompts, takes comma-separated task ids, and has no `--yes`.
 
 ## User Intent Patterns
 
@@ -143,8 +163,7 @@ Two short flags differ from the standalone `af` CLI: `-d` is **deployment** and 
 - "Run DAG X" / "Trigger the pipeline" -> `astro local af runs trigger <dag_id>`
 - "Run DAG X and wait" -> `astro local af runs trigger-wait <dag_id>`
 - "Why did this run fail?" -> `astro local af runs diagnose <dag_id> <run_id>`
-- "Delete this run" / "Remove stuck run" -> `astro local af runs delete <dag_id> <run_id> --yes`, after the user confirms
-- "Clear this run" / "Retry this run" / "Re-run this" -> `astro local af runs clear <dag_id> <run_id> --dry-run` to preview, then, after the user confirms, again with `--yes` instead of `--dry-run`
+- "Delete this run" / "Remove stuck run" / "Clear this run" / "Retry this run" / "Re-run this" -> see "Clearing and deleting" above
 - "Test this DAG and fix if it fails" -> use the **testing-dags** skill
 
 ### Task Operations
@@ -164,22 +183,22 @@ Two short flags differ from the standalone `af` CLI: `-d` is **deployment** and 
 - "astro deploy" / "DAG-only deploy" -> use the **deploying-airflow** skill
 
 ### System Operations
-- "What version of Airflow?" -> `astro local af version`
-- "What connections exist?" -> `astro local af connections list`
-- "Are pools full?" -> `astro local af pools list`
+- "What version of Airflow?" -> `astro local af version` (v1: `af config version`)
+- "What connections exist?" -> `astro local af connections list` (v1: `af config connections`)
+- "Are pools full?" -> `astro local af pools list` (v1: `af config pools`)
 - "Is Airflow healthy?" -> `astro local af health`
 
 ### API Exploration
 - "What API endpoints are available?" -> `astro local api ls`
 - "Find variable endpoints" -> `astro local api ls --filter variable`
-- "Access XCom values" / "Get XCom" -> `astro local api xcom-entries -F dag_id=X -F task_id=Y`
-- "Get event logs" / "Audit trail" -> `astro local api event-logs -F dag_id=X`
+- "Access XCom values" / "Get XCom" -> `astro local api ls --filter xcom` for the path, then `astro local api <path>`
+- "Get event logs" / "Audit trail" -> `astro local api eventLogs -F dag_id=X`
 - "Create connection via API" -> `astro local api connections -X POST --body '{...}'`
 - "Create variable via API" -> `astro local api variables -X POST -F key=name --raw-field value=val`
 
 ### Registry Discovery
 
-These use the standalone `af` CLI (`uvx --from astro-airflow-mcp af registry ...` if `af` is not on PATH). They read the public Airflow Registry, not your Airflow, so no project or deployment is involved.
+These use the standalone `af` CLI on both versions (`uvx --from astro-airflow-mcp af registry ...` if `af` is not on PATH). They read the public Airflow Registry, not your Airflow, so no project or deployment is involved.
 
 - "What operators does provider X have?" -> `af registry modules <provider>`
 - "What are the constructor params for operator Y?" -> `af registry parameters <provider>`
@@ -191,17 +210,14 @@ These use the standalone `af` CLI (`uvx --from astro-airflow-mcp af registry ...
 
 ### Validate DAGs Before Deploying
 
-If you're using the Astro CLI, you can validate DAGs without a running Airflow instance:
+Without a running Airflow:
 
 ```bash
-# Parse DAGs to catch import errors and syntax issues
-astro dev parse
-
-# Run unit tests
-astro dev pytest
+astro local check     # Parse DAGs: import errors, syntax issues   v1: astro dev parse
+uv run pytest         # Run the project's tests                    v1: astro dev pytest
 ```
 
-Otherwise, validate against a running instance:
+Against a running Airflow:
 
 ```bash
 astro local af dags errors     # Check for parse/import errors
@@ -210,7 +226,7 @@ astro local af dags warnings   # Check for deprecation warnings
 
 ### Discover Operator Signatures Before Writing Code
 
-The Airflow Registry at `airflow.apache.org/registry` is the authoritative source for provider classes and their current constructor signatures. Prefer it over memory or stale documentation when authoring DAGs — the registry reflects the live provider release. These use the standalone `af` CLI, whose output is a single JSON object (not NDJSON rows).
+The Airflow Registry at `airflow.apache.org/registry` is the authoritative source for provider classes and their current constructor signatures. Prefer it over memory or stale documentation when authoring DAGs — the registry reflects the live provider release. `af registry` is the same on both versions and prints one JSON object.
 
 ```bash
 # List all providers and pick the one you need
@@ -234,8 +250,8 @@ Results are cached locally: 1 hour for the latest version, 30 days for pinned ve
 ### Investigate a Failed Run
 
 ```bash
-# 1. List recent runs to find failure
-astro local af runs list --dag-id my_dag
+# 1. Find the failed run
+astro local af runs list --dag-id my_dag --state failed
 
 # 2. Diagnose the specific run
 astro local af runs diagnose my_dag manual__2024-01-15T10:00:00+00:00
@@ -243,7 +259,7 @@ astro local af runs diagnose my_dag manual__2024-01-15T10:00:00+00:00
 # 3. Get logs for failed task (from diagnose output)
 astro local af tasks logs my_dag manual__2024-01-15T10:00:00+00:00 extract_data
 
-# 4. After fixing, preview what clearing the run resets, then clear it to retry all tasks
+# 4. After fixing, preview what clearing the run resets, then, once the user agrees, clear it
 astro local af runs clear my_dag manual__2024-01-15T10:00:00+00:00 --dry-run
 astro local af runs clear my_dag manual__2024-01-15T10:00:00+00:00 --yes
 ```
@@ -251,14 +267,9 @@ astro local af runs clear my_dag manual__2024-01-15T10:00:00+00:00 --yes
 ### Morning Health Check
 
 ```bash
-# 1. Overall system health
-astro local af health
-
-# 2. Check for broken DAGs
-astro local af dags errors
-
-# 3. Check pool utilization
-astro local af pools list
+astro local af health         # 1. Overall system health
+astro local af dags errors    # 2. Check for broken DAGs
+astro local af pools list     # 3. Check pool utilization   v1: af config pools
 ```
 
 ### Understand a DAG
@@ -271,21 +282,15 @@ astro local af dags explore my_dag
 ### Check Why DAG Isn't Running
 
 ```bash
-# Check if paused
-astro local af dags get my_dag
-
-# Check for import errors
-astro local af dags errors
-
-# Check recent runs
-astro local af runs list --dag-id my_dag
+astro local af dags get my_dag              # Is it paused?
+astro local af dags errors                  # Import errors?
+astro local af runs list --dag-id my_dag    # Recent runs
 ```
 
 ### Trigger and Monitor
 
 ```bash
-# Option 1: Trigger and wait (blocking)
-# Exit 0: run succeeded. 1: run failed (failed tasks are in the output). 2: timed out, run still going.
+# Option 1: Trigger and wait (blocking). The testing-dags skill explains reading the result.
 astro local af runs trigger-wait my_dag --timeout 1800
 
 # Option 2: Trigger and check later
@@ -295,29 +300,20 @@ astro local af runs get my_dag <run_id>
 
 ## Output Format
 
-Commands print a human-readable table by default. Pass `-o json` whenever you parse the output. A list prints NDJSON: one JSON object per line, with no `{total, items}` wrapper, and an empty list prints nothing:
+**v2** prints a table by default. Pass `-o json` whenever you parse the output: a list prints NDJSON, one JSON object per line with no wrapper, and an empty list prints nothing. Rows carry a curated set of fields (for example `schedule`, not `timetable_summary`, and `tags` as plain strings). A list returns one page, 100 rows by default, and with `-o json` it is cut at the cap with no sign that it was, so filter (`--dag-id`, `--state`) or pass `--limit <n>` when you need more.
+
+**v1** always prints JSON, and wraps a list in an object with its count: `{"total_dags": 5, "returned_count": 5, "dags": [...]}` (the key is `dag_runs`, `pools`, `variables`, ... for other lists).
+
+So a `jq` filter needs the form for your version:
 
 ```bash
-astro local af dags list -o json
-# {"dag_id":"example_dag","is_paused":false,"schedule":"@daily","owners":["airflow"],"tags":["demo"],...}
-# {"dag_id":"other_dag",...}
-```
-
-Rows carry a curated set of fields (for example `schedule`, not `timetable_summary`, and `tags` as plain strings). A failure prints `{"error": ..., "code": ...}` and exits non-zero.
-
-List commands return one page, 100 rows by default, and with `-o json` a longer list is cut at the cap with no sign that it was (the `showing N of M` hint is printed only for the text table). Pass `-l <n>` (`--limit`) when a skill needs more rows, or name a DAG to narrow the list.
-
-Use `jq -s` to collect the rows, or filter them one at a time:
-
-```bash
-# Find failed runs (across every DAG, so raise the page size)
-astro local af runs list -l 500 -o json | jq -s '.[] | select(.state == "failed")'
-
-# Get DAG IDs only
+# DAG ids
 astro local af dags list -o json | jq -r '.dag_id'
+# v1: af dags list | jq -r '.dags[].dag_id'
 
-# Find paused DAGs
-astro local af dags list -o json | jq -s '[.[] | select(.is_paused == true)]'
+# Paused DAGs, as one array
+astro local af dags list --paused -o json | jq -s '.'
+# v1: af dags list --paused | jq '.dags'
 ```
 
 ## Task Logs Options
@@ -332,7 +328,7 @@ astro local af tasks logs my_dag run_id task_id --map-index 5
 
 ## Direct API Access with `astro local api`
 
-Use `astro local api` for endpoints not covered by high-level commands (XCom, event-logs, backfills, etc). For a deployment, `astro api airflow <endpoint> -d <link>` is the same idea, but it takes a body with `--input <file>` (no `--body`) and has no `--root`.
+Use `astro local api` (v1: `af api`) for endpoints not covered by high-level commands (XCom, event logs, backfills, etc).
 
 ```bash
 # Discover available endpoints
@@ -346,9 +342,9 @@ astro local api variables -X POST -F key=my_var --raw-field value="my value"
 astro local api variables/old_var -X DELETE
 ```
 
-**Field syntax**: `-F key=value` auto-converts types, `--raw-field key=value` keeps as string. A non-2xx response fails the command, so a script can branch on the exit code.
+**Field syntax**: `-F key=value` auto-converts types, `--raw-field key=value` keeps as string.
 
-**Full reference**: See [api-reference.md](api-reference.md) for all options, common endpoints (XCom, event-logs, backfills), and examples.
+**Full reference**: See [api-reference.md](api-reference.md) for all options, deployments, common endpoints (XCom, event logs, backfills), and examples.
 
 ## Related Skills
 
