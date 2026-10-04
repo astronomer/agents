@@ -60,7 +60,7 @@ project/                           project/
 uv add apache-airflow-providers-snowflake    # v1: add the line to requirements.txt
 ```
 
-On v2, `uv add` writes the requirement into `pyproject.toml`, keeps the `[tool.uv]` pins that hold Airflow to the build a deployment runs, and installs the package, so a running standalone Airflow picks it up. On v1, `requirements.txt` takes pip requirement lines:
+On v2, `uv add` writes the requirement into `pyproject.toml`, keeps the `[tool.uv]` pins that hold Airflow to the build a deployment runs, and installs the package into the project's `.venv`, where a running standalone Airflow can import it. Restart anyway for what a provider registers at startup (connection types, plugins); in Docker mode the restart is what puts the package in the image. On v1, `requirements.txt` takes pip requirement lines:
 
 ```
 apache-airflow-providers-snowflake==5.3.0
@@ -70,10 +70,10 @@ requests>=2.28.0
 
 ### OS Packages
 
-v2 lists them in `pyproject.toml`; v1 in `packages.txt`, one per line:
+v2 lists them in `pyproject.toml`, as a key under the `[tool.astro]` table `astro init` already wrote (a second `[tool.astro]` header breaks the file); v1 in `packages.txt`, one per line:
 
 ```toml
-[tool.astro]
+# under the existing [tool.astro]
 packages = ["gcc", "libpq-dev"]
 ```
 
@@ -81,10 +81,10 @@ On v2 only Docker mode (`astro local start --docker`) can install OS packages; s
 
 ### Custom Dockerfile
 
-For complex setups (private PyPI, custom scripts). v1 always builds from the project's `Dockerfile`. v2 uses one only when the manifest names it, and its `FROM` must name the same Airflow series as the manifest's pin:
+For complex setups (private PyPI, custom scripts). v1 always builds from the project's `Dockerfile`. v2 uses one only when the manifest names it (a key under the existing `[tool.astro]` table), only in Docker mode, and its `FROM` must name the same Airflow series as the manifest's pin:
 
 ```toml
-[tool.astro]
+# under the existing [tool.astro]
 dockerfile = "Dockerfile"
 ```
 
@@ -146,7 +146,7 @@ airflow:
 
 | Task | v2 | v1 |
 |---|---|---|
-| Export from the environment | `astro local env list` shows every value and its source (no export file) | `astro dev object export --connections` (Docker mode; writes `airflow_settings.yaml`, and a `--settings-file` must already exist) |
+| Export from the environment | `astro local env list` shows every value and its source (no export file) | `astro dev object export --connections` (writes `airflow_settings.yaml`; a `--settings-file` must already exist) |
 | Import into the environment | no file import: set each value with `astro local env connection set` / `airflow-variable set` | `astro dev object import --connections --settings-file connections.yaml` |
 
 ---

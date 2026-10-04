@@ -74,11 +74,11 @@ On the Helm chart, bake the bundle into a custom image as above or mount it via 
 ### Astro (one option, not required)
 
 1. Build/pack the bundle, then stage it in the project: `mkdir -p include/executable-bundles && cp ../go-bundle/<packed-bundle> include/executable-bundles/`.
-2. In the project `Dockerfile`, copy the bundle to the coordinator's directory: `COPY include/executable-bundles/ /opt/airflow/executable-bundles/`.
+2. In the project `Dockerfile` (create it on Astro CLI v2, see step 4), copy the bundle to the coordinator's directory: `COPY include/executable-bundles/ /opt/airflow/executable-bundles/`.
 3. Put the coordinator config in the project `.env` (loaded automatically): the `AIRFLOW__SDK__*` JSON values (see **configuring-airflow-language-sdks**).
-4. Start it with the image build. Astro CLI v2: declare the Dockerfile in `pyproject.toml` (`[tool.astro]` `dockerfile = "Dockerfile"`) and run `astro local start --docker` (`astro local restart` after changes; standalone mode builds no image). v1: `astro dev start` (or `astro dev restart`). Deploy with `astro deploy`.
+4. Start it with the image build. Astro CLI v2: `astro init` creates no `Dockerfile`, so create one: its `FROM` must name an Astro Runtime image of the same Airflow series as the `apache-airflow` pin in `pyproject.toml` (3.3 or newer for the language SDKs). Declare it by adding `dockerfile = "Dockerfile"` under the existing `[tool.astro]` table, and run `astro local start --docker` (`astro local restart` after changes; standalone mode builds no image). v1: `astro dev start` (or `astro dev restart`). Deploy with `astro deploy`.
 
-> Don't pin Astro Runtime / Airflow versions from memory; read the generated `Dockerfile` or current docs. While the Go SDK is in preview, a beta/dev image may be required.
+> Don't pin Astro Runtime / Airflow versions from memory; read the generated `Dockerfile` (v1) or the `pyproject.toml` pin (v2), or current docs. While the Go SDK is in preview, a beta/dev image may be required.
 
 ---
 

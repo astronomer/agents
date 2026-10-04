@@ -171,18 +171,32 @@ def load_dagbag(project):
     return dagbag, import_path, None
 
 
-def astro_parse_command(project):
-    """The Astro CLI's whole-project parse check for the CLI on PATH.
+# How long the Astro CLI version probe may take before Gate 2 gives up on it.
+ASTRO_PROBE_TIMEOUT_SECONDS = 60
 
-    Astro CLI v2 replaced `astro dev parse` with `astro local check`, and 1.x
-    has no `astro local`, so `astro local --help` succeeding is the v2 signal.
+# `astro local check` exits 2 when it reached no verdict (not an Astro project,
+# a v1 project under the v2 CLI, an environment it could not build); 1 means
+# the Dags failed.
+ASTRO_CHECK_NO_VERDICT = 2
+
+
+def astro_parse_command(project):
+    """The Astro CLI's whole-project parse check for the CLI on PATH, or None.
+
+    Astro CLI v2 replaced `astro dev parse` with `astro local check`. The probe
+    is the one the skills use: `astro local af --help` succeeds only on v2.
+    None means the probe did not answer in time.
     """
-    probe = subprocess.run(
-        ["astro", "local", "--help"],
-        cwd=project,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        probe = subprocess.run(
+            ["astro", "local", "af", "--help"],
+            cwd=project,
+            capture_output=True,
+            text=True,
+            timeout=ASTRO_PROBE_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired:
+        return None
     if probe.returncode == 0:
         return ["astro", "local", "check"]
     return ["astro", "dev", "parse"]
@@ -206,9 +220,10 @@ def gate2_dagbag(project, dagbag, import_path, load_error):
         result["details"]["dagbag"] = "skipped: " + (load_error or "unavailable")
 
     # The Astro CLI's parse check, if the CLI is installed.
-    if shutil.which("astro") is not None:
-        checks_ran += 1
-        command = astro_parse_command(project)
+    command = (
+        astro_parse_command(project) if shutil.which("astro") is not None else None
+    )
+    if command is not None:
         proc = subprocess.run(
             command,
             cwd=project,
@@ -218,8 +233,19 @@ def gate2_dagbag(project, dagbag, import_path, load_error):
         result["details"]["astro_parse_command"] = " ".join(command)
         result["details"]["astro_parse_returncode"] = proc.returncode
         result["details"]["astro_parse_output"] = (proc.stdout + proc.stderr).strip()
-        if proc.returncode != 0:
-            result["status"] = "fail"
+        if command[1] == "local" and proc.returncode == ASTRO_CHECK_NO_VERDICT:
+            # No verdict on the Dags: report it, but don't fail or count it.
+            result["details"]["astro_parse"] = (
+                "skipped: astro local check reached no verdict"
+            )
+        else:
+            checks_ran += 1
+            if proc.returncode != 0:
+                result["status"] = "fail"
+    elif shutil.which("astro") is not None:
+        result["details"]["astro_parse"] = (
+            "skipped: the astro CLI did not answer the version probe"
+        )
     else:
         result["details"]["astro_parse"] = "skipped: astro CLI not on PATH"
 

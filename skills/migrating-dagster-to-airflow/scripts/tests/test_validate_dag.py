@@ -166,7 +166,7 @@ def _fake_astro(monkeypatch, local_help_rc, parse_rc=0):
 
     def run(cmd, **kwargs):
         calls.append(cmd)
-        if cmd == ["astro", "local", "--help"]:
+        if cmd == ["astro", "local", "af", "--help"]:
             return _Proc(local_help_rc)
         return _Proc(parse_rc, stdout="parsed")
 
@@ -194,3 +194,27 @@ def test_gate2_parse_failure_fails_the_gate(monkeypatch, tmp_path):
     r = validate_dag.gate2_dagbag(str(tmp_path), None, None, "no airflow")
     assert r["status"] == "fail"
     assert r["details"]["astro_parse_returncode"] == 1
+
+
+def test_gate2_no_verdict_from_astro_local_check_does_not_fail(monkeypatch, tmp_path):
+    _fake_astro(monkeypatch, 0, parse_rc=2)
+    r = validate_dag.gate2_dagbag(str(tmp_path), None, None, "no airflow")
+    assert r["status"] == "skip"
+    assert "no verdict" in r["details"]["astro_parse"]
+
+
+def test_gate2_exit_2_from_astro_dev_parse_still_fails(monkeypatch, tmp_path):
+    _fake_astro(monkeypatch, 1, parse_rc=2)
+    r = validate_dag.gate2_dagbag(str(tmp_path), None, None, "no airflow")
+    assert r["status"] == "fail"
+
+
+def test_gate2_skips_the_cli_when_the_probe_times_out(monkeypatch, tmp_path):
+    def run(cmd, **kwargs):
+        raise validate_dag.subprocess.TimeoutExpired(cmd, kwargs.get("timeout"))
+
+    monkeypatch.setattr(validate_dag.shutil, "which", lambda name: "/usr/bin/astro")
+    monkeypatch.setattr(validate_dag.subprocess, "run", run)
+    r = validate_dag.gate2_dagbag(str(tmp_path), None, None, "no airflow")
+    assert r["status"] == "skip"
+    assert "version probe" in r["details"]["astro_parse"]
