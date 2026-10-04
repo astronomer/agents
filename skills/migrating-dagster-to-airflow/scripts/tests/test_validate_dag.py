@@ -149,3 +149,48 @@ def test_gate2_real_dagbag_requires_airflow(tmp_path):
     dagbag, import_path, err = validate_dag.load_dagbag(str(tmp_path))
     r = validate_dag.gate2_dagbag(str(tmp_path), dagbag, import_path, err)
     assert r["gate"] == 2 and r["status"] in ("pass", "fail", "skip")
+
+
+# --- Gate 2: which Astro CLI parse check runs --------------------------------
+
+
+class _Proc:
+    def __init__(self, returncode, stdout="", stderr=""):
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
+
+
+def _fake_astro(monkeypatch, local_help_rc, parse_rc=0):
+    calls = []
+
+    def run(cmd, **kwargs):
+        calls.append(cmd)
+        if cmd == ["astro", "local", "--help"]:
+            return _Proc(local_help_rc)
+        return _Proc(parse_rc, stdout="parsed")
+
+    monkeypatch.setattr(validate_dag.shutil, "which", lambda name: "/usr/bin/astro")
+    monkeypatch.setattr(validate_dag.subprocess, "run", run)
+    return calls
+
+
+@pytest.mark.parametrize(
+    ("local_help_rc", "expected"),
+    [(0, ["astro", "local", "check"]), (1, ["astro", "dev", "parse"])],
+)
+def test_gate2_runs_the_parse_check_of_the_cli_on_path(
+    monkeypatch, tmp_path, local_help_rc, expected
+):
+    calls = _fake_astro(monkeypatch, local_help_rc)
+    r = validate_dag.gate2_dagbag(str(tmp_path), None, None, "no airflow")
+    assert calls[-1] == expected
+    assert r["details"]["astro_parse_command"] == " ".join(expected)
+    assert r["status"] == "pass"
+
+
+def test_gate2_parse_failure_fails_the_gate(monkeypatch, tmp_path):
+    _fake_astro(monkeypatch, 0, parse_rc=1)
+    r = validate_dag.gate2_dagbag(str(tmp_path), None, None, "no airflow")
+    assert r["status"] == "fail"
+    assert r["details"]["astro_parse_returncode"] == 1

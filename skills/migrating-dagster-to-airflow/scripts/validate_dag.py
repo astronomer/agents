@@ -5,7 +5,9 @@ Implements the cheap-to-expensive ladder from reference/validation.md:
 
   Gate 1  python import + lint   ast.parse over dags/ and include/, then ruff
   Gate 2  DagBag import check    load the project with airflow's DagBag, and/or
-                                 shell out to `astro dev parse`
+                                 shell out to the Astro CLI's parse check
+                                 (`astro local check` on CLI v2,
+                                 `astro dev parse` on 1.x)
   Gate 3  structural asserts     compare each DAG against the inventory manifest
                                  (task count, dependency edges, schedule string,
                                  asset outlets)
@@ -130,7 +132,7 @@ def load_dagbag(project):
     """Load the project with airflow's DagBag, in this interpreter.
 
     Returns (dagbag, import_path, error). `dagbag` is None when airflow is not
-    importable here, in which case the caller falls back to `astro dev parse`.
+    importable here, in which case the caller falls back to the Astro CLI parse check.
     Run this script with the Astro project's own python so airflow is present.
     """
     dags_dir = os.path.join(project, "dags")
@@ -169,8 +171,25 @@ def load_dagbag(project):
     return dagbag, import_path, None
 
 
+def astro_parse_command(project):
+    """The Astro CLI's whole-project parse check for the CLI on PATH.
+
+    Astro CLI v2 replaced `astro dev parse` with `astro local check`, and 1.x
+    has no `astro local`, so `astro local --help` succeeding is the v2 signal.
+    """
+    probe = subprocess.run(
+        ["astro", "local", "--help"],
+        cwd=project,
+        capture_output=True,
+        text=True,
+    )
+    if probe.returncode == 0:
+        return ["astro", "local", "check"]
+    return ["astro", "dev", "parse"]
+
+
 def gate2_dagbag(project, dagbag, import_path, load_error):
-    """Gate 2: the project imports cleanly (DagBag and/or `astro dev parse`)."""
+    """Gate 2: the project imports cleanly (DagBag and/or the Astro CLI parse check)."""
     result = {"gate": 2, "name": "dagbag-import", "status": "pass", "details": {}}
     checks_ran = 0
 
@@ -186,15 +205,17 @@ def gate2_dagbag(project, dagbag, import_path, load_error):
     else:
         result["details"]["dagbag"] = "skipped: " + (load_error or "unavailable")
 
-    # `astro dev parse`, if the CLI is installed.
+    # The Astro CLI's parse check, if the CLI is installed.
     if shutil.which("astro") is not None:
         checks_ran += 1
+        command = astro_parse_command(project)
         proc = subprocess.run(
-            ["astro", "dev", "parse"],
+            command,
             cwd=project,
             capture_output=True,
             text=True,
         )
+        result["details"]["astro_parse_command"] = " ".join(command)
         result["details"]["astro_parse_returncode"] = proc.returncode
         result["details"]["astro_parse_output"] = (proc.stdout + proc.stderr).strip()
         if proc.returncode != 0:
