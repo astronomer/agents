@@ -145,6 +145,28 @@ class Accepts(SkillCase):
             """)
         self.assertClean()
 
+    def test_marker_covers_its_wrapped_paragraph(self) -> None:
+        self.write("""
+            ## Use
+
+            ```bash
+            astro use
+            # v1: af instance current
+            ```
+
+            **v1:** the standalone CLI reaches its current instance, which
+            `af instance current` does not show when v1 settings override it.
+
+            Plain prose again.
+            """)
+        self.assertClean()
+
+    def test_marker_paragraph_ends_at_blank_line(self) -> None:
+        self.write(
+            "## Use\n\n```bash\nastro local af health\n```\n\n**v1:** a note.\n\nOn v1 this differs.\n"
+        )
+        self.assertFlags("v1 mentioned in prose")
+
     def test_v1_none_and_continuation_lines(self) -> None:
         self.write("""
             ## Use

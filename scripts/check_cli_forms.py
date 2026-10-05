@@ -13,7 +13,8 @@ Every skill that runs Astro CLI or `af` commands follows the same pattern:
    `astro local af` / `astro local api`) and `astro init` command needs one.
    A v1-only command with no v2 counterpart hangs off a `# v2: none` line.
 4. A behavior difference that isn't a command sits on its own line starting
-   `**v1:**` (or `**v2:**`), or under a heading that starts `v1:`.
+   `**v1:**` (or `**v2:**`; the marker covers its whole paragraph, so the line
+   may wrap), or under a heading that starts `v1:`.
 
 So outside the block, a v1-only command (`astro dev ...`, the standalone
 `af ...`) may appear only on a `# v1:` line or a `**v1:**` line, and "v1" (or
@@ -84,6 +85,8 @@ MARKER_LINE_RE = re.compile(
     r"^\s*(?:(?:>\s*)*(?:[-*+]\s+|\d+\.\s+)?\*\*v[12]:\*\*\s|#{1,6}\s+v[12]:\s)"
 )
 TABLE_V1_HEADER_RE = re.compile(r"^\s*\|.*\|\s*v1\s*\|")
+HEADING_START_RE = re.compile(r"^#{1,6}\s")
+LIST_START_RE = re.compile(r"^\s*(?:>\s*)*(?:[-*+]|\d+\.)\s")
 
 
 @dataclass
@@ -227,6 +230,9 @@ def check_body(rel: str, lines: list[Line]) -> list[str]:
     prev: Line | None = None
     # The v2 command that still owes a `# v1:` line, if any.
     owed: Line | None = None
+    # A `**v1:**` marker covers the rest of its paragraph, so a wrapped line
+    # continues it.
+    in_marker = False
     for ln in lines:
         text = ln.text
         boundary = (
@@ -263,6 +269,7 @@ def check_body(rel: str, lines: list[Line]) -> list[str]:
             or (ln.in_code and (FENCE_RE.match(text) or not ln.shell))
         ):
             prev = None
+            in_marker = False
             continue
         if PROBE in text:
             bad(
@@ -323,7 +330,15 @@ def check_body(rel: str, lines: list[Line]) -> list[str]:
                     ln,
                     "a `# v1:` line must be inside a code block, under its v2 command",
                 )
-            marker = MARKER_LINE_RE.match(text)
+            starts = MARKER_LINE_RE.match(text)
+            if (
+                not text.strip()
+                or HEADING_START_RE.match(text)
+                or (LIST_START_RE.match(text) and not starts)
+            ):
+                in_marker = False
+            in_marker = bool(starts) or in_marker
+            marker = in_marker
             if re.match(r"^(?: {4}|\t)", text) and has_v1_command(
                 SPAN_RE.sub("", text)
             ):
