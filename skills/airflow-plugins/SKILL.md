@@ -25,6 +25,20 @@ Airflow 3 plugins let you embed FastAPI apps, React UIs, middleware, macros, ope
 
 ---
 
+<!-- astro-cli-version:start -->
+## Astro CLI version
+
+Commands in this skill, including its reference files, are written for Astro CLI v2. Before anything else, run this as a command of its own, with nothing chained before or after it, and choose the dialect from what it prints: `astro local af --help >/dev/null 2>&1 && echo v2 || echo v1`
+On Windows `cmd.exe`, which has no `/dev/null`, run `astro local af --help >NUL 2>&1 && echo v2 || echo v1` instead.
+
+- **v2:** run them as written.
+- **v1** (Astro CLI 1.x, or no Astro CLI): use the standalone `af` CLI. Write `af` for `astro local af` and `af api` for `astro local api`, and drop `-o json` and `--output json` (`af` prints JSON, except `af instance` commands, which print tables). Where a command needs more than that, its v1 form is the line under it, starting `# v1:`. Where something behaves differently on v1, a line starting **v1:** says how. If `af` is not on PATH, write `uvx --from astro-airflow-mcp af <args>` out in full in every command. Don't put it in a shell variable or alias: zsh won't split `$AF`, and shell state doesn't carry over between commands.
+- v2 replaced `astro dev` with `astro local`; `astro dev <cmd>` on v2 fails and names its replacement.
+- If a v2 command reports an Astro v1 project, the v2 CLI cannot run that project, although the probe printed v2. Switch to the v1 forms: the standalone `af` still reaches an Airflow that is already running, but starting or parsing it (`astro dev ...`) needs Astro CLI 1.x. Tell the user; upgrading the project (`astro init`) is their call.
+- `-d` and `-o` mean deployment and output in v2, but DAG id and offset in v1, so never carry either into a v1 command. `--dag-id`, `--offset`, `--state`, `--limit`, `--try`, `--map-index`, and `--timeout` mean the same in both.
+- If a command here, or in the project's `AGENTS.md`, disagrees with the installed CLI, trust the CLI: check `astro <cmd> --help` (v1: `af <cmd> --help` or `astro dev <cmd> --help`).
+<!-- astro-cli-version:end -->
+
 ## Step 1: Choose plugin components
 
 A single plugin class can register multiple component types at once.
@@ -533,20 +547,30 @@ MYPLUGIN_USERNAME=admin
 MYPLUGIN_PASSWORD=admin
 ```
 
-Commands below are Astro CLI v2 forms with the v1 (`astro dev`) form beside them; check which applies first, on its own: `astro local af --help >/dev/null 2>&1 && echo v2 || echo v1`.
-
 ```bash
-astro local restart    # required after any Python plugin change   v1: astro dev restart
-astro local logs       # plugin import errors show here            v1: astro dev logs
+# Required after any Python plugin change
+astro local restart
+# v1: astro dev restart
+# Plugin import errors show here
+astro local logs
+# v1: astro dev logs
 
-# Logs by component (v1 filters only in Docker mode):
-astro local logs --component api-server      # FastAPI apps, external_views   v1: astro dev logs --api-server
-astro local logs --component scheduler       # macros, timetables, listeners, operator links   v1: astro dev logs --scheduler
-astro local logs --component dag-processor   # DAG parsing errors   v1: astro dev logs --dag-processor
+# Logs by component
+# FastAPI apps, external_views
+astro local logs --component api-server
+# v1: astro dev logs --api-server
+# Macros, timetables, listeners, operator links
+astro local logs --component scheduler
+# v1: astro dev logs --scheduler
+# DAG parsing errors
+astro local logs --component dag-processor
+# v1: astro dev logs --dag-processor
 
 # Non-Astro:
 airflow plugins                # CLI — lists all loaded plugins
 ```
+
+**v1:** the component filters work only in Docker mode.
 
 **Production Astronomer:**
 ```bash
@@ -580,7 +604,7 @@ AIRFLOW__CORE__LAZY_LOAD_PLUGINS=False
 | Event loop freezes under load | Sync SDK called directly in `async def` | Wrap with `asyncio.to_thread()` |
 | 401 errors after 1 hour | JWT expires with no refresh | Use the 5-minute pre-expiry refresh pattern |
 | `StaticFiles` raises on startup | Directory missing | Create `assets/` and `static/` before starting |
-| Plugin not showing up | Python file changed without restart | `astro local restart` (v1: `astro dev restart`) |
+| Plugin not showing up | Python file changed without restart | `astro local restart` (see "Local Astro CLI" above) |
 | Endpoints accessible without login | FastAPI apps are not auto-authenticated | Add FastAPI security (e.g. OAuth2, API key) if endpoints must be private |
 | Middleware affecting wrong routes | Middleware applies to all API traffic | Filter by `request.url.path` inside `dispatch()` |
 | JS `fetch()` breaks on Astro | Absolute path in `fetch()` | Always use relative paths: `fetch('api/dags')` |

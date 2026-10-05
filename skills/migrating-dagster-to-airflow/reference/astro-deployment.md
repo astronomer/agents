@@ -21,10 +21,19 @@ Per location: `code_source` (package/module/file) has no Airflow equivalent, DAG
 
 | `container_context` key | Astro | Class |
 |---|---|---|
-| `k8s.env_vars` | Deployment environment variables (UI/API/`astro deployment variable create`), or Environment Manager variables shared from the workspace (`astro env variable set --workspace-id ... --auto-link`; Astro CLI v1: `astro env variable update --workspace-id ... --auto-link`; without `--auto-link` or a link the variable reaches no deployment) | MECH |
-| `k8s.env_secrets` (named K8s secrets) | Secret environment variables (`--secret`) and/or Airflow Connections in the Environment Manager (`astro env connection set`; Astro CLI v1: `astro env connection create`; at workspace scope add `--auto-link` or link it, as for variables) | JUDG |
+| `k8s.env_vars` | Deployment environment variables (UI/API/`astro deployment variable create`), or Environment Manager variables shared from the workspace (`astro env variable set --workspace-id ... --auto-link`, commands below the table; without `--auto-link` or a link the variable reaches no deployment) | MECH |
+| `k8s.env_secrets` (named K8s secrets) | Secret environment variables (`--secret`) and/or Airflow Connections in the Environment Manager (`astro env connection set`, commands below the table; at workspace scope add `--auto-link` or link it, as for variables) | JUDG |
 | `k8s.namespace`, `service_account_name`, `server_k8s_config`, `run_k8s_config` | Managed by Astro; per-task pod tweaks via `executor_config`/`pod_override` | JUDG |
 | `ecs.*` (task roles, subnets, security groups) | Astro workload identity / cloud connection config | JUDG |
+
+The Environment Manager commands in the table, with their `# v1:` forms:
+
+```bash
+astro env variable set --workspace-id ... --auto-link
+# v1: astro env variable update --workspace-id ... --auto-link
+astro env connection set
+# v1: astro env connection create
+```
 
 **Secrets naming map.** Build this table during inventory and fill the right column deliberately; nothing does it automatically:
 
@@ -101,7 +110,11 @@ Astronomer's Airflow-migration methodology (Prepare → metadata → code → cu
 
 1. Freeze new pipeline development on Dagster (freeze-old/build-new).
 2. Create Workspace + Deployments (per env, per region) on Astro.
-3. `astro init` the project(s) (Astro CLI v1: `astro dev init`); wire CI/CD (`astro deploy`, preview Deployments).
+3. Initialize the project(s); wire CI/CD (`astro deploy`, preview Deployments).
+   ```bash
+   astro init
+   # v1: astro dev init
+   ```
 4. Build the secrets/connection naming map; create Connections + env vars per Deployment.
 5. Migrate code domain-by-domain per the skill workflow (SKILL.md), validating each unit through the ladder in `validation.md`.
 6. Run side-by-side: Dagster remains authoritative; Airflow DAGs run paused-or-shadowed until parity per domain.

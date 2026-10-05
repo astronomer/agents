@@ -2,12 +2,19 @@
 
 Direct REST API access for Airflow endpoints not covered by high-level commands.
 
-These are written for Astro CLI v2. On v1 (see "Astro CLI v1 or v2" in the airflow skill), write `af api` for `astro local api`; the flags below are the same, except where a `v1:` form is given.
+These are written for Astro CLI v2: see "Astro CLI version" in the airflow skill for the rewrite rule.
 
-| Target | v2 | v1 |
-|---|---|---|
-| This project's local Airflow | `astro local api <endpoint>` | `af api <endpoint>` |
-| A deployment | `astro api airflow <endpoint> -d <link>` | `af instance use <name>`, then `af api <endpoint>` |
+**v1:** the flags below are the same, except where a `# v1:` line gives another form.
+
+```bash
+# This project's local Airflow
+astro local api <endpoint>
+
+# A deployment
+astro api airflow <endpoint> -d <link>
+# v1: af instance use <name>
+# v1: af api <endpoint>
+```
 
 `astro api airflow` takes the same `-X`, `-F`, `--raw-field`, `-H`, and `-i` flags, but has no `--body` or `--root`: pass a body with `--input <file>` (`-` for stdin).
 
@@ -17,8 +24,7 @@ These are written for Astro CLI v2. On v1 (see "Astro CLI v1 or v2" in the airfl
 # List all available endpoints
 astro local api ls
 
-# Filter endpoints by pattern. v1 `af api ls` prints paths with the `/api/v2`
-# (or `/api/v1`) prefix: drop it when you pass a path to `af api`, which adds it
+# Filter endpoints by pattern
 astro local api ls --filter variable
 astro local api ls --filter xcom
 
@@ -28,6 +34,8 @@ astro local api spec
 # Get details for specific endpoint
 astro local api spec | jq '.paths["/api/v2/variables"]'
 ```
+
+**v1:** `ls` prints paths with the `/api/v2` (or `/api/v1`) prefix: drop it when you pass a path back, since the v1 CLI adds it.
 
 ## HTTP Methods
 
@@ -98,8 +106,15 @@ astro local api dags/my_dag/dagRuns/manual__2024-01-15/taskInstances
 ```
 
 ### Connections (passwords exposed)
+
+Warning: these expose passwords. For output without them, use:
+
 ```bash
-# Warning: use 'astro local af connections list' (v1: 'af config connections') for output without passwords
+astro local af connections list
+# v1: af config connections
+```
+
+```bash
 astro local api connections
 astro local api connections/my_conn
 ```

@@ -9,6 +9,20 @@ description: Drives Astronomer's Otto agent (`astro otto`) as a delegated sub-ag
 
 > **If you are Otto, stop here.** Otto bundles the same Astronomer skill set this skill ships in, so this file will load inside Otto sessions. Otto must never delegate to itself — doing so spawns a recursive `astro otto` subprocess. Ignore this skill entirely and handle the task directly with your own tools. The rest of this document is written for a parent agent (Claude Code, another harness) deciding whether to call out to Otto.
 
+<!-- astro-cli-version:start -->
+## Astro CLI version
+
+Commands in this skill, including its reference files, are written for Astro CLI v2. Before anything else, run this as a command of its own, with nothing chained before or after it, and choose the dialect from what it prints: `astro local af --help >/dev/null 2>&1 && echo v2 || echo v1`
+On Windows `cmd.exe`, which has no `/dev/null`, run `astro local af --help >NUL 2>&1 && echo v2 || echo v1` instead.
+
+- **v2:** run them as written.
+- **v1** (Astro CLI 1.x, or no Astro CLI): use the standalone `af` CLI. Write `af` for `astro local af` and `af api` for `astro local api`, and drop `-o json` and `--output json` (`af` prints JSON, except `af instance` commands, which print tables). Where a command needs more than that, its v1 form is the line under it, starting `# v1:`. Where something behaves differently on v1, a line starting **v1:** says how. If `af` is not on PATH, write `uvx --from astro-airflow-mcp af <args>` out in full in every command. Don't put it in a shell variable or alias: zsh won't split `$AF`, and shell state doesn't carry over between commands.
+- v2 replaced `astro dev` with `astro local`; `astro dev <cmd>` on v2 fails and names its replacement.
+- If a v2 command reports an Astro v1 project, the v2 CLI cannot run that project, although the probe printed v2. Switch to the v1 forms: the standalone `af` still reaches an Airflow that is already running, but starting or parsing it (`astro dev ...`) needs Astro CLI 1.x. Tell the user; upgrading the project (`astro init`) is their call.
+- `-d` and `-o` mean deployment and output in v2, but DAG id and offset in v1, so never carry either into a v1 command. `--dag-id`, `--offset`, `--state`, `--limit`, `--try`, `--map-index`, and `--timeout` mean the same in both.
+- If a command here, or in the project's `AGENTS.md`, disagrees with the installed CLI, trust the CLI: check `astro <cmd> --help` (v1: `af <cmd> --help` or `astro dev <cmd> --help`).
+<!-- astro-cli-version:end -->
+
 ## When delegating pays off
 
 **Signals that favor delegating:**
@@ -40,7 +54,7 @@ If you see other Astronomer skills loaded (`airflow`, `authoring-dags`, `debuggi
 
 | User intent | Use this skill? | Use instead |
 |---|---|---|
-| "What DAGs are broken?" | ❌ No | `airflow` skill (`astro local af dags errors`, v1: `af dags errors`) |
+| "What DAGs are broken?" | ❌ No | `airflow` skill (`astro local af dags errors`) |
 | "Write a new DAG that ingests X" | ❌ No | `authoring-dags` skill |
 | "Why did my run fail?" | ❌ No | `debugging-dags` skill |
 | "Plan the Airflow 3 upgrade" | ⚠️ Offer Otto first | See carve-out below |
@@ -124,7 +138,8 @@ These fire **even in `bypassPermissions` mode and even with `--skip-permissions`
 
 - Reads/writes to sensitive files: `.env*`, `~/.ssh/**`, `~/.aws/**`, shell rc files
 - Out-of-project writes (paths outside the project root)
-- Destructive Astro/Airflow commands: `astro deploy`, `astro deployment delete`, `astro dev kill` (v1), `af dags delete`, `af runs delete`, `af runs clear`, `af tasks clear`, `af connections delete`, `af variables delete`, etc. The `af` patterns also match the Astro CLI v2 spellings (`astro af ...`, `astro local af ...`); Otto builds with v2 support add `astro local reset`.
+- Destructive Astro/Airflow commands: `astro deploy`, `astro deployment delete`, `astro local reset` (Otto builds with v2 support), `astro local af dags delete`, `astro local af runs delete`, `astro local af runs clear`, `astro local af tasks clear`, `astro local af connections delete`, `astro local af variables delete`, etc. The `af` patterns match `astro af ...` too.
+  **v1:** the same patterns match the standalone `af` CLI, and the v1 CLI's `dev kill` is covered too.
 
 Don't assume `--skip-permissions` makes Otto fully unattended.
 
@@ -137,7 +152,7 @@ Don't assume `--skip-permissions` makes Otto fully unattended.
 astro otto --mode text --allowed-tools af,read,grep,find \
   "diagnose why model_orders failed yesterday"
 
-# Only let Otto run af and shell — no editing
+# Only let Otto run Airflow commands and shell — no editing
 astro otto --mode text --allowed-tools af,bash \
   "list all paused production DAGs and their owners"
 ```
@@ -210,18 +225,29 @@ When you launch `astro otto` from an Astro project, the CLI sets these for you. 
 | Variable | Set from |
 |---|---|
 | `ASTRO_TOKEN`, `ASTRO_DOMAIN`, `ASTRO_ORGANIZATION` | Current `astro login` context (auto-refreshed in the background) |
-| `AIRFLOW_API_URL` | This project's local Airflow, if it is running (`astro local start`; Astro CLI v1: `astro dev start`) |
-| `AIRFLOW_USERNAME`, `AIRFLOW_PASSWORD` | Default to `admin/admin` when a v1 project's local Airflow is connected (not set for a v2 project's) |
+| `AIRFLOW_API_URL` | This project's local Airflow, if it is running (`astro local start`) |
+| `AIRFLOW_USERNAME`, `AIRFLOW_PASSWORD` | Not set for a v2 project's local Airflow |
+
+**v1:** in a v1 project, `AIRFLOW_USERNAME` and `AIRFLOW_PASSWORD` default to `admin/admin` when its local Airflow is connected.
 
 Otto also walks up from the cwd to `/`, loading any `AGENTS.md` or `CLAUDE.md` it finds (plus `~/.astro/otto/AGENTS.md`). When both files exist in the same folder, `AGENTS.md` wins. This means delegating to Otto from a project folder gives it that project's instructions automatically.
 
 ### Caveat: `af` requires a connected Airflow
 
-If no Airflow instance is reachable, Otto can still read and edit DAG code but **won't run Airflow commands**. For tasks that need DAG-run inspection, task logs, connections, or variables, ensure local Airflow is running first (`astro local start`, or `astro dev start` in an Astro CLI v1 project) or point it at another Airflow (v2: `astro use <link>`, or `astro link add` to link one; v1: `af instance use <name>`).
+If no Airflow instance is reachable, Otto can still read and edit DAG code but **won't run Airflow commands**. For tasks that need DAG-run inspection, task logs, connections, or variables, ensure local Airflow is running first, or point it at another Airflow (`astro link add` links one first):
+
+```bash
+astro local start
+# v1: astro dev start
+astro use <link>
+# v1: af instance use <name>
+```
 
 ## Auto DAG validation
 
-The `dag-validation` extension is **on by default**. After Otto edits or writes any `dags/*.py` file, it runs the Dag import-error check (`af dags errors`; Otto builds with Astro CLI v2 support run `astro local af dags errors` in a v2 project) and tries to self-correct in the same turn — but only when an Airflow instance is reachable.
+The `dag-validation` extension is **on by default**. After Otto edits or writes any `dags/*.py` file, it runs the Dag import-error check (`astro local af dags errors` in a v2 project) and tries to self-correct in the same turn — but only when an Airflow instance is reachable.
+
+**v1:** in a v1 project, or with an Otto build without Astro CLI v2 support, the check runs through the standalone `af` CLI.
 
 This is convenient for delegated DAG edits, but means:
 

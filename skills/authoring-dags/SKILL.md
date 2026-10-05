@@ -16,14 +16,19 @@ This skill guides you through creating and validating Airflow DAGs using best pr
 
 ---
 
-## Astro CLI v1 or v2
+<!-- astro-cli-version:start -->
+## Astro CLI version
 
-Commands here are written for Astro CLI v2. Before anything else, run this as a command of its own, with nothing chained before or after it, and choose the dialect from what it prints: `astro local af --help >/dev/null 2>&1 && echo v2 || echo v1`
+Commands in this skill, including its reference files, are written for Astro CLI v2. Before anything else, run this as a command of its own, with nothing chained before or after it, and choose the dialect from what it prints: `astro local af --help >/dev/null 2>&1 && echo v2 || echo v1`
+On Windows `cmd.exe`, which has no `/dev/null`, run `astro local af --help >NUL 2>&1 && echo v2 || echo v1` instead.
 
 - **v2:** run them as written.
-- **v1** (Astro CLI 1.x, or no Astro CLI): use the standalone `af` CLI. Write `af` for `astro local af` and `af api` for `astro local api`, and drop `-o json` (`af` prints JSON, except `af instance` commands, which print tables). Where a command needs more than that, its v1 form is given beside it, marked `v1:`. If `af` is not on PATH, write `uvx --from astro-airflow-mcp af <args>` out in full in every command. Don't put it in a shell variable or alias: zsh won't split `$AF`, and shell state doesn't carry over between commands.
-- If a v2 command reports an Astro v1 project, the v2 CLI cannot run that project: `af` still reaches an Airflow that is already running, but starting or parsing it (`astro dev ...`) needs Astro CLI 1.x. Tell the user; upgrading the project (`astro init`) is their call.
+- **v1** (Astro CLI 1.x, or no Astro CLI): use the standalone `af` CLI. Write `af` for `astro local af` and `af api` for `astro local api`, and drop `-o json` and `--output json` (`af` prints JSON, except `af instance` commands, which print tables). Where a command needs more than that, its v1 form is the line under it, starting `# v1:`. Where something behaves differently on v1, a line starting **v1:** says how. If `af` is not on PATH, write `uvx --from astro-airflow-mcp af <args>` out in full in every command. Don't put it in a shell variable or alias: zsh won't split `$AF`, and shell state doesn't carry over between commands.
+- v2 replaced `astro dev` with `astro local`; `astro dev <cmd>` on v2 fails and names its replacement.
+- If a v2 command reports an Astro v1 project, the v2 CLI cannot run that project, although the probe printed v2. Switch to the v1 forms: the standalone `af` still reaches an Airflow that is already running, but starting or parsing it (`astro dev ...`) needs Astro CLI 1.x. Tell the user; upgrading the project (`astro init`) is their call.
+- `-d` and `-o` mean deployment and output in v2, but DAG id and offset in v1, so never carry either into a v1 command. `--dag-id`, `--offset`, `--state`, `--limit`, `--try`, `--map-index`, and `--timeout` mean the same in both.
 - If a command here, or in the project's `AGENTS.md`, disagrees with the installed CLI, trust the CLI: check `astro <cmd> --help` (v1: `af <cmd> --help` or `astro dev <cmd> --help`).
+<!-- astro-cli-version:end -->
 
 ---
 
@@ -78,19 +83,35 @@ Use file tools to find existing patterns:
 
 Use these commands to understand what's available:
 
-| Command | Purpose |
-|---------|---------|
-| `astro local af connections list` (v1: `af config connections`) | What external systems are configured |
-| `astro local af variables list` (v1: `af config variables`) | What configuration values exist (v2 lists keys only; `variables get <key>` reads one) |
-| `astro local af providers` (v1: `af config providers`) | What operator packages are installed |
-| `astro local af version` (v1: `af config version`) | Version constraints and features |
-| `astro local af dags list` | Existing DAGs and naming conventions |
-| `astro local af pools list` (v1: `af config pools`) | Resource pools for concurrency |
+```bash
+# What external systems are configured
+astro local af connections list
+# v1: af config connections
+
+# What configuration values exist (v2 lists keys only; `variables get <key>` reads one)
+astro local af variables list
+# v1: af config variables
+
+# What operator packages are installed
+astro local af providers
+# v1: af config providers
+
+# Version constraints and features
+astro local af version
+# v1: af config version
+
+# Existing DAGs and naming conventions
+astro local af dags list
+
+# Resource pools for concurrency
+astro local af pools list
+# v1: af config pools
+```
 
 **Example discovery questions:**
-- "Is there a Snowflake connection?" -> `astro local af connections list` (v1: `af config connections`)
-- "What Airflow version?" -> `astro local af version` (v1: `af config version`)
-- "Are S3 operators available?" -> `astro local af providers` (v1: `af config providers`)
+- "Is there a Snowflake connection?" -> `astro local af connections list`
+- "What Airflow version?" -> `astro local af version`
+- "Are S3 operators available?" -> `astro local af providers`
 
 ---
 
@@ -163,7 +184,11 @@ Returns in one call: metadata, tasks, dependencies, source code.
 
 If you're running on Astro, you can also validate locally before deploying:
 
-- **Parse check**: Run `astro local check` (v1: `astro dev parse`) to catch import errors and DAG-level issues without starting a full Airflow environment
+- **Parse check**: Run this to catch import errors and DAG-level issues without starting a full Airflow environment:
+  ```bash
+  astro local check
+  # v1: astro dev parse
+  ```
 - **DAG-only deploy**: Once validated, use `astro deploy --dags` for fast DAG-only deploys that skip the Docker image build — ideal for iterating on DAG code
 
 ---
@@ -204,14 +229,16 @@ If issues found:
 
 | Phase | Command | Purpose |
 |-------|---------|---------|
-| Discover | `astro local af connections list` (v1: `af config connections`) | Available connections |
-| Discover | `astro local af variables list` (v1: `af config variables`) | Configuration values |
-| Discover | `astro local af providers` (v1: `af config providers`) | Installed operators |
-| Discover | `astro local af version` (v1: `af config version`) | Version info |
+| Discover | `astro local af connections list` | Available connections |
+| Discover | `astro local af variables list` | Configuration values |
+| Discover | `astro local af providers` | Installed operators |
+| Discover | `astro local af version` | Version info |
 | Validate | `astro local af dags errors` | Parse errors (check first!) |
 | Validate | `astro local af dags get <dag_id>` | Verify DAG config |
 | Validate | `astro local af dags warnings` | Configuration warnings |
 | Validate | `astro local af dags explore <dag_id>` | Full DAG inspection |
+
+**v1:** the four Discover commands are named differently; their v1 forms are under "Query the Airflow Environment" above.
 
 > **Testing commands** -- See the **testing-dags** skill for `astro local af runs trigger-wait`, `astro local af runs diagnose`, `astro local af tasks logs`, etc.
 

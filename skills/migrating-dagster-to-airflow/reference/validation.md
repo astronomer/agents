@@ -46,10 +46,11 @@ Ported source code can violate the target lint even though Dagster shipped it fi
 
 A file can be valid Python and still fail to produce a DAG (bad imports, top-level exceptions, duplicate DAG ids). Two equivalent checks; run both, they catch different things.
 
-The Astro CLI parse check (whole project, no running env; check the CLI version first, on its own: `astro local af --help >/dev/null 2>&1 && echo v2 || echo v1`):
+The Astro CLI parse check (whole project, no running env):
 
 ```bash
-astro local check    # v1: astro dev parse
+astro local check
+# v1: astro dev parse
 ```
 
 The pytest DagBag snippet. Note the Airflow 3.x import path is `airflow.dag_processing.dagbag`, **not** `airflow.models`:
@@ -71,7 +72,7 @@ def test_dag_present(dagbag):
 
 **Pass:** zero import errors and every expected DAG id resolves. CI helper for a machine-readable list: `airflow dags list-import-errors -o json`. Feeds rubric dimension 2 (threshold 100%).
 
-Known breakage on Runtime 3.3 / Astro CLI 1.x <= 1.43.1 (playbook entries exist for both): `astro dev parse` fails on the CLI's OWN scaffolded integrity test (`DagBag.__init__() got an unexpected keyword argument 'include_examples'`, removed in Airflow 3.3) regardless of DAG health, and any DagBag call passing `include_examples=` breaks the same way. The Gate 2 source of truth is an in-process `DagBag(dag_folder=...)` (no extra kwargs) inside the scheduler container; treat `astro dev parse` as advisory until the CLI catches up, and patch `.astro/test_dag_integrity_default.py` if it blocks CI.
+**v1:** known breakage on Runtime 3.3 / Astro CLI 1.x <= 1.43.1 (playbook entries exist for both): the parse check fails on the CLI's OWN scaffolded integrity test (`DagBag.__init__() got an unexpected keyword argument 'include_examples'`, removed in Airflow 3.3) regardless of DAG health, and any DagBag call passing `include_examples=` breaks the same way. The Gate 2 source of truth is an in-process `DagBag(dag_folder=...)` (no extra kwargs) inside the scheduler container; treat the v1 parse check as advisory until the CLI catches up, and patch `.astro/test_dag_integrity_default.py` if it blocks CI.
 
 ---
 
@@ -142,9 +143,13 @@ if __name__ == "__main__":
 
 ```bash
 airflow dags test <dag_id> [logical_date]     # CLI, same single-process engine
-uv run pytest                                 # runs the tests/ suite (once: uv add --dev pytest)   v1: astro dev pytest (in the Astro env)
-astro run <dag_id>                            # v1 only: single DAG in one worker container (v2 has no astro run; use airflow dags test above, via astro local run)
+uv run pytest                                 # runs the tests/ suite (once: uv add --dev pytest)
+# v1: astro dev pytest
+astro local run airflow dags test <dag_id>    # the dags test above, in the project environment
+# v1: astro run <dag_id>
 ```
+
+**v1:** the pytest command runs in the Astro environment, and `astro run` runs a single DAG in one worker container; v2 has no `astro run`.
 
 **Pass:** the run completes with all tasks in `success`. Feeds rubric dimension 5 (every generated DAG test-runs clean). For a partitioned unit, run at least one concrete `partition_key` and confirm the task read `dag_run.partition_key` as expected. Note: `partition_key` is None under `dags test`; the local way to exercise a concrete partition is `airflow backfill create --from-date D --to-date D` (see partitions.md).
 
@@ -154,7 +159,7 @@ astro run <dag_id>                            # v1 only: single DAG in one worke
 
 Local-venv gate runs have two environment traps with playbook entries (macOS fork-safety SIGABRT needing `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES`, and the split API-port config where `CORE__EXECUTION_API_SERVER_URL` does not follow `API__PORT`); check the playbook before debugging empty task logs.
 
-Fresh-container caveats for `astro dev pytest` (Astro CLI v1; verified in testing): Cosmos's dbt-ls cache reads Airflow Variables at parse time and dies in a fresh container (`no such table: variable`); set `AIRFLOW__COSMOS__ENABLE_CACHE=False` in `.env` for test runs. And use `dagbag.dags[...]`, never `get_dag()` (DB-backed).
+**v1:** fresh-container caveats for the v1 pytest command (verified in testing): Cosmos's dbt-ls cache reads Airflow Variables at parse time and dies in a fresh container (`no such table: variable`); set `AIRFLOW__COSMOS__ENABLE_CACHE=False` in `.env` for test runs. And use `dagbag.dags[...]`, never `get_dag()` (DB-backed).
 
 ---
 
@@ -239,5 +244,5 @@ Full probe transcript: `example-migrations/assets-dbt-python/runtime-probes.md`.
 - Timetable classes: cron -> `airflow.sdk...trigger.CronTriggerTimetable`; `schedule=[asset]` -> `airflow.sdk...assets.AssetTriggeredTimetable` with `asset_condition=AssetAll(...)` (list = AND); `(a | b)` -> `AssetAny(...)`.
 - `downstream_task_ids`, `task.outlets`, `Asset.name`, `Asset.uri` all exist with those spellings on `airflow.sdk` objects.
 - **URI normalization trap**: a host-only URI (`scheme://one_part`) is stored with a trailing slash (`'dagster://order_forecast_model/'`); assert against the normalized form.
-- `DagBag.__init__` no longer accepts `include_examples` (Airflow 3.3); `astro dev parse` on CLI <= 1.43.1 fails on its own scaffolded integrity test because of this (see troubleshooting.md). The import path `airflow.dag_processing.dagbag` is confirmed.
+- `DagBag.__init__` no longer accepts `include_examples` (Airflow 3.3); the Astro CLI 1.x parse check on CLI <= 1.43.1 fails on its own scaffolded integrity test because of this (see troubleshooting.md). The import path `airflow.dag_processing.dagbag` is confirmed.
 - Partitions: `dag_run.partition_key` is a plain string in the timetable's `key_format` (default `'%Y-%m-%dT%H:%M:%S'`, e.g. `'2026-07-07T00:00:00'` — NOT Dagster's `'2026-07-07'`); it is **None on `airflow dags test` / manual runs**. To execute one concrete partition locally (Gate 4), use `airflow backfill create --from-date D --to-date D`; `dags test`/`trigger` have no partition-key flag. `PartitionedAtRuntime` and the full mapper/window surface import from `airflow.sdk` (lazily; not in `dir()`).

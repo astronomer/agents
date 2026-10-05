@@ -7,14 +7,19 @@ description: Comprehensive DAG failure diagnosis and root-cause analysis  with s
 
 You are a data engineer debugging a failed Airflow DAG. Follow this systematic approach to identify the root cause and provide actionable remediation.
 
-## Astro CLI v1 or v2
+<!-- astro-cli-version:start -->
+## Astro CLI version
 
-Commands here are written for Astro CLI v2. Before anything else, run this as a command of its own, with nothing chained before or after it, and choose the dialect from what it prints: `astro local af --help >/dev/null 2>&1 && echo v2 || echo v1`
+Commands in this skill, including its reference files, are written for Astro CLI v2. Before anything else, run this as a command of its own, with nothing chained before or after it, and choose the dialect from what it prints: `astro local af --help >/dev/null 2>&1 && echo v2 || echo v1`
+On Windows `cmd.exe`, which has no `/dev/null`, run `astro local af --help >NUL 2>&1 && echo v2 || echo v1` instead.
 
 - **v2:** run them as written.
-- **v1** (Astro CLI 1.x, or no Astro CLI): use the standalone `af` CLI. Write `af` for `astro local af` and `af api` for `astro local api`, and drop `-o json` (`af` prints JSON, except `af instance` commands, which print tables). Where a command needs more than that, its v1 form is given beside it, marked `v1:`. If `af` is not on PATH, write `uvx --from astro-airflow-mcp af <args>` out in full in every command. Don't put it in a shell variable or alias: zsh won't split `$AF`, and shell state doesn't carry over between commands.
-- If a v2 command reports an Astro v1 project, the v2 CLI cannot run that project: `af` still reaches an Airflow that is already running, but starting or parsing it (`astro dev ...`) needs Astro CLI 1.x. Tell the user; upgrading the project (`astro init`) is their call.
+- **v1** (Astro CLI 1.x, or no Astro CLI): use the standalone `af` CLI. Write `af` for `astro local af` and `af api` for `astro local api`, and drop `-o json` and `--output json` (`af` prints JSON, except `af instance` commands, which print tables). Where a command needs more than that, its v1 form is the line under it, starting `# v1:`. Where something behaves differently on v1, a line starting **v1:** says how. If `af` is not on PATH, write `uvx --from astro-airflow-mcp af <args>` out in full in every command. Don't put it in a shell variable or alias: zsh won't split `$AF`, and shell state doesn't carry over between commands.
+- v2 replaced `astro dev` with `astro local`; `astro dev <cmd>` on v2 fails and names its replacement.
+- If a v2 command reports an Astro v1 project, the v2 CLI cannot run that project, although the probe printed v2. Switch to the v1 forms: the standalone `af` still reaches an Airflow that is already running, but starting or parsing it (`astro dev ...`) needs Astro CLI 1.x. Tell the user; upgrading the project (`astro init`) is their call.
+- `-d` and `-o` mean deployment and output in v2, but DAG id and offset in v1, so never carry either into a v1 command. `--dag-id`, `--offset`, `--state`, `--limit`, `--try`, `--map-index`, and `--timeout` mean the same in both.
 - If a command here, or in the project's `AGENTS.md`, disagrees with the installed CLI, trust the CLI: check `astro <cmd> --help` (v1: `af <cmd> --help` or `astro dev <cmd> --help`).
+<!-- astro-cli-version:end -->
 
 To debug a deployment instead of the local Airflow, see "Choosing Which Airflow" in the **airflow** skill.
 
@@ -67,7 +72,11 @@ A common cause of failures with no git activity is dependency drift — the user
    docker run --rm <previous_image> pip freeze > /tmp/prev.txt
    diff /tmp/prev.txt /tmp/now.txt
    ```
-   Also compare `docker run --rm <image> python --version` between the two — a Python minor-version bump (3.11 → 3.12, or even a patch) can break wheel compatibility even when `pip freeze` looks identical. `astro local af providers` (v1: `af config providers`) lists currently installed provider versions, useful for cross-checking against modules named in the traceback.
+   Also compare `docker run --rm <image> python --version` between the two — a Python minor-version bump (3.11 → 3.12, or even a patch) can break wheel compatibility even when `pip freeze` looks identical. This lists currently installed provider versions, useful for cross-checking against modules named in the traceback:
+   ```bash
+   astro local af providers
+   # v1: af config providers
+   ```
 
 2. **Venv-style operators bypass the worker image.** `@task.virtualenv`, `PythonVirtualenvOperator`, `ExternalPythonOperator`, and `KubernetesPodOperator` build their environment per task run, so an image diff won't catch failures inside them. If the failed task is one of these, read its `requirements` / `image` / `python_version` / `python` args directly:
    - Unbounded specifier (e.g. `pandas>=2.0.0` with no upper bound, or no specifier at all) → a new upstream release is the prime suspect.
@@ -130,6 +139,20 @@ How to prevent this from happening again:
 
 ### Quick Commands
 Provide ready-to-use commands, for the version the user has. Get the user's go-ahead before running any of them, and preview first:
-- To clear and rerun the entire DAG run: `astro local af runs clear <dag_id> <run_id> --dry-run`, then the same with `--yes` instead of `--dry-run` (same flags on v1)
-- To clear and rerun specific failed tasks: `astro local af tasks clear <dag_id> <run_id> <task_id> <task_id> --dry-run`, then the same with `--yes` instead of `--dry-run` (v1: `af tasks clear <dag_id> <run_id> <task_id>,<task_id> --dry-run`, then `--no-dry-run` instead of `--dry-run`; v1 never prompts)
-- To delete a stuck or unwanted run: `astro local af runs delete <dag_id> <run_id> --yes` (same flags on v1)
+
+```bash
+# Clear and rerun the entire DAG run: preview, then run it
+astro local af runs clear <dag_id> <run_id> --dry-run
+astro local af runs clear <dag_id> <run_id> --yes
+
+# Clear and rerun specific failed tasks: preview, then run it
+astro local af tasks clear <dag_id> <run_id> <task_id> <task_id> --dry-run
+# v1: af tasks clear <dag_id> <run_id> <task_id>,<task_id> --dry-run
+astro local af tasks clear <dag_id> <run_id> <task_id> <task_id> --yes
+# v1: af tasks clear <dag_id> <run_id> <task_id>,<task_id> --no-dry-run
+
+# Delete a stuck or unwanted run
+astro local af runs delete <dag_id> <run_id> --yes
+```
+
+**v1:** `tasks clear` never prompts.

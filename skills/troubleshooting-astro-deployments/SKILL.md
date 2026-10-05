@@ -12,6 +12,20 @@ This skill helps you diagnose and troubleshoot production Astronomer deployments
 
 ---
 
+<!-- astro-cli-version:start -->
+## Astro CLI version
+
+Commands in this skill, including its reference files, are written for Astro CLI v2. Before anything else, run this as a command of its own, with nothing chained before or after it, and choose the dialect from what it prints: `astro local af --help >/dev/null 2>&1 && echo v2 || echo v1`
+On Windows `cmd.exe`, which has no `/dev/null`, run `astro local af --help >NUL 2>&1 && echo v2 || echo v1` instead.
+
+- **v2:** run them as written.
+- **v1** (Astro CLI 1.x, or no Astro CLI): use the standalone `af` CLI. Write `af` for `astro local af` and `af api` for `astro local api`, and drop `-o json` and `--output json` (`af` prints JSON, except `af instance` commands, which print tables). Where a command needs more than that, its v1 form is the line under it, starting `# v1:`. Where something behaves differently on v1, a line starting **v1:** says how. If `af` is not on PATH, write `uvx --from astro-airflow-mcp af <args>` out in full in every command. Don't put it in a shell variable or alias: zsh won't split `$AF`, and shell state doesn't carry over between commands.
+- v2 replaced `astro dev` with `astro local`; `astro dev <cmd>` on v2 fails and names its replacement.
+- If a v2 command reports an Astro v1 project, the v2 CLI cannot run that project, although the probe printed v2. Switch to the v1 forms: the standalone `af` still reaches an Airflow that is already running, but starting or parsing it (`astro dev ...`) needs Astro CLI 1.x. Tell the user; upgrading the project (`astro init`) is their call.
+- `-d` and `-o` mean deployment and output in v2, but DAG id and offset in v1, so never carry either into a v1 command. `--dag-id`, `--offset`, `--state`, `--limit`, `--try`, `--map-index`, and `--timeout` mean the same in both.
+- If a command here, or in the project's `AGENTS.md`, disagrees with the installed CLI, trust the CLI: check `astro <cmd> --help` (v1: `af <cmd> --help` or `astro dev <cmd> --help`).
+<!-- astro-cli-version:end -->
+
 ## Quick Health Check
 
 Start with these commands to get an overview:
@@ -231,9 +245,17 @@ Astro keeps a deployment's variables in two separate places, and each has its ow
 | Commands | `astro deployment variable list`, `create`, `update` | `astro env variable list`, `get`, `set`, `delete`, `export`, `link` |
 | Delete from the CLI | no: use the Astro UI | yes |
 
-The Environment Manager also holds connections and Airflow variables (`astro env connection ...`, `astro env airflow-variable ...`). They take the same scope flags and delete the same way as `astro env variable`, but have no `export`. v2 also has `astro env list --deployment-id <DEPLOYMENT_ID>`, which lists every kind at once, without values.
+The Environment Manager also holds connections and Airflow variables (`astro env connection ...`, `astro env airflow-variable ...`). They take the same scope flags and delete the same way as `astro env variable`, but have no `export`.
 
-The `astro env` commands differ between CLI versions. The commands below are written for Astro CLI v2, and a `v1:` note gives the Astro CLI v1 form where it differs. v2 spells create-or-update as `set <KEY>`. v1 has `create --key <KEY>` and `update <KEY>`, and v1's `update` also creates a missing key. `astro env` first shipped in Astro CLI v1.43.0: on an older v1, `astro env` is an unknown command, which says nothing about whether the deployment has Environment Manager variables, so check those in the Astro UI. In a v2 project, `--deployment-id` on `astro env` commands also accepts a link name.
+**v2:** `astro env list --deployment-id <DEPLOYMENT_ID>` lists every kind at once, without values.
+
+The `astro env` commands differ between CLI versions; the commands below are v2, with a `# v1:` line under any that differ. v2 spells create-or-update as `set <KEY>`.
+
+**v1:** create-or-update is `create --key <KEY>` or `update <KEY>`, and `update` also creates a missing key.
+
+**v1:** `astro env` first shipped in Astro CLI v1.43.0: on an older v1, `astro env` is an unknown command, which says nothing about whether the deployment has Environment Manager variables, so check those in the Astro UI.
+
+**v2:** in a v2 project, `--deployment-id` on `astro env` commands also accepts a link name.
 
 ### Find Where a Variable Lives
 
@@ -279,14 +301,21 @@ astro deployment variable update API_KEY=<NEW_VALUE> --deployment-id <DEPLOYMENT
 Environment Manager variables, on one deployment or on the workspace:
 
 ```bash
-# A secret on one deployment, creating it if it does not exist; with no --value it prompts with echo off   v1: astro env variable update API_KEY --deployment-id <DEPLOYMENT_ID> --secret
+# A secret on one deployment, creating it if it does not exist; with no --value it prompts with echo off
 astro env variable set API_KEY --deployment-id <DEPLOYMENT_ID> --secret
+# v1: astro env variable update API_KEY --deployment-id <DEPLOYMENT_ID> --secret
 
-# On the workspace, reaching every deployment in it   v1: astro env variable update LOG_LEVEL --workspace-id <WORKSPACE_ID> --value INFO --auto-link
+# On the workspace, reaching every deployment in it
 astro env variable set LOG_LEVEL --workspace-id <WORKSPACE_ID> --value INFO --auto-link
+# v1: astro env variable update LOG_LEVEL --workspace-id <WORKSPACE_ID> --value INFO --auto-link
 ```
 
-`--secret` applies only when the variable is created; to change it later, delete and re-create the variable. Without `--auto-link` or a link (`astro env variable link set`; v1: `link create`), a workspace variable reaches no deployment.
+`--secret` applies only when the variable is created; to change it later, delete and re-create the variable. Without `--auto-link` or a link, a workspace variable reaches no deployment:
+
+```bash
+astro env variable link set --variable-key <KEY> --workspace-id <WORKSPACE_ID> --deployment-id <DEPLOYMENT_ID>
+# v1: astro env variable link create --variable-key <KEY> --workspace-id <WORKSPACE_ID> --deployment-id <DEPLOYMENT_ID>
+```
 
 ### Delete Variables
 
@@ -308,8 +337,9 @@ This deletes the deployment's own variable only. Run with `--deployment-id`, del
 # If the deployment appears under the variable's links, remove that link
 astro env variable link delete --variable-key <KEY> --workspace-id <WORKSPACE_ID> --deployment-id <DEPLOYMENT_ID>
 
-# If AUTO-LINK is true, the variable still reaches the deployment: exclude it too   v1: astro env variable link create ... --exclude
+# If AUTO-LINK is true, the variable still reaches the deployment: exclude it too
 astro env variable link set --variable-key <KEY> --workspace-id <WORKSPACE_ID> --deployment-id <DEPLOYMENT_ID> --exclude
+# v1: astro env variable link create --variable-key <KEY> --workspace-id <WORKSPACE_ID> --deployment-id <DEPLOYMENT_ID> --exclude
 ```
 
 An auto-linked variable can also carry an explicit link (for a per-deployment override). The exclude is refused while that link exists, so remove the link first, then exclude.
@@ -322,7 +352,9 @@ astro env variable delete <KEY> --workspace-id <WORKSPACE_ID> --yes
 
 Pass a key, not an ID, to `astro env variable delete`. An ID is deleted directly, whatever `--workspace-id` or `--deployment-id` says, so a workspace variable's ID deletes the workspace variable even when run with `--deployment-id`.
 
-`astro env connection` and `astro env airflow-variable` delete the same way. Their links are managed with `--connection-key` and `--airflow-variable-key` in v2; v1 has no `link` commands for them, so manage those links in the Astro UI.
+`astro env connection` and `astro env airflow-variable` delete the same way. Their links are managed with `--connection-key` and `--airflow-variable-key`.
+
+**v1:** there are no `link` commands for them, so manage those links in the Astro UI.
 
 **Note**: Both kinds reach DAGs as environment variables, and neither needs a redeploy. Environment Manager changes reach the deployment within a few minutes; tasks already running keep the old value.
 

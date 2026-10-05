@@ -7,14 +7,19 @@ description: Complex DAG testing workflows with debugging and fixing cycles. Use
 
 Use the Airflow CLI to test, debug, and fix DAGs in iterative cycles.
 
-## Astro CLI v1 or v2
+<!-- astro-cli-version:start -->
+## Astro CLI version
 
-Commands here are written for Astro CLI v2. Before anything else, run this as a command of its own, with nothing chained before or after it, and choose the dialect from what it prints: `astro local af --help >/dev/null 2>&1 && echo v2 || echo v1`
+Commands in this skill, including its reference files, are written for Astro CLI v2. Before anything else, run this as a command of its own, with nothing chained before or after it, and choose the dialect from what it prints: `astro local af --help >/dev/null 2>&1 && echo v2 || echo v1`
+On Windows `cmd.exe`, which has no `/dev/null`, run `astro local af --help >NUL 2>&1 && echo v2 || echo v1` instead.
 
 - **v2:** run them as written.
-- **v1** (Astro CLI 1.x, or no Astro CLI): use the standalone `af` CLI. Write `af` for `astro local af` and `af api` for `astro local api`, and drop `-o json` (`af` prints JSON, except `af instance` commands, which print tables). Where a command needs more than that, its v1 form is given beside it, marked `v1:`. If `af` is not on PATH, write `uvx --from astro-airflow-mcp af <args>` out in full in every command. Don't put it in a shell variable or alias: zsh won't split `$AF`, and shell state doesn't carry over between commands.
-- If a v2 command reports an Astro v1 project, the v2 CLI cannot run that project: `af` still reaches an Airflow that is already running, but starting or parsing it (`astro dev ...`) needs Astro CLI 1.x. Tell the user; upgrading the project (`astro init`) is their call.
+- **v1** (Astro CLI 1.x, or no Astro CLI): use the standalone `af` CLI. Write `af` for `astro local af` and `af api` for `astro local api`, and drop `-o json` and `--output json` (`af` prints JSON, except `af instance` commands, which print tables). Where a command needs more than that, its v1 form is the line under it, starting `# v1:`. Where something behaves differently on v1, a line starting **v1:** says how. If `af` is not on PATH, write `uvx --from astro-airflow-mcp af <args>` out in full in every command. Don't put it in a shell variable or alias: zsh won't split `$AF`, and shell state doesn't carry over between commands.
+- v2 replaced `astro dev` with `astro local`; `astro dev <cmd>` on v2 fails and names its replacement.
+- If a v2 command reports an Astro v1 project, the v2 CLI cannot run that project, although the probe printed v2. Switch to the v1 forms: the standalone `af` still reaches an Airflow that is already running, but starting or parsing it (`astro dev ...`) needs Astro CLI 1.x. Tell the user; upgrading the project (`astro init`) is their call.
+- `-d` and `-o` mean deployment and output in v2, but DAG id and offset in v1, so never carry either into a v1 command. `--dag-id`, `--offset`, `--state`, `--limit`, `--try`, `--map-index`, and `--timeout` mean the same in both.
 - If a command here, or in the project's `AGENTS.md`, disagrees with the installed CLI, trust the CLI: check `astro <cmd> --help` (v1: `af <cmd> --help` or `astro dev <cmd> --help`).
+<!-- astro-cli-version:end -->
 
 To test against a deployment instead of the local Airflow, see "Choosing Which Airflow" in the **airflow** skill.
 
@@ -26,10 +31,12 @@ These give fast feedback without a running Airflow instance:
 
 ```bash
 # Parse DAGs to catch import errors, syntax issues, and DAG-level problems
-astro local check     # v1: astro dev parse
+astro local check
+# v1: astro dev parse
 
 # Run the project's tests (tests/ directory)
-uv run pytest         # v1: astro dev pytest
+uv run pytest
+# v1: astro dev pytest
 ```
 
 A new v2 project has no pytest: add it once with `uv add --dev pytest`.
@@ -111,14 +118,18 @@ astro local af runs trigger-wait my_dag --timeout 300 -o json
 
 ### Response Interpretation
 
-Read the JSON the command prints (the v2 forms here pass `-o json`; v1 always prints JSON). The two versions shape it differently:
+Read the JSON the command prints (the v2 forms here pass `-o json`):
 
-| | v2 | v1 |
-|---|---|---|
-| Run state | top-level `state` | `dag_run.state` |
-| Timed out | `timed_out: true` | `timed_out: true`, and `state` at the top level |
-| Failed tasks | `failed_tasks` | `failed_tasks` |
-| Exit status | 0 succeeded, 1 failed (or the command itself failed, e.g. DAG not found), 2 timed out | 0 whenever the wait finished or timed out; 1 only when the command itself failed |
+| | Where to read it |
+|---|---|
+| Run state | top-level `state` |
+| Timed out | `timed_out: true` |
+| Failed tasks | `failed_tasks` |
+| Exit status | 0 succeeded, 1 failed (or the command itself failed, e.g. DAG not found), 2 timed out |
+
+**v1:** the command always prints JSON, shaped differently: the run state is `dag_run.state`; a timeout gives `timed_out: true`, and `state` at the top level; `failed_tasks` is the same.
+
+**v1:** the exit status is 0 whenever the wait finished or timed out, and 1 only when the command itself failed, so read the JSON rather than the exit status.
 
 | Result | Next step |
 |------|-----------|
@@ -144,7 +155,10 @@ Don't chain the next command with `&&` after `trigger-wait`: on v2 a failed run 
 }
 ```
 
-**Failure (v2; v1 has the same fields under `dag_run`, with `timed_out`, `elapsed_seconds`, and `failed_tasks` beside it):**
+**Failure (v2):**
+
+**v1:** the same fields sit under `dag_run`, with `timed_out`, `elapsed_seconds`, and `failed_tasks` beside it.
+
 ```json
 {
   "dag_id": "my_dag",
@@ -280,10 +294,19 @@ Once you identify the issue:
 |-------|-----|
 | Missing import | Add to DAG file |
 | Missing package | Add to `requirements.txt` |
-| Connection error | Check `astro local af connections list` (v1: `af config connections`), verify credentials |
-| Variable missing | Check `astro local af variables list` (v2 shows keys only; `variables get <key>` reads one) (v1: `af config variables`), create if needed |
+| Connection error | Check `astro local af connections list`, verify credentials |
+| Variable missing | Check `astro local af variables list` (v2 shows keys only; `variables get <key>` reads one), create if needed |
 | Timeout | Increase task timeout or optimize query |
 | Permission error | Check credentials in connection |
+
+The two checks:
+
+```bash
+astro local af connections list
+# v1: af config connections
+astro local af variables list
+# v1: af config variables
+```
 
 ### After Fixing
 
@@ -306,8 +329,10 @@ Once you identify the issue:
 | Debug | `astro local af dags errors` | Check for parse errors (if DAG won't load) |
 | Debug | `astro local af dags get <dag_id>` | Verify DAG config |
 | Debug | `astro local af dags explore <dag_id>` | Full DAG inspection |
-| Config | `astro local af connections list` (v1: `af config connections`) | List connections |
-| Config | `astro local af variables list` (v1: `af config variables`) | List variables |
+| Config | `astro local af connections list` | List connections |
+| Config | `astro local af variables list` | List variables |
+
+**v1:** the two config commands take a different form; it is under "Common Fixes" above.
 
 ---
 
@@ -393,7 +418,7 @@ astro local af runs get my_dag manual__2025-01-14T...
 ### Common Error Patterns
 
 **Connection Refused / Timeout:**
-- Check `astro local af connections list` (v1: `af config connections`) for correct host/port
+- Check `astro local af connections list` for correct host/port (see "Common Fixes")
 - Verify network connectivity to external system
 - Check if connection credentials are correct
 

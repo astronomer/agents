@@ -10,24 +10,41 @@ This skill helps you manage your local Airflow environment using the Astro CLI.
 > **To set up a new project**, see the **setting-up-astro-project** skill.
 > **When Airflow is running**, use the **airflow**, **authoring-dags**, and **testing-dags** skills to query and test it.
 
-## Astro CLI v1 or v2
+<!-- astro-cli-version:start -->
+## Astro CLI version
 
-Commands here are written for Astro CLI v2. Before anything else, run this as a command of its own, with nothing chained before or after it, and choose the dialect from what it prints: `astro local af --help >/dev/null 2>&1 && echo v2 || echo v1`
+Commands in this skill, including its reference files, are written for Astro CLI v2. Before anything else, run this as a command of its own, with nothing chained before or after it, and choose the dialect from what it prints: `astro local af --help >/dev/null 2>&1 && echo v2 || echo v1`
+On Windows `cmd.exe`, which has no `/dev/null`, run `astro local af --help >NUL 2>&1 && echo v2 || echo v1` instead.
 
 - **v2:** run them as written.
-- **v1** (Astro CLI 1.x, or no Astro CLI): use the standalone `af` CLI. Write `af` for `astro local af` and `af api` for `astro local api`, and drop `-o json` (`af` prints JSON, except `af instance` commands, which print tables). Where a command needs more than that, its v1 form is given beside it, marked `v1:`. If `af` is not on PATH, write `uvx --from astro-airflow-mcp af <args>` out in full in every command. Don't put it in a shell variable or alias: zsh won't split `$AF`, and shell state doesn't carry over between commands.
-- If a v2 command reports an Astro v1 project, the v2 CLI cannot run that project: `af` still reaches an Airflow that is already running, but starting or parsing it (`astro dev ...`) needs Astro CLI 1.x. Tell the user; upgrading the project (`astro init`) is their call.
+- **v1** (Astro CLI 1.x, or no Astro CLI): use the standalone `af` CLI. Write `af` for `astro local af` and `af api` for `astro local api`, and drop `-o json` and `--output json` (`af` prints JSON, except `af instance` commands, which print tables). Where a command needs more than that, its v1 form is the line under it, starting `# v1:`. Where something behaves differently on v1, a line starting **v1:** says how. If `af` is not on PATH, write `uvx --from astro-airflow-mcp af <args>` out in full in every command. Don't put it in a shell variable or alias: zsh won't split `$AF`, and shell state doesn't carry over between commands.
+- v2 replaced `astro dev` with `astro local`; `astro dev <cmd>` on v2 fails and names its replacement.
+- If a v2 command reports an Astro v1 project, the v2 CLI cannot run that project, although the probe printed v2. Switch to the v1 forms: the standalone `af` still reaches an Airflow that is already running, but starting or parsing it (`astro dev ...`) needs Astro CLI 1.x. Tell the user; upgrading the project (`astro init`) is their call.
+- `-d` and `-o` mean deployment and output in v2, but DAG id and offset in v1, so never carry either into a v1 command. `--dag-id`, `--offset`, `--state`, `--limit`, `--try`, `--map-index`, and `--timeout` mean the same in both.
 - If a command here, or in the project's `AGENTS.md`, disagrees with the installed CLI, trust the CLI: check `astro <cmd> --help` (v1: `af <cmd> --help` or `astro dev <cmd> --help`).
-
-In this skill nearly every v1 form is an `astro dev` command. v2 replaced `astro dev` with `astro local`, and `astro dev <x>` on v2 fails and names its replacement.
+<!-- astro-cli-version:end -->
 
 ## Modes
 
-| | v2 (`astro local`) | v1 (`astro dev`) |
-|---|---|---|
-| Default | **Standalone**: Airflow runs on your machine in `.venv/`, managed by `uv` | **Docker**: Airflow runs in containers |
-| Other mode | `astro local start --docker` | Standalone (Airflow 3 + `uv`, not on Windows): `astro dev start --standalone` |
-| Making it stick | No setting: pass `--docker` on each start. `restart` keeps the mode Airflow is running in | `astro config set dev.mode standalone`, or pass `--standalone` on **every** command (stop, kill, restart, bash, logs, ...). `astro dev run` hands its arguments to Airflow, so it works in standalone mode only with `dev.mode` set |
+| | v2 (`astro local`) |
+|---|---|
+| Default | **Standalone**: Airflow runs on your machine in `.venv/`, managed by `uv` |
+| Other mode | `astro local start --docker` |
+| Making it stick | No setting: pass `--docker` on each start. `restart` keeps the mode Airflow is running in |
+
+```bash
+astro local start            # Standalone, the default
+# v1: astro dev start --standalone
+astro local start --docker   # Docker
+# v1: astro dev start
+```
+
+**v1:** the default is **Docker**: Airflow runs in containers. The other mode is standalone (Airflow 3 + `uv`, not on Windows). To make it stick, set `dev.mode`, or pass `--standalone` on **every** command (stop, kill, restart, bash, logs, ...). The v1 CLI's `run` hands its arguments to Airflow, so it works in standalone mode only with `dev.mode` set.
+
+```bash
+# v2: none (no setting: pass --docker on each start)
+# v1: astro config set dev.mode standalone
+```
 
 Standalone state lives in `.venv/` and `.astro/standalone/` (database and logs) on both versions; DAGs come from `dags/`.
 
@@ -36,23 +53,42 @@ Standalone state lives in `.venv/` and `.astro/standalone/` (database and logs) 
 ## Start / Stop / Restart
 
 ```bash
-astro local start      # Start local Airflow                    v1: astro dev start
-astro local stop       # Stop it (keeps its data and .venv)     v1: astro dev stop
-astro local restart    # Restart, picking up project changes    v1: astro dev restart
-astro local status     # Is it running, and where               v1: astro dev ps
-astro local open       # Open the Airflow UI                    v1: no command (astro dev start opens it)
-astro local list       # Every local Airflow on this machine    v1: no equivalent
+astro local start      # Start local Airflow
+# v1: astro dev start
+astro local stop       # Stop it (keeps its data and .venv)
+# v1: astro dev stop
+astro local restart    # Restart, picking up project changes
+# v1: astro dev restart
+astro local status     # Is it running, and where
+# v1: astro dev ps
+astro local open       # Open the Airflow UI
+astro local list       # Every local Airflow on this machine
 ```
 
-| v2 | Purpose | v1 |
-|------|-------------|----|
-| `astro local start --port <n>` | Preferred API server port | `astro dev start --standalone --port <n>` (standalone only) |
-| `astro local start --docker` | Run in Docker | the default |
-| no equivalent | Run in the foreground | `astro dev start --standalone --foreground` |
+**v1:** there is no `open` (`start` opens the UI) and no `list`.
 
-**Restart after changing** the project's dependencies: `pyproject.toml` on v2; `requirements.txt`, `packages.txt`, or the `Dockerfile` on v1.
+| v2 | Purpose |
+|------|-------------|
+| `astro local start --port <n>` | Preferred API server port |
+| `astro local start --docker` | Run in Docker |
 
-**Credentials:** a v1 Docker environment logs in with `admin` / `admin`.
+```bash
+astro local start --port <n>
+# v1: astro dev start --standalone --port <n>
+```
+
+**v1:** `--port` on `start` works in standalone mode only, and Docker is the default, so there is no `--docker`. Standalone mode can also run in the foreground:
+
+```bash
+# v2: none
+# v1: astro dev start --standalone --foreground
+```
+
+**Restart after changing** the project's dependencies in `pyproject.toml`.
+
+**v1:** the dependencies are in `requirements.txt`, `packages.txt`, or the `Dockerfile`.
+
+**v1:** a Docker environment logs in with `admin` / `admin`.
 
 ---
 
@@ -60,41 +96,71 @@ astro local list       # Every local Airflow on this machine    v1: no equivalen
 
 Both versions give each project a hostname like `<project-name>.localhost:6563`, so several projects run side by side without port conflicts.
 
-| Task | v2 | v1 |
-|---|---|---|
-| This project's URL | `astro local open --print` (or `astro local status`) | printed by `astro dev start` |
-| All projects and their URLs | `astro local list` | `astro dev proxy status`, or visit `http://localhost:6563` |
-| Stop the proxy | no command | `astro dev proxy stop` (it restarts on the next `astro dev start`) |
-| Change the proxy port | no equivalent: v2 uses 6563, or another free port when that one is taken | `astro config set proxy.port <port>` |
-| Skip the proxy for one start | no equivalent | `astro dev start --no-proxy` |
+| Task | v2 |
+|---|---|
+| This project's URL | `astro local open --print` (or `astro local status`) |
+| All projects and their URLs | `astro local list` |
+| Stop the proxy | no command |
+| Change the proxy port | no equivalent: v2 uses 6563, or another free port when that one is taken |
+| Skip the proxy for one start | no equivalent |
+
+```bash
+astro local open --print
+# v1: astro dev start          # prints the project's URL
+astro local list
+# v1: astro dev proxy status   # or visit http://localhost:6563
+```
+
+**v1:** the proxy can be stopped (it restarts on the next start), moved, or skipped for one start:
+
+```bash
+# v2: none
+# v1: astro dev proxy stop
+# v2: none
+# v1: astro config set proxy.port <port>
+# v2: none
+# v1: astro dev start --no-proxy
+```
 
 ---
 
 ## View Logs
 
 ```bash
-astro local logs                # All logs             v1: astro dev logs
-astro local logs -f             # Follow in real time  v1: astro dev logs -f
-astro local logs --tail 200     # Last 200 lines       v1: no equivalent
+astro local logs                # All logs
+# v1: astro dev logs
+astro local logs -f             # Follow in real time
+# v1: astro dev logs -f
+astro local logs --tail 200     # Last 200 lines
 ```
+
+**v1:** `logs` has no `--tail`.
 
 ```bash
-astro local logs --component scheduler    # One component    v1: astro dev logs --scheduler
+astro local logs --component scheduler    # One component
+# v1: astro dev logs --scheduler
 ```
 
-Components are `scheduler`, `api-server`, `dag-processor`, and `triggerer` (`webserver` on Airflow 2); v2 also labels its own lines `system`. v2 filters by component in both modes. v1 takes a flag per component (`--scheduler`, `--api-server`, `--dag-processor`, `--triggerer`, `--webserver`), and in v1 standalone mode the log is one stream with no filtering.
+Components are `scheduler`, `api-server`, `dag-processor`, and `triggerer` (`webserver` on Airflow 2); v2 also labels its own lines `system`. v2 filters by component in both modes.
+
+**v1:** `logs` takes a flag per component (`--scheduler`, `--api-server`, `--dag-processor`, `--triggerer`, `--webserver`), and in standalone mode the log is one stream with no filtering.
 
 ---
 
 ## Run Airflow CLI Commands
 
 ```bash
-astro local shell                     # Shell with the Airflow environment   v1: astro dev bash
-astro local run airflow info          # Run one Airflow CLI command          v1: astro dev run info
-astro local run airflow dags list     #                                      v1: astro dev run dags list
+astro local shell                     # Shell with the Airflow environment
+# v1: astro dev bash
+astro local run airflow info          # Run one Airflow CLI command
+# v1: astro dev run info
+astro local run airflow dags list
+# v1: astro dev run dags list
 ```
 
-v2 `astro local run` runs any command, so name the `airflow` program. v1 `astro dev run` adds `airflow` itself, so leave it out. In v1 standalone mode, `bash` opens a venv-activated shell and `run` executes in the venv (`run` needs `dev.mode` set to `standalone`, see Modes).
+v2 `astro local run` runs any command, so name the `airflow` program.
+
+**v1:** `run` adds `airflow` itself, so leave it out. In standalone mode, `bash` opens a venv-activated shell and `run` executes in the venv (`run` needs `dev.mode` set to `standalone`, see Modes).
 
 ---
 
@@ -224,22 +290,36 @@ astro api airflow --url <url> get_task_instances -p dag_id=my_dag -p 'dag_run_id
 
 | Issue | Solution |
 |-------|----------|
-| Port 8080 in use | v2: `astro local start --port <n>`. v1: `astro config set api-server.port <n>` (`webserver.port` on Airflow 2), or in standalone mode `astro dev start --standalone --port <n>` |
+| Port 8080 in use | `astro local start --port <n>` |
 | Airflow won't start | Reset (below), then start again |
-| Package install failed | Check the dependencies: `pyproject.toml` (v1: `requirements.txt` syntax) |
-| DAG not appearing | `astro local check` (v1: `astro dev parse`) to check for import errors |
+| Package install failed | Check the dependencies: `pyproject.toml` |
+| DAG not appearing | `astro local check` to check for import errors |
 | Out of disk space (Docker) | `docker system prune` |
-| Standalone won't start | Ensure `uv` is on PATH (v1: and that the runtime is 3.x) |
-| Proxy port conflict | v1: `astro config set proxy.port <port>`. v2 moves to a free port by itself |
+| Standalone won't start | Ensure `uv` is on PATH |
+| Proxy port conflict | v2 moves to a free port by itself |
 | `.venv` corrupted | Reset (below), then start again |
+
+```bash
+astro local start --port <n>                    # Port 8080 in use
+# v1: astro config set api-server.port <n>      # webserver.port on Airflow 2
+# v1: astro dev start --standalone --port <n>   # or this, in standalone mode
+astro local check                               # DAG not appearing
+# v1: astro dev parse
+# v2: none (v2 moves to a free port by itself)  # Proxy port conflict
+# v1: astro config set proxy.port <port>
+```
+
+**v1:** check the dependencies' `requirements.txt` syntax; standalone also needs a 3.x runtime.
 
 ### Reset Environment
 
 When things are broken. This **deletes the local Airflow's data** (its database, logs, and environment; the project itself is untouched), so get the user's go-ahead first:
 
 ```bash
-astro local reset --yes     # v1: astro dev kill
-astro local start           # v1: astro dev start
+astro local reset --yes
+# v1: astro dev kill
+astro local start
+# v1: astro dev start
 ```
 
 Without `--yes`, `astro local reset` asks for confirmation, and fails in a non-interactive shell.
@@ -248,11 +328,21 @@ Without `--yes`, `astro local reset` asks for confirmation, and fails in a non-i
 
 ## Upgrade Airflow
 
-| Step | v2 | v1 |
-|---|---|---|
-| Test compatibility first | no equivalent: v2 has no `upgrade-test`. After upgrading, run `astro local check` and the tests | `astro dev upgrade-test` |
-| Change the version | `astro local upgrade airflow [version]` moves the project's Airflow pin (`--with-otto` starts Otto afterwards to update DAGs and providers) | Edit the `FROM` line in the `Dockerfile`, for example `FROM quay.io/astronomer/astro-runtime:13.0.0` |
-| Apply it | `astro local restart` if it is running, `astro local start` if not | `astro dev kill` (deletes local data; ask first), then `astro dev start` |
+| Step | v2 |
+|---|---|
+| Test compatibility first | no equivalent: v2 has no `upgrade-test`. After upgrading, run `astro local check` and the tests |
+| Change the version | `astro local upgrade airflow [version]` moves the project's Airflow pin (`--with-otto` starts Otto afterwards to update DAGs and providers) |
+| Apply it | `astro local restart` if it is running, `astro local start` if not |
+
+```bash
+astro local check               # after upgrading
+# v1: astro dev upgrade-test    # before upgrading
+astro local restart             # apply it (astro local start if it isn't running)
+# v1: astro dev kill            # deletes local data; ask first
+# v1: astro dev start
+```
+
+**v1:** change the version by editing the `FROM` line in the `Dockerfile`, for example `FROM quay.io/astronomer/astro-runtime:13.0.0`.
 
 ---
 

@@ -92,7 +92,7 @@ Real-world pattern (`project_fully_featured/definitions.py`): the same asset cod
 # include/warehouse.py
 def warehouse_hook():
     if os.environ.get("DEPLOYMENT", "local") == "local":
-        return DuckDBHook(...)          # local Airflow (astro local / astro dev)
+        return DuckDBHook(...)          # local Airflow (astro local)
     return SnowflakeHook(snowflake_conn_id="warehouse")
 ```
 

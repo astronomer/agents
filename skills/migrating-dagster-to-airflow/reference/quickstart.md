@@ -45,7 +45,7 @@ python3 <path-to-skill>/scripts/status.py --manifest manifest.json summary
 
 Open `manifest.json` and skim: `counts` tells you what kinds of definitions you have, and anything `spelling: "deprecated"` deserves a close look. Classifications start `pending`; the driving agent assigns MECH/JUDG/REDESIGN/NONE per record from the concept map during Phase 1 (a high MECH share afterward means an easier migration). The `legend` field decodes the tags.
 
-The manifest lives HERE in your run directory for now. Later (Phase 2, once `astro init` (Astro CLI v1: `astro dev init`) has created the Astro project) you copy it to the project's `include/inventory/manifest.json` so the structural tests can find it; the run-dir copy stays canonical.
+The manifest lives HERE in your run directory for now. Later (Phase 2, once `astro init` has created the Astro project; see the scaffold step in SKILL.md) you copy it to the project's `include/inventory/manifest.json` so the structural tests can find it; the run-dir copy stays canonical.
 
 A `<unit-id>` in any `status.py` command is a key of the manifest's `units` map (shaped `kind:name`, e.g. `asset:daily_sales`); `status.py show` lists them. One editing rule, worth learning before it bites: the PLAN fields on a unit (`dag_id`, `task_count`, `edges`, `schedule`, `asset_outlets`, `target`) are yours to fill during planning. The STATE field (`status`) is never hand-edited; it only moves via `status.py advance / defer / reopen`.
 

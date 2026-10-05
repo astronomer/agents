@@ -13,6 +13,20 @@ A Java SDK deployment has one artifact: a **bundle** — your compiled task clas
 
 ---
 
+<!-- astro-cli-version:start -->
+## Astro CLI version
+
+Commands in this skill, including its reference files, are written for Astro CLI v2. Before anything else, run this as a command of its own, with nothing chained before or after it, and choose the dialect from what it prints: `astro local af --help >/dev/null 2>&1 && echo v2 || echo v1`
+On Windows `cmd.exe`, which has no `/dev/null`, run `astro local af --help >NUL 2>&1 && echo v2 || echo v1` instead.
+
+- **v2:** run them as written.
+- **v1** (Astro CLI 1.x, or no Astro CLI): use the standalone `af` CLI. Write `af` for `astro local af` and `af api` for `astro local api`, and drop `-o json` and `--output json` (`af` prints JSON, except `af instance` commands, which print tables). Where a command needs more than that, its v1 form is the line under it, starting `# v1:`. Where something behaves differently on v1, a line starting **v1:** says how. If `af` is not on PATH, write `uvx --from astro-airflow-mcp af <args>` out in full in every command. Don't put it in a shell variable or alias: zsh won't split `$AF`, and shell state doesn't carry over between commands.
+- v2 replaced `astro dev` with `astro local`; `astro dev <cmd>` on v2 fails and names its replacement.
+- If a v2 command reports an Astro v1 project, the v2 CLI cannot run that project, although the probe printed v2. Switch to the v1 forms: the standalone `af` still reaches an Airflow that is already running, but starting or parsing it (`astro dev ...`) needs Astro CLI 1.x. Tell the user; upgrading the project (`astro init`) is their call.
+- `-d` and `-o` mean deployment and output in v2, but DAG id and offset in v1, so never carry either into a v1 command. `--dag-id`, `--offset`, `--state`, `--limit`, `--try`, `--map-index`, and `--timeout` mean the same in both.
+- If a command here, or in the project's `AGENTS.md`, disagrees with the installed CLI, trust the CLI: check `astro <cmd> --help` (v1: `af <cmd> --help` or `astro dev <cmd> --help`).
+<!-- astro-cli-version:end -->
+
 ## Build with Gradle (recommended)
 
 Apply the SDK's Gradle plugin and declare dependencies in `build.gradle`:
@@ -198,7 +212,7 @@ On Kubernetes (Helm chart), bake the JAR into a custom image as above, or mount 
 If the user is on Astronomer's Astro CLI, the same idea maps onto an Astro project:
 
 1. Build the bundle, then stage it in the project: `mkdir -p include/jars && cp ../java-bundle/build/bundle/*.jar include/jars/`.
-2. Edit the project `Dockerfile` (create it on Astro CLI v2, see step 4) to install a JRE and copy the JARs to the coordinator's directory:
+2. Edit the project `Dockerfile` (create it if it doesn't exist, see step 4) to install a JRE and copy the JARs to the coordinator's directory:
 
    ```dockerfile
    FROM quay.io/astronomer/astro-runtime:<version>
@@ -212,9 +226,18 @@ If the user is on Astronomer's Astro CLI, the same idea maps onto an Astro proje
    ```
 
 3. Put the coordinator config in the project's `.env` (loaded automatically) — see **configuring-airflow-language-sdks** for the `AIRFLOW__SDK__*` values.
-4. Build the image and start Airflow locally. Astro CLI v2: `astro init` creates no `Dockerfile`, so create one: its `FROM` must name an Astro Runtime image of the same Airflow series as the `apache-airflow` pin in `pyproject.toml` (3.3 or newer for the language SDKs). Declare it by adding `dockerfile = "Dockerfile"` under the existing `[tool.astro]` table, and run `astro local start --docker` (`astro local restart` after changes; standalone mode builds no image). v1: `astro dev start` (or `astro dev restart`). Deploy with `astro deploy` as usual.
+4. Build the image and start Airflow locally. `astro init` creates no `Dockerfile`, so create one: its `FROM` must name an Astro Runtime image of the same Airflow series as the `apache-airflow` pin in `pyproject.toml` (3.3 or newer for the language SDKs). Declare it by adding `dockerfile = "Dockerfile"` under the existing `[tool.astro]` table, and run it (restart after changes; standalone mode builds no image). Deploy with `astro deploy` as usual.
 
-> Don't pin Astro Runtime / Airflow versions from memory — read the generated `Dockerfile` (v1) or the `pyproject.toml` pin (v2), or check current docs. While the SDK and Airflow 3.3 are in preview, a beta/dev Astro Runtime image may be required.
+   ```bash
+   astro local start --docker
+   # v1: astro dev start
+   astro local restart
+   # v1: astro dev restart
+   ```
+
+   **v1:** the project already has a `Dockerfile` (the v1 init creates one), so skip creating it and the `[tool.astro]` step.
+
+> Don't pin Astro Runtime / Airflow versions from memory — read the `pyproject.toml` pin (on Astro CLI 1.x, the generated `Dockerfile`), or check current docs. While the SDK and Airflow 3.3 are in preview, a beta/dev Astro Runtime image may be required.
 
 ---
 
