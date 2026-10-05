@@ -1,6 +1,6 @@
 ---
 name: troubleshooting-astro-deployments
-description: Troubleshoot Astronomer production deployments with Astro CLI. Use when investigating deployment issues, viewing production logs, analyzing failures, or managing deployment environment variables.
+description: Troubleshoot Astronomer production deployments with Astro CLI. Use when investigating deployment issues, viewing production logs, analyzing failures, or managing deployment environment variables and Environment Manager variables.
 ---
 
 # Astro Deployment Troubleshooting
@@ -144,8 +144,12 @@ Look for:
 ### Step 5: Verify Configuration
 
 ```bash
-# Check environment variables
+# Check environment variables: the deployment's own, then the Environment Manager's (see Environment Variables Management)
 astro deployment variable list --deployment-id <DEPLOYMENT_ID>
+astro env variable list --deployment-id <DEPLOYMENT_ID> --resolve-linked
+
+# Check Environment Manager connections that reach the deployment
+astro env connection list --deployment-id <DEPLOYMENT_ID> --resolve-linked
 
 # Verify deployment settings
 astro deployment inspect <DEPLOYMENT_ID>
@@ -186,8 +190,9 @@ astro deployment logs <DEPLOYMENT_ID> --error --keyword "memory"
 ### Configuration Problems
 
 ```bash
-# 1. Review environment variables
+# 1. Review environment variables, in both places they can live
 astro deployment variable list --deployment-id <DEPLOYMENT_ID>
+astro env variable list --deployment-id <DEPLOYMENT_ID> --resolve-linked
 
 # 2. Check for secrets backend configuration
 # Look for: AIRFLOW__SECRETS__BACKEND, AIRFLOW__SECRETS__BACKEND_KWARGS
@@ -217,48 +222,104 @@ astro deployment inspect <DEPLOYMENT_ID>
 
 ## Environment Variables Management
 
-### List Variables
+Astro keeps a deployment's variables in two separate places, and each has its own commands:
+
+| | Deployment environment variables | Environment Manager variables |
+|---|---|---|
+| Stored | on the deployment itself | as Environment Manager objects, owned by a workspace or by one deployment. A workspace object reaches a deployment through a link, or through auto-link, which reaches every deployment in the workspace |
+| Commands | `astro deployment variable list`, `create`, `update` | `astro env variable list`, `get`, `set`, `delete`, `export`, `link` |
+| Delete from the CLI | no: use the Astro UI | yes |
+
+The Environment Manager also holds connections and Airflow variables (`astro env connection ...`, `astro env airflow-variable ...`), with the same scope flags, verbs, and delete rules as `astro env variable`.
+
+The `astro env` commands differ between CLI versions. The commands below are written for Astro CLI v2, and a `v1:` note gives the Astro CLI v1 form where it differs. v2 spells create-or-update as `set <KEY>`. v1 has `create --key <KEY>` and `update <KEY>`, and v1's `update` also creates a missing key. In a v2 project, `--deployment-id` on `astro env` commands also accepts a link name.
+
+### Find Where a Variable Lives
 
 ```bash
-# List all variables for deployment
+# Deployment environment variables
 astro deployment variable list --deployment-id <DEPLOYMENT_ID>
-
-# Find specific variable
 astro deployment variable list --deployment-id <DEPLOYMENT_ID> --key AWS_REGION
 
-# Export variables to file
-astro deployment variable list --deployment-id <DEPLOYMENT_ID> --save --env .env.backup
+# Environment Manager variables that reach the deployment, including workspace variables linked into it
+astro env variable list --deployment-id <DEPLOYMENT_ID> --resolve-linked
+
+# Only the Environment Manager variables the deployment itself owns, with their IDs
+astro env variable list --deployment-id <DEPLOYMENT_ID> --resolve-linked=false
 ```
 
-### Create Variables
+`--resolve-linked` is on by default. A key that shows up with `--resolve-linked` but not with `--resolve-linked=false` is a workspace variable linked into the deployment. To see how it is linked, list its links in the deployment's workspace (find the workspace ID with `astro workspace list`):
 
 ```bash
-# Create regular variable
-astro deployment variable create --deployment-id <DEPLOYMENT_ID> \
-  --key API_ENDPOINT \
-  --value https://api.example.com
-
-# Create secret (masked in UI and logs)
-astro deployment variable create --deployment-id <DEPLOYMENT_ID> \
-  --key API_KEY \
-  --value secret123 \
-  --secret
+astro env variable link list --variable-key <KEY> --workspace-id <WORKSPACE_ID>
 ```
 
-### Update Variables
+The output shows `AUTO-LINK` (true when the variable reaches every deployment in the workspace), the deployments it is explicitly linked to with any per-deployment override, and the deployments excluded from it.
+
+To save the deployment environment variables to a file, add `--save --env .env.backup` to `astro deployment variable list`. For Environment Manager variables, `astro env variable export --deployment-id <DEPLOYMENT_ID> > .env.backup` writes the same `KEY=VALUE` form; secret values are left blank unless you pass `--include-secrets`, which the organization's policy must allow.
+
+### Create or Update Variables
+
+Deployment environment variables take `KEY=VALUE` arguments:
 
 ```bash
-# Update existing variable
-astro deployment variable update --deployment-id <DEPLOYMENT_ID> \
-  --key API_KEY \
-  --value newsecret
+# Create (a key that already exists is skipped)
+astro deployment variable create API_ENDPOINT=https://api.example.com --deployment-id <DEPLOYMENT_ID>
+
+# Create as a secret (masked in the UI and logs)
+astro deployment variable create API_KEY=<VALUE> --deployment-id <DEPLOYMENT_ID> --secret
+
+# Update (creates the key if it is missing; a secret stays secret)
+astro deployment variable update API_KEY=<NEW_VALUE> --deployment-id <DEPLOYMENT_ID>
 ```
+
+Environment Manager variables, on one deployment or on the workspace:
+
+```bash
+# On one deployment, creating it if it does not exist   v1: astro env variable update API_KEY --deployment-id <DEPLOYMENT_ID> --value <VALUE> --secret
+astro env variable set API_KEY --deployment-id <DEPLOYMENT_ID> --value <VALUE> --secret
+
+# On the workspace, reaching every deployment in it   v1: astro env variable update LOG_LEVEL --workspace-id <WORKSPACE_ID> --value INFO --auto-link
+astro env variable set LOG_LEVEL --workspace-id <WORKSPACE_ID> --value INFO --auto-link
+```
+
+`--secret` applies only when the variable is created; to change it later, delete and re-create the variable. Omit `--value` to be prompted for the value with echo off, which keeps a secret out of the shell history.
 
 ### Delete Variables
 
-The CLI has no command to delete a deployment variable (`astro deployment variable` has only `list`, `create`, and `update`); remove it in the Astro UI, from the deployment's environment variables.
+Find which kind the variable is first (see Find Where a Variable Lives), then ask the user to confirm the exact key, kind, and scope before running any delete.
 
-**Note**: Variables are available to DAGs as environment variables. Changes require no redeployment.
+**Deployment environment variable.** No CLI command deletes one: `astro deployment variable` has only `list`, `create`, and `update`. Remove it in the Astro UI, from the deployment's environment variables.
+
+**Environment Manager variable owned by the deployment** (listed with `--resolve-linked=false`):
+
+```bash
+astro env variable delete <KEY> --deployment-id <DEPLOYMENT_ID> --yes
+```
+
+This deletes the deployment's own variable only. Run with `--deployment-id`, delete looks the key up among the deployment's own variables, so for a workspace variable linked into the deployment it fails with `environment object not found` and deletes nothing.
+
+**Workspace variable linked into the deployment.** To stop it reaching this one deployment, remove the link and leave the workspace variable in place:
+
+```bash
+# Explicitly linked (the deployment appears under the variable's links)
+astro env variable link delete --variable-key <KEY> --workspace-id <WORKSPACE_ID> --deployment-id <DEPLOYMENT_ID>
+
+# Auto-linked (AUTO-LINK is true): exclude the deployment instead   v1: astro env variable link create ... --exclude
+astro env variable link set --variable-key <KEY> --workspace-id <WORKSPACE_ID> --deployment-id <DEPLOYMENT_ID> --exclude
+```
+
+`link delete --exclude` removes an exclude again. Deleting the workspace variable itself removes it from **every** deployment that links it, so do it only when the user asks for that outcome, after showing them `astro env variable link list` for it:
+
+```bash
+astro env variable delete <KEY> --workspace-id <WORKSPACE_ID> --yes
+```
+
+Pass a key, not an ID, to `astro env variable delete`. An ID is deleted directly, whatever `--workspace-id` or `--deployment-id` says, so a workspace variable's ID deletes the workspace variable even when run with `--deployment-id`.
+
+`astro env connection` and `astro env airflow-variable` delete the same way. Their links are managed with `--connection-key` and `--airflow-variable-key` in v2; v1 has no `link` commands for them, so manage those links in the Astro UI.
+
+**Note**: Both kinds reach DAGs as environment variables, and neither needs a redeploy. Environment Manager changes reach the deployment within a few minutes; tasks already running keep the old value.
 
 ---
 
@@ -307,7 +368,7 @@ Focus on these fields when troubleshooting:
 | Tasks failing | `--workers` logs + search for DAG with `--keyword` |
 | Slow scheduling | `--scheduler` logs + check `inspect` for scheduler resources |
 | UI not responding | `--webserver` logs |
-| Connection issues | Check variables, search logs for connection name |
+| Connection issues | `astro env connection list --deployment-id <ID>`, check variables, search logs for connection name |
 | Import errors | `--error --keyword "ImportError"` + `--scheduler` logs |
 | Out of memory | `inspect` for resources + `--workers --keyword "memory"` |
 
