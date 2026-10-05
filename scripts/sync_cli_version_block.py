@@ -53,14 +53,21 @@ def sync(skill_dir: Path, source: str) -> bool:
     skill_md = skill_dir / "SKILL.md"
     text = skill_md.read_text(encoding="utf-8")
     runs_cli = any(
-        file_runs_cli(classify(p.read_text(encoding="utf-8"))) for p in skill_dir.rglob("*.md")
+        file_runs_cli(classify(p.read_text(encoding="utf-8")))
+        for p in skill_dir.rglob("*.md")
     )
     new = text
     if START in new and END in new:
         new = strip_block(new)
     if runs_cli:
-        new = insert_block(new, source) if START not in text else (
-            text[: text.index(START)] + source.rstrip("\n") + text[text.index(END) + len(END) :]
+        new = (
+            insert_block(new, source)
+            if START not in text
+            else (
+                text[: text.index(START)]
+                + source.rstrip("\n")
+                + text[text.index(END) + len(END) :]
+            )
         )
     if new != text:
         skill_md.write_text(new, encoding="utf-8")
