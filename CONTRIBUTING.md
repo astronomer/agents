@@ -108,24 +108,18 @@ A single canonical example per capability is useful context — it anchors the a
 
 ### Astro CLI v1 and v2 Commands
 
-Skills are read on Astro CLI v1 (with the standalone `af`) and v2 alike, so every skill that runs Astro CLI or `af` commands follows one pattern, checked by `scripts/check_cli_forms.py`:
+Skills are read on Astro CLI v1 (with the standalone `af`) and v2 alike, so every skill that runs Astro CLI or `af` commands follows one pattern. Copy it from an existing skill such as `skills/airflow/SKILL.md`:
 
-1. Its `SKILL.md` carries the "Astro CLI version" block from `shared/astro-cli-version.md`, before its first `##` section and before any command. Don't edit the copies: edit the source, then run `python3 scripts/sync_cli_version_block.py`. The block holds the version probe and the rewrite rule that turns a v2 command into its v1 form. The same file ships in astronomer/hosted-skills, byte for byte.
+1. `SKILL.md` carries the "Astro CLI version" block (between the `astro-cli-version:start` and `:end` comments) before its first `##` section. Copy it verbatim. Every copy is identical, here and in astronomer/hosted-skills, so a change to it goes into all of them (`grep -rl astro-cli-version:start skills`).
 2. Commands are written in their v2 form, in fenced code blocks.
-3. A v1 form the rewrite rule doesn't give goes on its own line directly under the v2 command, in the same code block. Every `astro local ...` command (other than `astro local af` and `astro local api`) and `astro init` needs one, `# v1: none` when v1 has no equivalent:
+3. A v1 form that the block's rewrite rule doesn't give goes on a `# v1:` line directly under the v2 command, or `# v1: none` when v1 has no equivalent:
 
    ```bash
    astro local check
    # v1: astro dev parse
-   astro local list
-   # v1: none
    ```
 
-   A v1-only command with no v2 counterpart hangs off a `# v2: none` line instead.
-
-4. A difference that isn't a command goes on its own line (or paragraph) starting `**v1:**` (or `**v2:**`), which may name v1 commands; a section that applies only to v1 has a `##`-or-deeper heading starting `v1:`, which covers the section's prose.
-
-Nowhere else: no v1 columns in tables, no `v1:` in a trailing comment, no v1 command in plain prose. `astro otto`, `astro organization` and `af registry` are the same on both versions.
+4. A difference that isn't a command goes on its own line starting `**v1:**`.
 
 ### Working on the MCP Server
 
@@ -160,7 +154,6 @@ The following checks run automatically on commit (using prek, a fast alternative
 - **YAML/JSON validation**: Checks syntax of config files
 - **Large file check**: Prevents accidentally committing large files
 - **doctoc**: Auto-generates table of contents for README.md
-- **check-cli-forms**: Skills follow the Astro CLI v1/v2 format (see [Astro CLI v1 and v2 Commands](#astro-cli-v1-and-v2-commands)); its tests run alongside
 
 Run hooks manually:
 

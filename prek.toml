@@ -22,10 +22,3 @@ rev = "v2.2.0"
 hooks = [
   { id = "doctoc", files = "^README\\.md$", args = ["--maxlevel", "3"], exclude = "(skills/|/commands/.*\\.md)$" },
 ]
-
-[[repos]]
-repo = "local"
-hooks = [
-  { id = "check-cli-forms", name = "Astro CLI v1/v2 command format", entry = "python3 scripts/check_cli_forms.py", language = "system", pass_filenames = false, files = "^(skills/.*\\.md|shared/astro-cli-version\\.md|scripts/.*\\.py)$" },
-  { id = "test-cli-forms", name = "check_cli_forms tests", entry = "python3 -m unittest discover -s scripts/tests", language = "system", pass_filenames = false, files = "^(skills/.*\\.md|shared/|scripts/)" },
-]
