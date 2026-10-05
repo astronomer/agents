@@ -247,7 +247,7 @@ After implementing auth, tell the user:
 - **Astronomer Astro (production)**: create a Deployment API token and set it as `MYPLUGIN_TOKEN` — the JWT exchange is skipped entirely:
   1. Astro UI → open the Deployment → **Access** → **API Tokens** → **+ Deployment API Token**
   2. Copy the token value (shown only once)
-  3. `astro deployment variable create MYPLUGIN_TOKEN=<token>`
+  3. `astro deployment variable create MYPLUGIN_TOKEN=<token> --deployment-id <DEPLOYMENT_ID> --secret`
 
   `MYPLUGIN_USERNAME` and `MYPLUGIN_PASSWORD` are not needed on Astro.
 
@@ -550,7 +550,7 @@ airflow plugins                # CLI — lists all loaded plugins
 
 **Production Astronomer:**
 ```bash
-astro deployment variable create --deployment-id <id> MYPLUGIN_HOST=https://airflow.example.com
+astro deployment variable create MYPLUGIN_HOST=https://airflow.example.com --deployment-id <DEPLOYMENT_ID>
 ```
 
 **Auto-reload during development** (skips lazy loading):
