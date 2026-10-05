@@ -106,6 +106,23 @@ Skills rot when they embed content that changes every upstream release (operator
 
 A single canonical example per capability is useful context — it anchors the agent on the correct shape (`@dag` decorator, import path, XCom wiring) that is stable across releases. Pair it with an explicit "verify params via `af registry` before writing code" instruction so stale param names in the example get corrected against live truth. See `skills/airflow-hitl/SKILL.md` for the current reference implementation of this pattern.
 
+### Astro CLI v1 and v2 Commands
+
+Skills are read on Astro CLI v1 (with the standalone `af`) and v2 alike, so every skill that runs Astro CLI or `af` commands follows one pattern, checked by `scripts/check_cli_forms.py`:
+
+1. Its `SKILL.md` carries the "Astro CLI version" block from `shared/astro-cli-version.md`, before its first `##` section. Don't edit the copies: edit the source, then run `python3 scripts/sync_cli_version_block.py`. The block holds the version probe and the rewrite rule that turns a v2 command into its v1 form. The same file ships in astronomer/hosted-skills, byte for byte.
+2. Commands are written in their v2 form, in fenced code blocks.
+3. A v1 form the rewrite rule doesn't give goes on its own line directly under the v2 command, in the same code block:
+
+   ```bash
+   astro local check
+   # v1: astro dev parse
+   ```
+
+4. A difference that isn't a command goes on its own line starting `**v1:**` (or `**v2:**`).
+
+Nowhere else: no v1 columns in tables, no `v1:` in a trailing comment, no v1 command in prose.
+
 ### Working on the MCP Server
 
 The Airflow MCP server is in `astro-airflow-mcp/`. See its [README](./astro-airflow-mcp/README.md) for specific development instructions.
@@ -139,6 +156,7 @@ The following checks run automatically on commit (using prek, a fast alternative
 - **YAML/JSON validation**: Checks syntax of config files
 - **Large file check**: Prevents accidentally committing large files
 - **doctoc**: Auto-generates table of contents for README.md
+- **check-cli-forms**: Skills follow the Astro CLI v1/v2 format (see [Astro CLI v1 and v2 Commands](#astro-cli-v1-and-v2-commands)); its tests run alongside
 
 Run hooks manually:
 
