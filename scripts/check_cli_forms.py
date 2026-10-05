@@ -42,6 +42,9 @@ H2_RE = re.compile(r"^##\s")
 # leading `$ ` prompt or `NAME=value` environment assignments.
 LEAD_RE = re.compile(r"^\s*(?:\$\s+)?(?:[A-Z_][A-Z0-9_]*=\S*\s+)*")
 CMD_START_RE = re.compile(r"(?:astro\s+[a-z][\w-]*|af\s+[a-z<\[][\w<>\[\]-]*)")
+# Commands spelled the same on both versions; a skill that runs only these
+# needs no version block.
+NEUTRAL_RE = re.compile(r"(?:astro\s+otto|af\s+registry)\b")
 ASTRO_DEV_RE = re.compile(r"\bastro\s+dev\b")
 # `af registry` reads the public provider registry and is the standalone `af`
 # on both versions, so it is not a v1 form.
@@ -54,7 +57,19 @@ V2_NONE_RE = re.compile(r"^\s*# v2: none\b")
 V2_LINE_RE = re.compile(r"^\s*# v2:")
 # Code blocks in these languages (or none) hold shell commands; the rest
 # (Python, YAML, ...) are not checked.
-SHELL_LANGS = {"", "bash", "sh", "shell", "zsh", "console", "text", "cmd", "bat", "powershell", "pwsh"}
+SHELL_LANGS = {
+    "",
+    "bash",
+    "sh",
+    "shell",
+    "zsh",
+    "console",
+    "text",
+    "cmd",
+    "bat",
+    "powershell",
+    "pwsh",
+}
 MARKER_LINE_RE = re.compile(r"^\s*(?:>\s*)*(?:[-*+]\s+|\d+\.\s+)?\*\*v[12]:\*\*\s")
 TABLE_V1_HEADER_RE = re.compile(r"^\s*\|.*\|\s*v1\s*\|")
 
@@ -105,7 +120,16 @@ def classify(text: str) -> list[Line]:
                 lines.append(Line(i + 1, line, True, in_block, False, shell))
                 shell = True
                 continue
-        lines.append(Line(i + 1, line, fence is not None, in_block, False, shell if fence else True))
+        lines.append(
+            Line(
+                i + 1,
+                line,
+                fence is not None,
+                in_block,
+                False,
+                shell if fence else True,
+            )
+        )
         if fence is None and line.strip() == END:
             in_block = False
     return lines
@@ -122,14 +146,17 @@ def has_v1_command(s: str) -> bool:
 
 
 def starts_with_command(s: str) -> bool:
-    """True if s begins with an `astro ...` or `af ...` invocation."""
-    return bool(CMD_START_RE.match(s[LEAD_RE.match(s).end() :]))
+    """True if s begins with an `astro ...` or `af ...` invocation that differs by version."""
+    rest = s[LEAD_RE.match(s).end() :]
+    return bool(CMD_START_RE.match(rest)) and not NEUTRAL_RE.match(rest)
 
 
 def is_command_line(text: str) -> bool:
     """A line in a code block that is not blank and not a comment."""
     stripped = text.strip()
-    return bool(stripped) and not stripped.startswith("#") and FENCE_RE.match(text) is None
+    return (
+        bool(stripped) and not stripped.startswith("#") and FENCE_RE.match(text) is None
+    )
 
 
 def mechanical_v1(cmd: str) -> str:
@@ -145,10 +172,16 @@ def file_runs_cli(lines: list[Line]) -> bool:
         if ln.in_frontmatter or ln.in_block:
             continue
         if ln.in_code:
-            if FENCE_RE.match(ln.text) or not ln.shell or ln.text.strip().startswith("#"):
+            if (
+                FENCE_RE.match(ln.text)
+                or not ln.shell
+                or ln.text.strip().startswith("#")
+            ):
                 continue
             segments = re.split(r"\|\||&&|[|;]|\$\(", ln.text)
-            if any(starts_with_command(seg) for seg in segments) or has_v1_command(ln.text):
+            if any(starts_with_command(seg) for seg in segments) or has_v1_command(
+                ln.text
+            ):
                 return True
         else:
             spans = SPAN_RE.findall(ln.text)
@@ -174,40 +207,83 @@ def check_body(rel: str, lines: list[Line]) -> list[str]:
             prev = None
             continue
         if PROBE in text:
-            bad(ln, "the version probe belongs only in the shared Astro CLI version block")
+            bad(
+                ln,
+                "the version probe belongs only in the shared Astro CLI version block",
+            )
         if ln.in_code:
-            if prev is not None and V2_LINE_RE.match(prev.text) and not V1_LINE_RE.match(text):
-                bad(prev, "a `# v2: none` line must be followed by the `# v1:` line it stands in for")
+            if (
+                prev is not None
+                and V2_LINE_RE.match(prev.text)
+                and not V1_LINE_RE.match(text)
+            ):
+                bad(
+                    prev,
+                    "a `# v2: none` line must be followed by the `# v1:` line it stands in for",
+                )
             if V1_LINE_RE.match(text):
                 v1 = " ".join(text.split("# v1:", 1)[1].split())
                 anchors = prev is not None and (
-                    is_command_line(prev.text) or V1_LINE_RE.match(prev.text) or V2_NONE_RE.match(prev.text)
+                    is_command_line(prev.text)
+                    or V1_LINE_RE.match(prev.text)
+                    or V2_NONE_RE.match(prev.text)
                 )
                 if not v1:
                     bad(ln, "empty `# v1:` line")
                 elif not anchors:
-                    bad(ln, "a `# v1:` line must sit directly under the v2 command it replaces (or a `# v2: none` line)")
-                elif is_command_line(prev.text) and not prev.text.rstrip().endswith("\\"):
+                    bad(
+                        ln,
+                        "a `# v1:` line must sit directly under the v2 command it replaces (or a `# v2: none` line)",
+                    )
+                elif is_command_line(prev.text) and not prev.text.rstrip().endswith(
+                    "\\"
+                ):
                     if v1 == mechanical_v1(prev.text):
-                        bad(ln, "redundant `# v1:` line: the block's rewrite rule already gives it")
+                        bad(
+                            ln,
+                            "redundant `# v1:` line: the block's rewrite rule already gives it",
+                        )
             elif V2_LINE_RE.match(text):
                 if not V2_NONE_RE.match(text):
-                    bad(ln, "the only `# v2:` line is `# v2: none`, standing in for a v1-only command")
+                    bad(
+                        ln,
+                        "the only `# v2:` line is `# v2: none`, standing in for a v1-only command",
+                    )
             else:
                 if not text.strip().startswith("#") and has_v1_command(text):
-                    bad(ln, "v1-only command outside a `# v1:` line; write the v2 form and put the v1 form on a `# v1:` line under it")
+                    bad(
+                        ln,
+                        "v1-only command outside a `# v1:` line; write the v2 form and put the v1 form on a `# v1:` line under it",
+                    )
                 if V1_WORD_RE.search(text):
-                    bad(ln, "\"v1\" in a code line; a v1 form goes on its own `# v1:` line")
+                    bad(
+                        ln,
+                        '"v1" in a code line; a v1 form goes on its own `# v1:` line',
+                    )
         else:
             if V1_LINE_RE.match(text):
-                bad(ln, "a `# v1:` line must be inside a code block, under its v2 command")
+                bad(
+                    ln,
+                    "a `# v1:` line must be inside a code block, under its v2 command",
+                )
             for span in SPAN_RE.findall(text):
                 if has_v1_command(span):
-                    bad(ln, f"v1-only command in prose or a table (`{span}`); move it to a `# v1:` line in a code block")
+                    bad(
+                        ln,
+                        f"v1-only command in prose or a table (`{span}`); move it to a `# v1:` line in a code block",
+                    )
             if TABLE_V1_HEADER_RE.match(text):
-                bad(ln, "table with a v1 column; keep v2 commands in the table and v1 forms on `# v1:` lines")
-            elif V1_WORD_RE.search(SPAN_RE.sub("", text)) and not MARKER_LINE_RE.match(text):
-                bad(ln, "v1 mentioned in prose; state a v1 difference on its own line starting `**v1:**`")
+                bad(
+                    ln,
+                    "table with a v1 column; keep v2 commands in the table and v1 forms on `# v1:` lines",
+                )
+            elif V1_WORD_RE.search(SPAN_RE.sub("", text)) and not MARKER_LINE_RE.match(
+                text
+            ):
+                bad(
+                    ln,
+                    "v1 mentioned in prose; state a v1 difference on its own line starting `**v1:**`",
+                )
         prev = ln
     return problems
 
@@ -224,33 +300,47 @@ def check_skill(skill_dir: Path, source: str) -> list[str]:
         rel = str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path)
         text = path.read_text(encoding="utf-8")
         if path != skill_md and (START in text or END in text):
-            problems.append(f"{rel}: the Astro CLI version block belongs only in SKILL.md")
+            problems.append(
+                f"{rel}: the Astro CLI version block belongs only in SKILL.md"
+            )
         if runs_cli:
             problems.extend(check_body(rel, lines))
 
     if not skill_md.is_file():
         return problems
-    rel = str(skill_md.relative_to(ROOT)) if skill_md.is_relative_to(ROOT) else str(skill_md)
+    rel = (
+        str(skill_md.relative_to(ROOT))
+        if skill_md.is_relative_to(ROOT)
+        else str(skill_md)
+    )
     text = skill_md.read_text(encoding="utf-8")
     starts, ends = text.count(START), text.count(END)
     if not runs_cli:
         if starts or ends:
-            problems.append(f"{rel}: runs no Astro CLI commands, so it should not carry the version block")
+            problems.append(
+                f"{rel}: runs no Astro CLI commands, so it should not carry the version block"
+            )
         return problems
     if starts != 1 or ends != 1:
-        problems.append(f"{rel}: runs Astro CLI commands, so it needs exactly one Astro CLI version block (run scripts/sync_cli_version_block.py)")
+        problems.append(
+            f"{rel}: runs Astro CLI commands, so it needs exactly one Astro CLI version block (run scripts/sync_cli_version_block.py)"
+        )
         return problems
     begin = text.index(START)
     finish = text.index(END) + len(END)
     if finish < begin or text[begin:finish] + "\n" != source:
-        problems.append(f"{rel}: the Astro CLI version block differs from shared/astro-cli-version.md (run scripts/sync_cli_version_block.py)")
+        problems.append(
+            f"{rel}: the Astro CLI version block differs from shared/astro-cli-version.md (run scripts/sync_cli_version_block.py)"
+        )
     for ln in parsed[skill_md]:
         if ln.in_frontmatter or ln.in_code:
             continue
         if ln.text.strip() == START:
             break
         if H2_RE.match(ln.text):
-            problems.append(f"{rel}:{ln.number}: the Astro CLI version block must come before the first `##` section")
+            problems.append(
+                f"{rel}:{ln.number}: the Astro CLI version block must come before the first `##` section"
+            )
             break
     return problems
 
@@ -276,7 +366,10 @@ def main(argv: list[str]) -> int:
     for p in problems:
         print(p)
     if problems:
-        print(f"\n{len(problems)} problem(s). The format is described in shared/astro-cli-version.md and scripts/check_cli_forms.py.", file=sys.stderr)
+        print(
+            f"\n{len(problems)} problem(s). The format is described in shared/astro-cli-version.md and scripts/check_cli_forms.py.",
+            file=sys.stderr,
+        )
         return 1
     return 0
 
