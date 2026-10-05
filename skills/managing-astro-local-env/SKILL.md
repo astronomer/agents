@@ -339,7 +339,7 @@ Without `--yes`, `astro local reset` asks for confirmation, and fails in a non-i
 astro local upgrade airflow [version]
 # v1: none (edit the Dockerfile's FROM line, below)
 astro local check
-# v1: none
+# v1: astro dev parse
 astro local restart             # apply it (astro local start if it isn't running)
 # v1: astro dev kill
 # v1: astro dev start

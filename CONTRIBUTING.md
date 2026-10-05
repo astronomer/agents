@@ -123,9 +123,9 @@ Skills are read on Astro CLI v1 (with the standalone `af`) and v2 alike, so ever
 
    A v1-only command with no v2 counterpart hangs off a `# v2: none` line instead.
 
-4. A difference that isn't a command goes on its own line starting `**v1:**` (or `**v2:**`), which may name v1 commands; a section that applies only to v1 has a heading starting `v1:`.
+4. A difference that isn't a command goes on its own line (or paragraph) starting `**v1:**` (or `**v2:**`), which may name v1 commands; a section that applies only to v1 has a `##`-or-deeper heading starting `v1:`, which covers the section's prose.
 
-Nowhere else: no v1 columns in tables, no `v1:` in a trailing comment, no v1 command in plain prose. `astro otto` and `af registry` are the same on both versions.
+Nowhere else: no v1 columns in tables, no `v1:` in a trailing comment, no v1 command in plain prose. `astro otto`, `astro organization` and `af registry` are the same on both versions.
 
 ### Working on the MCP Server
 

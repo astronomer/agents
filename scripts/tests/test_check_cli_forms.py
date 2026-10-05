@@ -183,6 +183,55 @@ class Accepts(SkillCase):
             """)
         self.assertClean()
 
+    def test_version_numbers_and_nested_lists_are_not_v1(self) -> None:
+        self.write("""
+            ## Use
+
+            Upgrading from common-ai 0.1.x or Airflow 2.1.x changes this.
+
+            - Step one
+                - then use af to list the dags
+
+            ```bash
+            astro local af dags list
+            ```
+            """)
+        self.assertClean()
+
+    def test_v1_heading_covers_its_section(self) -> None:
+        self.write("""
+            ## Use
+
+            ```bash
+            astro local af dags list
+            ```
+
+            ### v1: the old CLI
+
+            On this version `astro dev parse` validates.
+
+            #### Details
+
+            Still v1 here: `af dags list`.
+            """)
+        self.assertClean()
+
+    def test_pipe_continuation_and_console_prompt(self) -> None:
+        self.write("""
+            ## Use
+
+            ```bash
+            astro local logs |
+              grep error
+            # v1: astro dev logs | grep error
+            astro local start
+            # v1: astro local start
+            ```
+
+            # v2: only a heading
+            """)
+        self.assertClean()
+
     def test_skill_without_commands_needs_no_block(self) -> None:
         self.write(
             """
@@ -216,7 +265,7 @@ class Accepts(SkillCase):
             """
             ## Use
 
-            Run `astro otto --persona reviewer` in CI, and check `af registry providers`.
+            Run `astro otto --persona reviewer` in CI, check `af registry providers`, and `astro organization list`.
 
             ```bash
             astro otto --mode text "review this"
@@ -343,6 +392,46 @@ class Rejects(SkillCase):
             "## Use\n\n```bash\nastro local start\n```\n\nOn the old CLI:\n\n    af dags list\n"
         )
         self.assertFlags("indented code block")
+
+    def test_v2_command_in_indented_code(self) -> None:
+        self.write(
+            "## Use\n\n```bash\nastro local af health\n```\n\nRun:\n\n    astro local start\n"
+        )
+        self.assertFlags("indented code block")
+
+    def test_v1_heading_section_ends_at_same_level_heading(self) -> None:
+        self.write(
+            "## Use\n\n```bash\nastro local af health\n```\n\n## v1: old\n\nOK `af dags list`.\n\n## Next\n\nOn v1, run `af dags list`.\n"
+        )
+        self.assertFlags("v1-only command in prose")
+
+    def test_chained_local_command_without_v1_line(self) -> None:
+        self.write("## Use\n\n```bash\ncd proj && astro local start\n```\n")
+        self.assertFlags("add a `# v1:` line under it")
+
+    def test_redundant_v1_line_after_prompt(self) -> None:
+        self.write(
+            "## Use\n\n```console\n$ astro local af dags list\n# v1: af dags list\n```\n"
+        )
+        self.assertFlags("redundant")
+
+    def test_blockquote_paragraph_break_ends_marker(self) -> None:
+        self.write(
+            "## Use\n\n```bash\nastro local af health\n```\n\n> **v1:** a note.\n>\n> Separately, on v1 run `af dags list`.\n"
+        )
+        self.assertFlags("v1-only command in prose")
+
+    def test_v1_line_does_not_anchor_across_blocks(self) -> None:
+        self.write(
+            "## Use\n\n```bash\nastro local af health\n```\n\nThen:\n\n```bash\n# v1: af health\n```\n"
+        )
+        self.assertFlags("directly under the v2 command")
+
+    def test_indented_lines_that_are_not_code_blocks(self) -> None:
+        self.write(
+            "## Use\n\n```bash\nastro local af health\n```\n\n- Step one\n\n    continued: af dags list is the old form\n\nA paragraph\n    then af dags list again\n"
+        )
+        self.assertNotIn("indented code block", " ".join(self.problems()))
 
     def test_local_command_without_v1_line(self) -> None:
         self.write(
@@ -482,6 +571,13 @@ class Sync(SkillCase):
         self.assertTrue(sync.sync(self.dir, SOURCE))
         self.assertClean()
         self.assertFalse(sync.sync(self.dir, SOURCE))
+
+    def test_refuses_a_lone_marker(self) -> None:
+        self.write("## Use\n\n```bash\nastro local af health\n```\n", block=False)
+        path = self.dir / "SKILL.md"
+        path.write_text(lint.START + "\n" + path.read_text(), encoding="utf-8")
+        with self.assertRaises(SystemExit):
+            sync.sync(self.dir, SOURCE)
 
     def test_removes_block_from_skill_without_commands(self) -> None:
         self.write("## Use\n\nNo commands.\n")

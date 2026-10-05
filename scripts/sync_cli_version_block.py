@@ -24,8 +24,8 @@ from check_cli_forms import (  # noqa: E402
     H2_RE,
     START,
     classify,
-    file_runs_cli,
     load_source,
+    runs_command,
     skill_dirs,
 )
 
@@ -52,25 +52,24 @@ def sync(skill_dir: Path, source: str) -> bool:
     """Bring one skill's block in line with the source. True if it changed."""
     skill_md = skill_dir / "SKILL.md"
     text = skill_md.read_text(encoding="utf-8")
+    if text.count(START) != text.count(END) or text.count(START) > 1:
+        raise SystemExit(f"{skill_md}: fix the version block's markers by hand first")
     runs_cli = any(
-        file_runs_cli(classify(p.read_text(encoding="utf-8")))
+        runs_command(classify(p.read_text(encoding="utf-8")))
         for p in skill_dir.rglob("*.md")
     )
-    new = text
-    if START in new and END in new:
-        new = strip_block(new)
-    if runs_cli:
+    if START in text:
+        begin, finish = text.index(START), text.index(END) + len(END)
         new = (
-            insert_block(new, source)
-            if START not in text
-            else (
-                text[: text.index(START)]
-                + source.rstrip("\n")
-                + text[text.index(END) + len(END) :]
-            )
+            text[:begin] + source.rstrip("\n") + text[finish:]
+            if runs_cli
+            else strip_block(text)
         )
+    else:
+        new = insert_block(text, source) if runs_cli else text
     if new != text:
-        skill_md.write_text(new, encoding="utf-8")
+        with open(skill_md, "w", encoding="utf-8", newline="\n") as f:
+            f.write(new)
         return True
     return False
 
