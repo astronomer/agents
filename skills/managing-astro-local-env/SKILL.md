@@ -39,7 +39,7 @@ astro local start --docker   # Docker
 # v1: astro dev start
 ```
 
-**v1:** the default is **Docker**: Airflow runs in containers. The other mode is standalone (Airflow 3 + `uv`, not on Windows). To make it stick, set `dev.mode`, or pass `--standalone` on **every** command (stop, kill, restart, bash, logs, ...). The v1 CLI's `run` hands its arguments to Airflow, so it works in standalone mode only with `dev.mode` set.
+**v1:** the default is **Docker**: Airflow runs in containers. The other mode is standalone (Airflow 3 + `uv`, not on Windows). To make it stick, set `dev.mode`, or pass `--standalone` on **every** command (stop, kill, restart, bash, logs, ...). `astro dev run` hands its arguments to Airflow, so it works in standalone mode only with `dev.mode` set.
 
 ```bash
 # v2: none (no setting: pass --docker on each start)
@@ -62,10 +62,10 @@ astro local restart    # Restart, picking up project changes
 astro local status     # Is it running, and where
 # v1: astro dev ps
 astro local open       # Open the Airflow UI
+# v1: none (astro dev start opens it)
 astro local list       # Every local Airflow on this machine
+# v1: none
 ```
-
-**v1:** there is no `open` (`start` opens the UI) and no `list`.
 
 | v2 | Purpose |
 |------|-------------|
@@ -132,9 +132,8 @@ astro local logs                # All logs
 astro local logs -f             # Follow in real time
 # v1: astro dev logs -f
 astro local logs --tail 200     # Last 200 lines
+# v1: none (astro dev logs has no --tail)
 ```
-
-**v1:** `logs` has no `--tail`.
 
 ```bash
 astro local logs --component scheduler    # One component
@@ -335,12 +334,18 @@ Without `--yes`, `astro local reset` asks for confirmation, and fails in a non-i
 | Apply it | `astro local restart` if it is running, `astro local start` if not |
 
 ```bash
-astro local check               # after upgrading
+# v2: none (no upgrade-test: after upgrading, run astro local check and the tests)
 # v1: astro dev upgrade-test    # before upgrading
+astro local upgrade airflow [version]
+# v1: none (edit the Dockerfile's FROM line, below)
+astro local check
+# v1: none
 astro local restart             # apply it (astro local start if it isn't running)
-# v1: astro dev kill            # deletes local data; ask first
+# v1: astro dev kill
 # v1: astro dev start
 ```
+
+**v1:** applying an upgrade takes `astro dev kill`, which deletes the local Airflow's data: get the user's go-ahead first.
 
 **v1:** change the version by editing the `FROM` line in the `Dockerfile`, for example `FROM quay.io/astronomer/astro-runtime:13.0.0`.
 

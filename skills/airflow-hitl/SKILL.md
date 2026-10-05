@@ -181,7 +181,7 @@ requests.patch(
 )
 ```
 
-**v1:** `api ls` prints the full `/api/v2/...` path.
+**v1:** `af api ls` prints the full `/api/v2/...` path.
 
 ---
 

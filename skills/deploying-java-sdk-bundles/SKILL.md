@@ -237,7 +237,9 @@ If the user is on Astronomer's Astro CLI, the same idea maps onto an Astro proje
 
    **v1:** the project already has a `Dockerfile` (the v1 init creates one), so skip creating it and the `[tool.astro]` step.
 
-> Don't pin Astro Runtime / Airflow versions from memory — read the `pyproject.toml` pin (on Astro CLI 1.x, the generated `Dockerfile`), or check current docs. While the SDK and Airflow 3.3 are in preview, a beta/dev Astro Runtime image may be required.
+> Don't pin Astro Runtime / Airflow versions from memory — read the `pyproject.toml` pin, or check current docs. While the SDK and Airflow 3.3 are in preview, a beta/dev Astro Runtime image may be required.
+>
+> **v1:** read the generated `Dockerfile` instead of the `pyproject.toml` pin.
 
 ---
 

@@ -28,14 +28,7 @@ Format per entry: symptom (the error or misbehavior as observed), class (what is
   **v1:** declare the pool in `airflow_settings.yaml` instead.
 - **Origin**: test migration (`project_fully_featured`), comments/stories view creation race; independently hit and pool-pattern-verified in testing (gauntlet) under parallel asset-triggered DAGs. Applies to any single-writer local store (DuckDB, SQLite); keep connections short-lived (open-write-close per task). Reference home: io-and-data-passing.md, "Single-writer stores under Airflow parallelism".
 
-## The parse check fails from the CLI's own bundled integrity test on Airflow 3.3
-
-**v1:** this entry applies only to Astro CLI 1.x, whose parse check is the `# v1:` form here:
-
-```bash
-astro local check
-# v1: astro dev parse
-```
+## v1: `astro dev parse` fails from the CLI's own bundled integrity test on Airflow 3.3
 
 - **Symptom**: the parse check exits nonzero with `TypeError: DagBag.__init__() got an unexpected keyword argument 'include_examples'` in `.astro/test_dag_integrity_default.py`, regardless of your DAGs.
 - **Class**: tooling incompatibility. Airflow 3.3 removed `include_examples` from `DagBag.__init__`; astro CLI (<= 1.43.1) scaffolds an integrity test that still passes it.

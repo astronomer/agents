@@ -35,7 +35,7 @@ astro local api spec
 astro local api spec | jq '.paths["/api/v2/variables"]'
 ```
 
-**v1:** `ls` prints paths with the `/api/v2` (or `/api/v1`) prefix: drop it when you pass a path back, since the v1 CLI adds it.
+**v1:** `af api ls` prints paths with the `/api/v2` (or `/api/v1`) prefix: drop it when you pass a path to `af api`, which adds it.
 
 ## HTTP Methods
 

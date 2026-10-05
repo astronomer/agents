@@ -7,15 +7,6 @@ description: Persists task and asset state across retries and DAG runs using Air
 
 Airflow 3.3 ships two key/value stores and a crash-safety mixin for operators that submit external jobs.
 
-> **`task_state_store`, `asset_state_store`, and `ResumableJobMixin`'s crash-safety guarantee require Airflow 3.3+.** Check first:
-
-```bash
-astro local af version
-# v1: af config version
-```
-
-> Below 3.3: `task_state_store`/`asset_state_store` are unavailable, and `durable=True` is a no-op — provider operators ship a pre-3.3 `ResumableJobMixin` shim that always submits fresh (see Section 5). Tell the user those specific features aren't available yet and link the AIP-103 tracking issue. This does **not** gate Section 6's Triggerer-vs-`mode="reschedule"` decision, or the general "green submit ≠ success" anti-pattern — those apply on any Airflow version. On a pre-3.3 DAG, give that guidance in full; only drop the "`durable=True` adds crash-safety" half of it.
-
 ---
 
 <!-- astro-cli-version:start -->
@@ -31,6 +22,17 @@ On Windows `cmd.exe`, which has no `/dev/null`, run `astro local af --help >NUL 
 - `-d` and `-o` mean deployment and output in v2, but DAG id and offset in v1, so never carry either into a v1 command. `--dag-id`, `--offset`, `--state`, `--limit`, `--try`, `--map-index`, and `--timeout` mean the same in both.
 - If a command here, or in the project's `AGENTS.md`, disagrees with the installed CLI, trust the CLI: check `astro <cmd> --help` (v1: `af <cmd> --help` or `astro dev <cmd> --help`).
 <!-- astro-cli-version:end -->
+
+> **`task_state_store`, `asset_state_store`, and `ResumableJobMixin`'s crash-safety guarantee require Airflow 3.3+.** Check right after the probe:
+
+```bash
+astro local af version
+# v1: af config version
+```
+
+> Below 3.3: `task_state_store`/`asset_state_store` are unavailable, and `durable=True` is a no-op — provider operators ship a pre-3.3 `ResumableJobMixin` shim that always submits fresh (see Section 5). Tell the user those specific features aren't available yet and link the AIP-103 tracking issue. This does **not** gate Section 6's Triggerer-vs-`mode="reschedule"` decision, or the general "green submit ≠ success" anti-pattern — those apply on any Airflow version. On a pre-3.3 DAG, give that guidance in full; only drop the "`durable=True` adds crash-safety" half of it.
+
+---
 
 ## Section 1 — Pick the right primitive
 

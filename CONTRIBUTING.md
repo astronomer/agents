@@ -110,18 +110,22 @@ A single canonical example per capability is useful context — it anchors the a
 
 Skills are read on Astro CLI v1 (with the standalone `af`) and v2 alike, so every skill that runs Astro CLI or `af` commands follows one pattern, checked by `scripts/check_cli_forms.py`:
 
-1. Its `SKILL.md` carries the "Astro CLI version" block from `shared/astro-cli-version.md`, before its first `##` section. Don't edit the copies: edit the source, then run `python3 scripts/sync_cli_version_block.py`. The block holds the version probe and the rewrite rule that turns a v2 command into its v1 form. The same file ships in astronomer/hosted-skills, byte for byte.
+1. Its `SKILL.md` carries the "Astro CLI version" block from `shared/astro-cli-version.md`, before its first `##` section and before any command. Don't edit the copies: edit the source, then run `python3 scripts/sync_cli_version_block.py`. The block holds the version probe and the rewrite rule that turns a v2 command into its v1 form. The same file ships in astronomer/hosted-skills, byte for byte.
 2. Commands are written in their v2 form, in fenced code blocks.
-3. A v1 form the rewrite rule doesn't give goes on its own line directly under the v2 command, in the same code block:
+3. A v1 form the rewrite rule doesn't give goes on its own line directly under the v2 command, in the same code block. Every `astro local ...` command (other than `astro local af` and `astro local api`) and `astro init` needs one, `# v1: none` when v1 has no equivalent:
 
    ```bash
    astro local check
    # v1: astro dev parse
+   astro local list
+   # v1: none
    ```
 
-4. A difference that isn't a command goes on its own line starting `**v1:**` (or `**v2:**`).
+   A v1-only command with no v2 counterpart hangs off a `# v2: none` line instead.
 
-Nowhere else: no v1 columns in tables, no `v1:` in a trailing comment, no v1 command in prose.
+4. A difference that isn't a command goes on its own line starting `**v1:**` (or `**v2:**`), which may name v1 commands; a section that applies only to v1 has a heading starting `v1:`.
+
+Nowhere else: no v1 columns in tables, no `v1:` in a trailing comment, no v1 command in plain prose. `astro otto` and `af registry` are the same on both versions.
 
 ### Working on the MCP Server
 

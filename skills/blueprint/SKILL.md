@@ -485,7 +485,7 @@ class Extract(Blueprint[ExtractConfig]):
   ```bash
   astro local api ls --filter dagRun
   ```
-  **v1:** `af` prints the path with an `/api/v2` prefix; drop it before passing the path back to `af`.
+  **v1:** `af api ls` prints the path with an `/api/v2` prefix; drop it before passing the path to `af api`.
 
 ### Trigger Form Customization
 

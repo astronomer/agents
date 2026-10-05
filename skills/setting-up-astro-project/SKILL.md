@@ -138,10 +138,13 @@ astro local restart
 v2 reads `airflow_settings.yaml` nowhere. Set connections and Airflow variables with `astro local env` (stored encrypted unless you pass `--plain`, which writes the project's `.env`):
 
 ```bash
-astro local env connection set my_postgres --type postgres --host localhost --port 5432 --login user --schema mydb
 # pipe the password in (a --password flag lands in shell history)
+astro local env connection set my_postgres --type postgres --host localhost --port 5432 --login user --schema mydb
+# v1: none (airflow_settings.yaml, below)
 astro local env airflow-variable set env --value dev
+# v1: none (airflow_settings.yaml, below)
 astro local env list        # every declared value and where it resolves from
+# v1: none
 ```
 
 Pools are declared in `pyproject.toml`, and `astro local start` creates or updates them:
@@ -151,7 +154,7 @@ Pools are declared in `pyproject.toml`, and `astro local start` creates or updat
 slots = 5
 ```
 
-### `airflow_settings.yaml`
+### v1: `airflow_settings.yaml`
 
 **v1:** connections, variables and pools go in `airflow_settings.yaml`, loaded automatically on environment start:
 

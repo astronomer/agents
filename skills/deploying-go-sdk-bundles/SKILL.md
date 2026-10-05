@@ -101,7 +101,9 @@ On the Helm chart, bake the bundle into a custom image as above or mount it via 
 
    **v1:** the project already has a `Dockerfile` (the v1 init creates one), so skip creating it and the `[tool.astro]` step.
 
-> Don't pin Astro Runtime / Airflow versions from memory; read the `pyproject.toml` pin (on Astro CLI 1.x, the generated `Dockerfile`), or current docs. While the Go SDK is in preview, a beta/dev image may be required.
+> Don't pin Astro Runtime / Airflow versions from memory; read the `pyproject.toml` pin, or current docs. While the Go SDK is in preview, a beta/dev image may be required.
+>
+> **v1:** read the generated `Dockerfile` instead of the `pyproject.toml` pin.
 
 ---
 

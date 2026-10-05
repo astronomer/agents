@@ -68,21 +68,21 @@ The examples below use the local form. For a deployment on v2, swap `astro local
 **v2.** `astro af` never falls back to the local Airflow; that one is always `astro local af`.
 
 ```bash
-# See which deployments the project links, and pin the one bare `astro af` uses
+# See which deployments the project links
 astro use
 # v1: af instance list
 # v1: af instance current
+
+# Pin the one bare `astro af` uses
 astro use prod
 # v1: af instance add local --url http://localhost:8080 --local
 # v1: af instance use prod
-# v1: af instance use local
 
 # Link a deployment the project doesn't know yet. This writes the link into the
 # project's committed pyproject.toml, so get the user's go-ahead first. Bare
 # `astro link add` asks which deployment, but only in a terminal; a script names it.
 astro link add prod --deployment <deployment-id>
 # v1: af instance add prod --url https://airflow.example.com --token '${API_TOKEN}' --local
-# v1: af instance discover --dry-run
 
 # Reach an Airflow no project declares (or ASTRO_AIRFLOW_USERNAME + ASTRO_AIRFLOW_PASSWORD)
 ASTRO_AIRFLOW_TOKEN="$TOKEN" astro af dags list --url https://airflow.example.com
@@ -91,11 +91,11 @@ ASTRO_AIRFLOW_TOKEN="$TOKEN" astro af dags list --url https://airflow.example.co
 
 A bare `astro af <cmd>` resolves its deployment as `-d` > `ASTRO_DEPLOYMENT` > the `astro use` pin > the manifest's default link, and errors naming the options when none applies.
 
-**v1:** the standalone CLI acts on its *current instance*: the local Airflow at `http://localhost:8080` (instance `localhost:8080`) until `instance use` picks another, so check the current instance (`instance current`, above) before acting. For a one-off query against another Airflow, prefer the environment variables (`AIRFLOW_API_URL` + `AIRFLOW_AUTH_TOKEN`, or `AIRFLOW_USERNAME` + `AIRFLOW_PASSWORD`), which change nothing.
+**v1:** `af` acts on its *current instance*: the local Airflow at `http://localhost:8080` (instance `localhost:8080`) until `af instance use` picks another, so check `af instance current` before acting. For a one-off query against another Airflow, prefer the environment variables (`AIRFLOW_API_URL` + `AIRFLOW_AUTH_TOKEN`, or `AIRFLOW_USERNAME` + `AIRFLOW_PASSWORD`), which change nothing.
 
-**v1:** `instance use` persists: every later standalone command, in any skill, hits prod until you switch back (`instance use local`). The built-in localhost:8080 instance can vanish once another instance is configured, so register the local Airflow under a name (`instance add local`) before switching away from it.
+**v1:** `af instance use` persists: every later `af` command, in any skill, hits prod until you switch back with `af instance use local`. The built-in localhost:8080 instance can vanish once another instance is configured, which is why the local Airflow is registered under a name (`af instance add local`, above) before switching away from it.
 
-**v1:** `--local` keeps an added instance out of the committed `.astro/config.yaml`. The single quotes store the literal `${API_TOKEN}`, which the standalone CLI reads from the environment each time, not the token itself. `instance discover --dry-run` previews discoverable Astro deployments and local Airflows; without `--dry-run`, discover creates API tokens in Astro, so get the user's go-ahead first.
+**v1:** `--local` keeps an added instance out of the committed `.astro/config.yaml`. The single quotes store the literal `${API_TOKEN}`, which `af` reads from the environment each time, not the token itself. To find deployments to add, `af instance discover --dry-run` previews discoverable Astro deployments and local Airflows; without `--dry-run`, discover creates API tokens in Astro, so get the user's go-ahead first.
 
 **v1:** instances live in the project's `.astro/config.yaml` (committed) and `.astro/config.local.yaml` (gitignored), and in `~/.astro/config.yaml`. Inside a project, `add` writes the committed file unless you pass `--local` or `--global`; `use` writes the gitignored one.
 
@@ -246,7 +246,7 @@ astro local af tasks clear <dag_id> <run_id> <id> <id> --yes
 - "What API endpoints are available?" -> `astro local api ls`
 - "Find variable endpoints" -> `astro local api ls --filter variable`
 - "Access XCom values" / "Get XCom" -> `astro local api dags/<dag_id>/dagRuns/<run_id>/taskInstances/<task_id>/xcomEntries` (`astro local api ls --filter xcom` lists the XCom paths)
-  - **v1:** the listing prints them with the `/api/v2` prefix; drop it when you pass a path back.
+  - **v1:** `af api ls` prints them with the `/api/v2` prefix, which you drop when calling `af api`.
 - "Get event logs" / "Audit trail" -> `astro local api eventLogs -F dag_id=X`
 - "Create connection via API" -> `astro local api connections -X POST --body '{...}'`
 - "Create variable via API" -> `astro local api variables -X POST -F key=name --raw-field value=val`

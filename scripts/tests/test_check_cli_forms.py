@@ -93,7 +93,7 @@ class Accepts(SkillCase):
             ## Use
 
             ```bash
-            astro local start
+            astro local af dags list
             # v2: none (the proxy has no stop command)
             # v1: astro dev proxy stop
             ```
@@ -108,7 +108,7 @@ class Accepts(SkillCase):
 
             ```bash
             af registry parameters standard
-            astro local start
+            astro local af dags list
             ```
             """)
         self.assertClean()
@@ -125,7 +125,38 @@ class Accepts(SkillCase):
             ```bash
             # Only let Otto run af and shell
             astro otto --allowed-tools af,bash "diagnose"
-            astro local start
+            astro local af dags list
+            ```
+            """)
+        self.assertClean()
+
+    def test_marker_lines_may_name_v1_commands(self) -> None:
+        self.write("""
+            ## Use
+
+            ```bash
+            astro use
+            # v1: af instance current
+            ```
+
+            **v1:** `af instance use` persists until you switch back with `af instance use local`.
+
+            ### v1: `astro dev parse` fails on Airflow 3.3
+            """)
+        self.assertClean()
+
+    def test_v1_none_and_continuation_lines(self) -> None:
+        self.write("""
+            ## Use
+
+            ```bash
+            astro local list
+            # v1: none
+            astro local logs --component scheduler \\
+              --tail 200
+            # v1: none (no --tail)
+            astro init
+            # v1: astro dev init
             ```
             """)
         self.assertClean()
@@ -291,15 +322,66 @@ class Rejects(SkillCase):
         )
         self.assertFlags("indented code block")
 
+    def test_local_command_without_v1_line(self) -> None:
+        self.write(
+            "## Use\n\n```bash\nastro local start\nastro local af dags list\n```\n"
+        )
+        self.assertFlags("add a `# v1:` line under it")
+
+    def test_init_without_v1_line_at_end_of_block(self) -> None:
+        self.write("## Use\n\n```bash\nastro init\n```\n")
+        self.assertFlags("add a `# v1:` line under it")
+
+    def test_continued_local_command_without_v1_line(self) -> None:
+        self.write(
+            "## Use\n\n```bash\nastro local logs \\\n  --tail 5\nastro local af health\n```\n"
+        )
+        self.assertFlags("add a `# v1:` line under it")
+
+    def test_local_command_at_end_of_unclosed_block(self) -> None:
+        self.write("## Use\n\n```bash\nastro init")
+        self.assertFlags("add a `# v1:` line under it")
+
+    def test_v2_none_at_end_of_block(self) -> None:
+        self.write("## Use\n\n```bash\nastro local af health\n# v2: none\n```\n")
+        self.assertFlags("must be followed by the `# v1:` line")
+
+    def test_longer_fence_is_not_closed_by_shorter_one(self) -> None:
+        self.write(
+            "## Use\n\n```bash\nastro local af dags list\n```\n\n````text\n```\naf dags list\n````\n"
+        )
+        self.assertFlags("v1-only command outside a `# v1:` line")
+
+    def test_one_x_prose(self) -> None:
+        self.write(
+            "## Use\n\nOn Astro CLI 1.x this differs.\n\n```bash\nastro local af dags list\n```\n"
+        )
+        self.assertFlags("v1 mentioned in prose")
+
+    def test_af_with_a_flag_is_v1(self) -> None:
+        self.write("## Use\n\n```bash\nastro local af dags list\naf --help\n```\n")
+        self.assertFlags("v1-only command outside a `# v1:` line")
+
+    def test_redundant_v1_line_after_trailing_comment(self) -> None:
+        self.write(
+            "## Use\n\n```bash\nastro local af dags list --output=json   # List Dags\n# v1: af dags list\n```\n"
+        )
+        self.assertFlags("redundant")
+
+    def test_command_before_block(self) -> None:
+        path = self.dir / "SKILL.md"
+        path.write_text(
+            FRONT
+            + "Check `astro local af version` first.\n\n"
+            + SOURCE
+            + "\n## Use\n\n```bash\nastro local af dags list\n```\n",
+            encoding="utf-8",
+        )
+        self.assertFlags("a command before the Astro CLI version block")
+
     def test_v1_command_in_prose(self) -> None:
         self.write(
             "## Use\n\nRun `astro local start` (on v1, `astro dev start`).\n\n```bash\nastro local start\n```\n"
-        )
-        self.assertFlags("v1-only command in prose")
-
-    def test_v1_command_on_marker_line(self) -> None:
-        self.write(
-            "## Use\n\n```bash\nastro local start\n```\n\n**v1:** run `af dags list` instead.\n"
         )
         self.assertFlags("v1-only command in prose")
 
@@ -350,6 +432,9 @@ class Helpers(unittest.TestCase):
 
     def test_mechanical_v1(self) -> None:
         self.assertEqual(
+            lint.mechanical_v1("astro local af health -ojson  # check"), "af health"
+        )
+        self.assertEqual(
             lint.mechanical_v1("astro local af runs list -o json"), "af runs list"
         )
         self.assertEqual(
@@ -359,14 +444,14 @@ class Helpers(unittest.TestCase):
 
 class Sync(SkillCase):
     def test_inserts_before_first_section(self) -> None:
-        self.write("## Use\n\n```bash\nastro local start\n```\n", block=False)
+        self.write("## Use\n\n```bash\nastro local af dags list\n```\n", block=False)
         self.assertTrue(sync.sync(self.dir, SOURCE))
         text = (self.dir / "SKILL.md").read_text()
         self.assertLess(text.index(lint.START), text.index("## Use"))
         self.assertClean()
 
     def test_replaces_drifted_copy_in_place(self) -> None:
-        self.write("## Use\n\n```bash\nastro local start\n```\n")
+        self.write("## Use\n\n```bash\nastro local af dags list\n```\n")
         path = self.dir / "SKILL.md"
         path.write_text(
             path.read_text().replace("run them as written", "run them"),
