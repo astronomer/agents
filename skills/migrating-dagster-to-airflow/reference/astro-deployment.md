@@ -21,8 +21,8 @@ Per location: `code_source` (package/module/file) has no Airflow equivalent, DAG
 
 | `container_context` key | Astro | Class |
 |---|---|---|
-| `k8s.env_vars` | Deployment environment variables (UI/API/`astro deployment variable create`), or Environment Manager variables shared from the workspace (`astro env variable set --workspace-id`; Astro CLI v1: `astro env variable update --workspace-id`) | MECH |
-| `k8s.env_secrets` (named K8s secrets) | Secret environment variables (`--secret`) and/or Airflow Connections in the Environment Manager (`astro env connection set`; Astro CLI v1: `astro env connection create`) | JUDG |
+| `k8s.env_vars` | Deployment environment variables (UI/API/`astro deployment variable create`), or Environment Manager variables shared from the workspace (`astro env variable set --workspace-id ... --auto-link`; Astro CLI v1: `astro env variable update --workspace-id ... --auto-link`; without `--auto-link` or a link the variable reaches no deployment) | MECH |
+| `k8s.env_secrets` (named K8s secrets) | Secret environment variables (`--secret`) and/or Airflow Connections in the Environment Manager (`astro env connection set`; Astro CLI v1: `astro env connection create`; at workspace scope add `--auto-link` or link it, as for variables) | JUDG |
 | `k8s.namespace`, `service_account_name`, `server_k8s_config`, `run_k8s_config` | Managed by Astro; per-task pod tweaks via `executor_config`/`pod_override` | JUDG |
 | `ecs.*` (task roles, subnets, security groups) | Astro workload identity / cloud connection config | JUDG |
 

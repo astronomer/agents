@@ -247,7 +247,7 @@ After implementing auth, tell the user:
 - **Astronomer Astro (production)**: create a Deployment API token and set it as `MYPLUGIN_TOKEN` — the JWT exchange is skipped entirely:
   1. Astro UI → open the Deployment → **Access** → **API Tokens** → **+ Deployment API Token**
   2. Copy the token value (shown only once)
-  3. `astro deployment variable create MYPLUGIN_TOKEN=<token> --deployment-id <DEPLOYMENT_ID> --secret`
+  3. Put `MYPLUGIN_TOKEN=<token>` in a dotenv file (not on the command line), then `astro deployment variable update --deployment-id <DEPLOYMENT_ID> --load --env <FILE> --secret` (`update` creates the key or replaces a rotated token; `create` skips a key that already exists)
 
   `MYPLUGIN_USERNAME` and `MYPLUGIN_PASSWORD` are not needed on Astro.
 
