@@ -285,6 +285,12 @@ class Rejects(SkillCase):
         self.write("## Use\n\n```sh\nastro local start\nastro dev start\n```\n")
         self.assertFlags("v1-only command outside a `# v1:` line")
 
+    def test_v1_command_in_indented_code(self) -> None:
+        self.write(
+            "## Use\n\n```bash\nastro local start\n```\n\nOn the old CLI:\n\n    af dags list\n"
+        )
+        self.assertFlags("indented code block")
+
     def test_v1_command_in_prose(self) -> None:
         self.write(
             "## Use\n\nRun `astro local start` (on v1, `astro dev start`).\n\n```bash\nastro local start\n```\n"

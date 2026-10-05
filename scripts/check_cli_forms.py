@@ -266,6 +266,13 @@ def check_body(rel: str, lines: list[Line]) -> list[str]:
                     ln,
                     "a `# v1:` line must be inside a code block, under its v2 command",
                 )
+            if re.match(r"^(?: {4}|\t)", text) and has_v1_command(
+                SPAN_RE.sub("", text)
+            ):
+                bad(
+                    ln,
+                    "v1-only command in an indented code block; use a fenced block with a `# v1:` line",
+                )
             for span in SPAN_RE.findall(text):
                 if has_v1_command(span):
                     bad(
