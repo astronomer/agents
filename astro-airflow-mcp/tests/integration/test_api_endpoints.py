@@ -336,6 +336,17 @@ class TestTaskEndpoints:
         assert isinstance(result["task_instances"], list)
         print(f"Found {len(result['task_instances'])} task instances for run {dag_run_id}")
 
+    def test_get_all_task_instances(self, adapter, completed_dag_run):
+        """Pagination collects every instance through the real Airflow 2/3 API."""
+        dag_id, dag_run_id = completed_dag_run
+
+        result = adapter.get_all_task_instances(dag_id, dag_run_id, page_size=1)
+
+        instances = result["task_instances"]
+        assert len(instances) == result["total_entries"]
+        assert len(instances) > 1
+        assert len({(task["task_id"], task["map_index"]) for task in instances}) == len(instances)
+
     def test_get_task_instance(self, adapter, completed_dag_run):
         """Should get details of a specific task instance."""
         dag_id, dag_run_id = completed_dag_run

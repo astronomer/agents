@@ -55,7 +55,7 @@ def airflow_auth_method() -> str:
 
 @pytest.fixture(scope="session")
 def completed_dag_run():
-    """Trigger test DAG and wait for completion (runs once per session).
+    """Trigger a fresh test DAG run and wait for completion (once per session).
 
     Returns tuple of (dag_id, dag_run_id) for use by task instance tests.
     """
@@ -64,12 +64,6 @@ def completed_dag_run():
     password = os.getenv("AIRFLOW_PASSWORD", "admin")
 
     adapter = create_adapter(url, basic_auth_getter=lambda: (username, password))
-
-    # Check for existing completed run first
-    existing = adapter.list_dag_runs(dag_id=TEST_DAG_ID, limit=5)
-    for run in existing.get("dag_runs", []):
-        if run.get("state") in ("success", "failed"):
-            return TEST_DAG_ID, run["dag_run_id"]
 
     # Trigger and wait
     result = adapter.trigger_dag_run(dag_id=TEST_DAG_ID)

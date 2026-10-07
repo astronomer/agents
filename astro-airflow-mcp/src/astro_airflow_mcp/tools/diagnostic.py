@@ -11,6 +11,7 @@ from astro_airflow_mcp.server import (
 )
 from astro_airflow_mcp.tool_annotations import read_only
 from astro_airflow_mcp.tool_errors import error_payload, tool_error
+from astro_airflow_mcp.utils import summarize_task_instances
 
 
 def _list_dag_warnings_impl(
@@ -182,9 +183,12 @@ def diagnose_dag_run(dag_id: str, dag_run_id: str) -> str:
 
     Returns combined data:
     - DAG run metadata (state, start/end times, trigger type)
-    - All task instances for this run with their states
-    - Highlighted failed/upstream_failed tasks with details
-    - Summary of task states
+    - Up to 100 task instances with full details and explicit sample metadata
+    - All failed/upstream_failed tasks, including map_index, across every page
+    - Complete counts of task states (not limited to the sample)
+
+    If task retrieval fails or exceeds the pagination safety limit, returns a
+    task_instances error instead of a potentially incomplete summary.
 
     Args:
         dag_id: The ID of the DAG
@@ -205,32 +209,8 @@ def diagnose_dag_run(dag_id: str, dag_run_id: str) -> str:
 
     # Get task instances for this run
     try:
-        tasks_data = adapter.get_task_instances(dag_id, dag_run_id)
-        task_instances = tasks_data.get("task_instances", [])
-        result["task_instances"] = task_instances
-
-        # Summarize task states
-        state_counts: dict[str, int] = {}
-        failed_tasks = []
-        for ti in task_instances:
-            state = ti.get("state", "unknown")
-            state_counts[state] = state_counts.get(state, 0) + 1
-            if state in ("failed", "upstream_failed"):
-                failed_tasks.append(
-                    {
-                        "task_id": ti.get("task_id"),
-                        "state": state,
-                        "start_date": ti.get("start_date"),
-                        "end_date": ti.get("end_date"),
-                        "try_number": ti.get("try_number"),
-                    }
-                )
-
-        result["summary"] = {
-            "total_tasks": len(task_instances),
-            "state_counts": state_counts,
-            "failed_tasks": failed_tasks,
-        }
+        tasks_data = adapter.get_all_task_instances(dag_id, dag_run_id)
+        result.update(summarize_task_instances(tasks_data["task_instances"]))
     except Exception as e:
         result["task_instances"] = error_payload(e, dag_id=dag_id, dag_run_id=dag_run_id)
 
