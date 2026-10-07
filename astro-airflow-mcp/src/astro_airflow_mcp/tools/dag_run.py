@@ -107,14 +107,9 @@ def _get_failed_task_instances(
     Returns:
         List of failed task instance details
     """
-    try:
-        adapter = _get_adapter()
-        data = adapter.get_task_instances(dag_id, dag_run_id)
-        task_instances = data.get("task_instances", [])
-        return extract_failed_tasks(task_instances)
-    except Exception:
-        # If we can't fetch failed tasks, return empty list rather than failing
-        return []
+    adapter = _get_adapter()
+    data = adapter.get_all_task_instances(dag_id, dag_run_id)
+    return extract_failed_tasks(data["task_instances"])
 
 
 def _trigger_dag_and_wait_impl(
@@ -222,12 +217,15 @@ def _trigger_dag_and_wait_impl(
 
             # Fetch failed task details if not successful
             if current_state != "success":
-                failed_tasks = _get_failed_task_instances(
-                    dag_id=dag_id,
-                    dag_run_id=dag_run_id,
-                )
-                if failed_tasks:
-                    result["failed_tasks"] = failed_tasks
+                try:
+                    result["failed_tasks"] = _get_failed_task_instances(
+                        dag_id=dag_id,
+                        dag_run_id=dag_run_id,
+                    )
+                except Exception as e:
+                    result["failed_tasks_error"] = error_payload(
+                        e, dag_id=dag_id, dag_run_id=dag_run_id
+                    )
 
             return json.dumps(result, indent=2)
 
@@ -402,6 +400,7 @@ def trigger_dag_and_wait(
     - elapsed_seconds: How long we waited
     - timed_out: Whether we hit the timeout before completion
     - failed_tasks: List of failed task details (only if state != success)
+    - failed_tasks_error: Retrieval error if the failed-task listing is unavailable
 
     Args:
         dag_id: The ID of the DAG to trigger (e.g., "example_dag")
