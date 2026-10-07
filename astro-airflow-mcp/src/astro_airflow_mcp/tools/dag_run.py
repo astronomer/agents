@@ -12,7 +12,7 @@ from astro_airflow_mcp.server import (
 )
 from astro_airflow_mcp.tool_annotations import read_only, write
 from astro_airflow_mcp.tool_errors import error_payload, tool_error
-from astro_airflow_mcp.utils import extract_failed_tasks
+from astro_airflow_mcp.utils import summarize_failed_tasks
 
 
 def _list_dag_runs_impl(
@@ -94,34 +94,12 @@ def _trigger_dag_impl(
         return tool_error(e, dag_id=dag_id)
 
 
-def _get_failed_task_instances(
-    dag_id: str,
-    dag_run_id: str,
-) -> list[dict[str, Any]]:
-    """Fetch task instances that failed in a DAG run.
-
-    Args:
-        dag_id: The ID of the DAG
-        dag_run_id: The ID of the DAG run
-
-    Returns:
-        List of failed task instance details
-    """
-    try:
-        adapter = _get_adapter()
-        data = adapter.get_task_instances(dag_id, dag_run_id)
-        task_instances = data.get("task_instances", [])
-        return extract_failed_tasks(task_instances)
-    except Exception:
-        # If we can't fetch failed tasks, return empty list rather than failing
-        return []
-
-
 def _trigger_dag_and_wait_impl(
     dag_id: str,
     conf: dict | None = None,
     poll_interval: float = 5.0,
     timeout: float = 3600.0,
+    include_all_failed_tasks: bool = False,
 ) -> str:
     """Internal implementation for triggering a DAG and waiting for completion.
 
@@ -130,6 +108,7 @@ def _trigger_dag_and_wait_impl(
         conf: Optional configuration dictionary to pass to the DAG run
         poll_interval: Seconds between status checks (default: 5.0)
         timeout: Maximum time to wait in seconds (default: 3600.0 / 60 minutes)
+        include_all_failed_tasks: Return every failed-task detail instead of 100.
 
     Returns:
         JSON string containing the final DAG run status and any failed task details
@@ -222,12 +201,17 @@ def _trigger_dag_and_wait_impl(
 
             # Fetch failed task details if not successful
             if current_state != "success":
-                failed_tasks = _get_failed_task_instances(
-                    dag_id=dag_id,
-                    dag_run_id=dag_run_id,
-                )
-                if failed_tasks:
-                    result["failed_tasks"] = failed_tasks
+                try:
+                    tasks_data = _get_adapter().get_all_task_instances(dag_id, dag_run_id)
+                    result.update(
+                        summarize_failed_tasks(
+                            tasks_data["task_instances"], include_all_failed_tasks
+                        )
+                    )
+                except Exception as e:
+                    result["failed_tasks_error"] = error_payload(
+                        e, dag_id=dag_id, dag_run_id=dag_run_id
+                    )
 
             return json.dumps(result, indent=2)
 
@@ -368,6 +352,7 @@ def trigger_dag_and_wait(
     dag_id: str,
     conf: dict | None = None,
     timeout: float = 3600.0,
+    include_all_failed_tasks: bool = False,
 ) -> str:
     """Trigger a DAG run and wait for it to complete before returning.
 
@@ -401,13 +386,18 @@ def trigger_dag_and_wait(
     - end_date: When execution completed
     - elapsed_seconds: How long we waited
     - timed_out: Whether we hit the timeout before completion
-    - failed_tasks: List of failed task details (only if state != success)
+    - failed_tasks: Up to 100 failed task details (only if state != success)
+    - failed_tasks_total, failed_tasks_returned, failed_tasks_truncated: Failure sample metadata
+    - failed_tasks_error: Retrieval error if the failed-task listing is unavailable
 
     Args:
         dag_id: The ID of the DAG to trigger (e.g., "example_dag")
         conf: Optional configuration dictionary to pass to the DAG run.
               This will be available in the DAG via context['dag_run'].conf
         timeout: Maximum time to wait in seconds (default: 3600.0 / 60 minutes)
+        include_all_failed_tasks: Return every failed-task detail instead of 100.
+            To retrieve omitted details after this call, use diagnose_dag_run on
+            the returned dag_run_id with include_all_failed_tasks=True.
 
     Returns:
         JSON with final DAG run status and any failed task details
@@ -420,6 +410,7 @@ def trigger_dag_and_wait(
         conf=conf,
         poll_interval=poll_interval,
         timeout=timeout,
+        include_all_failed_tasks=include_all_failed_tasks,
     )
 
 

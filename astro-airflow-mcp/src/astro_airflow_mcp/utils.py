@@ -1,9 +1,10 @@
 """Shared utility functions for CLI and MCP server."""
 
+from collections import Counter
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
-from astro_airflow_mcp.constants import FAILED_TASK_STATES
+from astro_airflow_mcp.constants import DEFAULT_LIMIT, FAILED_TASK_STATES
 
 
 def normalize_airflow_url(url: str) -> str:
@@ -67,6 +68,7 @@ def extract_failed_tasks(task_instances: list[dict[str, Any]]) -> list[dict[str,
     return [
         {
             "task_id": task.get("task_id"),
+            "map_index": task.get("map_index"),
             "state": task.get("state"),
             "try_number": task.get("try_number"),
             "start_date": task.get("start_date"),
@@ -75,6 +77,48 @@ def extract_failed_tasks(task_instances: list[dict[str, Any]]) -> list[dict[str,
         for task in task_instances
         if task.get("state") in FAILED_TASK_STATES
     ]
+
+
+def summarize_failed_tasks(
+    task_instances: list[dict[str, Any]], include_all_failed_tasks: bool = False
+) -> dict[str, Any]:
+    """Count all failures and return bounded details, with actual failures first."""
+    failed = extract_failed_tasks(task_instances)
+    failed.sort(key=lambda task: task["state"] != "failed")
+    sample = failed if include_all_failed_tasks else failed[:DEFAULT_LIMIT]
+    return {
+        "failed_tasks": sample,
+        "failed_tasks_total": len(failed),
+        "failed_tasks_returned": len(sample),
+        "failed_tasks_truncated": len(sample) < len(failed),
+    }
+
+
+def summarize_task_instances(
+    task_instances: list[dict[str, Any]], include_all_failed_tasks: bool = False
+) -> dict[str, Any]:
+    """Summarize every instance, retaining only a bounded sample of full details.
+
+    Counts cover the complete listing. Failed-task details default to 100 with
+    an opt-in for all. The full-detail sample always stays bounded, prioritizing
+    failed, then upstream_failed instances. MCP and CLI share this format.
+    """
+    state_order = {"failed": 0, "upstream_failed": 1}
+    sample = sorted(task_instances, key=lambda task: state_order.get(task.get("state"), 2))[
+        :DEFAULT_LIMIT
+    ]
+    return {
+        "task_instances": sample,
+        "task_instances_returned": len(sample),
+        "task_instances_truncated": len(sample) < len(task_instances),
+        "summary": {
+            "total_tasks": len(task_instances),
+            "state_counts": dict(
+                Counter(task.get("state") or "unknown" for task in task_instances)
+            ),
+            **summarize_failed_tasks(task_instances, include_all_failed_tasks),
+        },
+    }
 
 
 def wrap_list_response(
