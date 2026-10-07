@@ -63,7 +63,7 @@ uv run scripts/cli.py exec "dfs = run_sql_many(['SELECT ...', 'SELECT ...']); pr
 
 **Timeouts:** `exec` waits up to 120s by default, then interrupts the query and returns a "client stopped waiting" message (the query may still finish server-side). Raise it for known long-running queries: `uv run scripts/cli.py exec "..." -t 600`.
 
-**Idle kernel:** the kernel self-terminates after 2h idle (preserving state until then). Override with `ASTRO_KERNEL_IDLE_TIMEOUT` (seconds; `0` disables).
+**Kernel lifetime:** state persists across turns within a session — `df` from one `exec` is still there on the next. The kernel self-terminates after 2h idle (override with `ASTRO_KERNEL_IDLE_TIMEOUT`, seconds; `0` disables) and is shut down when the session ends.
 
 ## CLI Reference
 
