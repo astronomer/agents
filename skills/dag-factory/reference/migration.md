@@ -42,7 +42,8 @@ dagfactory lint dags/
 dagfactory convert dags/ --override
 
 # 3. Have Airflow parse the DAGs
-astro dev parse  # or `airflow dags list-import-errors`
+astro local check  # or `airflow dags list-import-errors`
+# v1: astro dev parse
 ```
 
 ## Reference

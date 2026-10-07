@@ -766,7 +766,7 @@ make test
 make check
 
 # Local testing with Astro CLI
-astro dev start  # Start Airflow
+astro local start  # Start Airflow (Astro CLI v1: astro dev start)
 make run         # Run MCP server (connects to localhost:8080)
 ```
 

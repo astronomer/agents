@@ -7,11 +7,32 @@ description: Builds human-in-the-loop (HITL) Airflow workflows - approval gates,
 
 Pause a DAG until a human responds via the Airflow UI or REST API. HITL operators are deferrable — they release their worker slot while waiting.
 
-> **Requires Airflow 3.1+** (`af config version`).
->
 > **UI location**: Browse → Required Actions. Respond from the task instance page's Required Actions tab.
 >
 > **Cross-references**: `migrating-ai-sdk-to-common-ai` for AI/LLM task decorators; `airflow` for registry and API discovery commands used below.
+
+---
+
+<!-- astro-cli-version:start -->
+## Astro CLI version
+
+Commands in this skill, including its reference files, are written for Astro CLI v2. Before anything else, run this as a command of its own, with nothing chained before or after it, and choose the dialect from what it prints: `astro local af --help >/dev/null 2>&1 && echo v2 || echo v1`
+On Windows `cmd.exe`, which has no `/dev/null`, run `astro local af --help >NUL 2>&1 && echo v2 || echo v1` instead.
+
+- **v2:** run them as written.
+- **v1** (Astro CLI 1.x, or no Astro CLI): use the standalone `af` CLI. Write `af` for `astro local af` and `af api` for `astro local api`, and drop `-o json` and `--output json` (`af` prints JSON, except `af instance` commands, which print tables). Where a command needs more than that, its v1 form is the line under it, starting `# v1:`. Where something behaves differently on v1, a line starting **v1:** says how. If `af` is not on PATH, write `uvx --from astro-airflow-mcp af <args>` out in full in every command. Don't put it in a shell variable or alias: zsh won't split `$AF`, and shell state doesn't carry over between commands.
+- v2 replaced `astro dev` with `astro local`; `astro dev <cmd>` on v2 fails and names its replacement.
+- If a v2 command reports an Astro v1 project, the v2 CLI cannot run that project, although the probe printed v2. Switch to the v1 forms: the standalone `af` still reaches an Airflow that is already running, but starting or parsing it (`astro dev ...`) needs Astro CLI 1.x. Tell the user; upgrading the project (`astro init`) is their call.
+- `-d` and `-o` mean deployment and output in v2, but DAG id and offset in v1, so never carry either into a v1 command. `--dag-id`, `--offset`, `--state`, `--limit`, `--try`, `--map-index`, and `--timeout` mean the same in both.
+- If a command here, or in the project's `AGENTS.md`, disagrees with the installed CLI, trust the CLI: check `astro <cmd> --help` (v1: `af <cmd> --help` or `astro dev <cmd> --help`).
+<!-- astro-cli-version:end -->
+
+**Requires Airflow 3.1+.** Check the version right after the probe:
+
+```bash
+astro local af version
+# v1: af config version
+```
 
 ---
 
@@ -43,8 +64,9 @@ af registry parameters standard \
   | jq '.classes | to_entries[] | select(.key | test("\\.hitl\\.")) | {fqn: .key, parameters: .value.parameters}'
 
 # Pin to the exact installed provider version
-af config providers \
-  | jq '.providers[] | select(.package_name == "apache-airflow-providers-standard") | .version'
+astro local af providers -o json \
+  | jq -r 'select(.package_name == "apache-airflow-providers-standard") | .version'
+# v1: af config providers | jq -r '.providers[] | select(.package_name == "apache-airflow-providers-standard") | .version'
 # then: af registry parameters standard --version <VERSION>
 ```
 
@@ -117,7 +139,9 @@ HITL operators accept a `notifiers` list. Inside a notifier's `notify(context)` 
 The parameter name and accepted identifier format depend on the active auth manager. Do **not** hardcode — check which one is active and which kwarg the current provider exposes:
 
 ```bash
-af config show | jq '.auth_manager // .core.auth_manager'
+astro local af config --section core -o json | jq -r 'select(.key == "auth_manager") | .value'
+# v1: af config show | jq -r '.sections[] | select(.name == "core") | .options[] | select(.key == "auth_manager") | .value'
+# Both are refused unless Airflow exposes its config ([api] expose_config); then read AIRFLOW__CORE__AUTH_MANAGER from the project's env instead
 ```
 
 Then look up the current kwarg in Step 2 (at the time of writing it is `assigned_users`, accepting identifiers in whatever format the active auth manager uses — Astro uses the Astro user ID, FabAuthManager uses email, SimpleAuthManager uses username).
@@ -129,9 +153,11 @@ Then look up the current kwarg in Step 2 (at the time of writing it is `assigned
 For Slack bots, custom apps, or scripts. Discover the live endpoint rather than hardcoding a path:
 
 ```bash
-af api ls --filter hitl           # live endpoint list
-af api spec \
-  | jq '.paths | to_entries[] | select(.key | test("hitl"))'   # request/response schemas
+# Live endpoint list
+astro local api ls --filter hitl
+# Request/response schemas
+astro local api spec \
+  | jq '.paths | to_entries[] | select(.key | test("hitl"))'
 ```
 
 The PATCH-to-respond pattern is stable; the exact path is discovered. Typical shape:
@@ -143,7 +169,8 @@ HOST = os.environ["AIRFLOW_HOST"]
 TOKEN = os.environ["AIRFLOW_API_TOKEN"]
 HEADERS = {"Authorization": f"Bearer {TOKEN}"}
 
-# List pending — use the path from `af api ls --filter hitl`
+# List pending — use the path from `astro local api ls --filter hitl`.
+# It lists paths relative to the API base, so HOST must end in /api/v2.
 requests.get(f"{HOST}/<path>", headers=HEADERS, params={"state": "pending"})
 
 # Respond — same discovered path family, PATCH
@@ -154,11 +181,13 @@ requests.patch(
 )
 ```
 
+**v1:** `af api ls` prints the full `/api/v2/...` path.
+
 ---
 
 ## Step 6 — Safety checks
 
-- [ ] Airflow version ≥ 3.1 (`af config version`).
+- [ ] Airflow version ≥ 3.1 (`astro local af version`; see the check near the top).
 - [ ] Constructor kwargs match the current registry output from Step 2 — no `respondents`-vs-`assigned_users` style drift.
 - [ ] For branching: every option resolves to a downstream task id (directly or via the mapping kwarg from Step 2).
 - [ ] Every value in `defaults` is also in `options`.
@@ -178,7 +207,7 @@ af registry modules standard \
 
 ## Related skills
 
-- **airflow** — `af registry`, `af api`, `af config` command reference.
+- **airflow** — `af registry`, `astro local api`, `astro local af` command reference.
 - **migrating-ai-sdk-to-common-ai** — AI/LLM task decorators and GenAI patterns (common-ai provider).
 - **authoring-dags** — general DAG writing best practices.
 - **testing-dags** — iterative test → debug → fix cycles.

@@ -87,11 +87,18 @@ Translating the source's deps naively (the MECH `pyproject.toml` ->
 class, hit in testing: `dbt-core` pins `mashumaro<3.15`, which cannot run on
 Runtime 3.3's Python 3.14, so dbt cannot even parse and both DAGs fail at DagBag
 import. The fix is an explicit override, `mashumaro>=3.16` (3.17 worked), in
-`requirements.txt`. dbt-on-Astro dependency sets need the playbook's version-check
+the `pyproject.toml` dependencies. dbt-on-Astro dependency sets need the playbook's version-check
 before you build the image; see the dbt dependency entry in
 `reference/troubleshooting.md` rather than guessing pins here. At minimum: do not
 treat the dbt requirements translation as mechanical, and run the playbook check
-before the first `astro dev start`.
+before the first local start:
+
+```bash
+astro local start
+# v1: astro dev start
+```
+
+**v1:** the dependencies live in `requirements.txt` instead of `pyproject.toml`.
 
 ## ProfileConfig per environment (JUDG)
 
@@ -135,7 +142,7 @@ per-`target` database/schema differences become per-Deployment Connection or
 Not every dbt target is a Deployment. One real project's `get_dbt_target()` returns a
 fourth target, `personal`, a developer-laptop schema with no cloud counterpart.
 "One Deployment per environment" silently drops it. Map local/developer targets
-to `astro dev start` running against a local `profiles.yml` target, NOT a
+to local Airflow (`astro local start`, as above) running against a local `profiles.yml` target, NOT a
 Deployment. Enumerate every value the target function can return and confirm each
 maps to either a Deployment or the local dev flow; a target that maps to neither
 is a gap to call out in the migration report.
