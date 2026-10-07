@@ -158,12 +158,39 @@ By default, the server connects to `http://localhost:8080` (Airflow default; als
 | `AIRFLOW_VERIFY_SSL` | Set to `false` to disable SSL certificate verification |
 | `AIRFLOW_CA_CERT` | Path to custom CA certificate bundle |
 | `AF_READ_ONLY` | Set to `true` to block all write operations |
+| `ASTRO_MCP_ALLOWED_TOOLS` | Comma-separated MCP tool names to expose; unset to expose all tools |
 
 Example with auth (Claude Code):
 
 ```bash
 claude mcp add airflow -e AIRFLOW_API_URL=https://your-airflow.example.com -e AIRFLOW_USERNAME=admin -e AIRFLOW_PASSWORD=admin -- uvx astro-airflow-mcp --transport stdio
 ```
+
+**Selecting MCP tools**
+
+Set `ASTRO_MCP_ALLOWED_TOOLS` in the environment of the process running the MCP server to expose only selected [tools](#available-tools). For example, to allow DAG and DAG-run inspection in a standalone HTTP server:
+
+```bash
+ASTRO_MCP_ALLOWED_TOOLS="list_dags,get_dag_details,list_dag_runs,get_dag_run" \
+  uvx astro-airflow-mcp --transport http
+```
+
+The server advertises only those tools through `tools/list`. Direct `tools/call` requests for excluded tools are rejected before the tool executes.
+
+- Unset the variable to keep the default behavior of exposing all tools.
+- Names are exact and case-sensitive. Surrounding whitespace and duplicate names are ignored; wildcards are not supported.
+- Configuration errors do not stop the server. An empty value, an empty entry (such as `list_dags,`), or an unknown tool name makes the server start, expose no tools, and log an error that describes the problem. Fix the value and restart. A configuration error never falls back to exposing all tools.
+- The allowlist applies to every client of that server. It does not select tools per user or Slack channel.
+
+For [Airflow plugin mode](#airflow-plugin-mode), set the variable on the Airflow API server (Airflow 3) or webserver (Airflow 2) processes that host the plugin. Setting it only on a remote MCP client or agent does not configure the server.
+
+The setting is read once, when the server starts. After changing it, restart or redeploy all processes hosting that MCP endpoint, then refresh the client's tool discovery. Reconnecting a client alone does not reload the server's setting.
+
+To confirm the result, check the server logs after the restart. A `Tool allowlist active: exposing N of M tools` line means the policy applied. An error line naming `ASTRO_MCP_ALLOWED_TOOLS` means the server is running but exposes no tools; the line says what to fix. Neither line means the variable is unset and all tools are exposed.
+
+On Airflow 2 plugin mode, the webserver starts the MCP server when the first request reaches `/mcp/v1/`, separately in each webserver worker. These lines therefore appear after the first MCP request, not at restart. Send one MCP request (for example, connect a client and list tools) before you read the logs.
+
+The allowlist limits which tools a client can call. It does not restrict the arguments of an allowed tool, and an allowed tool still performs every operation its implementation contains. MCP resources and prompts stay available: excluding `get_airflow_config` does not remove the `airflow://config` resource. Airflow permissions and `AF_READ_ONLY` apply independently.
 
 ## Features
 
@@ -610,6 +637,7 @@ The package auto-registers as an Airflow plugin. No Dockerfile changes or config
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `AF_READ_ONLY` | Recommended | `false` | Set to `true` to block all write operations (trigger, pause, clear, delete) at the MCP server level, regardless of token permissions |
+| `ASTRO_MCP_ALLOWED_TOOLS` | Optional | unset (all tools) | Expose only the listed MCP tools and reject calls to excluded tools; see [Configuration](#configuration). Restart the hosting processes after changes |
 | `FASTMCP_STATELESS_HTTP` | Standalone HTTP server only | `false` | Disables stateful sessions when running the MCP server standalone. Not used in plugin mode — the plugin always runs FastMCP in stateless HTTP mode so Claude Code works out of the box |
 | `AIRFLOW_API_URL` | Optional | auto-detected | Override the internal API URL. On AF2 the default includes any `webserver.base_url` path prefix (e.g. `http://localhost:8080/d<deployment-id>`) |
 

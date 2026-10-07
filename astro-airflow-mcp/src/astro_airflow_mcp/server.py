@@ -7,6 +7,9 @@ in ``prompts.py``.
 """
 
 import json
+import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Any
 
 from fastmcp import FastMCP
@@ -14,16 +17,26 @@ from fastmcp.server.middleware.logging import LoggingMiddleware
 
 from astro_airflow_mcp.adapter_manager import AdapterManager
 from astro_airflow_mcp.adapters import AirflowAdapter
+from astro_airflow_mcp.constants import ALLOWED_TOOLS_ENV_VAR
 from astro_airflow_mcp.logging import get_logger
 from astro_airflow_mcp.telemetry import TelemetryMiddleware
+from astro_airflow_mcp.tool_policy import apply_tool_allowlist
 from astro_airflow_mcp.utils import wrap_list_response
 
 logger = get_logger(__name__)
 
 
+@asynccontextmanager
+async def _lifespan(server: FastMCP) -> AsyncIterator[None]:
+    """Apply the tool policy after registration and before accepting requests."""
+    await apply_tool_allowlist(server, os.getenv(ALLOWED_TOOLS_ENV_VAR))
+    yield
+
+
 # Create MCP server
 mcp = FastMCP(
     "Airflow MCP Server",
+    lifespan=_lifespan,
     instructions="""
     This server provides access to Apache Airflow's REST API through MCP tools.
 
