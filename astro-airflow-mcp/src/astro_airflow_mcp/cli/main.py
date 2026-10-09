@@ -19,7 +19,7 @@ from astro_airflow_mcp.cli.context import get_adapter, init_context
 from astro_airflow_mcp.cli.output import output_error, output_json
 from astro_airflow_mcp.cli.telemetry import track_command
 from astro_airflow_mcp.config import legacy_default_path
-from astro_airflow_mcp.config.loader import ConfigManager
+from astro_airflow_mcp.config.loader import ConfigManager, ConfigWriteError
 
 app = typer.Typer(
     name="af",
@@ -114,15 +114,17 @@ def telemetry(
 
         action_lower = action.lower()
         if action_lower == "disable":
+            manager.require_writable("af telemetry disable")
             manager.set_telemetry_disabled(True)
             output_json({"telemetry": "disabled"})
         elif action_lower == "enable":
+            manager.require_writable("af telemetry enable")
             manager.set_telemetry_disabled(False)
             output_json({"telemetry": "enabled"})
         else:
             output_error(f"Unknown action '{action}'. Use 'enable' or 'disable'.")
     except Exception as e:
-        output_error(str(e))
+        output_error(str(e), exit_code=2 if isinstance(e, ConfigWriteError) else 1)
 
 
 @app.command()
