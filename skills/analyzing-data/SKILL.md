@@ -65,6 +65,8 @@ uv run scripts/cli.py exec "dfs = run_sql_many(['SELECT ...', 'SELECT ...']); pr
 
 **Kernel lifetime:** state persists across turns within a session — `df` from one `exec` is still there on the next. The kernel self-terminates after 2h idle (override with `ASTRO_KERNEL_IDLE_TIMEOUT`, seconds; `0` disables) and is shut down when the session ends.
 
+**Switching warehouse:** the kernel binds to one warehouse when it starts, and that binding lasts as long as the kernel. `start -w <other>` therefore fails rather than silently leaving queries pointed at the old one. Use `restart -w <name>` to switch, which discards the kernel's current variables. `status` reports the current binding, and edits to `warehouse.yml` need a `restart` to take effect.
+
 ## CLI Reference
 
 ### Kernel
@@ -74,7 +76,7 @@ uv run scripts/cli.py warehouse list      # List warehouses
 uv run scripts/cli.py start [-w name]     # Start kernel (with optional warehouse)
 uv run scripts/cli.py exec "..."          # Execute Python code
 uv run scripts/cli.py status              # Kernel status
-uv run scripts/cli.py restart             # Restart kernel
+uv run scripts/cli.py restart [-w name]   # Restart kernel (use to switch warehouse)
 uv run scripts/cli.py stop                # Stop kernel
 uv run scripts/cli.py install <pkg>       # Install package
 ```

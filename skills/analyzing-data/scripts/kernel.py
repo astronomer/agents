@@ -68,6 +68,31 @@ class KernelManager:
         return self.connection_file.with_suffix(".pid")
 
     @property
+    def warehouse_file(self) -> Path:
+        """Sidecar naming the warehouse the running kernel is connected to.
+
+        The prelude runs once at start, so the kernel's warehouse binding lasts
+        as long as the kernel. Recording the name lets `start -w <other>` refuse
+        instead of silently returning and leaving queries pointed at the old one.
+        """
+        return self.connection_file.with_suffix(".warehouse")
+
+    @property
+    def bound_warehouse(self) -> str | None:
+        """Warehouse the running kernel is connected to, if recorded."""
+        try:
+            return self.warehouse_file.read_text().strip() or None
+        except OSError:
+            return None
+
+    def record_warehouse(self, name: str) -> None:
+        try:
+            self.warehouse_file.parent.mkdir(parents=True, exist_ok=True)
+            self.warehouse_file.write_text(name)
+        except OSError:
+            pass
+
+    @property
     def _deps_marker(self) -> Path:
         """Records the package set the venv was last provisioned with."""
         return self.venv_dir / ".astro-deps-hash"
@@ -190,6 +215,7 @@ class KernelManager:
         # discover the new kernel's PID, the absence of a file makes _interrupt a
         # safe no-op rather than signaling a dead/reused PID.
         self.pid_file.unlink(missing_ok=True)
+        self.warehouse_file.unlink(missing_ok=True)
 
         self._km = JupyterKernelManager(kernel_name=self.kernel_name)
 
@@ -323,6 +349,7 @@ class KernelManager:
         if self.connection_file.exists():
             self.connection_file.unlink()
         self.pid_file.unlink(missing_ok=True)
+        self.warehouse_file.unlink(missing_ok=True)
         print('{"message": "Kernel stopped"}')
 
     def execute(self, code: str, timeout: float = 120.0) -> ExecutionResult:
@@ -394,6 +421,7 @@ class KernelManager:
             "running": False,
             "connection_file": str(self.connection_file),
             "responsive": False,
+            "warehouse": self.bound_warehouse,
         }
         if not self.connection_file.exists():
             return info
