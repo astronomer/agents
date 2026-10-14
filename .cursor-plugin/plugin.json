@@ -27,7 +27,7 @@
     "hooks": {
       "sessionEnd": [
         {
-          "command": "uv run ./skills/analyzing-data/scripts/cli.py stop"
+          "command": "uv run --no-project ./skills/analyzing-data/hooks/stop-kernel.py"
         }
       ]
     }

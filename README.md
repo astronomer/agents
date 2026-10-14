@@ -117,7 +117,7 @@ Create `.cursor/hooks.json` in your project:
   "hooks": {
     "sessionEnd": [
       {
-        "command": "uv run $CURSOR_PROJECT_DIR/.cursor/skills/analyzing-data/scripts/cli.py stop",
+        "command": "uv run --no-project $CURSOR_PROJECT_DIR/.cursor/skills/analyzing-data/hooks/stop-kernel.py",
         "timeout": 10
       }
     ]
@@ -126,7 +126,7 @@ Create `.cursor/hooks.json` in your project:
 ```
 
 **What these hooks do:**
-- `sessionEnd`: Shuts the analysis kernel down when the conversation ends
+- `sessionEnd`: Shuts the analysis kernel down when the conversation ends (stdlib-only, so it completes inside the hook timeout)
 
 </details>
 
