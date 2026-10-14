@@ -703,6 +703,20 @@ class SQLAlchemyConnector(DatabaseConnector):
                 f"warehouse '{name}': databases list required for sqlalchemy"
             )
 
+    def _holds_file_lock(self) -> bool:
+        """Whether idle pooled connections would pin a single-writer file.
+
+        A file-backed DuckDB holds an exclusive lock for as long as a connection
+        to it is open. Returning that connection to the pool doesn't close it, so
+        anything else that opens the file for writing (dbt-duckdb, the user's own
+        app) fails with "Could not set lock on file" until the kernel exits.
+        """
+        dialect = _extract_dialect(self.url)
+        if dialect != "duckdb":
+            return False
+        _, _, target = self.url.partition("://")
+        return bool(target.strip("/")) and ":memory:" not in target
+
     def get_required_packages(self) -> list[str]:
         packages = ["sqlalchemy"]
         dialect = _extract_dialect(self.url)
@@ -732,37 +746,52 @@ class SQLAlchemyConnector(DatabaseConnector):
 
         databases_str = ", ".join(self.databases)
 
-        return f'''from sqlalchemy import create_engine, text
+        # NullPool closes each connection on release instead of parking it in the
+        # pool, which is what actually frees a single-writer file between queries.
+        if self._holds_file_lock():
+            pool_import = "\nfrom sqlalchemy.pool import NullPool"
+            pool_args = "poolclass=NullPool, "
+        else:
+            pool_import = ""
+            pool_args = f"pool_size={self.pool_size}, "
+
+        return f'''from sqlalchemy import create_engine, text{pool_import}
 from concurrent.futures import ThreadPoolExecutor
 import polars as pl
 import pandas as pd
 import os
 import atexit
 
-_engine = create_engine({url_code}, pool_size={self.pool_size}, echo={self.echo}{f", connect_args={self.connect_args!r}" if self.connect_args else ""})
-_conn = _engine.connect()
-atexit.register(lambda: (_conn.close(), _engine.dispose()))
+_engine = create_engine({url_code}, {pool_args}echo={self.echo}{f", connect_args={self.connect_args!r}" if self.connect_args else ""})
+atexit.register(_engine.dispose)
 
+# Every query runs in its own transaction, committed on success and rolled back
+# on error. A single long-lived connection would instead keep one transaction
+# open for the life of the kernel: on PostgreSQL one failed query then aborts
+# every later one ("current transaction is aborted"), and on MySQL's REPEATABLE
+# READ the first query pins a snapshot so later ones read stale data.
 def run_sql(query: str, limit: int = 100):
     """Execute SQL and return Polars DataFrame."""
-    result = _conn.execute(text(query))
-    if result.returns_rows:
-        columns = list(result.keys())
-        rows = result.fetchall()
-        df = pl.DataFrame(rows, schema=columns, orient="row")
-        return df.head(limit) if limit > 0 and len(df) > limit else df
-    return pl.DataFrame()
+    with _engine.begin() as conn:
+        result = conn.execute(text(query))
+        if result.returns_rows:
+            columns = list(result.keys())
+            rows = result.fetchall()
+            df = pl.DataFrame(rows, schema=columns, orient="row")
+            return df.head(limit) if limit > 0 and len(df) > limit else df
+        return pl.DataFrame()
 
 
 def run_sql_pandas(query: str, limit: int = 100):
     """Execute SQL and return Pandas DataFrame."""
-    result = _conn.execute(text(query))
-    if result.returns_rows:
-        columns = list(result.keys())
-        rows = result.fetchall()
-        df = pd.DataFrame(rows, columns=columns)
-        return df.head(limit) if limit > 0 and len(df) > limit else df
-    return pd.DataFrame()
+    with _engine.begin() as conn:
+        result = conn.execute(text(query))
+        if result.returns_rows:
+            columns = list(result.keys())
+            rows = result.fetchall()
+            df = pd.DataFrame(rows, columns=columns)
+            return df.head(limit) if limit > 0 and len(df) > limit else df
+        return pd.DataFrame()
 
 
 def run_sql_many(queries, limit: int = 100):
@@ -775,7 +804,7 @@ def run_sql_many(queries, limit: int = 100):
     that haven't started are cancelled and the call won't block on the rest, but
     queries already running aren't cancelled and may finish server-side."""
     def _one(query):
-        with _engine.connect() as conn:
+        with _engine.begin() as conn:
             result = conn.execute(text(query))
             if not result.returns_rows:
                 return pl.DataFrame()
