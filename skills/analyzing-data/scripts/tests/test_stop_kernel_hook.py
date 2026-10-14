@@ -20,7 +20,10 @@ def hook():
     """Load stop-kernel.py, which isn't importable by name (hyphen, no package)."""
     spec = importlib.util.spec_from_file_location("stop_kernel", HOOK_PATH)
     if spec is None or spec.loader is None:  # pragma: no cover - import plumbing
-        pytest.fail(f"could not load {HOOK_PATH}")
+        # `raise`, not pytest.fail: the type checker runs without the project's
+        # dependencies installed, so it cannot see that pytest.fail is NoReturn
+        # and would not narrow spec/spec.loader here.
+        raise RuntimeError(f"could not load {HOOK_PATH}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
