@@ -34,6 +34,34 @@ class TestAirflowV2Adapter:
         )
         assert adapter.api_base_path == "/api/v1"
 
+    def test_list_dag_runs_forwards_filters(self, mocker):
+        """Test V2 adapter includes DAG-run filters in the API query."""
+        adapter = AirflowV2Adapter("http://localhost:8080", "2.9.0")
+        mock_response = mocker.Mock(status_code=200)
+        mock_response.json.return_value = {"dag_runs": []}
+        mock_client = mocker.MagicMock()
+        mock_client.get.return_value = mock_response
+        mock_client.__enter__.return_value = mock_client
+        mocker.patch("httpx.Client", return_value=mock_client)
+
+        adapter.list_dag_runs(
+            state="failed",
+            start_date_gte="2026-09-14T00:00:00Z",
+            start_date_lte="2026-09-14T06:00:00Z",
+            end_date_gte="2026-09-14T00:00:00Z",
+            end_date_lte="2026-09-14T06:00:00Z",
+        )
+
+        assert mock_client.get.call_args.kwargs["params"] == {
+            "limit": 100,
+            "offset": 0,
+            "state": "failed",
+            "start_date_gte": "2026-09-14T00:00:00Z",
+            "start_date_lte": "2026-09-14T06:00:00Z",
+            "end_date_gte": "2026-09-14T00:00:00Z",
+            "end_date_lte": "2026-09-14T06:00:00Z",
+        }
+
     def test_constructor_normalizes_airflow_url(self):
         """A query string on the stored URL must not corrupt API URLs.
         Existing configs with ?orgId=… should keep working without re-discovery."""
@@ -340,6 +368,34 @@ class TestAirflowV3Adapter:
             "3.0.0",
         )
         assert adapter.api_base_path == "/api/v2"
+
+    def test_list_dag_runs_forwards_filters(self, mocker):
+        """Test V3 adapter includes DAG-run filters in the API query."""
+        adapter = AirflowV3Adapter("http://localhost:8080", "3.0.0")
+        mock_response = mocker.Mock(status_code=200)
+        mock_response.json.return_value = {"dag_runs": []}
+        mock_client = mocker.MagicMock()
+        mock_client.get.return_value = mock_response
+        mock_client.__enter__.return_value = mock_client
+        mocker.patch("httpx.Client", return_value=mock_client)
+
+        adapter.list_dag_runs(
+            state="failed",
+            start_date_gte="2026-09-14T00:00:00Z",
+            start_date_lte="2026-09-14T06:00:00Z",
+            end_date_gte="2026-09-14T00:00:00Z",
+            end_date_lte="2026-09-14T06:00:00Z",
+        )
+
+        assert mock_client.get.call_args.kwargs["params"] == {
+            "limit": 100,
+            "offset": 0,
+            "state": "failed",
+            "start_date_gte": "2026-09-14T00:00:00Z",
+            "start_date_lte": "2026-09-14T06:00:00Z",
+            "end_date_gte": "2026-09-14T00:00:00Z",
+            "end_date_lte": "2026-09-14T06:00:00Z",
+        }
 
     def test_get_dag_stats_call(self, mocker):
         """Test V3 adapter calls dagStats endpoint."""
