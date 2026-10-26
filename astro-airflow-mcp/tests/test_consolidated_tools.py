@@ -399,6 +399,7 @@ class TestGetSystemHealth:
         mock_adapter.list_import_errors.return_value = mock_import_errors
         mock_adapter.list_dag_warnings.return_value = mock_warnings
         mock_adapter.get_dag_stats.return_value = mock_stats
+        mock_adapter.list_dags.return_value = {"dags": [], "total_entries": 0}
 
         mocker.patch("astro_airflow_mcp.tools.diagnostic._get_adapter", return_value=mock_adapter)
 
@@ -426,6 +427,7 @@ class TestGetSystemHealth:
         mock_adapter.list_import_errors.return_value = mock_import_errors
         mock_adapter.list_dag_warnings.return_value = mock_warnings
         mock_adapter.get_dag_stats.return_value = mock_stats
+        mock_adapter.list_dags.return_value = {"dags": [], "total_entries": 0}
 
         mocker.patch("astro_airflow_mcp.tools.diagnostic._get_adapter", return_value=mock_adapter)
 
@@ -452,6 +454,7 @@ class TestGetSystemHealth:
         mock_adapter.list_import_errors.return_value = mock_import_errors
         mock_adapter.list_dag_warnings.return_value = mock_warnings
         mock_adapter.get_dag_stats.return_value = mock_stats
+        mock_adapter.list_dags.return_value = {"dags": [], "total_entries": 0}
 
         mocker.patch("astro_airflow_mcp.tools.diagnostic._get_adapter", return_value=mock_adapter)
 
@@ -474,6 +477,10 @@ class TestGetSystemHealth:
         mock_adapter.list_import_errors.return_value = mock_import_errors
         mock_adapter.list_dag_warnings.return_value = mock_warnings
         mock_adapter.get_dag_stats.side_effect = Exception("Endpoint not found")
+        mock_adapter.list_dags.return_value = {
+            "dags": [{"dag_id": "example"}],
+            "total_entries": 1,
+        }
 
         mocker.patch("astro_airflow_mcp.tools.diagnostic._get_adapter", return_value=mock_adapter)
 
@@ -482,5 +489,5 @@ class TestGetSystemHealth:
         data = json.loads(result)
 
         assert data["dag_stats"]["available"] is False
-        # Should still report overall health
-        assert data["overall_status"] == "healthy"
+        assert data["dag_stats"]["error"] == "Endpoint not found"
+        assert data["overall_status"] == "unknown"
