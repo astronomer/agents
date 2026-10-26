@@ -22,8 +22,10 @@ Generate a comprehensive, user-editable schema reference file for the data wareh
 ### Step 1: Read Warehouse Configuration
 
 ```bash
-cat ~/.astro/agents/warehouse.yml
+cat "${ASTRO_AGENTS_CONFIG_DIR:-$HOME/.astro/agents}/warehouse.yml"
 ```
+
+`ASTRO_AGENTS_CONFIG_DIR`, when set, is this session's own config directory; otherwise the config is in `~/.astro/agents`.
 
 Get the list of databases to discover (e.g., `databases: [HQ, ANALYTICS, RAW]`).
 

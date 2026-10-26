@@ -6,7 +6,7 @@ from pathlib import Path
 import yaml
 from dotenv import load_dotenv
 
-from config import get_config_dir
+from config import get_config_dir, get_config_dir_override, get_default_config_dir
 from connectors import DatabaseConnector, create_connector
 
 
@@ -15,9 +15,16 @@ def get_warehouse_config_path() -> Path:
 
 
 def _load_env_file() -> None:
-    env_path = get_config_dir() / ".env"
-    if env_path.exists():
-        load_dotenv(env_path)
+    # None of these override the process environment, so the first to set a
+    # key wins: the process, then the override dir's .env, then the user's own
+    # .env in the default dir (which a session dir does not carry). A .env in
+    # the working directory then overrides all of them.
+    override = get_config_dir_override()
+    env_paths = [override / ".env"] if override else []
+    env_paths.append(get_default_config_dir() / ".env")
+    for env_path in env_paths:
+        if env_path.exists():
+            load_dotenv(env_path)
     if Path(".env").exists():
         load_dotenv(".env", override=True)
 

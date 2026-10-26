@@ -253,3 +253,69 @@ class TestBulkImport:
 
         count = cache.load_concepts_from_warehouse_md(Path("/nonexistent/file.md"))
         assert count == 0
+
+
+class TestWarehouseMdLookup:
+    """Where load_concepts_from_warehouse_md looks when given no path."""
+
+    ROW = "| Concept | Table |\n|---|---|\n| {concept} | HQ.MART.{concept} |\n"
+
+    @pytest.fixture
+    def home(self, tmp_path, monkeypatch):
+        home = tmp_path / "home"
+        (home / ".astro" / "agents").mkdir(parents=True)
+        work = tmp_path / "work"
+        work.mkdir()
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: home))
+        import config
+
+        monkeypatch.setattr(config, "_NEW_CONFIG_DIR", home / ".astro" / "agents")
+        monkeypatch.setattr(
+            config, "_LEGACY_CONFIG_DIR", home / ".astro" / "ai" / "config"
+        )
+        monkeypatch.chdir(work)
+        return home
+
+    def _write(self, directory: Path, concept: str) -> None:
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / "warehouse.md").write_text(self.ROW.format(concept=concept))
+
+    def test_unset_reads_the_default_dir(self, home):
+        import cache
+
+        self._write(home / ".astro" / "agents", "users")
+        assert cache.load_concepts_from_warehouse_md() == 1
+        assert "users" in cache.list_concepts()
+
+    def test_override_dir_comes_first(self, home, tmp_path, monkeypatch):
+        import cache
+
+        self._write(home / ".astro" / "agents", "users")
+        self._write(tmp_path / "session", "orders")
+        monkeypatch.setenv("ASTRO_AGENTS_CONFIG_DIR", str(tmp_path / "session"))
+        cache.load_concepts_from_warehouse_md()
+        assert list(cache.list_concepts()) == ["orders"]
+
+    def test_override_without_one_falls_back_to_the_default_dir(
+        self, home, tmp_path, monkeypatch
+    ):
+        import cache
+
+        self._write(home / ".astro" / "agents", "users")
+        monkeypatch.setenv("ASTRO_AGENTS_CONFIG_DIR", str(tmp_path / "session"))
+        cache.load_concepts_from_warehouse_md()
+        assert list(cache.list_concepts()) == ["users"]
+
+    def test_override_falls_back_to_a_legacy_default_dir(
+        self, home, tmp_path, monkeypatch
+    ):
+        import cache
+        import config
+
+        legacy = tmp_path / "legacy"
+        self._write(legacy, "accounts")
+        monkeypatch.setattr(config, "_LEGACY_CONFIG_DIR", legacy)
+        monkeypatch.setattr(config, "_NEW_CONFIG_DIR", tmp_path / "no-new")
+        monkeypatch.setenv("ASTRO_AGENTS_CONFIG_DIR", str(tmp_path / "session"))
+        cache.load_concepts_from_warehouse_md()
+        assert list(cache.list_concepts()) == ["accounts"]
