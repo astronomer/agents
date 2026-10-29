@@ -21,7 +21,7 @@
     "cosmos",
     "openlineage"
   ],
-  "logo": "https://www.astronomer.io/logo/astronomer-dark.svg",
+  "logo": "assets/logo.svg",
   "hooks": {
     "version": 1,
     "hooks": {
