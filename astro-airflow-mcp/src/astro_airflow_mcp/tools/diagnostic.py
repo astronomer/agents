@@ -4,6 +4,7 @@ import json
 from typing import Any
 
 from astro_airflow_mcp.constants import DEFAULT_LIMIT, DEFAULT_OFFSET
+from astro_airflow_mcp.health import collect_system_health
 from astro_airflow_mcp.server import (
     _get_adapter,
     _wrap_list_response,
@@ -238,56 +239,8 @@ def get_system_health() -> str:
 
     Returns:
         JSON with system health overview
+
+    Failed or incomplete checks report unknown, never healthy. Known import
+    errors still report unhealthy, with incomplete checks noted separately.
     """
-    result: dict[str, Any] = {}
-    adapter = _get_adapter()
-
-    # Get version info
-    try:
-        result["version"] = adapter.get_version()
-    except Exception as e:
-        result["version"] = error_payload(e)
-
-    # Get import errors
-    try:
-        errors_data = adapter.list_import_errors(limit=100)
-        import_errors = errors_data.get("import_errors", [])
-        result["import_errors"] = {
-            "count": len(import_errors),
-            "errors": import_errors,
-        }
-    except Exception as e:
-        result["import_errors"] = error_payload(e)
-
-    # Get DAG warnings
-    try:
-        warnings_data = adapter.list_dag_warnings(limit=100)
-        dag_warnings = warnings_data.get("dag_warnings", [])
-        result["dag_warnings"] = {
-            "count": len(dag_warnings),
-            "warnings": dag_warnings,
-        }
-    except Exception as e:
-        result["dag_warnings"] = error_payload(e)
-
-    # Get DAG stats
-    try:
-        result["dag_stats"] = adapter.get_dag_stats()
-    except Exception:
-        result["dag_stats"] = {"available": False, "note": "dagStats endpoint not available"}
-
-    # Calculate overall health status
-    import_error_count = result.get("import_errors", {}).get("count", 0)
-    warning_count = result.get("dag_warnings", {}).get("count", 0)
-
-    if import_error_count > 0:
-        result["overall_status"] = "unhealthy"
-        result["status_reason"] = f"{import_error_count} import error(s) detected"
-    elif warning_count > 0:
-        result["overall_status"] = "warning"
-        result["status_reason"] = f"{warning_count} DAG warning(s) detected"
-    else:
-        result["overall_status"] = "healthy"
-        result["status_reason"] = "No import errors or warnings"
-
-    return json.dumps(result, indent=2)
+    return json.dumps(collect_system_health(_get_adapter), indent=2)
