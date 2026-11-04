@@ -3,6 +3,9 @@
 import json
 from unittest.mock import MagicMock
 
+import pytest
+from fastmcp.exceptions import ToolError
+
 import astro_airflow_mcp.tools.dag_run as dag_run_module
 import astro_airflow_mcp.tools.diagnostic as diagnostic_module
 
@@ -247,16 +250,17 @@ class TestListDagRunsTool:
         assert "No DAG runs found" in result
 
     def test_list_dag_runs_adapter_error(self, mocker):
-        """Exceptions from the adapter are returned as a string, not raised."""
+        """Exceptions from the adapter are raised as ToolError, not returned."""
         mock_adapter = MagicMock()
         mock_adapter.list_dag_runs.side_effect = Exception("boom")
 
         mocker.patch("astro_airflow_mcp.tools.dag_run._get_adapter", return_value=mock_adapter)
 
         list_fn = get_tool_fn(dag_run_module, "list_dag_runs")
-        result = list_fn("example_dag")
+        with pytest.raises(ToolError) as excinfo:
+            list_fn("example_dag")
 
-        assert "boom" in result
+        assert "boom" in str(excinfo.value)
 
 
 class TestDeleteDagRunTool:
@@ -290,9 +294,10 @@ class TestDeleteDagRunTool:
 
         mocker.patch("astro_airflow_mcp.tools.dag_run._get_adapter", return_value=mock_adapter)
 
-        result = dag_run_module._delete_dag_run_impl("example_dag", "nonexistent")
+        with pytest.raises(ToolError) as excinfo:
+            dag_run_module._delete_dag_run_impl("example_dag", "nonexistent")
 
-        assert "not found" in result
+        assert "not found" in str(excinfo.value)
 
 
 class TestClearDagRunTool:
@@ -348,16 +353,17 @@ class TestClearDagRunTool:
 
         mocker.patch("astro_airflow_mcp.tools.dag_run._get_adapter", return_value=mock_adapter)
 
-        result = dag_run_module._clear_dag_run_impl("example_dag", "run_123")
+        with pytest.raises(ToolError) as excinfo:
+            dag_run_module._clear_dag_run_impl("example_dag", "run_123")
 
-        assert "Server error" in result
+        assert "Server error" in str(excinfo.value)
 
 
 class TestTriggerDagAndWait:
     """Tests for trigger_dag_and_wait error propagation."""
 
     def test_propagates_structured_trigger_failure_without_polling(self, mocker):
-        """If triggering fails, return the structured error and never poll."""
+        """If triggering fails, propagate the structured error and never poll."""
         trigger_error = json.dumps(
             {
                 "error": "boom",
@@ -366,12 +372,15 @@ class TestTriggerDagAndWait:
                 "retryable": True,
             }
         )
-        mocker.patch.object(dag_run_module, "_trigger_dag_impl", return_value=trigger_error)
+        mocker.patch.object(
+            dag_run_module, "_trigger_dag_impl", side_effect=ToolError(trigger_error)
+        )
         sleep = mocker.patch("astro_airflow_mcp.tools.dag_run.time.sleep")
         get_run = mocker.patch.object(dag_run_module, "_get_dag_run_impl")
 
-        result = dag_run_module._trigger_dag_and_wait_impl(dag_id="my_dag")
-        data = json.loads(result)
+        with pytest.raises(ToolError) as excinfo:
+            dag_run_module._trigger_dag_and_wait_impl(dag_id="my_dag")
+        data = json.loads(str(excinfo.value))
 
         # Structured error fields survive the hand-off; timed_out is annotated.
         assert data["error"] == "boom"
@@ -381,6 +390,35 @@ class TestTriggerDagAndWait:
         # We must not poll a run that was never created.
         sleep.assert_not_called()
         get_run.assert_not_called()
+
+    def test_polling_tolerates_status_fetch_tool_error(self, mocker):
+        """A ToolError from a status fetch keeps polling with the last state."""
+        trigger_ok = json.dumps({"dag_run_id": "run_1", "state": "queued"})
+        mocker.patch.object(dag_run_module, "_trigger_dag_impl", return_value=trigger_ok)
+        mocker.patch("astro_airflow_mcp.tools.dag_run.time.sleep")
+        status_error = json.dumps(
+            {
+                "error": "connection reset",
+                "error_type": "ConnectError",
+                "hint": "reach airflow",
+                "retryable": False,
+            }
+        )
+        get_run = mocker.patch.object(
+            dag_run_module,
+            "_get_dag_run_impl",
+            side_effect=[
+                ToolError(status_error),
+                json.dumps({"dag_run_id": "run_1", "state": "success"}),
+            ],
+        )
+
+        result = dag_run_module._trigger_dag_and_wait_impl(dag_id="my_dag", timeout=60.0)
+        data = json.loads(result)
+
+        assert data["dag_run"]["state"] == "success"
+        assert data["timed_out"] is False
+        assert get_run.call_count == 2
 
 
 class TestGetSystemHealth:

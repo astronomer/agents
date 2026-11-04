@@ -4,6 +4,7 @@ import json
 
 import httpx
 import pytest
+from fastmcp.exceptions import ToolError
 
 from astro_airflow_mcp.adapters.base import NotFoundError, ReadOnlyError
 from astro_airflow_mcp.tool_errors import error_payload, tool_error
@@ -105,11 +106,12 @@ class TestExceptionClassification:
 
 
 class TestToolError:
-    """``tool_error`` is the JSON-string form returned by MCP tools."""
+    """``tool_error`` raises the payload as a ToolError (isError=true)."""
 
-    def test_returns_parseable_json(self):
-        result = tool_error(NotFoundError("dags/x"), dag_id="x")
-        data = json.loads(result)
+    def test_raises_parseable_json_payload(self):
+        with pytest.raises(ToolError) as excinfo:
+            tool_error(NotFoundError("dags/x"), dag_id="x")
+        data = json.loads(str(excinfo.value))
 
         assert data["error_type"] == "NotFoundError"
         assert data["dag_id"] == "x"
