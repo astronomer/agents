@@ -36,10 +36,10 @@ def _list_tools():
     return asyncio.run(run())
 
 
-def _call_tool(name: str, args: dict):
+def _call_tool(name: str, args: dict, raise_on_error: bool = True):
     async def run():
         async with Client(mcp) as client:
-            return await client.call_tool(name, args)
+            return await client.call_tool(name, args, raise_on_error=raise_on_error)
 
     return asyncio.run(run())
 
@@ -88,14 +88,15 @@ class TestServerAnnotations:
 
 
 class TestStructuredErrorRoundTrip:
-    """A failing tool returns structured JSON through the MCP protocol."""
+    """A failing tool is flagged isError and returns structured JSON."""
 
     def test_not_found_error_round_trips(self, mocker):
         mock_adapter = MagicMock()
         mock_adapter.get_dag.side_effect = NotFoundError("dags/nope")
         mocker.patch("astro_airflow_mcp.tools.dag._get_adapter", return_value=mock_adapter)
 
-        result = _call_tool("get_dag_details", {"dag_id": "nope"})
+        result = _call_tool("get_dag_details", {"dag_id": "nope"}, raise_on_error=False)
+        assert result.is_error is True
         data = json.loads(result.content[0].text)
 
         assert data["error_type"] == "NotFoundError"
@@ -109,7 +110,8 @@ class TestStructuredErrorRoundTrip:
         mock_adapter.pause_dag.side_effect = ReadOnlyError("PATCH dags/my_dag")
         mocker.patch("astro_airflow_mcp.tools.dag._get_adapter", return_value=mock_adapter)
 
-        result = _call_tool("pause_dag", {"dag_id": "my_dag"})
+        result = _call_tool("pause_dag", {"dag_id": "my_dag"}, raise_on_error=False)
+        assert result.is_error is True
         data = json.loads(result.content[0].text)
 
         assert data["error_type"] == "ReadOnlyError"

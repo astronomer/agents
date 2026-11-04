@@ -4,6 +4,8 @@ import json
 import time
 from typing import Any
 
+from fastmcp.exceptions import ToolError
+
 from astro_airflow_mcp.constants import DEFAULT_LIMIT, DEFAULT_OFFSET, TERMINAL_DAG_RUN_STATES
 from astro_airflow_mcp.server import (
     _get_adapter,
@@ -129,11 +131,23 @@ def _trigger_dag_and_wait_impl(
     Returns:
         JSON string containing the final DAG run status and any failed task details
     """
-    # Step 1: Trigger the DAG
-    trigger_response = _trigger_dag_impl(
-        dag_id=dag_id,
-        conf=conf,
-    )
+    # Step 1: Trigger the DAG. A failed trigger raises ToolError carrying the
+    # structured error payload; annotate it with timed_out and propagate it
+    # as an error rather than polling a run that was never created.
+    try:
+        trigger_response = _trigger_dag_impl(
+            dag_id=dag_id,
+            conf=conf,
+        )
+    except ToolError as e:
+        trigger_error: dict[str, Any] | None = None
+        try:
+            trigger_error = json.loads(str(e))
+        except json.JSONDecodeError:
+            trigger_error = None
+        if trigger_error is None:
+            raise
+        raise ToolError(json.dumps({**trigger_error, "timed_out": False}, indent=2)) from e
 
     try:
         trigger_data = json.loads(trigger_response)
@@ -151,11 +165,10 @@ def _trigger_dag_and_wait_impl(
             indent=2,
         )
 
-    # If triggering itself failed, _trigger_dag_impl returns a structured error
-    # (with hint/retryable); propagate it rather than polling a run that was
-    # never created.
+    # Defensive: if a structured error still arrives as a payload string,
+    # propagate it as an error the same way rather than polling.
     if isinstance(trigger_data, dict) and "error" in trigger_data:
-        return json.dumps({**trigger_data, "timed_out": False}, indent=2)
+        raise ToolError(json.dumps({**trigger_data, "timed_out": False}, indent=2))
 
     dag_run_id = trigger_data.get("dag_run_id")
     if not dag_run_id:
@@ -193,17 +206,26 @@ def _trigger_dag_and_wait_impl(
         # Wait before polling
         time.sleep(poll_interval)
 
-        # Get current status
-        status_response = _get_dag_run_impl(
-            dag_id=dag_id,
-            dag_run_id=dag_run_id,
-        )
-
+        # Get current status. A failed status fetch raises ToolError; that is
+        # not a terminal state — keep the last known state and continue
+        # polling, exactly as when the error arrived as a payload string
+        # (which carries no "state" and so left current_state unchanged).
         try:
-            status_data = json.loads(status_response)
-        except json.JSONDecodeError:
-            # If we can't parse, continue polling
-            continue
+            status_response = _get_dag_run_impl(
+                dag_id=dag_id,
+                dag_run_id=dag_run_id,
+            )
+        except ToolError as e:
+            try:
+                status_data = json.loads(str(e))
+            except json.JSONDecodeError:
+                continue
+        else:
+            try:
+                status_data = json.loads(status_response)
+            except json.JSONDecodeError:
+                # If we can't parse, continue polling
+                continue
 
         current_state = status_data.get("state", current_state)
 

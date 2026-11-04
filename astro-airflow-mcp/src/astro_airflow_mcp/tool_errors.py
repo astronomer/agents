@@ -1,8 +1,10 @@
 """Structured, agent-friendly error responses for MCP tools.
 
-MCP tools in this server return JSON strings. On failure we return a JSON
-object instead of a bare ``str(exc)`` so the calling agent can tell *why* a
-call failed and decide what to do next:
+MCP tools in this server return JSON strings. On failure the tool raises a
+FastMCP ``ToolError`` carrying a JSON object instead of a bare ``str(exc)``
+so the calling agent can tell *why* a call failed and decide what to do
+next — and so the MCP result is flagged ``isError: true`` rather than
+recording the failed call as a success:
 
     {
       "error": "<message>",        # always contains str(exc)
@@ -26,9 +28,10 @@ the old bare-string responses for substrings keep working.
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, NoReturn
 
 import httpx
+from fastmcp.exceptions import ToolError
 
 from astro_airflow_mcp.adapters.base import NotFoundError, ReadOnlyError
 
@@ -150,6 +153,20 @@ def tool_error(
     retryable: bool | None = None,
     hint: str | None = None,
     **context: Any,
-) -> str:
-    """JSON-string form of :func:`error_payload` for MCP tool return values."""
-    return json.dumps(error_payload(exc, retryable=retryable, hint=hint, **context), indent=2)
+) -> NoReturn:
+    """Raise the structured error payload as a FastMCP ``ToolError``.
+
+    The payload text is exactly what this function used to return, so agents
+    still see the same JSON — but because it travels as an exception,
+    FastMCP marks the tool result ``isError: true`` and clients/frameworks
+    that check the flag record the call as failed. ``ToolError`` messages
+    are delivered to the client even when the server masks error details.
+
+    Call sites keep the ``return tool_error(...)`` shape; the raise simply
+    unwinds through it. Consolidated tools that fold per-section failures
+    into a successful overall result use :func:`error_payload` directly and
+    are unaffected.
+    """
+    raise ToolError(
+        json.dumps(error_payload(exc, retryable=retryable, hint=hint, **context), indent=2)
+    )

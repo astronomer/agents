@@ -5,6 +5,7 @@ import time
 
 import httpx
 import pytest
+from fastmcp.exceptions import ToolError
 
 from astro_airflow_mcp.auth import TOKEN_REFRESH_BUFFER_SECONDS, TokenManager
 from astro_airflow_mcp.server import (
@@ -64,9 +65,10 @@ class TestImplFunctions:
         mock_adapter.get_dag.side_effect = Exception("DAG not found")
         mocker.patch("astro_airflow_mcp.tools.dag._get_adapter", return_value=mock_adapter)
 
-        result = _get_dag_details_impl("nonexistent_dag")
+        with pytest.raises(ToolError) as excinfo:
+            _get_dag_details_impl("nonexistent_dag")
 
-        assert "DAG not found" in result
+        assert "DAG not found" in str(excinfo.value)
 
     def test_list_dags_impl_success(self, mocker):
         """Test _list_dags_impl with successful response."""
@@ -230,13 +232,14 @@ class TestImplFunctions:
         mock_adapter.clear_task_instances.side_effect = Exception("DAG not found")
         mocker.patch("astro_airflow_mcp.tools.task._get_adapter", return_value=mock_adapter)
 
-        result = _clear_task_instances_impl(
-            dag_id="nonexistent_dag",
-            dag_run_id="run_123",
-            task_ids=["task1"],
-        )
+        with pytest.raises(ToolError) as excinfo:
+            _clear_task_instances_impl(
+                dag_id="nonexistent_dag",
+                dag_run_id="run_123",
+                task_ids=["task1"],
+            )
 
-        assert "DAG not found" in result
+        assert "DAG not found" in str(excinfo.value)
 
 
 class TestConfiguration:

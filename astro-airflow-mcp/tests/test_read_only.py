@@ -9,6 +9,7 @@ from contextlib import nullcontext as does_not_raise
 from unittest.mock import MagicMock
 
 import pytest
+from fastmcp.exceptions import ToolError
 
 from astro_airflow_mcp.adapters.base import ReadOnlyError, _assert_writable
 
@@ -60,7 +61,9 @@ class TestEndToEnd:
             "astro_airflow_mcp.tools.dag._get_adapter", return_value=self._real_adapter(mocker)
         )
 
-        result = _pause_dag_impl("my_dag")
+        with pytest.raises(ToolError) as excinfo:
+            _pause_dag_impl("my_dag")
+        result = str(excinfo.value)
         assert "read-only mode" in result
         assert "PATCH" in result
 
@@ -72,7 +75,9 @@ class TestEndToEnd:
             "astro_airflow_mcp.tools.dag._get_adapter", return_value=self._real_adapter(mocker)
         )
 
-        result = _unpause_dag_impl("my_dag")
+        with pytest.raises(ToolError) as excinfo:
+            _unpause_dag_impl("my_dag")
+        result = str(excinfo.value)
         assert "read-only mode" in result
 
     def test_trigger_dag_blocked(self, monkeypatch, mocker):
@@ -83,7 +88,9 @@ class TestEndToEnd:
             "astro_airflow_mcp.tools.dag_run._get_adapter", return_value=self._real_adapter(mocker)
         )
 
-        result = _trigger_dag_impl("my_dag")
+        with pytest.raises(ToolError) as excinfo:
+            _trigger_dag_impl("my_dag")
+        result = str(excinfo.value)
         assert "read-only mode" in result
         # _trigger_dag_impl unpause the DAG (PATCH) before triggering (POST),
         # so PATCH is the first write operation to be blocked.
@@ -97,9 +104,11 @@ class TestEndToEnd:
             "astro_airflow_mcp.tools.task._get_adapter", return_value=self._real_adapter(mocker)
         )
 
-        result = _clear_task_instances_impl(
-            dag_id="my_dag", dag_run_id="run_1", task_ids=["task1"], dry_run=False
-        )
+        with pytest.raises(ToolError) as excinfo:
+            _clear_task_instances_impl(
+                dag_id="my_dag", dag_run_id="run_1", task_ids=["task1"], dry_run=False
+            )
+        result = str(excinfo.value)
         assert "read-only mode" in result
 
     def test_raw_request_non_get_blocked(self, monkeypatch, mocker):
