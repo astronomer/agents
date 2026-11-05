@@ -15,9 +15,31 @@ class AirflowV2Adapter(AirflowAdapter):
         """API base path for Airflow 2.x."""
         return "/api/v1"
 
-    def list_dags(self, limit: int = 100, offset: int = 0, **kwargs: Any) -> dict[str, Any]:
+    def list_dags(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        order_by: str = "-dag_id",
+        tags: list[str] | None = None,
+        dag_id_pattern: str | None = None,
+        only_active: bool = True,
+        paused: bool | None = None,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
         """List all DAGs."""
-        return self._call("dags", params={"limit": limit, "offset": offset}, **kwargs)
+        params: dict[str, Any] = {
+            "limit": limit,
+            "offset": offset,
+            "order_by": order_by,
+            "only_active": only_active,
+        }
+        if tags is not None:
+            params["tags"] = tags
+        if dag_id_pattern is not None:
+            params["dag_id_pattern"] = dag_id_pattern
+        if paused is not None:
+            params["paused"] = paused
+        return self._call("dags", params=params, **kwargs)
 
     def get_dag(self, dag_id: str) -> dict[str, Any]:
         """Get details of a specific DAG."""
@@ -60,16 +82,31 @@ class AirflowV2Adapter(AirflowAdapter):
         return self._patch(f"dags/{dag_id}", json_data={"is_paused": False})
 
     def list_dag_runs(
-        self, dag_id: str | None = None, limit: int = 100, offset: int = 0, **kwargs: Any
+        self,
+        dag_id: str | None = None,
+        limit: int = 100,
+        offset: int = 0,
+        order_by: str = "-start_date",
+        state: list[str] | None = None,
+        start_date_gte: str | None = None,
+        start_date_lte: str | None = None,
+        **kwargs: Any,
     ) -> dict[str, Any]:
         """List DAG runs.
 
         Note: Airflow 2 requires dag_id. Use '~' to list runs for all DAGs.
         """
         dag_id_param = dag_id if dag_id else "~"
+        params: dict[str, Any] = {"limit": limit, "offset": offset, "order_by": order_by}
+        if state is not None:
+            params["state"] = state
+        if start_date_gte is not None:
+            params["start_date_gte"] = start_date_gte
+        if start_date_lte is not None:
+            params["start_date_lte"] = start_date_lte
         return self._call(
             f"dags/{dag_id_param}/dagRuns",
-            params={"limit": limit, "offset": offset},
+            params=params,
             **kwargs,
         )
 
@@ -112,7 +149,12 @@ class AirflowV2Adapter(AirflowAdapter):
         return self._call(f"dags/{dag_id}/dagRuns/{dag_run_id}/taskInstances/{task_id}")
 
     def get_task_instances(
-        self, dag_id: str, dag_run_id: str, limit: int = 100, offset: int = 0
+        self,
+        dag_id: str,
+        dag_run_id: str,
+        limit: int = 100,
+        offset: int = 0,
+        order_by: str = "-start_date",
     ) -> dict[str, Any]:
         """List all task instances for a DAG run.
 
@@ -121,10 +163,11 @@ class AirflowV2Adapter(AirflowAdapter):
             dag_run_id: DAG run ID
             limit: Maximum number of task instances to return
             offset: Offset for pagination
+            order_by: Sort field. Prefix with '-' for descending (default: '-start_date')
         """
         return self._call(
             f"dags/{dag_id}/dagRuns/{dag_run_id}/taskInstances",
-            params={"limit": limit, "offset": offset},
+            params={"limit": limit, "offset": offset, "order_by": order_by},
         )
 
     def get_task_logs(
@@ -195,6 +238,9 @@ class AirflowV2Adapter(AirflowAdapter):
         - 'dataset_events' -> 'asset_events'
         - 'dataset_uri' -> 'uri'
         - 'dataset_id' -> 'asset_id'
+
+        Note: The /datasets/events endpoint does not support order_by. Airflow
+        returns events sorted by timestamp descending by default.
         """
         try:
             params: dict[str, Any] = {"limit": limit, "offset": offset}
@@ -295,9 +341,24 @@ class AirflowV2Adapter(AirflowAdapter):
         """List DAG warnings."""
         return self._call("dagWarnings", params={"limit": limit, "offset": offset})
 
-    def list_import_errors(self, limit: int = 100, offset: int = 0) -> dict[str, Any]:
-        """List import errors from DAG files."""
-        return self._call("importErrors", params={"limit": limit, "offset": offset})
+    def list_import_errors(
+        self, limit: int = 100, offset: int = 0, order_by: str = "-import_error_id"
+    ) -> dict[str, Any]:
+        """List import errors from DAG files.
+
+        Note: The /importErrors endpoint does not support order_by. Sorting is
+        performed client-side after fetching results.
+        """
+        data = self._call("importErrors", params={"limit": limit, "offset": offset})
+        if "import_errors" in data and order_by:
+            reverse = order_by.startswith("-")
+            field = order_by.lstrip("-")
+            data["import_errors"] = sorted(
+                data["import_errors"],
+                key=lambda x: x.get(field, 0),
+                reverse=reverse,
+            )
+        return data
 
     def list_plugins(self, limit: int = 100, offset: int = 0) -> dict[str, Any]:
         """List installed Airflow plugins."""
