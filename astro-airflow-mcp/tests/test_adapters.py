@@ -342,29 +342,109 @@ class TestAirflowV3Adapter:
         assert adapter.api_base_path == "/api/v2"
 
     def test_get_dag_stats_call(self, mocker):
-        """Test V3 adapter calls dagStats endpoint."""
-        adapter = AirflowV3Adapter(
-            "http://localhost:8080",
-            "3.0.0",
+        """Explicit IDs use one stats request per DAG without listing DAGs."""
+        adapter = AirflowV3Adapter("http://localhost:8080", "3.2.0")
+        list_dags = mocker.patch.object(adapter, "list_dags")
+        call = mocker.patch.object(
+            adapter,
+            "_call",
+            side_effect=[
+                {"dags": [{"dag_id": "first"}], "total_entries": 1},
+                {"dags": [{"dag_id": "second"}], "total_entries": 1},
+            ],
         )
 
-        mock_response = mocker.Mock()
-        mock_response.json.return_value = {"dags": []}
-        mock_response.status_code = 200
-        mock_response.raise_for_status = mocker.Mock()
+        result = adapter.get_dag_stats(dag_ids=["first", "second"])
 
-        mock_client = mocker.Mock()
-        mock_client.get.return_value = mock_response
-        mock_client.__enter__ = mocker.Mock(return_value=mock_client)
-        mock_client.__exit__ = mocker.Mock(return_value=False)
+        assert result == {
+            "dags": [{"dag_id": "first"}, {"dag_id": "second"}],
+            "total_entries": 2,
+        }
+        list_dags.assert_not_called()
+        assert call.call_args_list == [
+            mocker.call("dagStats", params={"dag_ids": "first"}),
+            mocker.call("dagStats", params={"dag_ids": "second"}),
+        ]
 
-        mocker.patch("httpx.Client", return_value=mock_client)
+    def test_get_dag_stats_without_ids_paginates_dags(self, mocker):
+        """Omitting IDs resolves every DAG, including server-capped pages."""
+        adapter = AirflowV3Adapter("http://localhost:8080", "3.2.0")
+        list_dags = mocker.patch.object(
+            adapter,
+            "list_dags",
+            side_effect=[
+                {"dags": [{"dag_id": "first"}, {"dag_id": "second"}], "total_entries": 3},
+                {"dags": [{"dag_id": "third"}], "total_entries": 3},
+            ],
+        )
+        call = mocker.patch.object(
+            adapter,
+            "_call",
+            side_effect=[
+                {"dags": [{"dag_id": dag_id}], "total_entries": 1}
+                for dag_id in ["first", "second", "third"]
+            ],
+        )
+        result = adapter.get_dag_stats()
+
+        assert result == {
+            "dags": [{"dag_id": dag_id} for dag_id in ["first", "second", "third"]],
+            "total_entries": 3,
+        }
+        assert list_dags.call_args_list == [
+            mocker.call(limit=100, offset=0),
+            mocker.call(limit=100, offset=2),
+        ]
+        assert call.call_args_list == [
+            mocker.call("dagStats", params={"dag_ids": dag_id})
+            for dag_id in ["first", "second", "third"]
+        ]
+
+    def test_get_dag_stats_without_ids_empty_instance(self, mocker):
+        """An empty instance does not send an empty DAG ID to dagStats."""
+        adapter = AirflowV3Adapter("http://localhost:8080", "3.2.0")
+        mocker.patch.object(adapter, "list_dags", return_value={"dags": [], "total_entries": 0})
+        call = mocker.patch.object(adapter, "_call")
+
+        assert adapter.get_dag_stats() == {"dags": [], "total_entries": 0}
+        call.assert_not_called()
+
+    def test_get_dag_stats_without_ids_preserves_per_dag_errors(self, mocker):
+        """A stats failure remains visible while other DAGs return results."""
+        adapter = AirflowV3Adapter("http://localhost:8080", "3.2.0")
+        mocker.patch.object(
+            adapter,
+            "list_dags",
+            return_value={
+                "dags": [{"dag_id": "broken"}, {"dag_id": "healthy"}],
+                "total_entries": 2,
+            },
+        )
+        mocker.patch.object(
+            adapter,
+            "_call",
+            side_effect=[
+                RuntimeError("stats request failed"),
+                {"dags": [{"dag_id": "healthy"}], "total_entries": 1},
+            ],
+        )
 
         result = adapter.get_dag_stats()
 
-        assert result == {"dags": []}
-        call_args = mock_client.get.call_args
-        assert "/api/v2/dagStats" in call_args[0][0]
+        assert result["dags"] == [{"dag_id": "healthy"}]
+        assert result["total_entries"] == 1
+        assert result["errors"][0]["dag_id"] == "broken"
+        assert result["errors"][0]["error"] == "stats request failed"
+
+    def test_get_dag_stats_without_ids_propagates_listing_errors(self, mocker):
+        """A failed listing must not look like an instance with no DAGs."""
+        adapter = AirflowV3Adapter("http://localhost:8080", "3.2.0")
+        mocker.patch.object(adapter, "list_dags", side_effect=RuntimeError("listing failed"))
+        call = mocker.patch.object(adapter, "_call")
+
+        with pytest.raises(RuntimeError, match="listing failed"):
+            adapter.get_dag_stats()
+        call.assert_not_called()
 
     def test_passthrough_params(self, mocker):
         """Test kwargs are passed through to API call."""

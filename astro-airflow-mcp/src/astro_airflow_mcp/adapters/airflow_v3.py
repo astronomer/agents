@@ -291,11 +291,23 @@ class AirflowV3Adapter(AirflowAdapter):
             2. Multiple dag_ids in one call causes a 500 error
             3. DAGs with dag_display_name=None cause a 500 error
 
-            We work around these by calling once per DAG and handling errors.
+            We work around these by listing DAG IDs when none are supplied,
+            then calling once per DAG and handling errors.
 
         Available in Airflow 3.0+. Returns counts by DAG and state.
         """
         try:
+            if dag_ids is None:
+                dag_ids = []
+                offset = 0
+                while True:
+                    response = self.list_dags(limit=100, offset=offset)
+                    dags = response["dags"]
+                    dag_ids.extend(dag["dag_id"] for dag in dags)
+                    offset += len(dags)
+                    if not dags or offset >= response["total_entries"]:
+                        break
+
             # Workaround for Airflow 3.2.0 bugs
             if dag_ids:
                 # Call once per DAG to avoid multiple dag_ids bug
@@ -317,8 +329,7 @@ class AirflowV3Adapter(AirflowAdapter):
                 if not all_results["errors"]:
                     del all_results["errors"]
                 return all_results
-            # Pass empty dag_ids to avoid 500 error
-            return self._call("dagStats", params={"dag_ids": ""})
+            return {"dags": [], "total_entries": 0}
         except NotFoundError:
             return self._handle_not_found(
                 "dagStats", alternative="Use list_dag_runs to compute statistics"
