@@ -848,12 +848,14 @@ class TestSQLAlchemyPackageDetection:
         assert "echo=True" in prelude
 
     def test_atexit_cleanup_in_prelude(self):
-        """Connection cleanup should be registered with atexit."""
+        """Engine disposal should be registered with atexit.
+
+        There is no module-level connection to close: each helper opens and
+        releases its own, so the engine is the only thing left to tear down.
+        """
         conn = SQLAlchemyConnector(url="sqlite:///t.db", databases=["t"])
         prelude = conn.to_python_prelude()
-        assert "atexit.register" in prelude
-        assert "_conn.close()" in prelude
-        assert "_engine.dispose()" in prelude
+        assert "atexit.register(_engine.dispose)" in prelude
 
     @pytest.mark.parametrize(
         "url,expected_display",
@@ -1047,15 +1049,10 @@ class TestSQLiteEndToEnd:
             exec(prelude, local_vars)
 
             # Create test table and data
-            local_vars["_conn"].execute(
-                local_vars["text"](
-                    "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)"
-                )
+            local_vars["run_sql"](
+                "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)"
             )
-            local_vars["_conn"].execute(
-                local_vars["text"]("INSERT INTO users (name) VALUES ('Alice'), ('Bob')")
-            )
-            local_vars["_conn"].commit()
+            local_vars["run_sql"]("INSERT INTO users (name) VALUES ('Alice'), ('Bob')")
 
             # Test run_sql returns Polars
             result = local_vars["run_sql"]("SELECT * FROM users")
@@ -1114,13 +1111,8 @@ class TestRunSqlMany:
             conn = SQLAlchemyConnector(url=f"sqlite:///{db_path}", databases=["test"])
             local_vars: dict = {}
             exec(conn.to_python_prelude(), local_vars)
-            local_vars["_conn"].execute(
-                local_vars["text"]("CREATE TABLE t (id INTEGER PRIMARY KEY, n TEXT)")
-            )
-            local_vars["_conn"].execute(
-                local_vars["text"]("INSERT INTO t (n) VALUES ('a'), ('b'), ('c')")
-            )
-            local_vars["_conn"].commit()
+            local_vars["run_sql"]("CREATE TABLE t (id INTEGER PRIMARY KEY, n TEXT)")
+            local_vars["run_sql"]("INSERT INTO t (n) VALUES ('a'), ('b'), ('c')")
 
             dfs = local_vars["run_sql_many"](
                 ["SELECT * FROM t", "SELECT count(*) AS c FROM t"]
@@ -1146,10 +1138,7 @@ class TestRunSqlMany:
             conn = SQLAlchemyConnector(url=f"sqlite:///{db_path}", databases=["test"])
             local_vars: dict = {}
             exec(conn.to_python_prelude(), local_vars)
-            local_vars["_conn"].execute(
-                local_vars["text"]("CREATE TABLE t (id INTEGER PRIMARY KEY)")
-            )
-            local_vars["_conn"].commit()
+            local_vars["run_sql"]("CREATE TABLE t (id INTEGER PRIMARY KEY)")
             with pytest.raises(Exception):  # noqa: B017 - any DB error is acceptable
                 local_vars["run_sql_many"](["SELECT * FROM t", "SELECT * FROM nope"])
 
@@ -1222,3 +1211,61 @@ class TestSnowflakeRunSqlManyCursors:
             run_sql_many(["q0", "q1", "q2"])
         assert len(cursors) == 2  # third was never created
         assert all(c.closed for c in cursors), [c.closed for c in cursors]
+
+
+class TestSQLAlchemyConnectionScope:
+    """The prelude must not hold one connection open for the kernel's lifetime.
+
+    A long-lived connection keeps a single transaction open: PostgreSQL then
+    aborts every query after the first failure, MySQL's REPEATABLE READ pins a
+    stale snapshot, and a file-backed DuckDB keeps its exclusive file lock.
+    """
+
+    @staticmethod
+    def _prelude(url, **kwargs):
+        return SQLAlchemyConnector(
+            url=url, databases=["db"], **kwargs
+        ).to_python_prelude()
+
+    def test_no_module_level_connection(self):
+        assert "_conn = _engine.connect()" not in self._prelude("postgresql://u:p@h/db")
+
+    @pytest.mark.parametrize("helper", ["run_sql", "run_sql_pandas", "run_sql_many"])
+    def test_helper_opens_its_own_transaction(self, helper):
+        prelude = self._prelude("postgresql://u:p@h/db")
+        body = prelude.split(f"def {helper}")[1].split("\ndef ")[0]
+        assert "_engine.begin()" in body
+
+    def test_engine_is_disposed_at_exit(self):
+        assert "atexit.register(_engine.dispose)" in self._prelude(
+            "postgresql://u:p@h/db"
+        )
+
+    @pytest.mark.parametrize(
+        "url,expected",
+        [
+            ("duckdb:///dev.duckdb", True),
+            ("duckdb:///data/warehouse.db", True),
+            ("duckdb:///:memory:", False),
+            ("postgresql://u:p@h/db", False),
+            ("sqlite:///local.db", False),
+        ],
+        ids=["duckdb-file", "duckdb-nested", "duckdb-memory", "postgres", "sqlite"],
+    )
+    def test_holds_file_lock(self, url, expected):
+        assert (
+            SQLAlchemyConnector(url=url, databases=["db"])._holds_file_lock()
+            is expected
+        )
+
+    def test_file_backed_duckdb_disables_pooling(self):
+        """Pooled connections stay physically open, so the file stays locked."""
+        prelude = self._prelude("duckdb:///dev.duckdb")
+        assert "from sqlalchemy.pool import NullPool" in prelude
+        assert "poolclass=NullPool" in prelude
+        assert "pool_size" not in prelude
+
+    def test_server_databases_keep_pooling(self):
+        prelude = self._prelude("postgresql://u:p@h/db", pool_size=7)
+        assert "NullPool" not in prelude
+        assert "pool_size=7" in prelude
