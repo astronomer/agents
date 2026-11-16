@@ -1,6 +1,6 @@
 # agents
 
-AI agent tooling for data engineering workflows. Includes an [MCP server](./astro-airflow-mcp/) for Airflow, a [CLI tool (`af`)](./astro-airflow-mcp/README.md#airflow-cli-tool) for interacting with Airflow from your terminal, and [skills](#skills) that extend AI coding agents with specialized capabilities for working with Airflow and data warehouses. Works with [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Cursor](https://cursor.com), and other agentic coding tools.
+AI agent tooling for data engineering workflows. Includes an [MCP server](./astro-airflow-mcp/) for Airflow, setup for the hosted [Astro MCP](#astro-mcp), a [CLI tool (`af`)](./astro-airflow-mcp/README.md#airflow-cli-tool) for interacting with Airflow from your terminal, and [skills](#skills) that extend AI coding agents with specialized capabilities for working with Airflow and data warehouses. Works with [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Cursor](https://cursor.com), and other agentic coding tools.
 
 Built by [Astronomer](https://www.astronomer.io/). [Apache 2.0 licensed](https://github.com/astronomer/agents/blob/main/LICENSE) and compatible with open-source Apache Airflow.
 
@@ -15,8 +15,9 @@ Built by [Astronomer](https://www.astronomer.io/). [Apache 2.0 licensed](https:/
   - [Claude Code](#claude-code)
   - [Cursor](#cursor)
   - [Other MCP Clients](#other-mcp-clients)
+  - [Astro MCP](#astro-mcp)
 - [Features](#features)
-  - [MCP Server](#mcp-server)
+  - [MCP Servers (optional)](#mcp-servers-optional)
   - [Skills](#skills)
 - [Why Astro?](#why-astro)
   - [User Journeys](#user-journeys)
@@ -48,7 +49,7 @@ npx skills add astronomer/agents --skill '*'
 This installs all Astronomer skills into your project via [skills.sh](https://skills.sh). You'll be prompted to select which agents to install to. To also select skills individually, omit the `--skill` flag.
 
 > [!IMPORTANT]
-> **Claude Code users:** We recommend using the plugin instead (see [Claude Code](#claude-code) section below) for better integration with MCP servers and hooks.
+> **Claude Code users:** We recommend using the plugin instead (see [Claude Code](#claude-code) section below) for better integration with hooks.
 
 ### Compatibility
 
@@ -70,7 +71,19 @@ claude plugin install astronomer-data@astronomer
 # claude plugin uninstall data@astronomer && claude plugin marketplace update && claude plugin install astronomer-data@astronomer
 ```
 
-The plugin includes the Airflow MCP server that runs via `uvx` from PyPI. Data warehouse queries are handled by the `analyzing-data` skill using a background Jupyter kernel.
+The plugin doesn't bundle any MCP servers. The skills use the `af` CLI for Airflow, and data warehouse queries are handled by the `analyzing-data` skill using a background Jupyter kernel.
+
+MCP servers are optional. To add them:
+
+```bash
+# Airflow MCP (any Airflow 2.x/3.x REST API, runs locally via uvx)
+claude mcp add airflow -- uvx astro-airflow-mcp --transport stdio
+
+# Astro MCP (hosted, for Astro deployments; sign in with /mcp after adding)
+claude mcp add --transport http astro https://api.astronomer.io/labs/v1/astro/mcp
+```
+
+See [Astro MCP](#astro-mcp) for when to use which.
 
 ### Cursor
 
@@ -145,15 +158,56 @@ AIRFLOW_PASSWORD=admin \
 uvx astro-airflow-mcp --transport stdio
 ```
 
+### Astro MCP
+
+The Astro MCP is a hosted MCP server for [Astro](https://www.astronomer.io/product/). It reads your Astro organization: workspaces, deployments, clusters, deploy history and deployment logs. It also reads each deployment's Airflow: DAGs, runs, task logs and the rest of the Airflow REST API. It's read-only.
+
+**When to use which:** use the Astro MCP when your Airflow runs on Astro. You sign in once and can reach every deployment you have access to, without creating per-deployment API tokens. Use the [Airflow MCP](#other-mcp-clients) or `af` for local or self-hosted Airflow, or when you need to change state, such as triggering, clearing or pausing runs. The skills use the Astro MCP when it's connected and fall back to `af` and the `astro` CLI when it isn't.
+
+> [!NOTE]
+> The Astro MCP is a Labs endpoint: `https://api.astronomer.io/labs/v1/astro/mcp`. If you belong to more than one Astro organization, add `?organizationId=<your-org-id>` to the URL.
+
+**Claude Code:**
+
+```bash
+claude mcp add --transport http astro https://api.astronomer.io/labs/v1/astro/mcp
+```
+
+Then run `/mcp` in Claude Code and sign in to Astro.
+
+**Cursor** - Click to install:
+
+<a href="https://cursor.com/en-US/install-mcp?name=astro&config=eyJ1cmwiOiJodHRwczovL2FwaS5hc3Ryb25vbWVyLmlvL2xhYnMvdjEvYXN0cm8vbWNwIn0"><img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Add Astro MCP to Cursor" height="32"></a>
+
+<details>
+<summary>Manual MCP configuration</summary>
+
+Add to `~/.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "astro": {
+      "url": "https://api.astronomer.io/labs/v1/astro/mcp"
+    }
+  }
+}
+```
+
+</details>
+
+**Other MCP clients:** any client that supports remote (streamable HTTP) MCP servers with OAuth can connect to `https://api.astronomer.io/labs/v1/astro/mcp`. You'll be asked to sign in to Astro on first use.
+
 ## Features
 
-The `astronomer-data` plugin bundles an MCP server and skills into a single installable package.
+The `astronomer-data` plugin packages skills and hooks into a single installable package. MCP servers are optional and installed separately (see [Installation](#installation)).
 
-### MCP Server
+### MCP Servers (optional)
 
 | Server | Description |
 |--------|-------------|
 | **[Airflow](https://github.com/astronomer/agents/tree/main/astro-airflow-mcp)** | Full Airflow REST API integration via [astro-airflow-mcp](https://github.com/astronomer/agents/tree/main/astro-airflow-mcp): DAG management, triggering, task logs, system health |
+| **[Astro](#astro-mcp)** | Hosted, read-only access to Astro: workspaces, deployments, deploys, deployment logs, and each deployment's Airflow (DAGs, runs, task logs, REST API) |
 
 ### Skills
 

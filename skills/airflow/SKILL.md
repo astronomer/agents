@@ -1,6 +1,6 @@
 ---
 name: airflow
-description: Queries, manages, and troubleshoots Apache Airflow using the `af` CLI. Use when working with anything related to Airflow - a DAG, a DAG run, a task log, an import or parse error, a broken DAG, or any Airflow operation. Covers listing and triggering DAGs, retrying runs, reading task logs, diagnosing failures, debugging import and parse errors, checking connections, variables and pools, exploring the REST API, and monitoring health (for example "trigger a pipeline", "retry a run", "list connections", "check Airflow health", "why did my DAG fail"). This is the entrypoint that routes to sibling skills for authoring, testing, deploying, and migrating Airflow 2 to 3. Not for warehouse/SQL analytics on Airflow metadata tables (use analyzing-data); for deep root-cause reports use debugging-dags or airflow-investigation.
+description: Queries, manages, and troubleshoots Apache Airflow using the `af` CLI, or the Astro MCP for read-only work on Astro deployments when it's connected. Use when working with anything related to Airflow - a DAG, a DAG run, a task log, an import or parse error, a broken DAG, or any Airflow operation. Covers listing and triggering DAGs, retrying runs, reading task logs, diagnosing failures, debugging import and parse errors, checking connections, variables and pools, exploring the REST API, and monitoring health (for example "trigger a pipeline", "retry a run", "list connections", "check Airflow health", "why did my DAG fail"). This is the entrypoint that routes to sibling skills for authoring, testing, deploying, and migrating Airflow 2 to 3. Not for warehouse/SQL analytics on Airflow metadata tables (use analyzing-data); for deep root-cause reports use debugging-dags or airflow-investigation.
 ---
 
 # Airflow Operations
@@ -39,6 +39,23 @@ For more details:
 ## Running the CLI
 
 These commands assume `af` is on PATH. Run via `astro otto` to get it automatically, or install standalone with `uv tool install astro-airflow-mcp`.
+
+## Astro MCP
+
+If tools from the Astro MCP are available in this session (for example `list_deployments` and `get_airflow_api`; the prefix depends on the client), use them for read-only work on **Astro deployments**. Use `af` for local or open-source Airflow, for anything that changes state, and whenever the Astro MCP isn't connected.
+
+| Task | Astro MCP tool |
+|------|----------------|
+| Find the deployment | `list_workspaces`, `list_deployments` (instead of `af instance discover astro`, which creates API tokens) |
+| List or inspect DAGs | `list_dags`, `get_dag` |
+| List runs, find failures | `list_dag_runs` (filter by `state`, date range) |
+| Read task logs | `get_task_logs` |
+| Anything else in the Airflow REST API (task instances, XComs, event logs, import errors, pools...) | `search_airflow_api` to find the path, then `get_airflow_api` |
+| Connections, Airflow variables, environment variables | `list_environment_objects` (Astro-managed objects only; `get_airflow_api` can't read connections, variables or config) |
+
+The Astro MCP can't change anything. Triggering, clearing or deleting runs, pausing or unpausing DAGs, and `af api` calls with `-X POST/PATCH/DELETE` still need `af`, pointed at the deployment.
+
+The Astro MCP's `list_skills` tool returns Astronomer guides for Astro-specific tasks, such as upgrading Airflow on a deployment. Check it when no skill here covers the task.
 
 ## Instance Configuration
 

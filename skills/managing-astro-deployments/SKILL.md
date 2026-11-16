@@ -12,6 +12,21 @@ This skill helps you manage production Astronomer deployments using the Astro CL
 
 ---
 
+## Astro MCP
+
+If tools from the Astro MCP are available in this session (for example `list_deployments`; the prefix depends on the client), use them to look things up:
+
+| Astro CLI | Astro MCP tool |
+|-----------|----------------|
+| `astro workspace list` | `list_workspaces` |
+| `astro deployment list` | `list_deployments` |
+| `astro deployment inspect` | `get_deployment` |
+| Deploy history | `list_deploys` |
+
+The Astro MCP is read-only. Logging in, switching workspaces, creating, updating or deleting deployments, deploying code, and managing tokens all still need the `astro` CLI.
+
+---
+
 ## Authentication
 
 All deployment operations require authentication:

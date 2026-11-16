@@ -11,6 +11,22 @@ You are a data engineer debugging a failed Airflow DAG. Follow this systematic a
 
 These commands assume `af` is on PATH. Run via `astro otto` to get it automatically, or install standalone with `uv tool install astro-airflow-mcp`.
 
+## Astro MCP
+
+If the DAG runs on an **Astro deployment** and tools from the Astro MCP are available in this session (for example `list_deployments` and `get_task_logs`; the prefix depends on the client), use them for the read-only steps below. Otherwise use `af`.
+
+| Step | Astro MCP tool |
+|------|----------------|
+| Find the deployment | `list_deployments` |
+| Find failed runs | `list_dag_runs` with `state` set to `failed` |
+| Find the failed task in a run | `get_airflow_api` on the run's task instances (use `search_airflow_api` for the path) |
+| Read task logs | `get_task_logs` (pass `tryNumber` for an earlier try) |
+| Import errors | `search_airflow_api` for import errors, then `get_airflow_api` |
+| Recent deploys | `list_deploys` |
+| Scheduler, worker or DAG processor errors | `get_deployment_logs` with `sources` and `searchText` |
+
+The Astro MCP is read-only. Clearing, deleting or re-triggering runs still needs `af`.
+
 ---
 
 ## Step 1: Identify the Failure
@@ -87,7 +103,8 @@ A release timestamp landing between the last green run and the first red run, fo
 
 If you're running on Astro, these additional tools can help with diagnosis:
 
-- **Deployment activity log**: Check the Astro UI for recent deploys — a failed deploy or recent code change is often the cause of sudden failures
+- **Recent deploys**: A failed deploy or recent code change is often the cause of sudden failures. With the Astro MCP, call `list_deploys` and look for a deploy between the last green run and the first red run. Each deploy shows its image tag, Astro Runtime and Airflow versions, git metadata, and who made it. Without the MCP, check the deployment's activity in the Astro UI.
+- **Component logs**: With the Astro MCP, `get_deployment_logs` searches scheduler, worker, triggerer and DAG processor logs for errors that never reach a task log, such as pod evictions, OOM kills, or parse failures. Without it, use `astro deployment logs` (see the **troubleshooting-astro-deployments** skill).
 - **Astro alerts**: Configure alerts in the Astro UI for proactive failure monitoring (DAG failure, task duration, SLA miss)
 - **Observability**: Use the Astro [observability dashboard](https://www.astronomer.io/docs/astro/airflow-alerts) to track DAG health trends and spot recurring issues
 
@@ -122,7 +139,7 @@ How to prevent this from happening again:
 - Pin dependencies (constraints file, lockfile, or upper-bound specifiers on venv/external/pod operators) to avoid silent upstream drift?
 
 ### Quick Commands
-Provide ready-to-use commands:
+Provide ready-to-use commands. These use `af` even when the Astro MCP is connected, because the MCP can't change state:
 - To clear and rerun the entire DAG run: `af runs clear <dag_id> <run_id>`
 - To clear and rerun specific failed tasks: `af tasks clear <dag_id> <run_id> <task_ids> -D`
 - To delete a stuck or unwanted run: `af runs delete <dag_id> <run_id>`
