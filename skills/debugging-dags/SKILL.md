@@ -19,13 +19,15 @@ If the DAG runs on an **Astro deployment** and tools from the Astro MCP are avai
 |------|----------------|
 | Find the deployment | `list_deployments` |
 | Find failed runs | `list_dag_runs` with `state` set to `failed` |
-| Find the failed task in a run | `get_airflow_api` with path `dags/<dag_id>/dagRuns/<run_id>/taskInstances` and query `{"state": ["failed", "upstream_failed"]}` |
+| Find the failed task in a run | `get_airflow_api` with `deploymentId`, `path` `dags/<dag_id>/dagRuns/<run_id>/taskInstances` and `query` `{"state": ["failed", "upstream_failed"]}` |
 | Read task logs | `get_task_logs` (pass `tryNumber` for an earlier try) |
-| Import errors | `get_airflow_api` with path `importErrors` |
+| Import errors | `get_airflow_api` with `deploymentId` and `path` `importErrors` |
 | Recent deploys | `list_deploys` |
 | Scheduler, worker or DAG processor errors | `get_deployment_logs` with `sources` and `searchText` |
 
-These paths work on Airflow 2 and 3. For anything else, use `search_airflow_api` with the deployment ID to find the path first.
+`get_airflow_api` requires `deploymentId` (from `list_deployments`) and a `path` relative to the API root, with no leading slash. In `query`, an array repeats the parameter, so the `state` filter above matches either state. These paths and the `state` filter work on Airflow 2 and 3.
+
+Airflow 3 ignores query parameters it doesn't know, so a misspelled or version-specific filter (for example `execution_date` on Airflow 2 vs `logical_date` on Airflow 3) returns unfiltered results instead of an error. For any other path or filter, call `search_airflow_api` with the `deploymentId` first to get the exact names for that deployment's Airflow version.
 
 The Astro MCP is read-only. Clearing, deleting or re-triggering runs still needs `af`. The **airflow** skill's Astro MCP section explains how to point `af` at the deployment.
 

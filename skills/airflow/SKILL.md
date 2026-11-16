@@ -88,8 +88,11 @@ af instance discover local --scan     # Deep scan all ports 1024-65535
 # IMPORTANT: Always run with --dry-run first and ask for user consent before
 # running discover without it. The non-dry-run mode writes the discovered
 # instances to config (the project's committed .astro/config.yaml when inside
-# a project). Astro instances authenticate with the user's `astro login`
-# session; no API tokens are created.
+# a project; pass --local for the gitignored .astro/config.local.yaml).
+# From astro-airflow-mcp 0.7.0, Astro instances authenticate with the user's
+# `astro login` session and no API tokens are created. Older versions create
+# an API token per deployment in Astro, so check `af --version` and tell the
+# user if it's below 0.7.0 before asking for consent.
 
 # Show where an instance came from (file path + scope)
 af instance show prod
