@@ -19,13 +19,15 @@ If the DAG runs on an **Astro deployment** and tools from the Astro MCP are avai
 |------|----------------|
 | Find the deployment | `list_deployments` |
 | Find failed runs | `list_dag_runs` with `state` set to `failed` |
-| Find the failed task in a run | `get_airflow_api` on the run's task instances (use `search_airflow_api` for the path) |
+| Find the failed task in a run | `get_airflow_api` with path `dags/<dag_id>/dagRuns/<run_id>/taskInstances` and query `{"state": ["failed", "upstream_failed"]}` |
 | Read task logs | `get_task_logs` (pass `tryNumber` for an earlier try) |
-| Import errors | `search_airflow_api` for import errors, then `get_airflow_api` |
+| Import errors | `get_airflow_api` with path `importErrors` |
 | Recent deploys | `list_deploys` |
 | Scheduler, worker or DAG processor errors | `get_deployment_logs` with `sources` and `searchText` |
 
-The Astro MCP is read-only. Clearing, deleting or re-triggering runs still needs `af`.
+These paths work on Airflow 2 and 3. For anything else, use `search_airflow_api` with the deployment ID to find the path first.
+
+The Astro MCP is read-only. Clearing, deleting or re-triggering runs still needs `af`. The **airflow** skill's Astro MCP section explains how to point `af` at the deployment.
 
 ---
 

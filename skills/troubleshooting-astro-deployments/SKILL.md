@@ -22,12 +22,12 @@ If tools from the Astro MCP are available in this session (for example `list_dep
 | `astro deployment inspect` | `get_deployment` |
 | `astro deployment logs --scheduler/--workers/--triggerer/--webserver` | `get_deployment_logs` with `sources` (webserver logs exist only on Airflow 2; use `apiserver` on Airflow 3, and `dag-processor` for parse errors) |
 | `astro deployment logs --keyword "..."` | `get_deployment_logs` with `searchText` |
-| `astro deployment variable list` | `list_environment_objects` (also lists Airflow connections and variables managed in Astro; secret values stay hidden) |
 | Check for a recent deploy | `list_deploys` (image tag, Runtime version, git metadata, who deployed) |
 
 Notes:
 - `get_deployment_logs` searches a window of at most 24 hours (`range` in seconds, or `startDate` and `endDate`). It has no log-level filter, so search for `ERROR`, `Traceback` or the error text with `searchText`.
 - For DAG runs and task logs on the deployment, use `list_dag_runs` and `get_task_logs` (see the **airflow** and **debugging-dags** skills).
+- For a deployment's environment variables, keep using `astro deployment variable list`. `list_environment_objects` doesn't replace it: it returns objects from Astro's Environment Manager, which are stored separately from the environment variables set on the deployment. Use it as an extra source when a connection or variable could come from the Environment Manager.
 - The Astro MCP is read-only. Creating, updating or deleting environment variables still needs the `astro` CLI.
 
 ---
