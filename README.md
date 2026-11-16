@@ -87,7 +87,7 @@ Cursor supports both MCP servers and skills.
 
 **MCP Servers** (optional) - Click to install:
 
-<a href="https://cursor.com/en-US/install-mcp?name=astro-airflow-mcp&config=eyJjb21tYW5kIjoidXZ4IiwiYXJncyI6WyJhc3Ryby1haXJmbG93LW1jcCIsIi0tdHJhbnNwb3J0Iiwic3RkaW8iXX0"><img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Add Airflow MCP to Cursor" height="32"></a>
+<a href="https://cursor.com/en-US/install-mcp?name=airflow&config=eyJjb21tYW5kIjoidXZ4IiwiYXJncyI6WyJhc3Ryby1haXJmbG93LW1jcCIsIi0tdHJhbnNwb3J0Iiwic3RkaW8iXX0"><img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Add Airflow MCP to Cursor" height="32"></a>
 
 For Airflow on Astro, see [Astro MCP](#astro-mcp).
 
@@ -446,7 +446,7 @@ my_redshift:
 
 ### Airflow
 
-The skills use the `af` CLI, which connects to `http://localhost:8080` by default (where `astro dev start` runs Airflow). To use another instance, add it with `af instance add`, or find your Astro deployments with `af instance discover astro`, which signs in with your `astro login` session. If you've installed the optional Airflow MCP, it reads the local Airflow port from `.astro/config.yaml` when you run your client from an Astro project directory.
+The skills use the `af` CLI, which connects to `http://localhost:8080` by default (where `astro dev start` runs Airflow). To use another instance, add it with `af instance add`, or find your Astro deployments with `af instance discover astro`. From astro-airflow-mcp 0.7.0, discovery signs in with your `astro login` session; older versions create an API token for each deployment, so check `af --version` and preview with `af instance discover astro --dry-run` first. If you've installed the optional Airflow MCP, it reads the local Airflow port from `.astro/config.yaml` when you run your client from an Astro project directory.
 
 For remote instances, `af` and the Airflow MCP both read these environment variables:
 
