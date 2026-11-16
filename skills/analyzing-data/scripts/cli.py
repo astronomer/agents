@@ -15,7 +15,7 @@
 # # above never resolve. ty 0.0.62 started reading rules from PEP 723 metadata,
 # # and for a script that carries its own metadata this block wins over ty.toml,
 # # so the suppression has to be repeated here.
-# unresolved-import = "ignore"
+# import-not-found = "ignore"
 # ///
 """CLI for the analyzing-data skill.
 
