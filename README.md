@@ -73,17 +73,13 @@ claude plugin install astronomer-data@astronomer
 
 The plugin doesn't bundle any MCP servers. The skills use the `af` CLI for Airflow, and data warehouse queries are handled by the `analyzing-data` skill using a background Jupyter kernel.
 
-MCP servers are optional. To add them:
+MCP servers are optional. To add the Airflow MCP (any Airflow 2.x/3.x REST API, runs locally via uvx):
 
 ```bash
-# Airflow MCP (any Airflow 2.x/3.x REST API, runs locally via uvx)
 claude mcp add airflow -- uvx astro-airflow-mcp --transport stdio
-
-# Astro MCP (hosted, for Astro deployments; sign in with /mcp after adding)
-claude mcp add --transport http astro https://api.astronomer.io/labs/v1/astro/mcp
 ```
 
-See [Astro MCP](#astro-mcp) for when to use which.
+For Airflow on Astro, see [Astro MCP](#astro-mcp).
 
 ### Cursor
 
@@ -92,9 +88,8 @@ Cursor supports both MCP servers and skills.
 **MCP Servers** (optional) - Click to install:
 
 <a href="https://cursor.com/en-US/install-mcp?name=astro-airflow-mcp&config=eyJjb21tYW5kIjoidXZ4IiwiYXJncyI6WyJhc3Ryby1haXJmbG93LW1jcCIsIi0tdHJhbnNwb3J0Iiwic3RkaW8iXX0"><img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Add Airflow MCP to Cursor" height="32"></a>
-<a href="https://cursor.com/en-US/install-mcp?name=astro&config=eyJ1cmwiOiJodHRwczovL2FwaS5hc3Ryb25vbWVyLmlvL2xhYnMvdjEvYXN0cm8vbWNwIn0"><img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Add Astro MCP to Cursor" height="32"></a>
 
-The Airflow MCP is for any Airflow instance; the Astro MCP is for Airflow on Astro. See [Astro MCP](#astro-mcp) for when to use which.
+For Airflow on Astro, see [Astro MCP](#astro-mcp).
 
 **Skills** - Install to your project:
 

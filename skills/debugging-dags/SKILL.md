@@ -105,7 +105,7 @@ A release timestamp landing between the last green run and the first red run, fo
 
 If you're running on Astro, these additional tools can help with diagnosis:
 
-- **Recent deploys**: A failed deploy or recent code change is often the cause of sudden failures. With the Astro MCP, call `list_deploys` and look for a deploy between the last green run and the first red run. Each deploy shows its image tag, Astro Runtime and Airflow versions, git metadata, and who made it. Without the MCP, check the deployment's activity in the Astro UI.
+- **Recent deploys**: A failed deploy or recent code change is often the cause of sudden failures. With the Astro MCP, call `list_deploys` and look for a deploy between the last green run and the first red run. Without the MCP, check the deployment's activity in the Astro UI.
 - **Component logs**: With the Astro MCP, `get_deployment_logs` searches scheduler, worker, triggerer and DAG processor logs for errors that never reach a task log, such as pod evictions, OOM kills, or parse failures. Without it, use `astro deployment logs` (see the **troubleshooting-astro-deployments** skill).
 - **Astro alerts**: Configure alerts in the Astro UI for proactive failure monitoring (DAG failure, task duration, SLA miss)
 - **Observability**: Use the Astro [observability dashboard](https://www.astronomer.io/docs/astro/airflow-alerts) to track DAG health trends and spot recurring issues

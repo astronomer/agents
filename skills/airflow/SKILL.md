@@ -58,7 +58,7 @@ If tools from the Astro MCP are available in this session (for example `list_dep
 The Astro MCP can't change anything. Triggering, clearing or deleting runs, pausing or unpausing DAGs, and `af api` calls with `-X POST/PATCH/DELETE` still need `af`, pointed at the deployment:
 
 1. Run `af instance list` and look for an instance whose URL matches the deployment. If one exists, `af instance use <name>`.
-2. Otherwise run `af instance discover astro --dry-run` and show the user what it would add. With their consent, run it again without `--dry-run`, then `af instance use <name>`. Discovered Astro instances sign in with the user's `astro login` session, so run `astro login` first if needed. No API tokens are created.
+2. Otherwise run `af instance discover astro` as described in **Instance Configuration** below (dry run first, then with the user's consent), then `af instance use <name>`. Run `astro login` first if needed.
 
 The Astro MCP's `list_skills` tool returns Astronomer guides for Astro-specific tasks, such as upgrading Airflow on a deployment. Check it when no skill here covers the task.
 

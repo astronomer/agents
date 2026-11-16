@@ -25,7 +25,7 @@ If tools from the Astro MCP are available in this session (for example `list_dep
 
 The Astro MCP is read-only. Logging in, switching workspaces, creating, updating or deleting deployments, deploying code, and managing tokens all still need the `astro` CLI.
 
-The Astro MCP signs in separately from the `astro` CLI. A working MCP doesn't mean the CLI is logged in or using the same workspace. Before any CLI command that changes something, follow **Authentication** and **Workspace Management** below. Make sure the CLI's current workspace contains the deployment the MCP showed, and pass `--deployment-id` explicitly.
+The Astro MCP signs in separately from the `astro` CLI. Before any CLI command that changes something, follow **Authentication** and **Workspace Management** below to confirm the CLI's workspace contains the deployment the MCP showed, and pass `--deployment-id` explicitly.
 
 ---
 
