@@ -27,7 +27,7 @@
     "hooks": {
       "stop": [
         {
-          "command": "uv run ./skills/analyzing-data/scripts/cli.py stop"
+          "command": "./skills/analyzing-data/hooks/stop.sh"
         }
       ]
     }
