@@ -181,3 +181,62 @@ class TestInterruptGuards:
             patch("kernel.os.kill", side_effect=ProcessLookupError),
         ):
             km._interrupt()  # must not propagate
+
+
+class TestPerConfigDirKernel:
+    """ASTRO_AGENTS_CONFIG_DIR gives each config dir its own kernel."""
+
+    def _manager_for(self, monkeypatch, config_dir, venv_dir):
+        monkeypatch.setenv("ASTRO_AGENTS_CONFIG_DIR", str(config_dir))
+        return KernelManager(venv_dir=venv_dir)
+
+    def test_connection_and_pid_files_live_in_the_config_dir(
+        self, monkeypatch, tmp_path
+    ):
+        m = self._manager_for(monkeypatch, tmp_path / "a", tmp_path / "venv")
+        assert m.connection_file == tmp_path / "a" / "kernel.json"
+        assert m.pid_file == tmp_path / "a" / "kernel.pid"
+
+    def test_two_dirs_are_independent(self, monkeypatch, tmp_path):
+        venv = tmp_path / "venv"
+        a = self._manager_for(monkeypatch, tmp_path / "a", venv)
+        b = self._manager_for(monkeypatch, tmp_path / "b", venv)
+
+        assert a.connection_file != b.connection_file
+        assert a.pid_file != b.pid_file
+        # The venv stays shared.
+        assert a.venv_dir == b.venv_dir
+
+        # A "running" kernel in dir A is invisible to dir B...
+        a.connection_file.parent.mkdir(parents=True)
+        a.connection_file.write_text("{}")
+        a.pid_file.write_text("123")
+        assert not b.is_running
+        assert not b.execute("1").success
+
+        # ...and stopping B leaves A's kernel files alone.
+        b.stop()
+        assert a.connection_file.exists()
+        assert a.pid_file.exists()
+
+        a.stop()
+        assert not a.connection_file.exists()
+        assert not a.pid_file.exists()
+
+    def test_unset_keeps_default_location(self, monkeypatch):
+        from pathlib import Path
+
+        monkeypatch.delenv("ASTRO_AGENTS_CONFIG_DIR", raising=False)
+        with patch.object(Path, "exists", return_value=False):
+            m = KernelManager()
+        assert m.connection_file == Path.home() / ".astro" / "agents" / "kernel.json"
+        assert m.venv_dir == Path.home() / ".astro" / "agents" / "kernel_venv"
+
+    def test_override_does_not_move_the_venv(self, monkeypatch, tmp_path):
+        from pathlib import Path
+
+        monkeypatch.setenv("ASTRO_AGENTS_CONFIG_DIR", str(tmp_path))
+        with patch.object(Path, "exists", return_value=False):
+            m = KernelManager()
+        assert m.venv_dir == Path.home() / ".astro" / "agents" / "kernel_venv"
+        assert m.connection_file == tmp_path / "kernel.json"
