@@ -137,6 +137,36 @@ class TestDeleteCommand:
         assert "(global)" in result.output
 
 
+class TestNonRegularConfigPath:
+    @pytest.mark.parametrize(
+        ("argv", "command_name"),
+        [
+            (
+                ["add", "prod", "--url", "https://prod.example.com", "--token", "${T}"],
+                "af instance add",
+            ),
+            (["use", "prod"], "af instance use"),
+            (["delete", "prod"], "af instance delete"),
+            (["reset", "--force"], "af instance reset"),
+        ],
+    )
+    def test_mutating_commands_fail_before_silent_noop(
+        self, cli_env, monkeypatch, argv, command_name
+    ):
+        project, runner = cli_env
+        neutralized_config = project / "neutralized-config"
+        neutralized_config.mkdir()
+        monkeypatch.setenv("AF_CONFIG", str(neutralized_config))
+
+        result = runner.invoke(app, argv)
+
+        assert result.exit_code == 2
+        assert f"{command_name} cannot persist" in result.output
+        assert "AF_CONFIG points to a non-regular path" in result.output
+        assert str(neutralized_config) in result.output
+        assert list(neutralized_config.iterdir()) == []
+
+
 class TestShowCommand:
     def test_show_includes_scope_and_path(self, cli_env):
         project, runner = cli_env

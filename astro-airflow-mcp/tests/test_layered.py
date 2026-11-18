@@ -288,6 +288,18 @@ class TestLayeredWrites:
         with pytest.raises(ConfigError, match="no project root"):
             layered.assert_writable(Scope.PROJECT_SHARED)
 
+    def test_assert_writable_rejects_non_regular_af_config(self, tmp_path, monkeypatch):
+        """Explicit write commands should not silently disappear into AF_CONFIG=/dev/null."""
+        fake_home = tmp_path / "home"
+        fake_home.mkdir()
+        monkeypatch.setattr(Path, "home", lambda: fake_home)
+        neutralized_config = tmp_path / "neutralized-config"
+        neutralized_config.mkdir()
+        monkeypatch.setenv("AF_CONFIG", str(neutralized_config))
+
+        with pytest.raises(ConfigError, match="af instance add cannot persist"):
+            LayeredConfig().assert_writable(Scope.AUTO, command_name="af instance add")
+
     def test_add_explicit_project_outside_project_raises(self, tmp_path, monkeypatch):
         fake_home = tmp_path / "home"
         fake_home.mkdir()
