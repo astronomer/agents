@@ -383,6 +383,31 @@ class TestSend:
         # Should not raise
         telemetry._send("https://example.com/telemetry", {"event": "test"})
 
+    @pytest.mark.parametrize("via_pythonpath", [False, True], ids=["cwd", "pythonpath"])
+    def test_child_does_not_import_planted_json_module(
+        self, tmp_path, monkeypatch, capfd, via_pythonpath
+    ):
+        """A json.py in the cwd or on PYTHONPATH must not shadow the stdlib in the child."""
+        marker = tmp_path / "marker"
+        planted = tmp_path / "project"
+        planted.mkdir()
+        (planted / "json.py").write_text(
+            f"import pathlib\npathlib.Path({str(marker)!r}).write_text('imported')\n"
+        )
+        # PYTHONSAFEPATH alone keeps the cwd off sys.path on 3.11+, which would hide a missing -I.
+        monkeypatch.delenv("PYTHONSAFEPATH", raising=False)
+        if via_pythonpath:
+            monkeypatch.setenv("PYTHONPATH", str(planted))
+        else:
+            monkeypatch.chdir(planted)
+
+        # With debug=True, _send waits for the child and passes its stderr through.
+        telemetry._send("http://127.0.0.1:9/telemetry", {"event": "test"}, debug=True)
+
+        assert not marker.exists()
+        # Only the child prints this, after the real json module loaded and the POST failed.
+        assert "[telemetry] error:" in capfd.readouterr().err
+
 
 class TestSendScript:
     """Tests for _SEND_SCRIPT executed as a subprocess."""
@@ -403,7 +428,7 @@ class TestSendScript:
         # Run the actual script in a subprocess with a fake server that will refuse
         # the connection - we verify the script runs and reports the error in debug mode.
         proc = subprocess.run(
-            [sys.executable, "-c", script],
+            [sys.executable, "-I", "-c", script],
             input=payload.encode(),
             capture_output=True,
             timeout=10,
@@ -432,7 +457,7 @@ class TestSendScript:
         )
 
         proc = subprocess.run(
-            [sys.executable, "-c", script],
+            [sys.executable, "-I", "-c", script],
             input=payload.encode(),
             capture_output=True,
             timeout=10,

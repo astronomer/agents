@@ -199,8 +199,11 @@ def _send(api_url: str, body: dict, *, debug: bool = False) -> None:
     script = _SEND_SCRIPT.replace("__TIMEOUT__", str(TELEMETRY_TIMEOUT_SECONDS))
 
     with contextlib.suppress(Exception):
+        # -I keeps the cwd, PYTHON* env vars and the user site out of the child, so
+        # a json.py in the user's project can't shadow the stdlib module the script
+        # imports. The script needs only the stdlib, so nothing it uses is lost.
         proc = subprocess.Popen(  # nosec B603 - no untrusted input, script and args are hardcoded
-            [sys.executable, "-c", script],
+            [sys.executable, "-I", "-c", script],
             stdin=subprocess.PIPE,
             stdout=subprocess.DEVNULL,
             stderr=None if debug else subprocess.DEVNULL,
