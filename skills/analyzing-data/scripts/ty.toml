@@ -3,13 +3,13 @@
 #
 # These rules do not reach scripts that carry PEP 723 inline metadata. Since
 # ty 0.0.62 such a script is configured by its own metadata block instead, so
-# cli.py repeats the unresolved-import suppression in its header. Any new
+# cli.py repeats the import-not-found suppression in its header. Any new
 # inline-metadata script in this directory needs the same.
 
 [rules]
 # Ignore unresolved imports for third-party libraries
 # ty doesn't install dependencies, so these will always fail
-unresolved-import = "ignore"
+import-not-found = "ignore"
 
 # Ignore unresolved references in template files
 # These variables (_conn, pl, pd) are injected at runtime

@@ -93,4 +93,4 @@ jobs:
 
       - name: Run ty type checker
         working-directory: skills/analyzing-data/scripts
-        run: uvx ty check
+        run: uvx ty@0.0.102 check
