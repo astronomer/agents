@@ -7,7 +7,7 @@ description: Initialize warehouse schema discovery. Generates .astro/warehouse.m
 
 Generate a comprehensive, user-editable schema reference file for the data warehouse.
 
-**Scripts:** `../analyzing-data/scripts/` — All CLI commands below are relative to the `analyzing-data` skill's directory. Before running any `scripts/cli.py` command, `cd` to `../analyzing-data/` relative to this file.
+**All CLI commands below are relative to this skill's directory.** Before running any `scripts/cli.py` command, `cd` to the directory containing this file.
 
 ## What This Does
 
@@ -65,7 +65,6 @@ For each database in configured_databases:
         Discover all metadata for database {DATABASE}.
 
         Use the CLI to run SQL queries:
-        # Scripts are relative to ../analyzing-data/
         uv run scripts/cli.py exec "df = run_sql('...')"
         uv run scripts/cli.py exec "print(df)"
 
@@ -98,7 +97,7 @@ For each database in configured_databases:
 For key categorical columns (like OPERATOR, STATUS, TYPE, FEATURE), discover value families:
 
 ```bash
-uv run cli.py exec "df = run_sql('''
+uv run scripts/cli.py exec "df = run_sql('''
 SELECT DISTINCT column_name, COUNT(*) as occurrences
 FROM table
 WHERE column_name IS NOT NULL
@@ -106,7 +105,7 @@ GROUP BY column_name
 ORDER BY occurrences DESC
 LIMIT 50
 ''')"
-uv run cli.py exec "print(df)"
+uv run scripts/cli.py exec "print(df)"
 ```
 
 Group related values into families by common prefix/suffix (e.g., `Export*` for ExportCSV, ExportJSON, ExportParquet).
@@ -198,9 +197,8 @@ Query downstream first: `reporting` > `mart_*` > `metric_*` > `model_*` > `IN_*`
 After generating warehouse.md, populate the concept cache:
 
 ```bash
-# Scripts are relative to ../analyzing-data/
-uv run cli.py concept import -p .astro/warehouse.md
-uv run cli.py concept learn customers HQ.MART_CUST.CURRENT_ASTRO_CUSTS -k ACCT_ID
+uv run scripts/cli.py concept import -p .astro/warehouse.md
+uv run scripts/cli.py concept learn customers HQ.MART_CUST.CURRENT_ASTRO_CUSTS -k ACCT_ID
 ```
 
 ### Step 8: Offer CLAUDE.md Integration (Ask User)
@@ -291,7 +289,6 @@ Watch for these indicators:
 If you suspect cache issues:
 
 ```bash
-# Scripts are relative to ../analyzing-data/
 uv run scripts/cli.py cache status
 uv run scripts/cli.py cache clear --stale-only
 uv run scripts/cli.py cache clear
