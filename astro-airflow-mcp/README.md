@@ -230,6 +230,11 @@ The allowlist limits which tools a client can call. It does not restrict the arg
 | `diagnose_dag_run` | Debug a DAG run: run details, complete task-state counts and failed task instances |
 | `get_system_health` | System overview: health status, import errors, warnings, DAG stats |
 
+`get_system_health` and `af health` report `unknown` when any required check fails
+or returns incomplete data, including partial per-DAG statistics. Known import
+errors still report `unhealthy`, with incomplete checks noted in `status_reason`.
+An instance is considered empty only after successful, complete DAG discovery.
+
 `diagnose_dag_run` and `af runs diagnose` paginate through task instances before
 building their summaries. `summary.total_tasks`, `summary.state_counts`, and
 `summary.failed_tasks` cover the complete listing; failed instances include
