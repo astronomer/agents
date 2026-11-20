@@ -22,7 +22,7 @@ This skill helps migrate **Airflow 2.x DAG code** to **Airflow 3.x**, focusing o
 2. Scan for remaining issues using the manual search checklist in [reference/migration-checklist.md](reference/migration-checklist.md).
    - Focus on: direct metadata DB access, legacy imports, scheduling/context keys, XCom pickling, datasets-to-assets, REST API/auth, plugins, and file paths.
    - Hard behavior/config gotchas to explicitly review:
-     - Cron scheduling semantics: consider `AIRFLOW__SCHEDULER__CREATE_CRON_DATA_INTERVAL=True` if you need Airflow 2-style cron data intervals.
+     - Cron scheduling semantics: consider `AIRFLOW__SCHEDULER__CREATE_CRON_DATA_INTERVALS=True` if you need Airflow 2-style cron data intervals.
      - `.airflowignore` syntax changed from regexp to glob; set `AIRFLOW__CORE__DAG_IGNORE_FILE_SYNTAX=regexp` if you must keep regexp behavior.
      - OAuth callback URLs add an `/auth/` prefix (e.g. `/auth/oauth-authorized/google`).
      - **Shared utility imports**: Bare imports like `import common` from `dags/common/` no longer work on Astro. Use fully qualified imports: `import dags.common`.
@@ -169,7 +169,7 @@ For detailed code examples and migration patterns, see:
 
 **Cannot trigger with future `logical_date`**: Use `logical_date=None` and rely on `run_id` instead.
 
-Cron note: for scheduled runs using cron, `logical_date` semantics differ under `CronTriggerTimetable` (aligning `logical_date` with `run_after`). If you need Airflow 2-style cron data intervals, consider `AIRFLOW__SCHEDULER__CREATE_CRON_DATA_INTERVAL=True`.
+Cron note: for scheduled runs using cron, `logical_date` semantics differ under `CronTriggerTimetable` (aligning `logical_date` with `run_after`). If you need Airflow 2-style cron data intervals, consider `AIRFLOW__SCHEDULER__CREATE_CRON_DATA_INTERVALS=True`.
 
 ### Default Behavior Changes
 
