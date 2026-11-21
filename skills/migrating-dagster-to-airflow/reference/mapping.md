@@ -206,8 +206,23 @@ Target Astro Runtime 3.3+ to get the full surface. Pre-3.2 fallback is logical-d
 
 | Dagster | Airflow 3 / Astro target | Class | Notes |
 |---|---|---|---|
-| `dagster dev` | `astro dev start` | MECH | Different feel; set expectations |
-| `dagster definitions validate` | `astro dev parse` (DagBag import check) | MECH | First rung of the validation ladder |
-| `materialize()` in unit tests | `dag.test()` (in-file) / `astro dev pytest` | JUDG | See `validation.md` |
+| `dagster dev` | `astro local start` | MECH | Different feel; set expectations |
+| `dagster definitions validate` | `astro local check` (DagBag import check) | MECH | First rung of the validation ladder |
+| `materialize()` in unit tests | `dag.test()` (in-file) / `uv run pytest` (once: `uv add --dev pytest`) | JUDG | See `validation.md` |
 | `build_asset_context()` etc. | Plain function tests of task callables | JUDG | |
-| `dagster asset materialize` CLI | `astro run <dag-id>` (single DAG, one worker container) | MECH | |
+| `dagster asset materialize` CLI | `astro local run airflow dags test <dag-id>` (runs it in the project environment) | MECH | |
+
+The commands in this table, with their `# v1:` forms:
+
+```bash
+astro local start
+# v1: astro dev start
+astro local check
+# v1: astro dev parse
+uv run pytest
+# v1: astro dev pytest
+astro local run airflow dags test <dag-id>
+# v1: astro run <dag-id>
+```
+
+**v1:** `astro run` runs a single DAG in one worker container; v2 has no `astro run`.

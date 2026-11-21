@@ -106,6 +106,21 @@ Skills rot when they embed content that changes every upstream release (operator
 
 A single canonical example per capability is useful context — it anchors the agent on the correct shape (`@dag` decorator, import path, XCom wiring) that is stable across releases. Pair it with an explicit "verify params via `af registry` before writing code" instruction so stale param names in the example get corrected against live truth. See `skills/airflow-hitl/SKILL.md` for the current reference implementation of this pattern.
 
+### Astro CLI v1 and v2 Commands
+
+Skills are read on Astro CLI v1 (with the standalone `af`) and v2 alike, so every skill that runs Astro CLI or `af` commands follows one pattern. Copy it from an existing skill such as `skills/airflow/SKILL.md`:
+
+1. `SKILL.md` carries the "Astro CLI version" block (between the `astro-cli-version:start` and `:end` comments) before its first `##` section. Copy it verbatim. Every copy is identical, here and in astronomer/hosted-skills, so a change to it goes into all of them (`grep -rl astro-cli-version:start skills`).
+2. Commands are written in their v2 form, in fenced code blocks.
+3. A v1 form that the block's rewrite rule doesn't give goes on a `# v1:` line directly under the v2 command, or `# v1: none` when v1 has no equivalent:
+
+   ```bash
+   astro local check
+   # v1: astro dev parse
+   ```
+
+4. A difference that isn't a command goes on its own line starting `**v1:**`.
+
 ### Working on the MCP Server
 
 The Airflow MCP server is in `astro-airflow-mcp/`. See its [README](./astro-airflow-mcp/README.md) for specific development instructions.
