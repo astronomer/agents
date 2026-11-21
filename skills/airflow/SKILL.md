@@ -1,6 +1,6 @@
 ---
 name: airflow
-description: Queries, manages, and troubleshoots Apache Airflow using the `af` CLI. Use when working with anything related to Airflow - a DAG, a DAG run, a task log, an import or parse error, a broken DAG, or any Airflow operation. Covers listing and triggering DAGs, retrying runs, reading task logs, diagnosing failures, debugging import and parse errors, checking connections, variables and pools, exploring the REST API, and monitoring health (for example "trigger a pipeline", "retry a run", "list connections", "check Airflow health", "why did my DAG fail"). This is the entrypoint that routes to sibling skills for authoring, testing, deploying, and migrating Airflow 2 to 3. Not for warehouse/SQL analytics on Airflow metadata tables (use analyzing-data); for deep root-cause reports use debugging-dags or airflow-investigation.
+description: Queries, manages, and troubleshoots Apache Airflow using the `af` CLI, or the Astro MCP for read-only work on Astro deployments when it's connected. Use when working with anything related to Airflow - a DAG, a DAG run, a task log, an import or parse error, a broken DAG, or any Airflow operation. Covers listing and triggering DAGs, retrying runs, reading task logs, diagnosing failures, debugging import and parse errors, checking connections, variables and pools, exploring the REST API, and monitoring health (for example "trigger a pipeline", "retry a run", "list connections", "check Airflow health", "why did my DAG fail"). This is the entrypoint that routes to sibling skills for authoring, testing, deploying, and migrating Airflow 2 to 3. Not for warehouse/SQL analytics on Airflow metadata tables (use analyzing-data); for deep root-cause reports use debugging-dags or airflow-investigation.
 ---
 
 # Airflow Operations
@@ -40,6 +40,28 @@ For more details:
 
 These commands assume `af` is on PATH. Run via `astro otto` to get it automatically, or install standalone with `uv tool install astro-airflow-mcp`.
 
+## Astro MCP
+
+If tools from the Astro MCP are available in this session (for example `list_deployments` and `get_airflow_api`; the prefix depends on the client), use them for read-only work on **Astro deployments**. Use `af` for local or open-source Airflow, for anything that changes state, and whenever the Astro MCP isn't connected.
+
+| Task | Astro MCP tool |
+|------|----------------|
+| Find the deployment | `list_workspaces`, `list_deployments` |
+| List or inspect DAGs | `list_dags`, `get_dag` |
+| List runs, find failures | `list_dag_runs` (filter by `state`, date range) |
+| Read task logs | `get_task_logs` |
+| Anything else in the Airflow REST API (task instances, XComs, event logs, import errors, pools...) | `search_airflow_api` to find the path, then `get_airflow_api` |
+| Connections and Airflow variables managed in Astro | `list_environment_objects` |
+
+`get_airflow_api` can't read connections, variables or config, and `list_environment_objects` only returns objects managed in Astro's Environment Manager. For connections and variables stored in Airflow itself, use `af config connections` and `af config variables`.
+
+The Astro MCP can't change anything. Triggering, clearing or deleting runs, pausing or unpausing DAGs, and `af api` calls with `-X POST/PATCH/DELETE` still need `af`, pointed at the deployment:
+
+1. Run `af instance list` and look for an instance whose URL matches the deployment. If one exists, `af instance use <name>`.
+2. Otherwise run `af instance discover astro` as described in **Instance Configuration** below (dry run first, then with the user's consent), then `af instance use <name>`. Run `astro login` first if needed.
+
+The Astro MCP's `list_skills` tool returns Astronomer guides for Astro-specific tasks, such as upgrading Airflow on a deployment. Check it when no skill here covers the task.
+
 ## Instance Configuration
 
 Manage multiple Airflow instances with persistent configuration:
@@ -64,8 +86,13 @@ af instance discover local            # Scan common local Airflow ports
 af instance discover local --scan     # Deep scan all ports 1024-65535
 
 # IMPORTANT: Always run with --dry-run first and ask for user consent before
-# running discover without it. The non-dry-run mode creates API tokens in
-# Astro Cloud, which is a sensitive action that requires explicit approval.
+# running discover without it. The non-dry-run mode writes the discovered
+# instances to config (the project's committed .astro/config.yaml when inside
+# a project; pass --local for the gitignored .astro/config.local.yaml).
+# From astro-airflow-mcp 0.7.0, Astro instances authenticate with the user's
+# `astro login` session and no API tokens are created. Older versions create
+# an API token per deployment in Astro, so check `af --version` and tell the
+# user if it's below 0.7.0 before asking for consent.
 
 # Show where an instance came from (file path + scope)
 af instance show prod

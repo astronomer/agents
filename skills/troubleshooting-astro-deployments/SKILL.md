@@ -1,6 +1,6 @@
 ---
 name: troubleshooting-astro-deployments
-description: Troubleshoot Astronomer production deployments with Astro CLI. Use when investigating deployment issues, viewing production logs, analyzing failures, or managing deployment environment variables.
+description: Troubleshoot Astronomer production deployments with the Astro MCP (when connected) or the Astro CLI. Use when investigating deployment issues, viewing production logs, analyzing failures, or managing deployment environment variables.
 ---
 
 # Astro Deployment Troubleshooting
@@ -9,6 +9,28 @@ This skill helps you diagnose and troubleshoot production Astronomer deployments
 
 > **For deployment management**, see the **managing-astro-deployments** skill.
 > **For local development**, see the **managing-astro-local-env** skill.
+
+---
+
+## Astro MCP
+
+If tools from the Astro MCP are available in this session (for example `list_deployments` and `get_deployment_logs`; the prefix depends on the client), use them for the read-only steps in this skill. Otherwise use the `astro` commands below.
+
+| Astro CLI | Astro MCP tool |
+|-----------|----------------|
+| `astro deployment list` | `list_deployments` |
+| `astro deployment inspect` | `get_deployment` |
+| `astro deployment logs --scheduler/--workers/--triggerer/--webserver` | `get_deployment_logs` with `sources`, one or more of `scheduler`, `worker`, `triggerer`, `dag-processor` (parse errors), `webserver` (Airflow 2 only) or `apiserver` (Airflow 3 only) |
+| `astro deployment logs --keyword "..."` | `get_deployment_logs` with `searchText` |
+| `astro deployment logs --error/--warn/--info` | No equivalent. Pass `searchText` (for example `ERROR`), or use the CLI when you need every line at a log level |
+| Check for a recent deploy | `list_deploys` (image tag, Runtime version, git metadata, who deployed) |
+
+Notes:
+- `get_deployment_logs` searches a window of at most 24 hours (`range` in seconds, or `startDate` and `endDate`). It has no log-level filter, so search for `ERROR`, `Traceback` or the error text with `searchText`.
+- The Astro MCP signs in separately from the `astro` CLI, so the two can be in different organizations or workspaces. Before combining MCP results with an `astro` command on the same deployment, run `astro deployment inspect <deployment-id>` with the ID the MCP showed and check that the name matches. If it isn't found, ask the user which organization or workspace to use; see the **managing-astro-deployments** skill.
+- For DAG runs and task logs on the deployment, use `list_dag_runs` and `get_task_logs` (see the **airflow** and **debugging-dags** skills).
+- For a deployment's environment variables, keep using `astro deployment variable list`. `list_environment_objects` doesn't replace it: it returns objects from Astro's Environment Manager, which are stored separately from the environment variables set on the deployment. Use it as an extra source when a connection or variable could come from the Environment Manager.
+- The Astro MCP is read-only. Creating, updating or deleting environment variables still needs the `astro` CLI.
 
 ---
 

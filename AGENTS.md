@@ -68,7 +68,7 @@ description: When to use this skill (Claude uses this to decide when to invoke i
 Plugin configuration is split across two files:
 
 - **hooks**: Inlined in `.claude-plugin/plugin.json`, scripts co-located in `skills/<name>/hooks/`
-- **mcpServers**: Inlined in `.claude-plugin/plugin.json`
+- **MCP servers**: Not bundled. The Airflow MCP and Astro MCP are optional installs documented in `README.md`; don't add an `mcpServers` block to `plugin.json`
 - **skills**: Auto-discovered from `skills/` directory
 - **marketplace metadata**: Defined in `.claude-plugin/marketplace.json` (`strict: false`)
 
@@ -78,7 +78,7 @@ Use `${CLAUDE_PLUGIN_ROOT}` to reference files within the plugin (required becau
 
 ## Key Files
 
-- `.claude-plugin/plugin.json` - Plugin manifest with hooks and mcpServers
+- `.claude-plugin/plugin.json` - Plugin manifest with hooks
 - `.claude-plugin/marketplace.json` - Marketplace catalog (metadata only, `strict: false`)
 - `skills/*/SKILL.md` - Individual skills (auto-discovered)
 - `skills/*/hooks/*.sh` - Hook scripts (co-located with skills, referenced via relative paths from SKILL.md or `${CLAUDE_PLUGIN_ROOT}/skills/<name>/hooks/...` from plugin.json)
