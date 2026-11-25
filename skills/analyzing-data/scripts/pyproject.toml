@@ -10,6 +10,7 @@ classifiers = [
 [project.optional-dependencies]
 test = [
     "pytest",
+    "click>=8.0.0",
     "sqlalchemy",
     "polars",
     "pandas",

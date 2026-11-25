@@ -91,7 +91,20 @@ def start(warehouse: str | None):
     km = KernelManager()
 
     if km.is_running:
-        click.echo("Kernel already running")
+        bound = km.bound_warehouse
+        if warehouse and bound and warehouse != bound:
+            click.echo(
+                f"Error: kernel is already connected to warehouse '{bound}', "
+                f"not '{warehouse}'.",
+                err=True,
+            )
+            click.echo(
+                f"Switch with: uv run scripts/cli.py restart -w {warehouse}  "
+                f"(this discards the kernel's current variables)",
+                err=True,
+            )
+            sys.exit(1)
+        click.echo(f"Kernel already running (warehouse: {bound or 'unknown'})")
         return
 
     try:
@@ -117,6 +130,7 @@ def start(warehouse: str | None):
     extra_packages = wh_config.get_required_packages()
 
     km.start(env_vars=env_vars, extra_packages=extra_packages)
+    km.record_warehouse(wh_name)
 
     result = km.execute(wh_config.to_python_prelude(), timeout=60.0)
     if not result.success:
@@ -148,6 +162,7 @@ def execute(code: str, timeout: float):
             env_vars = wh_config.get_env_vars_for_kernel()
             extra_packages = wh_config.get_required_packages()
             km.start(env_vars=env_vars, extra_packages=extra_packages)
+            km.record_warehouse(wh_name)
             result = km.execute(wh_config.to_python_prelude(), timeout=60.0)
             if result.output:
                 click.echo(result.output, err=True)
@@ -174,18 +189,24 @@ def stop():
 
 
 @main.command()
-def restart():
+@click.option("--warehouse", "-w", help="Warehouse name from config")
+def restart(warehouse: str | None):
     """Restart the kernel (stop + start)."""
     km = KernelManager()
     km.stop()
 
     try:
         config = WarehouseConfig.load()
-        wh_name, wh_config = config.get_default()
+        wh_name, wh_config = (
+            (warehouse, config.connectors[warehouse])
+            if warehouse
+            else config.get_default()
+        )
         click.echo(f"Restarting kernel with: {wh_name}")
         env_vars = wh_config.get_env_vars_for_kernel()
         extra_packages = wh_config.get_required_packages()
         km.start(env_vars=env_vars, extra_packages=extra_packages)
+        km.record_warehouse(wh_name)
         result = km.execute(wh_config.to_python_prelude(), timeout=60.0)
         if result.output:
             click.echo(result.output)
@@ -206,8 +227,10 @@ def status(as_json: bool):
         click.echo(json.dumps(info, indent=2))
     else:
         if info["running"]:
+            state = "running" if info["responsive"] else "running (unresponsive)"
+            warehouse = info.get("warehouse")
             click.echo(
-                f"Kernel: {'running' if info['responsive'] else 'running (unresponsive)'}"
+                f"Kernel: {state}" + (f" (warehouse: {warehouse})" if warehouse else "")
             )
         else:
             click.echo("Kernel: not running")
@@ -244,6 +267,7 @@ def ensure():
         env_vars = wh_config.get_env_vars_for_kernel()
         extra_packages = wh_config.get_required_packages()
         km.start(env_vars=env_vars, extra_packages=extra_packages)
+        km.record_warehouse(wh_name)
         result = km.execute(wh_config.to_python_prelude(), timeout=60.0)
         if result.output:
             click.echo(result.output, err=True)
