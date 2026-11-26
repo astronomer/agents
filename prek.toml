@@ -22,3 +22,9 @@ rev = "v2.2.0"
 hooks = [
   { id = "doctoc", files = "^README\\.md$", args = ["--maxlevel", "3"], exclude = "(skills/|/commands/.*\\.md)$" },
 ]
+
+[[repos]]
+repo = "local"
+hooks = [
+  { id = "warehouse-init-scripts-in-sync", name = "warehouse-init scripts match analyzing-data", language = "system", pass_filenames = false, files = "^skills/(analyzing-data|warehouse-init)/scripts/", entry = '''sh -c 'for f in skills/warehouse-init/scripts/*.py; do cmp -s "$f" "skills/analyzing-data/scripts/${f##*/}" || { echo "$f differs from skills/analyzing-data/scripts; copy it over"; exit 1; }; done' ''' },
+]
